@@ -1532,10 +1532,7 @@ function switchTab(tabId) {
   }
 
   // Fecha menu mobile se aberto
-  const sidebar = document.getElementById('sidebar');
-  if (window.innerWidth < 768 && sidebar) {
-    sidebar.classList.add('-translate-x-full');
-  }
+  toggleSidebarMobile(false);
 
   // Executa carregamento sob demanda
   if (tabId === 'dashboard') {
@@ -1571,13 +1568,32 @@ function switchTab(tabId) {
   updateUserRoleUI();
 }
 
+function toggleSidebarMobile(forceState) {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+
+  const isClosed = sidebar.classList.contains('-translate-x-full');
+  const shouldOpen = forceState !== undefined ? forceState : isClosed;
+
+  if (shouldOpen) {
+    sidebar.classList.remove('-translate-x-full');
+    if (backdrop) backdrop.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+  } else {
+    sidebar.classList.add('-translate-x-full');
+    if (backdrop) backdrop.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  }
+}
+
 function initMobileMenu() {
   const btn = document.getElementById('mobileMenuBtn');
-  const sidebar = document.getElementById('sidebar');
-  if (btn && sidebar) {
-    btn.addEventListener('click', () => {
-      sidebar.classList.toggle('-translate-x-full');
-    });
+  if (btn) {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      toggleSidebarMobile();
+    };
   }
 }
 

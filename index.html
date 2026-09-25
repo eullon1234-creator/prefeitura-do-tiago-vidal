@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Prefeitura de Canteiro | Controle de Alojamentos</title>
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -63,11 +63,20 @@
   </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
+    html, body {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      max-width: 100vw;
+      -webkit-tap-highlight-color: transparent;
+    }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .overscroll-contain {
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
@@ -75,34 +84,34 @@
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased overflow-x-hidden w-full">
 
   <!-- Top Navbar -->
-  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md no-print">
-    <div class="px-4 py-2.5 flex items-center justify-between gap-4">
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md no-print w-full">
+    <div class="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2 max-w-full">
       <!-- Left: Brand & Mobile Toggle -->
-      <div class="flex items-center gap-3">
-        <button id="mobileMenuBtn" class="md:hidden text-slate-300 hover:text-white p-1 rounded hover:bg-slate-800">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <button id="mobileMenuBtn" onclick="toggleSidebarMobile()" class="md:hidden text-slate-300 hover:text-white p-1.5 -ml-1 rounded-lg hover:bg-slate-800 flex-shrink-0" aria-label="Abrir Menu">
           <i class="fa-solid fa-bars text-lg"></i>
         </button>
-        <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('dashboard')">
-          <div class="h-10 px-2 py-1 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-700/50 flex-shrink-0">
-            <img src="logo_gel_cropped.png" alt="GEL - Goetze Lobato Engenharia" class="h-8 w-auto object-contain">
+        <div class="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" onclick="switchTab('dashboard')">
+          <div class="h-9 sm:h-10 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_cropped.png" alt="GEL" class="h-7 sm:h-8 w-auto object-contain">
           </div>
-          <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="font-bold tracking-tight text-sm sm:text-base text-white">PREFEITURA DE CANTEIRO</span>
-              <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5 flex-nowrap">
+              <span class="font-extrabold tracking-tight text-xs sm:text-base text-white truncate">PREFEITURA</span>
+              <span class="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex-shrink-0">Taboca 2</span>
             </div>
-            <p class="text-[11px] sm:text-xs text-slate-400 leading-none mt-0.5">GEL • Goetze Lobato Engenharia S.A.</p>
+            <p class="hidden sm:block text-[11px] sm:text-xs text-slate-400 truncate leading-none mt-0.5">GEL • Goetze Lobato Engenharia S.A.</p>
           </div>
         </div>
       </div>
 
       <!-- Right: User info, mode switch & fast actions -->
-      <div class="flex items-center gap-2.5">
-        <!-- Firebase Status Badge -->
-        <button onclick="switchTab('configuracoes')" title="Firebase Firestore: Conectado ao projeto prefeitura-cc71b. Clique para gerenciar sincronização." class="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-xs transition">
+      <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <!-- Firebase Status Badge (Telas Grandes) -->
+        <button onclick="switchTab('configuracoes')" title="Firebase Firestore Conectado" class="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-xs transition">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="firebaseDot"></span>
           <span class="text-slate-300 font-medium flex items-center gap-1">
             <i class="fa-solid fa-fire text-amber-500 text-xs"></i> 
@@ -110,9 +119,9 @@
           </span>
         </button>
 
-        <!-- Controle de Tamanho da Letra (Configurações de Tipografia) -->
-        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="Ajustar tamanho da letra do sistema">
-          <span class="text-[10px] text-slate-400 px-1 font-semibold hidden sm:inline"><i class="fa-solid fa-font mr-0.5"></i></span>
+        <!-- Controle de Tipografia (Telas Médias e Grandes) -->
+        <div class="hidden lg:flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="Ajustar tamanho da letra do sistema">
+          <span class="text-[10px] text-slate-400 px-1 font-semibold"><i class="fa-solid fa-font mr-0.5"></i></span>
           <button onclick="alterarTamanhoFonte('sm')" id="btnFontNav_sm" class="px-1.5 py-0.5 text-[11px] font-bold rounded text-slate-400 hover:text-white transition" title="Letra Pequena (13.5px)">A-</button>
           <button onclick="alterarTamanhoFonte('md')" id="btnFontNav_md" class="px-1.5 py-0.5 text-xs font-bold rounded bg-amber-500 text-slate-950 transition" title="Letra Normal / Padrão (15px)">A</button>
           <button onclick="alterarTamanhoFonte('lg')" id="btnFontNav_lg" class="px-1.5 py-0.5 text-sm font-bold rounded text-slate-400 hover:text-white transition" title="Letra Grande (17px)">A+</button>
@@ -120,36 +129,37 @@
         </div>
 
         <!-- Botão Instalar App (PWA) no Celular e PC -->
-        <button id="btnInstalarAppHeader" onclick="iniciarInstalacaoApp()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer" title="Instalar aplicativo no celular ou computador">
-          <i class="fa-solid fa-download text-sm"></i>
+        <button id="btnInstalarAppHeader" onclick="iniciarInstalacaoApp()" class="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Instalar aplicativo no celular ou computador">
+          <i class="fa-solid fa-download text-xs"></i>
           <span class="hidden sm:inline">Baixar App</span>
-          <span class="sm:hidden">App</span>
+          <span class="sm:hidden text-[11px]">App</span>
         </button>
 
-        <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original -->
-        <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition" title="Exportar Planilha Oficial no formato original exato">
+        <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original (Desktop) -->
+        <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition flex-shrink-0" title="Exportar Planilha Oficial no formato original exato">
           <i class="fa-solid fa-file-excel"></i> Planilha Oficial
         </button>
 
         <!-- Maintenance Alert Indicator -->
-        <button onclick="goToAlertas()" title="Ver itens em manutenção" class="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
-          <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+        <button onclick="goToAlertas()" title="Ver itens em manutenção" class="relative p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex-shrink-0">
+          <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm"></i>
           <span id="badgeAlertasNav" class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full hidden">0</span>
         </button>
 
-        <!-- Profile / Role badge -->
-        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1">
-          <div class="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5" id="userBadge">
+        <!-- Profile / Role badge (Responsivo: Compacto no celular, Completo no desktop) -->
+        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5 sm:p-1 flex-shrink-0">
+          <div class="px-1.5 sm:px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5" id="userBadge">
             <i class="fa-solid fa-shield-halved text-amber-400" id="userRoleIcon"></i>
-            <span id="userRoleText" class="text-amber-300 font-medium">PREFEITO</span>
+            <span id="userRoleText" class="text-amber-300 font-medium hidden sm:inline">PREFEITO</span>
           </div>
-          <button onclick="toggleUserMode()" class="px-2 py-1 text-[11px] rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition" title="Alternar entre modo Prefeito (Admin) e Consulta">
-            <i class="fa-solid fa-repeat text-slate-400 mr-1"></i>Alternar
+          <button onclick="toggleUserMode()" class="px-1.5 sm:px-2 py-1 text-[11px] rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition flex items-center gap-1" title="Alternar entre modo Prefeito (Admin) e Consulta">
+            <i class="fa-solid fa-repeat text-slate-400 text-[10px]"></i>
+            <span class="hidden md:inline">Alternar</span>
           </button>
         </div>
 
         <!-- Refresh Button -->
-        <button onclick="refreshAllData()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Atualizar Dados">
+        <button onclick="refreshAllData()" class="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex-shrink-0" title="Atualizar Dados">
           <i class="fa-solid fa-arrows-rotate text-sm" id="refreshIcon"></i>
         </button>
       </div>
@@ -157,11 +167,32 @@
   </header>
 
   <!-- Main Container -->
-  <div class="flex-1 flex overflow-hidden">
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Backdrop Overlay para Fechar Sidebar no Celular ao Clicar Fora -->
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 hidden md:hidden transition-opacity duration-300 no-print" onclick="toggleSidebarMobile(false)"></div>
 
     <!-- Sidebar Navigation -->
-    <aside id="sidebar" class="w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between transition-all duration-300 z-20 md:static fixed inset-y-0 left-0 -translate-x-full md:translate-x-0 no-print">
-      <div class="p-3 space-y-1">
+    <aside id="sidebar" class="w-72 sm:w-80 md:w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between transition-transform duration-300 ease-in-out z-50 md:z-20 fixed md:static inset-y-0 left-0 -translate-x-full md:translate-x-0 shadow-2xl md:shadow-none h-full no-print">
+      
+      <!-- Topo da Sidebar no Mobile (com Logo Oficial & Botão Fechar X) -->
+      <div class="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/90 flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="h-9 px-2 py-0.5 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_cropped.png" alt="GEL Logo" class="h-7 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-extrabold text-white text-sm leading-tight">Prefeitura de Canteiro</h4>
+            <p class="text-[10px] text-slate-400">GEL • Goetze Lobato Eng. S.A.</p>
+          </div>
+        </div>
+        <button onclick="toggleSidebarMobile(false)" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" aria-label="Fechar menu lateral">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Links de Navegação com Scroll Livre e Suave -->
+      <div class="p-3 space-y-1 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
         <div class="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
           Módulos Principais
         </div>
@@ -217,10 +248,21 @@
           <i class="fa-solid fa-sliders w-5 text-indigo-400"></i>
           <span>Configurações & Firebase</span>
         </button>
+
+        <!-- Atalho Rápido de Instalar App também dentro da Sidebar -->
+        <div class="pt-3 pb-4">
+          <button onclick="toggleSidebarMobile(false); iniciarInstalacaoApp();" class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-xs shadow-md transition transform active:scale-98">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-mobile-screen-button text-sm"></i>
+              <span>Instalar Aplicativo Oficial</span>
+            </span>
+            <i class="fa-solid fa-download text-xs"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Sidebar Footer -->
-      <div class="p-3 border-t border-slate-800 bg-slate-950/60">
+      <div class="p-3 border-t border-slate-800 bg-slate-950/60 flex-shrink-0">
         <div class="flex items-center gap-2 mb-2 p-1.5 rounded-lg bg-slate-900 border border-slate-800">
           <div class="h-6 px-1.5 py-0.5 rounded bg-white flex items-center justify-center flex-shrink-0 shadow-xs">
             <img src="logo_gel_cropped.png" alt="GEL" class="h-4 w-auto object-contain">
@@ -1434,16 +1476,16 @@
   </div>
 
   <!-- Modal Novo / Editar Alojado -->
-  <div id="modalAlojadoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalAlojadoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalAlojadoTitulo" class="text-base font-bold">Cadastrar Novo Alojado</h3>
-        <button onclick="fecharModal('modalAlojadoForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalAlojadoForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formAlojado" onsubmit="salvarAlojado(event)" class="p-6 space-y-4">
+      <form id="formAlojado" onsubmit="salvarAlojado(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
         <input type="hidden" id="alojadoFormId">
 
         <!-- Seleção de Vaga (Somente se for novo ou reatribuindo) -->
@@ -1533,16 +1575,16 @@
   </div>
 
   <!-- Modal Realocar Alojado -->
-  <div id="modalRealocar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalRealocar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 class="text-base font-bold">Realocar Alojado de Vaga</h3>
-        <button onclick="fecharModal('modalRealocar')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalRealocar')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formRealocar" onsubmit="confirmarRealocacao(event)" class="p-6 space-y-4">
+      <form id="formRealocar" onsubmit="confirmarRealocacao(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="realocarAlojadoId">
         
         <div class="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
@@ -1616,16 +1658,16 @@
   </div>
 
   <!-- Modal Novo / Editar Móvel -->
-  <div id="modalMovelForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalMovelForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalMovelTitulo" class="text-base font-bold">Cadastrar Item / Móvel</h3>
-        <button onclick="fecharModal('modalMovelForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalMovelForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formMovel" onsubmit="salvarMovel(event)" class="p-6 space-y-4">
+      <form id="formMovel" onsubmit="salvarMovel(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="movelFormId">
         
         <!-- Seleção de Quarto (se não foi aberto dentro do modal do quarto) -->
@@ -1701,16 +1743,16 @@
   </div>
 
   <!-- Modal Novo / Editar Bloco -->
-  <div id="modalBlocoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalBlocoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalBlocoTitulo" class="text-base font-bold">Cadastrar Novo Bloco</h3>
-        <button onclick="fecharModal('modalBlocoForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalBlocoForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formBloco" onsubmit="salvarBloco(event)" class="p-6 space-y-4">
+      <form id="formBloco" onsubmit="salvarBloco(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="blocoFormId">
         
         <div>
@@ -1740,16 +1782,16 @@
   </div>
 
   <!-- Modal Novo Quarto -->
-  <div id="modalQuartoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalQuartoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 class="text-base font-bold">Adicionar Novo Quarto</h3>
-        <button onclick="fecharModal('modalQuartoForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalQuartoForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formQuarto" onsubmit="salvarQuarto(event)" class="p-6 space-y-4">
+      <form id="formQuarto" onsubmit="salvarQuarto(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <div>
           <label class="block text-xs font-semibold text-slate-700">Bloco de Destino *</label>
           <select id="quartoFormBlocoId" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -1787,16 +1829,16 @@
   </div>
 
   <!-- Modal Nova Empresa -->
-  <div id="modalEmpresaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalEmpresaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalEmpresaTitulo" class="text-base font-bold">Cadastrar Empresa / Contratada</h3>
-        <button onclick="fecharModal('modalEmpresaForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalEmpresaForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formEmpresa" onsubmit="salvarEmpresa(event)" class="p-6 space-y-4">
+      <form id="formEmpresa" onsubmit="salvarEmpresa(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="empresaFormId">
         
         <div>
