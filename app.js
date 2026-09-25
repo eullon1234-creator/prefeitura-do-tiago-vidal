@@ -111,6 +111,30 @@ const StaticApiEngine = {
                 });
               });
 
+              // Migração: Garantir que todos os quartos possuam 'Fechadura' cadastrada em seus móveis
+              let fechadurasAdicionadas = 0;
+              const hojeData = new Date().toISOString().split('T')[0];
+              (this.dbState.quartos || []).forEach(q => {
+                if (!q.moveis) q.moveis = [];
+                const temFechadura = q.moveis.some(m => m.tipo_item === 'Fechadura' || m.tipo_item === 'Trinco / Fechadura');
+                if (!temFechadura) {
+                  q.moveis.push({
+                    id: (q.id * 100) + 13,
+                    tipo_item: 'Fechadura',
+                    quantidade: 1,
+                    estado_conservacao: 'Bom',
+                    precisa_manutencao: 0,
+                    data_vistoria: hojeData,
+                    observacoes: 'Fechadura da porta funcionando'
+                  });
+                  fechadurasAdicionadas++;
+                }
+              });
+              if (fechadurasAdicionadas > 0) {
+                console.log(`[MIGRAÇÃO] Fechadura adicionada em ${fechadurasAdicionadas} quartos no cache local.`);
+                this.saveToStorage();
+              }
+
               this.recomputeStats();
               this.initialized = true;
               console.log("StaticApiEngine: Estado carregado do localStorage com sucesso.");
@@ -397,7 +421,8 @@ const StaticApiEngine = {
         const moveis = [
           { id: novoId + 10, tipo_item: 'Ar-Condicionado', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Funcionando' },
           { id: novoId + 11, tipo_item: 'Beliche / Camas', quantidade: 2, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' },
-          { id: novoId + 12, tipo_item: 'Guarda-roupa / Armário', quantidade: 4, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' }
+          { id: novoId + 12, tipo_item: 'Guarda-roupa / Armário', quantidade: 4, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' },
+          { id: novoId + 13, tipo_item: 'Fechadura', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Fechadura da porta funcionando' }
         ];
         const novoQ = {
           id: novoId,

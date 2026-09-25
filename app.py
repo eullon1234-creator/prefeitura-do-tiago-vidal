@@ -517,7 +517,8 @@ def create_quarto(req: QuartoCreate):
             ('Armário / Guarda-roupa', 4, 'Bom', 0),
             ('Ar-Condicionado', 1, 'Bom', 0),
             ('Lâmpada LED', 1, 'Bom', 0),
-            ('Tomadas', 2, 'Bom', 0)
+            ('Tomadas', 2, 'Bom', 0),
+            ('Fechadura', 1, 'Bom', 0)
         ]
         hoje = date.today().isoformat()
         for item, qtd, estado, manut in itens_padrao:
