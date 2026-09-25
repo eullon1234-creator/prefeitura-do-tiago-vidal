@@ -666,6 +666,58 @@ const StaticApiEngine = {
 
     // 7. Móveis
     if (path.includes('/api/moveis')) {
+      // 7.1 Resolver Manutenção (Marcar como Reparado)
+      const matchResolver = path.match(/\/api\/moveis\/(\d+)\/resolver-manutencao/);
+      if (matchResolver && method === 'POST') {
+        const mId = Number(matchResolver[1]);
+        const hoje = new Date().toISOString().split('T')[0];
+        const dataFormatada = new Date().toLocaleDateString('pt-BR');
+        const user = params.get('usuario') || currentUserName || 'Prefeito';
+        let itemNome = 'Item';
+        let quartoNum = '';
+        let blocoNome = '';
+        let found = false;
+
+        this.dbState.quartos.forEach(q => {
+          (q.moveis || []).forEach(m => {
+            if (m.id === mId) {
+              m.estado_conservacao = 'Bom';
+              m.precisa_manutencao = 0;
+              m.data_vistoria = hoje;
+              m.observacoes = (m.observacoes && m.observacoes.trim() !== '' ? m.observacoes + ' • ' : '') + `[Reparado em ${dataFormatada} por ${user}]`;
+              itemNome = m.tipo_item || 'Item';
+              quartoNum = q.numero;
+              blocoNome = q.bloco_nome;
+              found = true;
+            }
+          });
+        });
+
+        if (found) {
+          if (!this.dbState.auditoria) this.dbState.auditoria = [];
+          this.dbState.auditoria.unshift({
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            usuario: user,
+            acao: "RESOLVER_MANUTENCAO",
+            entidade: "movel",
+            entidade_id: mId,
+            detalhes: `Manutenção resolvida no item '${itemNome}' do Quarto ${quartoNum} (${blocoNome})`
+          });
+
+          this.recomputeStats();
+          this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('moveis_vistorias', mId, {
+            movel_id: mId,
+            estado_conservacao: 'Bom',
+            precisa_manutencao: 0,
+            data_vistoria: hoje
+          });
+        }
+
+        return { message: "Manutenção marcada como resolvida com sucesso" };
+      }
+
       if (path.includes('/vistoria') && method === 'POST') {
         const movelId = Number(body.movel_id);
         this.dbState.quartos.forEach(q => {
@@ -684,7 +736,7 @@ const StaticApiEngine = {
         return { message: "Vistoria atualizada com sucesso" };
       }
 
-      if (method === 'POST') {
+      if ((path.endsWith('/api/moveis') || path.endsWith('/api/moveis/')) && method === 'POST') {
         const novoMId = Date.now();
         const quartoId = Number(body.quarto_id);
         const q = this.dbState.quartos.find(x => x.id === quartoId);
