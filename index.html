@@ -1575,6 +1575,23 @@ service cloud.firestore {
           </div>
         </div>
 
+        <!-- WhatsApp / Celular (Opcional) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 flex items-center justify-between">
+            <span class="flex items-center gap-1.5 text-slate-800">
+              <i class="fa-brands fa-whatsapp text-emerald-600 font-bold text-sm"></i> WhatsApp / Celular
+            </span>
+            <span class="text-[11px] text-slate-400 font-normal">Opcional</span>
+          </label>
+          <div class="relative mt-1">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-emerald-600 font-semibold text-sm pointer-events-none">
+              <i class="fa-brands fa-whatsapp"></i>
+            </span>
+            <input type="tel" id="alojadoFormWhatsapp" placeholder="(XX) 9XXXX-XXXX" maxlength="16" oninput="formatarTelefoneInput(this)" class="w-full py-2 pl-9 pr-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Ao tocar no nome do colaborador, abrirá o botão direto para o WhatsApp dele.</p>
+        </div>
+
         <!-- Foto do Trabalhador -->
         <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-4">
           <div class="relative w-16 h-16 rounded-full overflow-hidden bg-slate-200 border-2 border-amber-500/50 flex-shrink-0 flex items-center justify-center">
@@ -1940,8 +1957,18 @@ service cloud.firestore {
           <div id="modalFotoInfoLocal" class="text-[11px] text-slate-400">Bloco • Quarto • Cama</div>
         </div>
 
-        <!-- Ações: Upload e Remoção de Foto -->
-        <div class="w-full pt-2 flex flex-col gap-2">
+        <!-- Botão WhatsApp Direto -->
+        <a id="modalFotoBtnWhatsapp" href="#" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition cursor-pointer hidden">
+          <i class="fa-brands fa-whatsapp text-xl"></i>
+          <span id="modalFotoWhatsappTexto">Conversar no WhatsApp</span>
+        </a>
+
+        <!-- Ações: Upload, Edição e Remoção de Foto -->
+        <div class="w-full pt-1 flex flex-col gap-2">
+          <button type="button" onclick="editarAlojadoDoModalFoto()" class="btn-prefeito w-full py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-pen-to-square text-sky-600"></i>
+            <span>Editar Cadastro / WhatsApp</span>
+          </button>
           <label class="btn-prefeito w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition">
             <i class="fa-solid fa-camera"></i>
             <span>Tirar Foto / Trocar Foto</span>
@@ -2221,6 +2248,6 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=2.0"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>

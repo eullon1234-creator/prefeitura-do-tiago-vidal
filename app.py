@@ -56,6 +56,7 @@ class AlojadoCreate(BaseModel):
     nome_completo: str
     empresa_id: Optional[int] = None
     funcao: Optional[str] = ""
+    whatsapp: Optional[str] = ""
     data_entrada: Optional[str] = None
     observacoes: Optional[str] = ""
     foto_url: Optional[str] = ""
@@ -66,6 +67,7 @@ class AlojadoUpdate(BaseModel):
     nome_completo: str
     empresa_id: Optional[int] = None
     funcao: Optional[str] = ""
+    whatsapp: Optional[str] = ""
     data_entrada: Optional[str] = None
     observacoes: Optional[str] = ""
     foto_url: Optional[str] = ""
@@ -471,7 +473,7 @@ def get_quarto_detalhes(quarto_id: int):
     cursor.execute("""
     SELECT 
         v.id as vaga_id, v.quarto_id, v.numero_cama, v.status,
-        a.id as alojado_id, a.matricula, a.nome_completo, a.funcao, a.data_entrada, a.foto_url, a.observacoes as alojado_obs,
+        a.id as alojado_id, a.matricula, a.nome_completo, a.funcao, a.whatsapp, a.data_entrada, a.foto_url, a.observacoes as alojado_obs,
         e.id as empresa_id, e.nome as empresa_nome, e.cor as empresa_cor
     FROM vagas v
     LEFT JOIN alojados a ON a.vaga_id = v.id AND a.status = 'ativo'
@@ -597,7 +599,7 @@ def get_alojados(
     
     query = """
     SELECT 
-        a.id, a.matricula, a.nome_completo, a.funcao, a.data_entrada, a.data_saida, a.status, a.observacoes, a.foto_url,
+        a.id, a.matricula, a.nome_completo, a.funcao, a.whatsapp, a.data_entrada, a.data_saida, a.status, a.observacoes, a.foto_url,
         e.id as empresa_id, e.nome as empresa_nome, e.cor as empresa_cor,
         v.id as vaga_id, v.numero_cama,
         q.id as quarto_id, q.numero as quarto_numero,
@@ -674,9 +676,9 @@ def create_alojado(req: AlojadoCreate):
     dt_entrada = req.data_entrada or date.today().isoformat()
     try:
         cursor.execute("""
-        INSERT INTO alojados (vaga_id, matricula, nome_completo, empresa_id, funcao, data_entrada, status, observacoes, foto_url)
-        VALUES (?, ?, ?, ?, ?, ?, 'ativo', ?, ?)
-        """, (req.vaga_id, req.matricula.strip() if req.matricula else "", req.nome_completo.strip().upper(), emp_id, req.funcao.strip().upper() if req.funcao else "", dt_entrada, req.observacoes or "", req.foto_url or ""))
+        INSERT INTO alojados (vaga_id, matricula, nome_completo, empresa_id, funcao, whatsapp, data_entrada, status, observacoes, foto_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?)
+        """, (req.vaga_id, req.matricula.strip() if req.matricula else "", req.nome_completo.strip().upper(), emp_id, req.funcao.strip().upper() if req.funcao else "", req.whatsapp.strip() if req.whatsapp else "", dt_entrada, req.observacoes or "", req.foto_url or ""))
         alojado_id = cursor.lastrowid
         
         # Marcar vaga como ocupada
@@ -709,9 +711,9 @@ def update_alojado(alojado_id: int, req: AlojadoUpdate):
             
     cursor.execute("""
     UPDATE alojados 
-    SET matricula = ?, nome_completo = ?, empresa_id = ?, funcao = ?, data_entrada = ?, observacoes = ?, foto_url = COALESCE(NULLIF(?, ''), foto_url)
+    SET matricula = ?, nome_completo = ?, empresa_id = ?, funcao = ?, whatsapp = ?, data_entrada = ?, observacoes = ?, foto_url = COALESCE(NULLIF(?, ''), foto_url)
     WHERE id = ?
-    """, (req.matricula.strip() if req.matricula else "", req.nome_completo.strip().upper(), emp_id, req.funcao.strip().upper() if req.funcao else "", req.data_entrada, req.observacoes or "", req.foto_url or "", alojado_id))
+    """, (req.matricula.strip() if req.matricula else "", req.nome_completo.strip().upper(), emp_id, req.funcao.strip().upper() if req.funcao else "", req.whatsapp.strip() if req.whatsapp else "", req.data_entrada, req.observacoes or "", req.foto_url or "", alojado_id))
     
     log_auditoria(conn, req.usuario, "EDITAR", "alojado", alojado_id, f"Dados do alojado '{req.nome_completo.upper()}' atualizados")
     conn.commit()

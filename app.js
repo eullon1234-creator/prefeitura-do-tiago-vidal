@@ -513,10 +513,20 @@ const StaticApiEngine = {
       const a = this.dbState.alojados.find(x => x.id === aId);
       if (a) {
         if (body.nome_completo) a.nome_completo = body.nome_completo.toUpperCase();
-        if (body.matricula) a.matricula = body.matricula;
-        if (body.funcao) a.funcao = body.funcao.toUpperCase();
+        if (body.matricula !== undefined) a.matricula = body.matricula;
+        if (body.funcao !== undefined) a.funcao = body.funcao.toUpperCase();
+        if (body.whatsapp !== undefined) a.whatsapp = body.whatsapp ? body.whatsapp.trim() : '';
+        if (body.data_entrada !== undefined) a.data_entrada = body.data_entrada;
         if (body.observacoes !== undefined) a.observacoes = body.observacoes;
         if (body.foto_url !== undefined) a.foto_url = body.foto_url;
+        if (body.empresa_id) {
+          a.empresa_id = Number(body.empresa_id);
+          const emp = this.dbState.empresas.find(e => e.id == a.empresa_id);
+          if (emp) {
+            a.empresa_nome = emp.nome;
+            a.empresa_cor = emp.cor;
+          }
+        }
         // Atualiza na vaga
         this.dbState.quartos.forEach(q => {
           (q.vagas || []).forEach(v => {
@@ -599,6 +609,7 @@ const StaticApiEngine = {
         empresa_nome: emp.nome,
         empresa_cor: emp.cor,
         funcao: (body.funcao || '').toUpperCase(),
+        whatsapp: body.whatsapp ? body.whatsapp.trim() : '',
         data_entrada: body.data_entrada || new Date().toISOString().split('T')[0],
         data_saida: null,
         status: 'ativo',
@@ -1260,6 +1271,10 @@ function iniciarListenerTempoRealFirebase() {
             al.numero_cama = data.numero_cama;
             mudou = true;
           }
+          if (data.whatsapp !== undefined && data.whatsapp !== al.whatsapp) {
+            al.whatsapp = data.whatsapp;
+            mudou = true;
+          }
 
           if (mudou) {
             alteracoes++;
@@ -1333,7 +1348,7 @@ async function sincronizarComNuvemHeader() {
           const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
           if (al) {
             let mudou = false;
-            ['foto_url', 'nome_completo', 'funcao', 'status', 'quarto_numero', 'bloco_nome', 'numero_cama'].forEach(k => {
+            ['foto_url', 'nome_completo', 'funcao', 'status', 'quarto_numero', 'bloco_nome', 'numero_cama', 'whatsapp'].forEach(k => {
               if (data[k] !== undefined && data[k] !== null && data[k] !== al[k]) {
                 al[k] = data[k];
                 mudou = true;
@@ -2410,6 +2425,46 @@ function aplicarFiltrosQuartos() {
   carregarQuartos();
 }
 
+// ========================================================
+// FUNÇÕES UTILITÁRIAS DE TELEFONE E WHATSAPP
+// ========================================================
+function formatarTelefoneInput(input) {
+  if (!input) return;
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 10) {
+    input.value = `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
+  } else if (v.length > 6) {
+    input.value = `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
+  } else if (v.length > 2) {
+    input.value = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+  } else if (v.length > 0) {
+    input.value = `(${v}`;
+  } else {
+    input.value = '';
+  }
+}
+
+function formatarTelefoneTexto(val) {
+  if (!val) return '';
+  const digits = String(val).replace(/\D/g, '').slice(-11);
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  } else if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return val;
+}
+
+function getWhatsappUrl(telefone) {
+  if (!telefone) return null;
+  let digits = String(telefone).replace(/\D/g, '');
+  if (!digits || digits.length < 10) return null;
+  if (digits.length === 10 || digits.length === 11) {
+    digits = '55' + digits;
+  }
+  return `https://wa.me/${digits}`;
+}
+
 function renderQuartosCards(quartos) {
   const container = document.getElementById('gridQuartos');
   const vazioEl = document.getElementById('quartosVazio');
@@ -2446,6 +2501,13 @@ function renderQuartosCards(quartos) {
         const safeFuncao = (v.funcao || '').replace(/'/g, "\\'");
         const clickFoto = `abrirModalFotoAlojado(${v.alojado_id}, '${safeNome}', '${v.foto_url || ''}', '${safeEmpresa}', '${v.empresa_cor || ''}', '${safeFuncao}', '${v.matricula || ''}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
 
+        // Buscar telefone atualizado
+        const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
+          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === v.alojado_id)
+          : null;
+        const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
+        const waUrl = getWhatsappUrl(zapNum);
+
         return `
           <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between text-xs">
             <div class="flex items-center justify-between gap-1 mb-1.5">
@@ -2460,16 +2522,30 @@ function renderQuartosCards(quartos) {
             <div class="flex items-center gap-2 mb-1">
               ${renderAvatarHtml(v.nome_completo, v.foto_url, 'w-8 h-8', 'text-[11px]', clickFoto)}
               <div class="min-w-0 flex-1">
-                <div class="font-bold text-slate-900 truncate" title="${v.nome_completo}">${v.nome_completo}</div>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="font-bold text-slate-900 truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${v.nome_completo}</span>
+                  ${waUrl ? `
+                    <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-[11px] flex-shrink-0 transition" title="Conversar no WhatsApp (${zapNum})">
+                      <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                  ` : ''}
+                </div>
                 <div class="text-[11px] text-slate-500 truncate">${v.funcao || 'Alojado'} • Reg: ${v.matricula || '-'}</div>
               </div>
             </div>
 
             <!-- Ações rápidas na cama -->
             <div class="mt-2 pt-1.5 border-t border-slate-200 flex items-center justify-between">
-              <button onclick="${clickFoto}" class="text-[10px] font-semibold text-slate-500 hover:text-amber-600 flex items-center gap-1" title="Foto do trabalhador">
-                <i class="fa-solid fa-camera"></i> Foto
-              </button>
+              <div class="flex items-center gap-2">
+                <button onclick="${clickFoto}" class="text-[10px] font-semibold text-slate-500 hover:text-amber-600 flex items-center gap-1" title="Foto do trabalhador">
+                  <i class="fa-solid fa-camera"></i> Foto
+                </button>
+                ${waUrl ? `
+                  <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 transition" title="Conversar no WhatsApp">
+                    <i class="fa-brands fa-whatsapp"></i> Zap
+                  </a>
+                ` : ''}
+              </div>
               <div class="flex items-center gap-2">
                 <button onclick="abrirModalRealocar(${v.alojado_id}, '${safeNome}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})" class="btn-prefeito text-[10px] font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1">
                   <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
@@ -2577,6 +2653,13 @@ async function abrirModalQuartoDetalhes(quartoId) {
         const safeFuncao = (v.funcao || '').replace(/'/g, "\\'");
         const clickFoto = `abrirModalFotoAlojado(${v.alojado_id}, '${safeNome}', '${v.foto_url || ''}', '${safeEmpresa}', '${v.empresa_cor || ''}', '${safeFuncao}', '${v.matricula || ''}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
 
+        // Buscar telefone atualizado
+        const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
+          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === v.alojado_id)
+          : null;
+        const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
+        const waUrl = getWhatsappUrl(zapNum);
+
         return `
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
             <div class="flex items-center justify-between">
@@ -2587,13 +2670,27 @@ async function abrirModalQuartoDetalhes(quartoId) {
             <div class="flex items-center gap-3">
               ${renderAvatarHtml(v.nome_completo, v.foto_url, 'w-11 h-11', 'text-xs', clickFoto)}
               <div class="min-w-0 flex-1">
-                <div class="font-bold text-slate-900 text-sm truncate">${v.nome_completo}</div>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="font-bold text-slate-900 text-sm truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${v.nome_completo}</span>
+                  ${waUrl ? `
+                    <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-xs flex-shrink-0 transition" title="Conversar no WhatsApp (${zapNum})">
+                      <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                  ` : ''}
+                </div>
                 <div class="text-slate-500">Matrícula: <b>${v.matricula || '-'}</b> • Função: <b>${v.funcao || '-'}</b></div>
-                <div class="text-slate-400 text-[10px]">Entrada: ${v.data_entrada || '-'}</div>
+                <div class="text-slate-400 text-[10px]">Entrada: ${v.data_entrada || '-'} ${zapNum ? `• <span class="text-emerald-700 font-mono font-medium">${formatarTelefoneTexto(zapNum)}</span>` : ''}</div>
               </div>
             </div>
 
-            <div class="pt-1.5 border-t border-slate-200 flex justify-end">
+            <div class="pt-1.5 border-t border-slate-200 flex items-center justify-between">
+              <div>
+                ${waUrl ? `
+                  <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[11px] font-bold transition">
+                    <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i> WhatsApp
+                  </a>
+                ` : ''}
+              </div>
               <button onclick="${clickFoto}" class="text-[11px] font-semibold text-amber-600 hover:text-amber-800 flex items-center gap-1">
                 <i class="fa-solid fa-camera"></i> Ver / Trocar Foto
               </button>
@@ -2759,6 +2856,7 @@ function renderTabelaAlojados(data) {
       const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
       const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
       const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
+      const waUrl = getWhatsappUrl(a.whatsapp);
       const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
 
       return `
@@ -2768,8 +2866,15 @@ function renderTabelaAlojados(data) {
             <div class="flex items-center gap-3">
               ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-10 h-10', 'text-xs', clickFoto)}
               <div>
-                <div class="font-bold text-slate-900 cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver detalhes e foto">${a.nome_completo}</div>
-                <div class="text-[11px] text-slate-400">Entrada: ${a.data_entrada || '-'}</div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-900 cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver detalhes e foto">${a.nome_completo}</span>
+                  ${waUrl ? `
+                    <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-xs transition" title="Conversar no WhatsApp (${a.whatsapp})">
+                      <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                  ` : ''}
+                </div>
+                <div class="text-[11px] text-slate-400">Entrada: ${a.data_entrada || '-'} ${a.whatsapp ? `• <span class="text-emerald-700 font-mono font-medium">${formatarTelefoneTexto(a.whatsapp)}</span>` : ''}</div>
               </div>
             </div>
           </td>
@@ -2794,7 +2899,7 @@ function renderTabelaAlojados(data) {
                 <i class="fa-solid fa-rotate-left"></i> Reativar
               </button>
             `}
-            <button onclick="abrirModalEditarAlojado(${a.id}, '${a.matricula || ''}', '${a.nome_completo}', ${a.empresa_id || "null"}, '${a.funcao || ''}', '${a.data_entrada || ''}', '${a.observacoes || ''}')" class="btn-prefeito text-slate-500 hover:text-sky-600 p-1 mr-1" title="Editar Dados">
+            <button onclick="abrirModalEditarAlojado(${a.id})" class="btn-prefeito text-slate-500 hover:text-sky-600 p-1 mr-1" title="Editar Dados">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
             <button onclick="confirmarExcluirAlojado(${a.id}, '${a.nome_completo}')" class="btn-prefeito text-slate-400 hover:text-red-600 p-1" title="Excluir Registro">
@@ -2817,6 +2922,7 @@ function renderTabelaAlojados(data) {
       const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
       const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
       const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
+      const waUrl = getWhatsappUrl(a.whatsapp);
       const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
 
       return `
@@ -2824,23 +2930,36 @@ function renderTabelaAlojados(data) {
           <div class="flex items-center gap-3 min-w-0 flex-1">
             ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-11 h-11 flex-shrink-0', 'text-xs', clickFoto)}
             <div class="min-w-0 flex-1">
-              <div class="font-bold text-slate-900 text-sm leading-tight truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}">${a.nome_completo}</div>
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="font-bold text-slate-900 text-sm leading-tight truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}">${a.nome_completo}</span>
+                ${waUrl ? `
+                  <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-xs flex-shrink-0 transition" title="Conversar no WhatsApp (${a.whatsapp})">
+                    <i class="fa-brands fa-whatsapp"></i>
+                  </a>
+                ` : ''}
+              </div>
               <div class="text-xs text-slate-500 font-medium truncate mt-0.5">
                 ${a.funcao || 'Sem função'} • <span class="font-bold" style="color: ${a.empresa_cor || '#475569'}">${a.empresa_nome || '-'}</span>
               </div>
               <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-1.5 flex-wrap">
                 ${isAtivo ? `<span class="bg-slate-100 px-1.5 py-0.5 rounded font-semibold text-slate-700 text-[10px]">🏢 ${a.bloco_nome} • Q.${a.quarto_numero} (Cama ${a.numero_cama})</span>` : '<span class="text-slate-400 italic text-[10px]">Desocupado</span>'}
                 <span class="text-[10px] text-slate-400 font-mono">Reg: ${a.matricula || '-'}</span>
+                ${a.whatsapp ? `<span class="text-[10px] text-emerald-700 font-mono font-semibold">📞 ${formatarTelefoneTexto(a.whatsapp)}</span>` : ''}
               </div>
             </div>
           </div>
           <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
             ${statusBadge}
             <div class="flex items-center gap-1 mt-0.5">
+              ${waUrl ? `
+                <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs shadow-xs flex items-center justify-center transition" title="Conversar no WhatsApp (${a.whatsapp})">
+                  <i class="fa-brands fa-whatsapp text-sm"></i>
+                </a>
+              ` : ''}
               <button onclick="${clickFoto}" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Ver foto">
                 <i class="fa-solid fa-camera"></i>
               </button>
-              <button onclick="abrirModalEditarAlojado(${a.id}, '${a.matricula || ''}', '${safeNome}', ${a.empresa_id || 'null'}, '${safeFuncao}', '${a.data_entrada || ''}', '${a.observacoes || ''}')" class="btn-prefeito p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Editar">
+              <button onclick="abrirModalEditarAlojado(${a.id})" class="btn-prefeito p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Editar">
                 <i class="fa-solid fa-pen"></i>
               </button>
               ${isAtivo ? `
@@ -2895,6 +3014,10 @@ async function openModalNovoAlojado(vagaPreId = null) {
   document.getElementById('secaoSelecaoVaga').classList.remove('hidden');
   limparFotoForm();
 
+  // Limpa campo de WhatsApp
+  const zapInput = document.getElementById('alojadoFormWhatsapp');
+  if (zapInput) zapInput.value = '';
+
   // Carrega opções de empresas
   preencherSelectEmpresas('alojadoFormEmpresa');
 
@@ -2911,19 +3034,32 @@ function openModalNovoAlojadoComVaga(vagaId) {
   openModalNovoAlojado(vagaId);
 }
 
-function abrirModalEditarAlojado(id, matricula, nome, empresaId, funcao, dataEntrada, obs, fotoUrl = '') {
+function abrirModalEditarAlojado(id, matricula = '', nome = '', empresaId = null, funcao = '', dataEntrada = '', obs = '', fotoUrl = '', whatsapp = '') {
   if (!checkPrefeitoAccess()) return;
+
+  let al = null;
+  if (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+    al = window.StaticApiEngine.dbState.alojados.find(x => x.id == id);
+  }
+
   document.getElementById('modalAlojadoTitulo').textContent = 'Editar Dados do Alojado';
   document.getElementById('alojadoFormId').value = id;
   document.getElementById('secaoSelecaoVaga').classList.add('hidden'); // Vaga é alterada por realocação
 
-  preencherSelectEmpresas('alojadoFormEmpresa', empresaId);
+  const empIdFinal = (al && al.empresa_id) ? al.empresa_id : empresaId;
+  preencherSelectEmpresas('alojadoFormEmpresa', empIdFinal);
 
-  document.getElementById('alojadoFormNome').value = nome;
-  document.getElementById('alojadoFormMatricula').value = matricula;
-  document.getElementById('alojadoFormFuncao').value = funcao;
-  document.getElementById('alojadoFormDataEntrada').value = dataEntrada || '';
-  document.getElementById('alojadoFormObs').value = obs || '';
+  document.getElementById('alojadoFormNome').value = (al && al.nome_completo) ? al.nome_completo : (nome || '');
+  document.getElementById('alojadoFormMatricula').value = (al && al.matricula) ? al.matricula : (matricula || '');
+  document.getElementById('alojadoFormFuncao').value = (al && al.funcao) ? al.funcao : (funcao || '');
+  document.getElementById('alojadoFormDataEntrada').value = (al && al.data_entrada) ? al.data_entrada : (dataEntrada || '');
+  document.getElementById('alojadoFormObs').value = (al && al.observacoes) ? al.observacoes : (obs || '');
+
+  const zapInput = document.getElementById('alojadoFormWhatsapp');
+  if (zapInput) {
+    const rawZap = (al && al.whatsapp) ? al.whatsapp : (whatsapp || '');
+    zapInput.value = formatarTelefoneTexto(rawZap);
+  }
 
   // Foto atual
   const imgPreview = document.getElementById('alojadoFormFotoPreview');
@@ -2932,12 +3068,13 @@ function abrirModalEditarAlojado(id, matricula, nome, empresaId, funcao, dataEnt
   const urlInput = document.getElementById('alojadoFormFotoUrl');
   document.getElementById('alojadoFormFotoInput').value = '';
 
-  if (fotoUrl && fotoUrl.trim() !== '') {
-    imgPreview.src = fotoUrl;
+  const fotoAtualFinal = (al && al.foto_url) ? al.foto_url : fotoUrl;
+  if (fotoAtualFinal && fotoAtualFinal.trim() !== '') {
+    imgPreview.src = fotoAtualFinal;
     imgPreview.classList.remove('hidden');
     placeholder.classList.add('hidden');
     btnRemover.classList.remove('hidden');
-    urlInput.value = fotoUrl;
+    urlInput.value = fotoAtualFinal;
   } else {
     limparFotoForm();
   }
@@ -2989,6 +3126,8 @@ async function salvarAlojado(e) {
   const funcao = document.getElementById('alojadoFormFuncao').value.trim();
   const dataEntrada = document.getElementById('alojadoFormDataEntrada').value;
   const obs = document.getElementById('alojadoFormObs').value.trim();
+  const zapInput = document.getElementById('alojadoFormWhatsapp');
+  const whatsapp = zapInput ? zapInput.value.trim() : '';
   const fotoUrlAtual = document.getElementById('alojadoFormFotoUrl').value;
   const fotoInput = document.getElementById('alojadoFormFotoInput');
 
@@ -3012,6 +3151,7 @@ async function salvarAlojado(e) {
           matricula: matricula,
           empresa_id: empresaId ? parseInt(empresaId) : null,
           funcao: funcao,
+          whatsapp: whatsapp,
           data_entrada: dataEntrada,
           observacoes: obs,
           foto_url: fotoUrlAtual,
@@ -3069,6 +3209,7 @@ async function salvarAlojado(e) {
           matricula: matricula,
           empresa_id: empresaId ? parseInt(empresaId) : null,
           funcao: funcao,
+          whatsapp: whatsapp,
           data_entrada: dataEntrada,
           observacoes: obs,
           foto_url: fotoUrlAtual,
@@ -3135,14 +3276,13 @@ function abrirModalFotoAlojado(alojadoId, nome, fotoUrl, empresaNome, empresaCor
   const vazioEl = document.getElementById('modalFotoVazio');
   const btnRemover = document.getElementById('modalFotoBtnRemover');
   
-  // Buscar a foto mais atualizada no banco em memória
-  let fotoAtual = fotoUrl;
+  // Buscar os dados atualizados do colaborador no banco em memória
+  let al = null;
   if (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
-    const al = window.StaticApiEngine.dbState.alojados.find(x => x.id == alojadoId);
-    if (al && al.foto_url) {
-      fotoAtual = al.foto_url;
-    }
+    al = window.StaticApiEngine.dbState.alojados.find(x => x.id == alojadoId);
   }
+
+  let fotoAtual = (al && al.foto_url) ? al.foto_url : fotoUrl;
 
   if (fotoAtual && fotoAtual.trim() !== '') {
     photoCacheManager.getPhoto(fotoAtual).then(cached => {
@@ -3158,9 +3298,34 @@ function abrirModalFotoAlojado(alojadoId, nome, fotoUrl, empresaNome, empresaCor
     vazioEl.classList.remove('hidden');
     btnRemover.classList.add('hidden');
   }
+
+  // Configuração do botão direto para WhatsApp
+  const btnZap = document.getElementById('modalFotoBtnWhatsapp');
+  const txtZap = document.getElementById('modalFotoWhatsappTexto');
+  const zapNum = (al && al.whatsapp) ? al.whatsapp : '';
+  const waUrl = getWhatsappUrl(zapNum);
+
+  if (btnZap) {
+    if (waUrl) {
+      btnZap.href = waUrl;
+      const zapFormatado = formatarTelefoneTexto(zapNum);
+      if (txtZap) txtZap.textContent = `Conversar no WhatsApp (${zapFormatado})`;
+      btnZap.classList.remove('hidden');
+    } else {
+      btnZap.href = '#';
+      btnZap.classList.add('hidden');
+    }
+  }
   
   abrirModal('modalFotoAlojado');
   updateUserRoleUI();
+}
+
+function editarAlojadoDoModalFoto() {
+  const alojadoId = document.getElementById('modalFotoAlojadoId').value;
+  if (!alojadoId) return;
+  fecharModal('modalFotoAlojado');
+  abrirModalEditarAlojado(Number(alojadoId));
 }
 
 function uploadFotoModalAlojado(input) {
