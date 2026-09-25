@@ -1051,16 +1051,33 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function formatFotoUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('/uploads/')) {
+    return '.' + trimmed;
+  }
+  return trimmed;
+}
+
 function renderAvatarHtml(nome, fotoUrl, sizeClass = 'w-9 h-9', textSize = 'text-xs', clickCall = '') {
   const cursor = clickCall ? 'cursor-pointer hover:ring-2 hover:ring-amber-500 transition' : '';
   const onclickAttr = clickCall ? `onclick="${clickCall}" title="Ver / alterar foto de ${nome.replace(/"/g, '&quot;')}"` : '';
+  const initials = getInitials(nome);
+  const formattedUrl = formatFotoUrl(fotoUrl);
 
-  if (fotoUrl && fotoUrl.trim() !== '') {
-    const cachedUrl = photoCacheManager.memCache.get(fotoUrl) || fotoUrl;
-    return `<img src="${cachedUrl}" data-cache-url="${fotoUrl}" onload="handleAvatarImgLoaded(this)" alt="${nome.replace(/"/g, '&quot;')}" ${onclickAttr} class="${sizeClass} rounded-full object-cover border border-slate-300 shadow-xs flex-shrink-0 ${cursor}">`;
+  if (formattedUrl && formattedUrl.trim() !== '') {
+    const cachedUrl = photoCacheManager.memCache.get(formattedUrl) || formattedUrl;
+    return `
+      <div class="${sizeClass} rounded-full overflow-hidden flex-shrink-0 relative ${cursor}" ${onclickAttr}>
+        <img src="${cachedUrl}" data-cache-url="${formattedUrl}" onload="handleAvatarImgLoaded(this)" onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');" alt="${nome.replace(/"/g, '&quot;')}" class="w-full h-full object-cover border border-slate-300 shadow-xs">
+        <div class="hidden w-full h-full bg-slate-800 text-amber-300 font-bold ${textSize} flex items-center justify-center border border-slate-700">
+          ${initials}
+        </div>
+      </div>
+    `;
   }
 
-  const initials = getInitials(nome);
   return `
     <div ${onclickAttr} class="${sizeClass} rounded-full bg-slate-800 text-amber-300 font-bold ${textSize} flex items-center justify-center flex-shrink-0 shadow-xs border border-slate-700 ${cursor}">
       ${initials}
@@ -1113,6 +1130,7 @@ function initFirebase() {
       firebaseInitialized = true;
       atualizarBadgeFirebaseUI(true, "Firebase Conectado");
       console.log("Firebase Firestore inicializado com sucesso:", firebaseConfig.projectId);
+      iniciarListenerTempoRealFirebase();
     } else {
       console.warn("SDK do Firebase não detectado.");
       atualizarBadgeFirebaseUI(false, "Offline");
@@ -1120,6 +1138,178 @@ function initFirebase() {
   } catch (err) {
     console.error("Erro ao inicializar Firebase:", err);
     atualizarBadgeFirebaseUI(false, "Erro Firebase");
+  }
+}
+
+let listenerTempoRealAtivo = false;
+
+// Sincronização em tempo real entre Celular e PC via Firebase Firestore
+function iniciarListenerTempoRealFirebase() {
+  if (!firebaseInitialized || !firestoreDb || listenerTempoRealAtivo) return;
+  listenerTempoRealAtivo = true;
+
+  console.log("🔥 [FIREBASE] Iniciando listener em tempo real entre celular e PC...");
+
+  // Ouvir alterações em tempo real na coleção de alojados (fotos, check-in, realocação, status)
+  firestoreDb.collection('alojados').onSnapshot(async (snapshot) => {
+    try {
+      if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+        await window.StaticApiEngine.init();
+      }
+
+      let alteracoes = 0;
+      snapshot.docChanges().forEach((change) => {
+        const data = change.doc.data();
+        if (!data || !data.id) return;
+        
+        const aId = Number(data.id);
+        const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
+        if (al) {
+          let mudou = false;
+          if (data.foto_url !== undefined && data.foto_url !== al.foto_url) {
+            al.foto_url = data.foto_url;
+            mudou = true;
+          }
+          if (data.nome_completo && data.nome_completo !== al.nome_completo) {
+            al.nome_completo = data.nome_completo;
+            mudou = true;
+          }
+          if (data.funcao && data.funcao !== al.funcao) {
+            al.funcao = data.funcao;
+            mudou = true;
+          }
+          if (data.status && data.status !== al.status) {
+            al.status = data.status;
+            mudou = true;
+          }
+          if (data.quarto_numero && data.quarto_numero !== al.quarto_numero) {
+            al.quarto_numero = data.quarto_numero;
+            mudou = true;
+          }
+          if (data.bloco_nome && data.bloco_nome !== al.bloco_nome) {
+            al.bloco_nome = data.bloco_nome;
+            mudou = true;
+          }
+          if (data.numero_cama && data.numero_cama !== al.numero_cama) {
+            al.numero_cama = data.numero_cama;
+            mudou = true;
+          }
+
+          if (mudou) {
+            alteracoes++;
+            (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
+              (q.vagas || []).forEach(v => {
+                if (v.alojado && v.alojado.id === aId) {
+                  if (data.status === 'desligado') {
+                    v.status = 'livre';
+                    v.alojado = null;
+                  } else {
+                    v.alojado = { ...v.alojado, ...al };
+                  }
+                }
+              });
+            });
+          }
+        } else if (change.type === 'added' && data.nome_completo) {
+          window.StaticApiEngine.dbState.alojados.unshift(data);
+          alteracoes++;
+        }
+      });
+
+      if (alteracoes > 0) {
+        console.log(`⚡ [FIREBASE] ${alteracoes} colaborador(es) sincronizado(s) em tempo real da nuvem!`);
+        window.StaticApiEngine.recomputeStats();
+        window.StaticApiEngine.saveToStorage();
+        if (typeof carregarDashboard === 'function') carregarDashboard();
+        if (typeof carregarAlojados === 'function') carregarAlojados();
+        if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+        if (typeof carregarBlocosLista === 'function') carregarBlocosLista();
+        if (typeof carregarVagasLivresLista === 'function') carregarVagasLivresLista();
+        showToast(`⚡ Nuvem: ${alteracoes} alteração(ões) sincronizada(s) automaticamente!`, 'info');
+      }
+    } catch (err) {
+      console.warn("Aviso ao processar atualização em tempo real:", err);
+    }
+  }, (err) => {
+    if (err && (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission')))) {
+      console.warn("⚠️ Firebase Firestore: Permissões de leitura negadas pelas Regras.");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+    }
+  });
+}
+
+// Botão Sincronizar Nuvem no Header (Força verificação e atualização mútua)
+async function sincronizarComNuvemHeader() {
+  const icon = document.getElementById('iconSyncNuvemHeader');
+  if (icon) icon.classList.add('fa-spin');
+  showToast('🔄 Verificando e sincronizando dados da nuvem...', 'info');
+
+  try {
+    if (!firebaseInitialized || !firestoreDb) {
+      initFirebase();
+      if (!firebaseInitialized || !firestoreDb) {
+        showToast('⚠️ Firebase não conectado. Verifique sua conexão com a internet.', 'warning');
+        return;
+      }
+    }
+
+    await window.StaticApiEngine.init();
+
+    // Puxar todos os registros de alojados que já estão na nuvem
+    const snap = await firestoreDb.collection('alojados').get();
+    let atualizados = 0;
+    
+    if (!snap.empty) {
+      snap.forEach(doc => {
+        const data = doc.data();
+        if (data && data.id) {
+          const aId = Number(data.id);
+          const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
+          if (al) {
+            let mudou = false;
+            ['foto_url', 'nome_completo', 'funcao', 'status', 'quarto_numero', 'bloco_nome', 'numero_cama'].forEach(k => {
+              if (data[k] !== undefined && data[k] !== null && data[k] !== al[k]) {
+                al[k] = data[k];
+                mudou = true;
+              }
+            });
+            if (mudou) {
+              atualizados++;
+              (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
+                (q.vagas || []).forEach(v => {
+                  if (v.alojado && v.alojado.id === aId) {
+                    if (data.status === 'desligado') {
+                      v.status = 'livre';
+                      v.alojado = null;
+                    } else {
+                      v.alojado = { ...v.alojado, ...al };
+                    }
+                  }
+                });
+              });
+            }
+          }
+        }
+      });
+    }
+
+    if (atualizados > 0) {
+      window.StaticApiEngine.recomputeStats();
+      window.StaticApiEngine.saveToStorage();
+      refreshAllData();
+      showToast(`✅ ${atualizados} colaborador(es) sincronizado(s) com sucesso da nuvem!`, 'success');
+    } else {
+      showToast('✅ Seus dados já estão sincronizados com a nuvem!', 'success');
+    }
+  } catch (err) {
+    console.error("Erro ao sincronizar com nuvem:", err);
+    if (err && (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission')))) {
+      showToast("⚠️ Firebase: Permissão negada no Firestore. Ajuste as Regras no Console do Firebase.", "warning");
+    } else {
+      showToast(`Erro na sincronização: ${err.message}`, 'error');
+    }
+  } finally {
+    if (icon) icon.classList.remove('fa-spin');
   }
 }
 

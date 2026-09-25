@@ -135,6 +135,13 @@
           <span class="sm:hidden text-[11px]">App</span>
         </button>
 
+        <!-- Botão Sincronizar Nuvem (PC e Celular) -->
+        <button id="btnSyncNuvemHeader" onclick="sincronizarComNuvemHeader()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Sincronizar com a Nuvem (Atualizar Celular e PC)">
+          <i class="fa-solid fa-cloud-arrow-down text-xs" id="iconSyncNuvemHeader"></i>
+          <span class="hidden sm:inline">Sincronizar Nuvem</span>
+          <span class="sm:hidden text-[11px]">Nuvem</span>
+        </button>
+
         <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original (Desktop) -->
         <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition flex-shrink-0" title="Exportar Planilha Oficial no formato original exato">
           <i class="fa-solid fa-file-excel"></i> Planilha Oficial
@@ -2214,6 +2221,6 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=1.6"></script>
+  <script src="app.js?v=1.7"></script>
 </body>
 </html>

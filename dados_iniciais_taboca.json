@@ -149,7 +149,7 @@
       "status": "ativo",
       "observacoes": "Importado da planilha oficial Taboca 2",
       "created_at": "2026-09-24 23:03:50",
-      "foto_url": "/uploads/fotos_alojados/alojado_1043_4d23f848.jpg",
+      "foto_url": "uploads/fotos_alojados/alojado_1043_4d23f848.jpg",
       "empresa_nome": "GEL",
       "empresa_cor": "#2563eb",
       "bloco_nome": "Bloco 5",
@@ -28872,7 +28872,7 @@
           "nome_completo": "ADAILTON DA SILVA LIMA",
           "matricula": "18586",
           "funcao": "LÍDER DE EQUIPE",
-          "foto_url": "/uploads/fotos_alojados/alojado_1043_4d23f848.jpg",
+          "foto_url": "uploads/fotos_alojados/alojado_1043_4d23f848.jpg",
           "empresa_nome": "GEL",
           "empresa_cor": "#2563eb"
         }
