@@ -7,6 +7,14 @@
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" href="favicon.ico">
+  <!-- PWA Manifest & Suporte a Instalação no Celular e PC -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Prefeitura">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
   <!-- Silenciar aviso informativo do Tailwind CDN no console -->
   <script>
     const _origWarn = console.warn;
@@ -110,6 +118,13 @@
           <button onclick="alterarTamanhoFonte('lg')" id="btnFontNav_lg" class="px-1.5 py-0.5 text-sm font-bold rounded text-slate-400 hover:text-white transition" title="Letra Grande (17px)">A+</button>
           <button onclick="alterarTamanhoFonte('xl')" id="btnFontNav_xl" class="px-1.5 py-0.5 text-base font-bold rounded text-slate-400 hover:text-white transition" title="Letra Extra Grande (19px)">A++</button>
         </div>
+
+        <!-- Botão Instalar App (PWA) no Celular e PC -->
+        <button id="btnInstalarAppHeader" onclick="iniciarInstalacaoApp()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer" title="Instalar aplicativo no celular ou computador">
+          <i class="fa-solid fa-download text-sm"></i>
+          <span class="hidden sm:inline">Baixar App</span>
+          <span class="sm:hidden">App</span>
+        </button>
 
         <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original -->
         <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition" title="Exportar Planilha Oficial no formato original exato">
@@ -215,7 +230,7 @@
     </aside>
 
     <!-- Content Area -->
-    <main class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 bg-slate-100">
+    <main class="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 md:p-6 pb-28 md:pb-6 bg-slate-100">
 
       <!-- ================= TAB 1: DASHBOARD ================= -->
       <div id="tab-dashboard" class="tab-content space-y-6">
@@ -515,9 +530,15 @@
           </div>
         </div>
 
-        <!-- Tabela de Alojados -->
+        <!-- Tabela e Cards de Alojados -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="overflow-x-auto">
+          <!-- Cards Otimizados para Celular (Mobile) -->
+          <div id="listaAlojadosMobile" class="md:hidden divide-y divide-slate-100">
+            <!-- Populado via Javascript no celular -->
+          </div>
+
+          <!-- Tabela Completa para Computador / Tablet -->
+          <div class="hidden md:block overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-700">
               <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                 <tr>
@@ -1915,6 +1936,187 @@
       <button onclick="fecharModal('modalNotificacao')" class="w-full py-2 rounded-lg bg-slate-900 text-white text-xs font-bold mt-2">
         OK
       </button>
+    </div>
+  </div>
+
+  <!-- ================= BARRA DE NAVEGAÇÃO INFERIOR FIXA (MOBILE APP) ================= -->
+  <nav id="bottomNavBar" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around items-center py-2 px-1 shadow-2xl no-print" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
+    <button onclick="switchTab('dashboard')" data-mob-tab="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-amber-400 transition font-bold scale-105">
+      <i class="fa-solid fa-chart-pie text-lg mb-0.5"></i>
+      <span class="text-[10px]">Painel</span>
+    </button>
+    <button onclick="switchTab('blocos')" data-mob-tab="blocos" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-border-all text-lg mb-0.5"></i>
+      <span class="text-[10px]">Quartos</span>
+    </button>
+    <button onclick="switchTab('alojados')" data-mob-tab="alojados" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-users-line text-lg mb-0.5"></i>
+      <span class="text-[10px]">Alojados</span>
+    </button>
+    <button onclick="switchTab('moveis')" data-mob-tab="moveis" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-bed text-lg mb-0.5"></i>
+      <span class="text-[10px]">Móveis</span>
+    </button>
+    <button onclick="toggleMenuMobileMais()" id="btnMobMais" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-bars-staggered text-lg mb-0.5"></i>
+      <span class="text-[10px]">Mais</span>
+    </button>
+  </nav>
+
+  <!-- ================= DRAWER / MENU "MAIS" PARA CELULAR ================= -->
+  <div id="drawerMobileMais" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden flex flex-col justify-end transition-opacity duration-300 no-print" onclick="fecharMenuMobileMais(event)">
+    <div class="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="w-12 h-1.5 bg-slate-700 rounded-full mx-auto -mt-1 mb-2"></div>
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-white text-sm">Mais Funcionalidades</h4>
+            <p class="text-[11px] text-slate-400">Prefeitura de Canteiro • Taboca 2</p>
+          </div>
+        </div>
+        <button onclick="fecharMenuMobileMais()" class="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Ação Rápida de Instalar App no Celular -->
+      <button onclick="fecharMenuMobileMais(); iniciarInstalacaoApp();" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-sm shadow-md transition transform active:scale-98">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-slate-950/20 flex items-center justify-center text-slate-950">
+            <i class="fa-solid fa-mobile-screen-button text-base"></i>
+          </div>
+          <div class="text-left">
+            <div class="font-extrabold text-sm">Baixar / Instalar App</div>
+            <div class="text-[11px] text-slate-900/80 font-medium">Instalar no Celular ou Computador</div>
+          </div>
+        </div>
+        <i class="fa-solid fa-download text-slate-950"></i>
+      </button>
+
+      <!-- Grade de Atalhos -->
+      <div class="grid grid-cols-2 gap-2.5 pt-1">
+        <button onclick="fecharMenuMobileMais(); switchTab('gestao_cadastros')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-building-circle-gear text-indigo-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Estrutura & Empresas</span>
+          <span class="text-[10px] text-slate-400">Cadastros e cores</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('relatorios')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-file-excel text-emerald-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Relatórios & Excel</span>
+          <span class="text-[10px] text-slate-400">Exportar planilhas</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('importacao')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-file-import text-orange-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Importar Planilha</span>
+          <span class="text-[10px] text-slate-400">Atualizar dados</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('auditoria')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-clock-rotate-left text-cyan-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Auditoria & Logs</span>
+          <span class="text-[10px] text-slate-400">Histórico de ações</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('configuracoes')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-sliders text-amber-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Configurações</span>
+          <span class="text-[10px] text-slate-400">Firebase & fontes</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); toggleUserMode()" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-shield-halved text-amber-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Modo de Acesso</span>
+          <span class="text-[10px] text-slate-400">Prefeito / Consulta</span>
+        </button>
+      </div>
+
+      <!-- Botão Rápido Baixar Planilha Original no Mobile -->
+      <button onclick="fecharMenuMobileMais(); exportarPlanilhaOficial()" class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800 text-emerald-400 border border-emerald-900/50 hover:bg-slate-750 font-bold text-xs transition">
+        <i class="fa-solid fa-file-excel"></i> Baixar Planilha Oficial (.xlsx)
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= MODAL INSTALAR APLICATIVO (PWA) ================= -->
+  <div id="modalInstalarApp" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4 no-print">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+      
+      <!-- Topo com Ícone do App -->
+      <div class="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 p-6 text-white text-center relative">
+        <button onclick="fecharModalInstalacao()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center text-3xl mx-auto shadow-lg mb-3 border-2 border-amber-400/50">
+          <i class="fa-solid fa-hotel"></i>
+        </div>
+        <h3 class="font-extrabold text-lg text-white">Instalar Aplicativo Oficial</h3>
+        <p class="text-xs text-slate-300 mt-1 max-w-xs mx-auto">Prefeitura de Canteiro • Taboca 2</p>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30 mt-2.5">
+          <i class="fa-solid fa-bolt"></i> Abre em 0s • Sem barras de navegador • Offline
+        </div>
+      </div>
+
+      <!-- Abas de Instrução por Dispositivo -->
+      <div class="p-5 space-y-4">
+        
+        <!-- Botão Direto de Instalação (Disponível quando navegador suporta prompt) -->
+        <div id="blocoBotaoInstalarNativo">
+          <button onclick="executarPromptInstalacao()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition transform active:scale-98">
+            <i class="fa-solid fa-download text-base"></i> Instalar Aplicativo Agora
+          </button>
+          <div class="text-center text-[11px] text-slate-400 mt-1.5">Compatível com Android, Google Chrome, Microsoft Edge e iOS</div>
+        </div>
+
+        <!-- Guia Passo a Passo por Aparelho -->
+        <div class="border-t border-slate-100 pt-3 space-y-3">
+          <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-circle-info text-amber-500"></i> Como Adicionar no seu Aparelho:
+          </div>
+
+          <!-- Opção iPhone / iPad (Safari) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <i class="fa-brands fa-apple text-base text-slate-900"></i> No iPhone ou iPad (Safari):
+            </div>
+            <ol class="text-xs text-slate-600 space-y-1.5 list-decimal pl-4 leading-relaxed">
+              <li>Toque no botão <b>Compartilhar</b> <i class="fa-solid fa-arrow-up-from-bracket text-sky-600 font-bold"></i> (ícone com quadrado e seta) no rodapé do Safari.</li>
+              <li>Role para cima e toque em <b class="text-slate-900">"Adicionar à Tela de Início"</b> <i class="fa-regular fa-square-plus text-slate-800"></i>.</li>
+              <li>Toque em <b class="text-emerald-700">"Adicionar"</b> no canto superior. Pronto!</li>
+            </ol>
+          </div>
+
+          <!-- Opção Android (Chrome) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <i class="fa-brands fa-android text-base text-emerald-600"></i> No Celular Android (Chrome):
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Clique no botão verde acima ou toque no menu <b>três pontinhos (⋮)</b> no topo do Chrome e selecione <b class="text-slate-900">"Instalar aplicativo"</b> ou <b class="text-slate-900">"Adicionar à tela inicial"</b>.
+            </p>
+          </div>
+
+          <!-- Opção Computador (Windows / Mac) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <i class="fa-solid fa-desktop text-base text-sky-600"></i> No Computador (PC / Notebook):
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              No Google Chrome ou Edge, clique no ícone de <b>instalar aplicativo</b> (ícone de computador com seta para baixo) na barra de endereços ao lado do link, ou clique no botão acima.
+            </p>
+          </div>
+        </div>
+
+        <button onclick="fecharModalInstalacao()" class="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+          Fechar
+        </button>
+      </div>
+
     </div>
   </div>
 

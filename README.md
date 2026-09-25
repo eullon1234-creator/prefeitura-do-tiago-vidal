@@ -7,14 +7,32 @@ Sistema web completo para gestão, controle e fiscalização de alojamentos em c
 
 ---
 
-## 📱 Acesso Online & Celular (GitHub Pages)
-Você pode abrir o sistema em qualquer celular, tablet ou computador diretamente pelo link do **GitHub Pages**:  
-🔗 **[https://eullon1234-creator.github.io/prefeitura-do-tiago-vidal/](https://eullon1234-creator.github.io/prefeitura-do-tiago-vidal/)**
+## 📱 Como Baixar / Instalar o Aplicativo (Celular e PC)
+O sistema funciona como um **aplicativo nativo (PWA)** instalável com 1 clique:
 
-* ⚡ **Economia Extrema de Dados**: As fotos e dados carregam com cache inteligente local no aparelho (IndexedDB) consumindo 0 bytes após o primeiro acesso.
-* ☁️ **Nuvem Permanente ImgBB & Firebase**: Fotos salvas gratuitamente via ImgBB e dados sincronizados no Firebase Firestore (`prefeitura-cc71b`).
+* 🤖 **No Android (Google Chrome):**
+  1. Abra o link do sistema no Chrome.
+  2. Clique no botão **"Baixar App"** no topo da tela ou toque nos **3 pontinhos (⋮)** do Chrome.
+  3. Escolha **"Instalar aplicativo"** ou **"Adicionar à tela inicial"**.
+  4. O app terá seu próprio ícone na tela inicial e abrirá em tela cheia sem barras de navegador!
+
+* 🍎 **No iPhone / iPad (Apple Safari):**
+  1. Abra o link no Safari.
+  2. Toque no botão de **Compartilhar** (ícone do quadrado com a seta para cima 📤).
+  3. Role para cima e selecione **"Adicionar à Tela de Início"** ➕.
+  4. Toque em **"Adicionar"**. O aplicativo funcionará como app nativo!
+
+* 💻 **No Computador (PC / Windows / Mac):**
+  1. Abra no Chrome ou Edge.
+  2. Clique no botão **"Baixar App"** no topo ou no ícone de instalar na barra de endereços (ao lado dos favoritos).
+  3. O aplicativo criará um atalho na área de trabalho e abrirá em janela própria e dedicada.
 
 ---
+
+## ⚡ Economia Extrema de Dados e Modo Offline
+* ⚡ **Cache Local no Aparelho (IndexedDB)**: As fotos e dados carregam com cache inteligente local no aparelho consumindo **0 KB** de dados após a visualização inicial.
+* ☁️ **Nuvem Permanente ImgBB & Firebase**: Fotos salvas gratuitamente via ImgBB e dados sincronizados no Firebase Firestore (`prefeitura-cc71b`).
+* 📶 **Offline First**: O Service Worker mantém o aplicativo utilizável mesmo em locais do canteiro de obras com sinal fraco ou sem internet.
 
 ## 💻 Como Iniciar no Computador Local (PC do Prefeito)
 

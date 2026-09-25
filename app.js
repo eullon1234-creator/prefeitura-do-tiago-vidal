@@ -1514,6 +1514,16 @@ function switchTab(tabId) {
     }
   });
 
+  // Atualiza botões da barra inferior mobile (celular)
+  document.querySelectorAll('.mobile-nav-btn').forEach(el => {
+    const mobTab = el.getAttribute('data-mob-tab');
+    if (mobTab === tabId) {
+      el.className = 'mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-amber-400 transition font-bold scale-105';
+    } else if (mobTab) {
+      el.className = 'mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium';
+    }
+  });
+
   // Esconde todas as abas e mostra a ativa
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   const activeEl = document.getElementById(`tab-${tabId}`);
@@ -2251,79 +2261,140 @@ async function carregarAlojados() {
 
 function renderTabelaAlojados(data) {
   const tbody = document.getElementById('tabelaAlojadosCorpo');
+  const mobileList = document.getElementById('listaAlojadosMobile');
   const contador = document.getElementById('alojadosContadorTexto');
   const paginacao = document.getElementById('alojadosPaginacao');
-  if (!tbody) return;
+  if (!tbody && !mobileList) return;
 
   const total = data.total;
   const items = data.items;
 
-  contador.textContent = `Mostrando ${items.length} de ${total} registros (Página ${data.page})`;
+  if (contador) contador.textContent = `Mostrando ${items.length} de ${total} registros (Página ${data.page})`;
 
   if (items.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">Nenhum trabalhador alojado encontrado com os filtros aplicados.</td></tr>`;
-    paginacao.innerHTML = '';
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">Nenhum trabalhador alojado encontrado com os filtros aplicados.</td></tr>`;
+    if (mobileList) mobileList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Nenhum trabalhador alojado encontrado com os filtros aplicados.</div>`;
+    if (paginacao) paginacao.innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = items.map(a => {
-    const isAtivo = a.status === 'ativo';
-    const statusBadge = isAtivo 
-      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">ATIVO</span>'
-      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">DESLIGADO</span>';
+  // Render para Tabela (Computador / Tablet)
+  if (tbody) {
+    tbody.innerHTML = items.map(a => {
+      const isAtivo = a.status === 'ativo';
+      const statusBadge = isAtivo 
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">ATIVO</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">DESLIGADO</span>';
 
-    const localizacao = isAtivo 
-      ? `<b>${a.bloco_nome}</b> • Quarto ${a.quarto_numero} (Cama ${a.numero_cama})`
-      : `<span class="text-slate-400 italic">Desocupado (Saída: ${a.data_saida || '-'})</span>`;
+      const localizacao = isAtivo 
+        ? `<b>${a.bloco_nome}</b> • Quarto ${a.quarto_numero} (Cama ${a.numero_cama})`
+        : `<span class="text-slate-400 italic">Desocupado (Saída: ${a.data_saida || '-'})</span>`;
 
-    const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
-    const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
-    const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
-    const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
+      const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
+      const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
+      const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
+      const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
 
-    return `
-      <tr class="hover:bg-slate-50 transition">
-        <td class="py-3 px-4 font-mono font-semibold text-slate-700">${a.matricula || '-'}</td>
-        <td class="py-3 px-4">
-          <div class="flex items-center gap-3">
-            ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-10 h-10', 'text-xs', clickFoto)}
-            <div>
-              <div class="font-bold text-slate-900 cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver detalhes e foto">${a.nome_completo}</div>
-              <div class="text-[11px] text-slate-400">Entrada: ${a.data_entrada || '-'}</div>
+      return `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-4 font-mono font-semibold text-slate-700">${a.matricula || '-'}</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-3">
+              ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-10 h-10', 'text-xs', clickFoto)}
+              <div>
+                <div class="font-bold text-slate-900 cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver detalhes e foto">${a.nome_completo}</div>
+                <div class="text-[11px] text-slate-400">Entrada: ${a.data_entrada || '-'}</div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3 px-4 text-slate-600 font-medium">${a.funcao || '-'}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-xs font-bold text-white shadow-xs" style="background-color: ${a.empresa_cor || '#475569'}">
+              ${a.empresa_nome || '-'}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-xs text-slate-800">${localizacao}</td>
+          <td class="py-3 px-4">${statusBadge}</td>
+          <td class="py-3 px-4 text-right whitespace-nowrap">
+            ${isAtivo ? `
+              <button onclick="abrirModalRealocar(${a.id}, '${a.nome_completo}', '${a.bloco_nome}', '${a.quarto_numero}', ${a.numero_cama})" class="btn-prefeito px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs mr-1" title="Realocar para outra vaga">
+                <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
+              </button>
+              <button onclick="abrirModalDesligar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 font-semibold text-xs mr-1" title="Registrar Saída / Desligamento">
+                <i class="fa-solid fa-person-walking-arrow-right"></i> Saída
+              </button>
+            ` : `
+              <button onclick="abrirModalReativar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs mr-1" title="Reativar colaborador">
+                <i class="fa-solid fa-rotate-left"></i> Reativar
+              </button>
+            `}
+            <button onclick="abrirModalEditarAlojado(${a.id}, '${a.matricula || ''}', '${a.nome_completo}', ${a.empresa_id || "null"}, '${a.funcao || ''}', '${a.data_entrada || ''}', '${a.observacoes || ''}')" class="btn-prefeito text-slate-500 hover:text-sky-600 p-1 mr-1" title="Editar Dados">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button onclick="confirmarExcluirAlojado(${a.id}, '${a.nome_completo}')" class="btn-prefeito text-slate-400 hover:text-red-600 p-1" title="Excluir Registro">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Render para Cards no Celular (Mobile Touch View)
+  if (mobileList) {
+    mobileList.innerHTML = items.map(a => {
+      const isAtivo = a.status === 'ativo';
+      const statusBadge = isAtivo 
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">ATIVO</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">DESLIGADO</span>';
+
+      const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
+      const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
+      const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
+      const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
+
+      return `
+        <div class="p-3.5 bg-white hover:bg-slate-50 transition flex items-center justify-between gap-3 border-b border-slate-100">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-11 h-11 flex-shrink-0', 'text-xs', clickFoto)}
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-slate-900 text-sm leading-tight truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}">${a.nome_completo}</div>
+              <div class="text-xs text-slate-500 font-medium truncate mt-0.5">
+                ${a.funcao || 'Sem função'} • <span class="font-bold" style="color: ${a.empresa_cor || '#475569'}">${a.empresa_nome || '-'}</span>
+              </div>
+              <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-1.5 flex-wrap">
+                ${isAtivo ? `<span class="bg-slate-100 px-1.5 py-0.5 rounded font-semibold text-slate-700 text-[10px]">🏢 ${a.bloco_nome} • Q.${a.quarto_numero} (Cama ${a.numero_cama})</span>` : '<span class="text-slate-400 italic text-[10px]">Desocupado</span>'}
+                <span class="text-[10px] text-slate-400 font-mono">Reg: ${a.matricula || '-'}</span>
+              </div>
             </div>
           </div>
-        </td>
-        <td class="py-3 px-4 text-slate-600 font-medium">${a.funcao || '-'}</td>
-        <td class="py-3 px-4">
-          <span class="px-2 py-0.5 rounded text-xs font-bold text-white shadow-xs" style="background-color: ${a.empresa_cor || '#475569'}">
-            ${a.empresa_nome || '-'}
-          </span>
-        </td>
-        <td class="py-3 px-4 text-xs text-slate-800">${localizacao}</td>
-        <td class="py-3 px-4">${statusBadge}</td>
-        <td class="py-3 px-4 text-right whitespace-nowrap">
-          ${isAtivo ? `
-            <button onclick="abrirModalRealocar(${a.id}, '${a.nome_completo}', '${a.bloco_nome}', '${a.quarto_numero}', ${a.numero_cama})" class="btn-prefeito px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs mr-1" title="Realocar para outra vaga">
-              <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
-            </button>
-            <button onclick="abrirModalDesligar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 font-semibold text-xs mr-1" title="Registrar Saída / Desligamento">
-              <i class="fa-solid fa-person-walking-arrow-right"></i> Saída
-            </button>
-          ` : `
-            <button onclick="abrirModalReativar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs mr-1" title="Reativar colaborador">
-              <i class="fa-solid fa-rotate-left"></i> Reativar
-            </button>
-          `}
-          <button onclick="abrirModalEditarAlojado(${a.id}, '${a.matricula || ''}', '${a.nome_completo}', ${a.empresa_id || "null"}, '${a.funcao || ''}', '${a.data_entrada || ''}', '${a.observacoes || ''}')" class="btn-prefeito text-slate-500 hover:text-sky-600 p-1 mr-1" title="Editar Dados">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button onclick="confirmarExcluirAlojado(${a.id}, '${a.nome_completo}')" class="btn-prefeito text-slate-400 hover:text-red-600 p-1" title="Excluir Registro">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+          <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+            ${statusBadge}
+            <div class="flex items-center gap-1 mt-0.5">
+              <button onclick="${clickFoto}" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Ver foto">
+                <i class="fa-solid fa-camera"></i>
+              </button>
+              <button onclick="abrirModalEditarAlojado(${a.id}, '${a.matricula || ''}', '${safeNome}', ${a.empresa_id || 'null'}, '${safeFuncao}', '${a.data_entrada || ''}', '${a.observacoes || ''}')" class="btn-prefeito p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Editar">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              ${isAtivo ? `
+                <button onclick="abrirModalRealocar(${a.id}, '${safeNome}', '${a.bloco_nome}', '${a.quarto_numero}', ${a.numero_cama})" class="btn-prefeito p-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs shadow-xs" title="Mover vaga">
+                  <i class="fa-solid fa-arrows-turn-to-dots"></i>
+                </button>
+                <button onclick="abrirModalDesligar(${a.id}, '${safeNome}')" class="btn-prefeito p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs shadow-xs" title="Saída">
+                  <i class="fa-solid fa-person-walking-arrow-right"></i>
+                </button>
+              ` : `
+                <button onclick="abrirModalReativar(${a.id}, '${safeNome}')" class="btn-prefeito p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs shadow-xs" title="Reativar">
+                  <i class="fa-solid fa-rotate-left"></i>
+                </button>
+              `}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 
   // Botoes de paginação
   const totalPages = Math.ceil(total / 50);
@@ -3742,3 +3813,91 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 300);
   }, 4000);
 }
+
+// ========================================================
+// PWA & INSTALAÇÃO DO APLICATIVO (CELULAR E PC)
+// ========================================================
+let deferredInstallPrompt = null;
+
+// Registro do Service Worker para suporte PWA offline e instalação
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[PWA] Service Worker registrado com sucesso:', reg.scope))
+      .catch(err => console.log('[PWA] Erro ao registrar Service Worker:', err));
+  });
+}
+
+// Capturar evento de instalação do Chrome / Edge / Android
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  console.log('[PWA] Pronto para instalar o aplicativo.');
+  const btnHeader = document.getElementById('btnInstalarAppHeader');
+  if (btnHeader) btnHeader.classList.remove('hidden');
+});
+
+// App instalado com sucesso
+window.addEventListener('appinstalled', () => {
+  console.log('[PWA] Aplicativo instalado com sucesso na tela inicial!');
+  deferredInstallPrompt = null;
+  showToast('Aplicativo instalado com sucesso na tela inicial!', 'success');
+  fecharModalInstalacao();
+  const btnHeader = document.getElementById('btnInstalarAppHeader');
+  if (btnHeader) btnHeader.classList.add('hidden');
+});
+
+function iniciarInstalacaoApp() {
+  abrirModalInstalacao();
+}
+
+function abrirModalInstalacao() {
+  abrirModal('modalInstalarApp');
+}
+
+function fecharModalInstalacao() {
+  fecharModal('modalInstalarApp');
+}
+
+async function executarPromptInstalacao() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    console.log('[PWA] Resposta instalação:', outcome);
+    if (outcome === 'accepted') {
+      showToast('Instalando o aplicativo...', 'info');
+      deferredInstallPrompt = null;
+      fecharModalInstalacao();
+    }
+  } else {
+    showToast('Siga o passo a passo ilustrado na tela para adicionar!', 'info');
+  }
+}
+
+// ========================================================
+// MENU MOBILE "MAIS" (DRAWER INFERIOR NO CELULAR)
+// ========================================================
+function toggleMenuMobileMais() {
+  const drawer = document.getElementById('drawerMobileMais');
+  if (drawer) {
+    if (drawer.classList.contains('hidden')) {
+      drawer.classList.remove('hidden');
+      drawer.classList.add('flex');
+    } else {
+      drawer.classList.add('hidden');
+      drawer.classList.remove('flex');
+    }
+  }
+}
+
+function fecharMenuMobileMais(e) {
+  if (e && e.target && e.target !== e.currentTarget && e.target.closest && e.target.closest('#drawerMobileMais > div')) {
+    return;
+  }
+  const drawer = document.getElementById('drawerMobileMais');
+  if (drawer) {
+    drawer.classList.add('hidden');
+    drawer.classList.remove('flex');
+  }
+}
+
