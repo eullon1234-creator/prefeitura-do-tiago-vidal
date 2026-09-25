@@ -1,0 +1,1914 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prefeitura de Canteiro | Controle de Alojamentos</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Cropper.js (Edição e Recorte de Fotos 1:1) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+  <!-- Firebase SDKs (v10 compat para sincronização com Firestore) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#0f172a',
+            },
+            prefeito: {
+              500: '#eab308',
+              600: '#ca8a04',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white; color: black; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+
+  <!-- Top Navbar -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md no-print">
+    <div class="px-4 py-2.5 flex items-center justify-between gap-4">
+      <!-- Left: Brand & Mobile Toggle -->
+      <div class="flex items-center gap-3">
+        <button id="mobileMenuBtn" class="md:hidden text-slate-300 hover:text-white p-1 rounded hover:bg-slate-800">
+          <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+        <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchTab('dashboard')">
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-bold shadow-sm">
+            <i class="fa-solid fa-hotel text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold tracking-tight text-base text-white">PREFEITURA DE CANTEIRO</span>
+              <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
+            </div>
+            <p class="text-xs text-slate-400">Controle Integrado de Alojamentos & Vistorias</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: User info, mode switch & fast actions -->
+      <div class="flex items-center gap-2.5">
+        <!-- Firebase Status Badge -->
+        <button onclick="switchTab('configuracoes')" title="Firebase Firestore: Conectado ao projeto prefeitura-cc71b. Clique para gerenciar sincronização." class="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-xs transition">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="firebaseDot"></span>
+          <span class="text-slate-300 font-medium flex items-center gap-1">
+            <i class="fa-solid fa-fire text-amber-500 text-xs"></i> 
+            <span id="firebaseStatusText">Firebase Conectado</span>
+          </span>
+        </button>
+
+        <!-- Controle de Tamanho da Letra (Configurações de Tipografia) -->
+        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="Ajustar tamanho da letra do sistema">
+          <span class="text-[10px] text-slate-400 px-1 font-semibold hidden sm:inline"><i class="fa-solid fa-font mr-0.5"></i></span>
+          <button onclick="alterarTamanhoFonte('sm')" id="btnFontNav_sm" class="px-1.5 py-0.5 text-[11px] font-bold rounded text-slate-400 hover:text-white transition" title="Letra Pequena (13.5px)">A-</button>
+          <button onclick="alterarTamanhoFonte('md')" id="btnFontNav_md" class="px-1.5 py-0.5 text-xs font-bold rounded bg-amber-500 text-slate-950 transition" title="Letra Normal / Padrão (15px)">A</button>
+          <button onclick="alterarTamanhoFonte('lg')" id="btnFontNav_lg" class="px-1.5 py-0.5 text-sm font-bold rounded text-slate-400 hover:text-white transition" title="Letra Grande (17px)">A+</button>
+          <button onclick="alterarTamanhoFonte('xl')" id="btnFontNav_xl" class="px-1.5 py-0.5 text-base font-bold rounded text-slate-400 hover:text-white transition" title="Letra Extra Grande (19px)">A++</button>
+        </div>
+
+        <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original -->
+        <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition" title="Exportar Planilha Oficial no formato original exato">
+          <i class="fa-solid fa-file-excel"></i> Planilha Oficial
+        </button>
+
+        <!-- Maintenance Alert Indicator -->
+        <button onclick="goToAlertas()" title="Ver itens em manutenção" class="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+          <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+          <span id="badgeAlertasNav" class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full hidden">0</span>
+        </button>
+
+        <!-- Profile / Role badge -->
+        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1">
+          <div class="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5" id="userBadge">
+            <i class="fa-solid fa-shield-halved text-amber-400" id="userRoleIcon"></i>
+            <span id="userRoleText" class="text-amber-300 font-medium">PREFEITO</span>
+          </div>
+          <button onclick="toggleUserMode()" class="px-2 py-1 text-[11px] rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition" title="Alternar entre modo Prefeito (Admin) e Consulta">
+            <i class="fa-solid fa-repeat text-slate-400 mr-1"></i>Alternar
+          </button>
+        </div>
+
+        <!-- Refresh Button -->
+        <button onclick="refreshAllData()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Atualizar Dados">
+          <i class="fa-solid fa-arrows-rotate text-sm" id="refreshIcon"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar" class="w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between transition-all duration-300 z-20 md:static fixed inset-y-0 left-0 -translate-x-full md:translate-x-0 no-print">
+      <div class="p-3 space-y-1">
+        <div class="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+          Módulos Principais
+        </div>
+        
+        <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-white bg-slate-800/80 border-l-4 border-amber-500">
+          <i class="fa-solid fa-chart-pie w-5 text-amber-400"></i>
+          <span>Dashboard Geral</span>
+        </button>
+        
+        <button onclick="switchTab('blocos')" data-tab="blocos" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-border-all w-5 text-sky-400"></i>
+          <span>Blocos & Quartos</span>
+          <span id="sideCountVagas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">880</span>
+        </button>
+        
+        <button onclick="switchTab('alojados')" data-tab="alojados" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-users-line w-5 text-emerald-400"></i>
+          <span>Gestão de Alojados</span>
+          <span id="sideCountAlojados" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">387</span>
+        </button>
+        
+        <button onclick="switchTab('moveis')" data-tab="moveis" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-bed w-5 text-violet-400"></i>
+          <span>Móveis & Vistoria</span>
+          <span id="sideCountAlertas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-red-950 text-red-300 border border-red-800">0</span>
+        </button>
+
+        <div class="px-3 pt-4 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+          Administração & Relatórios
+        </div>
+
+        <button onclick="switchTab('gestao_cadastros')" data-tab="gestao_cadastros" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-building-circle-gear w-5 text-indigo-400"></i>
+          <span>Estrutura & Empresas</span>
+        </button>
+
+        <button onclick="switchTab('relatorios')" data-tab="relatorios" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-file-excel w-5 text-green-400"></i>
+          <span>Relatórios & Exportação</span>
+        </button>
+
+        <button onclick="switchTab('importacao')" data-tab="importacao" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-file-import w-5 text-orange-400"></i>
+          <span>Importar Planilha</span>
+        </button>
+
+        <button onclick="switchTab('auditoria')" data-tab="auditoria" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-clock-rotate-left w-5 text-cyan-400"></i>
+          <span>Auditoria & Logs</span>
+        </button>
+
+        <button onclick="switchTab('configuracoes')" data-tab="configuracoes" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-sliders w-5 text-indigo-400"></i>
+          <span>Configurações & Firebase</span>
+        </button>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-3 border-t border-slate-800 bg-slate-950/50">
+        <div class="flex items-center gap-2 text-xs text-slate-400">
+          <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+          <span>Banco Conectado (SQLite)</span>
+        </div>
+        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro v1.0 • Taboca 2</p>
+      </div>
+    </aside>
+
+    <!-- Content Area -->
+    <main class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 bg-slate-100">
+
+      <!-- ================= TAB 1: DASHBOARD ================= -->
+      <div id="tab-dashboard" class="tab-content space-y-6">
+        
+        <!-- Header / Salutation & Action Buttons -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Painel Geral de Ocupação</h1>
+              <span id="roleBadgeInPage" class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                Acesso: Prefeito
+              </span>
+            </div>
+            <p class="text-sm text-slate-500 mt-0.5">Visão consolidada dos blocos, quartos, vagas e estado de conservação das instalações.</p>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-2.5">
+            <button onclick="openModalNovoAlojado()" class="btn-prefeito inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm shadow-sm transition">
+              <i class="fa-solid fa-user-plus"></i> Novo Alojado
+            </button>
+            <button onclick="switchTab('blocos')" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-medium text-sm shadow-sm transition">
+              <i class="fa-solid fa-map-location-dot"></i> Mapa de Camas
+            </button>
+            <button onclick="exportarResumoExcel()" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm shadow-sm transition" title="Exportar Resumo">
+              <i class="fa-solid fa-file-excel"></i> Exportar
+            </button>
+          </div>
+        </div>
+
+        <!-- Banner de Alerta de Manutenção (aparece se houver itens danificados) -->
+        <div id="bannerAlertaManutencao" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-sm flex items-start justify-between gap-4">
+          <div class="flex items-start gap-3">
+            <div class="p-2 rounded-lg bg-red-100 text-red-600">
+              <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-red-900 text-sm">Atenção da Prefeitura: Itens com Manutenção Pendente / Danificados</h4>
+              <p class="text-xs text-red-700 mt-0.5" id="bannerAlertaTexto">Existem quartos com móveis/itens que necessitam de intervenção ou reparo imediato.</p>
+            </div>
+          </div>
+          <button onclick="switchTab('moveis')" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold whitespace-nowrap transition">
+            Verificar Itens
+          </button>
+        </div>
+
+        <!-- KPI Cards Principais -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Total Vagas -->
+          <div class="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Capacidade Total</span>
+              <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+                <i class="fa-solid fa-bed text-sm"></i>
+              </div>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="kpiTotalVagas" class="text-2xl md:text-3xl font-extrabold text-slate-900">--</span>
+              <span class="text-xs text-slate-400">vagas/camas</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500 flex items-center gap-1.5">
+              <span id="kpiTotalQuartos" class="font-medium text-slate-700">--</span> quartos em
+              <span id="kpiTotalBlocos" class="font-medium text-slate-700">--</span> blocos
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-400"></div>
+          </div>
+
+          <!-- Vagas Ocupadas -->
+          <div class="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vagas Ocupadas</span>
+              <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                <i class="fa-solid fa-users text-sm"></i>
+              </div>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="kpiOcupadas" class="text-2xl md:text-3xl font-extrabold text-blue-600">--</span>
+              <span class="text-xs text-slate-400">trabalhadores</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">
+              Taxa de ocupação geral: <span id="kpiTaxaOcupacao" class="font-bold text-blue-600">--%</span>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-blue-600"></div>
+          </div>
+
+          <!-- Vagas Disponíveis -->
+          <div class="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vagas Disponíveis</span>
+              <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <i class="fa-solid fa-circle-check text-sm"></i>
+              </div>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="kpiLivres" class="text-2xl md:text-3xl font-extrabold text-emerald-600">--</span>
+              <span class="text-xs text-slate-400">livres</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">
+              Prontas para receber novos alojados
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500"></div>
+          </div>
+
+          <!-- Vistorias & Manutenções -->
+          <div class="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Manutenções / Danos</span>
+              <div class="w-8 h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center">
+                <i class="fa-solid fa-wrench text-sm"></i>
+              </div>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span id="kpiAlertasManut" class="text-2xl md:text-3xl font-extrabold text-red-600">--</span>
+              <span class="text-xs text-slate-400">itens em alerta</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-500">
+              <button onclick="switchTab('moveis')" class="text-red-600 hover:underline font-medium">Ver detalhes das vistorias →</button>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-red-500"></div>
+          </div>
+        </div>
+
+        <!-- Cards de Ocupação por Bloco -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-cubes-stacked text-amber-500"></i>
+              Ocupação Detalhada por Bloco
+            </h2>
+            <button onclick="switchTab('blocos')" class="text-xs text-sky-600 hover:text-sky-700 font-semibold">
+              Ver quartos e camas →
+            </button>
+          </div>
+          
+          <div id="gridBlocosCards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            <!-- Populado via Javascript -->
+          </div>
+        </div>
+
+        <!-- Gráficos: Ocupação por Empresa & Ocupação por Bloco -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Gráfico por Bloco (Barra) -->
+          <div class="lg:col-span-7 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-chart-column text-sky-500"></i>
+                Vagas Ocupadas vs. Disponíveis por Bloco
+              </h3>
+              <span class="text-xs text-slate-400 font-medium">Canteiro Taboca 2</span>
+            </div>
+            <div class="h-64">
+              <canvas id="chartBlocos"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico por Empresa (Donut / Barra) -->
+          <div class="lg:col-span-5 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie text-emerald-500"></i>
+                Distribuição de Alojados por Empresa
+              </h3>
+              <span class="text-xs text-slate-400 font-medium" id="totalEmpresasCount">-- empresas</span>
+            </div>
+            <div class="h-64 relative flex items-center justify-center">
+              <canvas id="chartEmpresas"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 2: VISÃO DE BLOCOS E QUARTOS (MAPA DE CAMAS) ================= -->
+      <div id="tab-blocos" class="tab-content hidden space-y-6">
+        
+        <!-- Header & Filtros do Mapa de Quartos -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Mapa Visual de Quartos e Camas</h1>
+              <p class="text-sm text-slate-500">Monitore em tempo real cada cama, trabalhador alojado e estado dos móveis por quarto.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="openModalNovoQuarto()" class="btn-prefeito px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-plus"></i> Novo Quarto
+              </button>
+            </div>
+          </div>
+
+          <!-- Filtro por Tipo / Bloco -->
+          <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">Bloco:</span>
+            <div id="filtroBlocosBotoes" class="flex flex-wrap items-center gap-1.5">
+              <!-- Botoes de blocos populados dinamicamente -->
+            </div>
+          </div>
+
+          <!-- Barra de Busca e Filtros Rápidos -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+            <!-- Busca -->
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+              <input type="text" id="filtroQuartoBusca" oninput="aplicarFiltrosQuartos()" placeholder="Buscar por nº quarto ou nome..." class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+            </div>
+
+            <!-- Filtro de Ocupação -->
+            <div>
+              <select id="filtroQuartoStatus" onchange="aplicarFiltrosQuartos()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todas as ocupações</option>
+                <option value="com_vagas">Quartos com Vagas Livres</option>
+                <option value="quase_cheio">Quase Cheios (1 vaga restante)</option>
+                <option value="lotado">Totalmente Lotados (100%)</option>
+                <option value="vazio">Totalmente Vazios</option>
+              </select>
+            </div>
+
+            <!-- Filtro de Alertas de Móveis -->
+            <div>
+              <select id="filtroQuartoAlerta" onchange="aplicarFiltrosQuartos()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todos os estados de móveis</option>
+                <option value="1">Com Alerta de Manutenção/Dano</option>
+              </select>
+            </div>
+
+            <!-- Legenda das Cores -->
+            <div class="flex items-center justify-end gap-3 text-xs text-slate-600">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Com Vagas</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Quase Cheio</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Lotado</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grade de Cards de Quartos -->
+        <div id="gridQuartos" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <!-- Populado via Javascript -->
+        </div>
+
+        <!-- Estado Vazio -->
+        <div id="quartosVazio" class="hidden bg-white p-12 rounded-xl text-center border border-slate-200">
+          <i class="fa-solid fa-magnifying-glass text-4xl text-slate-300 mb-3"></i>
+          <h3 class="text-base font-bold text-slate-700">Nenhum quarto encontrado</h3>
+          <p class="text-xs text-slate-400 mt-1">Tente ajustar seus termos de busca ou filtros de bloco acima.</p>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 3: GESTÃO DE ALOJADOS ================= -->
+      <div id="tab-alojados" class="tab-content hidden space-y-6">
+        
+        <!-- Header & Ações -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Gestão Completa de Alojados</h1>
+              <p class="text-sm text-slate-500">Cadastre, edite, realoque ou desligue colaboradores do canteiro com controle de histórico.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="openModalNovoAlojado()" class="btn-prefeito px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-user-plus"></i> Novo Alojado
+              </button>
+              <button onclick="exportarAlojadosExcel()" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm shadow-sm transition flex items-center gap-1.5" title="Exportar Alojados em Excel">
+                <i class="fa-solid fa-file-excel"></i> Exportar
+              </button>
+            </div>
+          </div>
+
+          <!-- Filtros da Tabela -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-2 border-t border-slate-100">
+            <!-- Busca Geral -->
+            <div class="relative md:col-span-2">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+              <input type="text" id="filtroAlojadosBusca" oninput="debounceCarregarAlojados()" placeholder="Buscar por Nome, Matrícula ou Função..." class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+            </div>
+
+            <!-- Filtro de Bloco -->
+            <div>
+              <select id="filtroAlojadosBloco" onchange="carregarAlojados()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todos os Blocos</option>
+              </select>
+            </div>
+
+            <!-- Filtro de Empresa -->
+            <div>
+              <select id="filtroAlojadosEmpresa" onchange="carregarAlojados()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todas as Empresas</option>
+              </select>
+            </div>
+
+            <!-- Filtro de Status -->
+            <div>
+              <select id="filtroAlojadosStatus" onchange="carregarAlojados()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50 font-medium">
+                <option value="ativo" selected>Somente Ativos (Alojados)</option>
+                <option value="desligado">Desligados / Histórico</option>
+                <option value="todos">Todos os Registros</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela de Alojados -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-700">
+              <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Matrícula</th>
+                  <th class="py-3 px-4">Nome do Alojado</th>
+                  <th class="py-3 px-4">Função</th>
+                  <th class="py-3 px-4">Empresa</th>
+                  <th class="py-3 px-4">Alojamento Atual</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaAlojadosCorpo" class="divide-y divide-slate-100">
+                <!-- Populado via Javascript -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Paginação & Contagem -->
+          <div class="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <span id="alojadosContadorTexto">Mostrando 0 de 0 registros</span>
+            <div class="flex items-center gap-1.5" id="alojadosPaginacao">
+              <!-- Botoes de paginação -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 4: MÓVEIS & VISTORIA ================= -->
+      <div id="tab-moveis" class="tab-content hidden space-y-6">
+        
+        <!-- Header & Ações -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Gestão de Móveis, Itens & Vistorias</h1>
+              <p class="text-sm text-slate-500">Inventário de bens em cada quarto (camas, colchões, armários, climatização) e fiscalização de conservação.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="openModalNovoMovel()" class="btn-prefeito px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-plus"></i> Novo Item
+              </button>
+              <button onclick="exportarMoveisDanificadosExcel()" class="px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-file-excel"></i> Exportar Danificados
+              </button>
+            </div>
+          </div>
+
+          <!-- Métricas Rápidas de Conservação -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <span class="text-[11px] font-semibold text-slate-500 uppercase">Total de Itens</span>
+              <div id="kpiMoveisTotal" class="text-xl font-bold text-slate-800 mt-1">--</div>
+            </div>
+            <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+              <span class="text-[11px] font-semibold text-emerald-700 uppercase">Em Bom Estado</span>
+              <div id="kpiMoveisBom" class="text-xl font-bold text-emerald-800 mt-1">--</div>
+            </div>
+            <div class="p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <span class="text-[11px] font-semibold text-amber-700 uppercase">Estado Regular</span>
+              <div id="kpiMoveisRegular" class="text-xl font-bold text-amber-800 mt-1">--</div>
+            </div>
+            <div class="p-3 rounded-lg bg-red-50 border border-red-200">
+              <span class="text-[11px] font-semibold text-red-700 uppercase">Ruim / Danificado</span>
+              <div id="kpiMoveisRuim" class="text-xl font-bold text-red-800 mt-1">--</div>
+            </div>
+          </div>
+
+          <!-- Filtros de Móveis -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+            <div>
+              <input type="text" id="filtroMovelBusca" oninput="carregarMoveis()" placeholder="Buscar item, quarto, obs..." class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+            </div>
+            <div>
+              <select id="filtroMovelBloco" onchange="carregarMoveis()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todos os Blocos</option>
+              </select>
+            </div>
+            <div>
+              <select id="filtroMovelEstado" onchange="carregarMoveis()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todos os Estados</option>
+                <option value="Bom">Bom</option>
+                <option value="Regular">Regular</option>
+                <option value="Ruim">Ruim</option>
+                <option value="Danificado">Danificado</option>
+              </select>
+            </div>
+            <div>
+              <select id="filtroMovelManut" onchange="carregarMoveis()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50 font-medium">
+                <option value="">Todas as Situações</option>
+                <option value="1">⚠️ Somente Manutenção Pendente</option>
+                <option value="0">Em Ordem</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela de Móveis -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-700">
+              <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Localização</th>
+                  <th class="py-3 px-4">Item / Móvel</th>
+                  <th class="py-3 px-4 text-center">Quantidade</th>
+                  <th class="py-3 px-4">Estado de Conservação</th>
+                  <th class="py-3 px-4">Precisa Manutenção?</th>
+                  <th class="py-3 px-4">Última Vistoria</th>
+                  <th class="py-3 px-4">Observações</th>
+                  <th class="py-3 px-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaMoveisCorpo" class="divide-y divide-slate-100">
+                <!-- Populado via Javascript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 5: GESTÃO DE CADASTROS (ESTRUTURA & EMPRESAS) ================= -->
+      <div id="tab-gestao_cadastros" class="tab-content hidden space-y-6">
+        
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h1 class="text-xl md:text-2xl font-bold text-slate-900">Estrutura Física & Empresas Contratadas</h1>
+          <p class="text-sm text-slate-500">Cadastre e configure Blocos de alojamento, Quartos, Capacidades e Empresas prestadoras de serviço.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Seção de Blocos -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <i class="fa-solid fa-cubes text-sky-600"></i> Blocos Cadastrados
+                </h3>
+                <p class="text-xs text-slate-400">Classificação por Alojamento, ADM ou Contêiner.</p>
+              </div>
+              <button onclick="openModalNovoBloco()" class="btn-prefeito px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-plus"></i> Novo Bloco
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+                  <tr>
+                    <th class="py-2.5 px-3">Nome</th>
+                    <th class="py-2.5 px-3">Tipo</th>
+                    <th class="py-2.5 px-3 text-center">Quartos</th>
+                    <th class="py-2.5 px-3 text-center">Vagas</th>
+                    <th class="py-2.5 px-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaBlocosCadastros" class="divide-y divide-slate-100">
+                  <!-- Populado via Javascript -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Seção de Empresas -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <i class="fa-solid fa-briefcase text-emerald-600"></i> Empresas & Empreiteiras
+                </h3>
+                <p class="text-xs text-slate-400">Contratadas com trabalhadores alojados na obra.</p>
+              </div>
+              <button onclick="openModalNovaEmpresa()" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-plus"></i> Nova Empresa
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+                  <tr>
+                    <th class="py-2.5 px-3">Empresa</th>
+                    <th class="py-2.5 px-3 text-center">Cor Badge</th>
+                    <th class="py-2.5 px-3 text-center">Alojados Ativos</th>
+                    <th class="py-2.5 px-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaEmpresasCadastros" class="divide-y divide-slate-100">
+                  <!-- Populado via Javascript -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 6: RELATÓRIOS & EXPORTAÇÃO ================= -->
+      <div id="tab-relatorios" class="tab-content hidden space-y-6">
+        
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Relatórios & Exportações Oficiais</h1>
+              <p class="text-sm text-slate-500">Geração de documentos em Excel (.xlsx) e formatos de impressão para a fiscalização da obra.</p>
+            </div>
+            <button onclick="window.print()" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm flex items-center gap-2 transition">
+              <i class="fa-solid fa-print"></i> Imprimir / Salvar PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Card Destaque: Planilha Oficial Modelo 100% Idêntico (Todas as Abas e Colunas) -->
+        <div class="bg-gradient-to-r from-emerald-900 via-slate-900 to-emerald-950 p-6 rounded-2xl text-white shadow-lg border border-emerald-500/30 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div class="space-y-2 max-w-2xl">
+            <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/40 uppercase tracking-wider">
+              <i class="fa-solid fa-star text-amber-400"></i> Modelo Oficial Idêntico à Planilha Original
+            </div>
+            <h2 class="text-xl md:text-2xl font-black text-white tracking-tight">Exportar Planilha Oficial Completa (Taboca 2)</h2>
+            <p class="text-xs md:text-sm text-slate-300 leading-relaxed">
+              Exportação oficial com <strong>todas as 4 abas originais</strong> (<span class="text-emerald-300 font-mono">BLOCOS ALOJAMENTO</span>, <span class="text-emerald-300 font-mono">BLOCOS ADM</span>, <span class="text-emerald-300 font-mono">RESUMO (2)</span>, <span class="text-emerald-300 font-mono">BLOCOS CONTÊINER</span>), layout exato de colunas lado a lado, cores, fórmulas de cálculo e cabeçalhos preservados, preenchida com todos os dados atuais de ocupação.
+            </p>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button onclick="exportarPlanilhaOficial()" class="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/20 transition transform active:scale-95 whitespace-nowrap">
+              <i class="fa-solid fa-file-excel text-base text-slate-950"></i> Baixar Planilha Oficial (.xlsx)
+            </button>
+          </div>
+        </div>
+
+        <!-- Cards de Download Rápido -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- Card 1: Resumo Original -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-3">
+                <i class="fa-solid fa-table text-lg"></i>
+              </div>
+              <h3 class="font-bold text-slate-900 text-base">Relatório Resumo de Ocupação</h3>
+              <p class="text-xs text-slate-500 mt-1">Idêntico à aba "RESUMO" da planilha original Taboca 2. Contém totais por bloco, vagas, ocupadas e disponíveis.</p>
+            </div>
+            <button onclick="exportarResumoExcel()" class="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-download"></i> Baixar Excel (.xlsx)
+            </button>
+          </div>
+
+          <!-- Card 2: Lista Completa de Alojados -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+                <i class="fa-solid fa-address-book text-lg"></i>
+              </div>
+              <h3 class="font-bold text-slate-900 text-base">Relação Geral de Alojados</h3>
+              <p class="text-xs text-slate-500 mt-1">Lista completa com Matrícula, Nome, Função, Empresa, Bloco, Quarto e Cama de todos os trabalhadores.</p>
+            </div>
+            <button onclick="exportarAlojadosExcel()" class="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-download"></i> Baixar Excel (.xlsx)
+            </button>
+          </div>
+
+          <!-- Card 3: Móveis e Danos -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-10 h-10 rounded-lg bg-red-100 text-red-700 flex items-center justify-center mb-3">
+                <i class="fa-solid fa-screwdriver-wrench text-lg"></i>
+              </div>
+              <h3 class="font-bold text-slate-900 text-base">Relatório de Itens Danificados</h3>
+              <p class="text-xs text-slate-500 mt-1">Relação de quartos com móveis/itens em estado Ruim/Danificado ou que necessitam de manutenção preventiva/corretiva.</p>
+            </div>
+            <button onclick="exportarMoveisDanificadosExcel()" class="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-download"></i> Baixar Excel (.xlsx)
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabela Prévia do Resumo Geral (ao vivo na tela) -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+              <i class="fa-solid fa-file-invoice text-slate-700"></i>
+              Pré-visualização do Resumo Geral de Alojamentos
+            </h3>
+            <span class="text-xs text-slate-400">Atualizado dinamicamente</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-900 text-white text-xs font-semibold uppercase">
+                <tr>
+                  <th class="py-3 px-4">Alojamento / Bloco</th>
+                  <th class="py-3 px-4">Descrição / Tipo</th>
+                  <th class="py-3 px-4 text-center">Total Vagas</th>
+                  <th class="py-3 px-4 text-center">Ocupadas</th>
+                  <th class="py-3 px-4 text-center">Disponíveis</th>
+                  <th class="py-3 px-4 text-center">% Ocupação</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaResumoGeralAoVivo" class="divide-y divide-slate-200">
+                <!-- Populado via Javascript -->
+              </tbody>
+              <tfoot id="tabelaResumoGeralFooter" class="bg-slate-100 font-bold border-t-2 border-slate-300">
+                <!-- Totais -->
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 7: IMPORTAR PLANILHA ================= -->
+      <div id="tab-importacao" class="tab-content hidden space-y-6">
+        
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h1 class="text-xl md:text-2xl font-bold text-slate-900">Importação & Sincronização de Planilhas</h1>
+          <p class="text-sm text-slate-500">Importe novas versões da planilha do canteiro ou restaure o estado original oficial.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Upload de Nova Planilha -->
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Carregar Nova Planilha (.xlsx)</h3>
+                <p class="text-xs text-slate-500">Mapeia automaticamente blocos, quartos, vagas e alojados.</p>
+              </div>
+            </div>
+
+            <form id="formUploadPlanilha" onsubmit="enviarPlanilhaUpload(event)" class="space-y-4 pt-2">
+              <div class="border-2 border-dashed border-slate-300 hover:border-amber-500 rounded-xl p-6 text-center cursor-pointer transition bg-slate-50" onclick="document.getElementById('inputArquivoExcel').click()">
+                <i class="fa-solid fa-file-excel text-4xl text-emerald-600 mb-2"></i>
+                <div class="font-semibold text-slate-800 text-sm" id="nomeArquivoSelecionado">Selecione ou arraste a planilha aqui</div>
+                <div class="text-xs text-slate-400 mt-1">Formato suportado: .xlsx ou .xlsm</div>
+                <input type="file" id="inputArquivoExcel" accept=".xlsx, .xlsm" class="hidden" onchange="atualizarNomeArquivo(this)">
+              </div>
+
+              <button type="submit" id="btnUploadSubmit" class="btn-prefeito w-full py-2.5 px-4 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm shadow-sm transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-upload"></i> Processar e Importar Planilha
+              </button>
+            </form>
+          </div>
+
+          <!-- Restauração da Planilha Base Oficial -->
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Restaurar Dados Originais (Taboca 2)</h3>
+                <p class="text-xs text-slate-500">Recarrega o banco de dados a partir do arquivo anexo oficial.</p>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-2">
+              <p class="font-medium text-slate-800">Esta ação irá restabelecer os seguintes dados da obra:</p>
+              <ul class="list-disc list-inside space-y-1 text-slate-600">
+                <li>10 Blocos (Blocos 1 a 5, Blocos 1 a 3 ADM, Contêineres 1 e 2)</li>
+                <li>220 Quartos com 880 Camas no total</li>
+                <li>387 Alojados oficiais com suas matrículas e funções</li>
+                <li>Móveis e equipamentos padrão vistoriados em cada quarto</li>
+              </ul>
+            </div>
+
+            <button onclick="confirmarRestaurarPadrao()" class="btn-prefeito w-full py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-sm transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-rotate-left"></i> Restaurar Planilha Oficial Taboca 2
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 8: AUDITORIA & LOGS ================= -->
+      <div id="tab-auditoria" class="tab-content hidden space-y-6">
+        
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Registro de Auditoria & Histórico</h1>
+              <p class="text-sm text-slate-500">Rastreabilidade completa de todas as alterações feitas pelo prefeito e administradores.</p>
+            </div>
+            <button onclick="carregarAuditoria()" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrows-rotate"></i> Atualizar Logs
+            </button>
+          </div>
+
+          <!-- Filtros de Auditoria -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+            <div>
+              <input type="text" id="filtroAuditBusca" oninput="carregarAuditoria()" placeholder="Filtrar por detalhe..." class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+            </div>
+            <div>
+              <select id="filtroAuditAcao" onchange="carregarAuditoria()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todas as Ações</option>
+                <option value="CRIAR">Criação</option>
+                <option value="EDITAR">Edição</option>
+                <option value="REALOCAR">Realocação de Cama</option>
+                <option value="DESLIGAR">Desligamento / Saída</option>
+                <option value="REATIVAR">Reativação</option>
+                <option value="EXCLUIR">Exclusão</option>
+                <option value="RESOLVER_MANUTENCAO">Manutenção Resolvida</option>
+                <option value="IMPORTACAO">Importação</option>
+              </select>
+            </div>
+            <div>
+              <select id="filtroAuditUsuario" onchange="carregarAuditoria()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+                <option value="">Todos os Usuários</option>
+                <option value="prefeito">Prefeito</option>
+                <option value="admin">Administrador</option>
+                <option value="sistema_importacao">Sistema de Importação</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela de Logs -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-700">
+              <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Data & Hora</th>
+                  <th class="py-3 px-4">Usuário</th>
+                  <th class="py-3 px-4">Ação</th>
+                  <th class="py-3 px-4">Entidade</th>
+                  <th class="py-3 px-4">Detalhes da Alteração</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaAuditoriaCorpo" class="divide-y divide-slate-100 font-mono text-xs">
+                <!-- Populado via Javascript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB 8: CONFIGURAÇÕES & FIREBASE ================= -->
+      <div id="tab-configuracoes" class="tab-content hidden space-y-6">
+        
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Configurações do Sistema & Nuvem</h1>
+              <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200">Painel do Prefeito</span>
+            </div>
+            <p class="text-sm text-slate-500">Personalize o tamanho das letras, gerencie a integração do Firebase e visualize os padrões das instalações.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportarPlanilhaOficial()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-2 transition shadow-sm">
+              <i class="fa-solid fa-file-excel"></i> Exportar Planilha Oficial
+            </button>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 1: TAMANHO DAS LETRAS / TIPOGRAFIA -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-lg font-bold">
+                <i class="fa-solid fa-font"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Tamanho das Letras da Interface</h3>
+                <p class="text-xs text-slate-500">Escolha a escala de texto ideal para facilitar a visualização no computador, tablet ou celular em campo.</p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-600">Salvo no Navegador</span>
+          </div>
+
+          <!-- Cards de Seleção de Fonte -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            <!-- Opção 1: Pequeno -->
+            <div id="cardFontConfig_sm" onclick="alterarTamanhoFonte('sm')" class="cursor-pointer p-4 rounded-xl border border-slate-200 hover:border-amber-500 transition-all flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-slate-800 text-sm">Pequeno</span>
+                  <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">13.5px</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-3">Mais informações na tela ao mesmo tempo. Bom para listas densas.</p>
+              </div>
+              <div class="p-2.5 rounded bg-slate-50 border border-slate-100 text-xs text-slate-700">
+                Texto de exemplo no alojamento
+              </div>
+            </div>
+
+            <!-- Opção 2: Padrão / Normal -->
+            <div id="cardFontConfig_md" onclick="alterarTamanhoFonte('md')" class="cursor-pointer p-4 rounded-xl border-2 border-amber-500 bg-amber-50/30 transition-all flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                    Padrão / Normal
+                    <i class="fa-solid fa-circle-check text-amber-500 text-xs"></i>
+                  </span>
+                  <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">15px</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-3">Recomendado para uso geral em notebooks e desktops de escritório.</p>
+              </div>
+              <div class="p-2.5 rounded bg-white border border-slate-200 text-sm text-slate-800 font-medium">
+                Texto de exemplo no alojamento
+              </div>
+            </div>
+
+            <!-- Opção 3: Grande -->
+            <div id="cardFontConfig_lg" onclick="alterarTamanhoFonte('lg')" class="cursor-pointer p-4 rounded-xl border border-slate-200 hover:border-amber-500 transition-all flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-slate-800 text-sm">Grande</span>
+                  <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">17px</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-3">Excelente para telas de alta resolução, tablets e monitores distantes.</p>
+              </div>
+              <div class="p-2.5 rounded bg-slate-50 border border-slate-100 text-base text-slate-800 font-medium">
+                Texto de exemplo no alojamento
+              </div>
+            </div>
+
+            <!-- Opção 4: Extra Grande -->
+            <div id="cardFontConfig_xl" onclick="alterarTamanhoFonte('xl')" class="cursor-pointer p-4 rounded-xl border border-slate-200 hover:border-amber-500 transition-all flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-bold text-slate-800 text-sm">Extra Grande</span>
+                  <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">19px</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-3">Máxima legibilidade para uso no campo ou conferências rápidas na obra.</p>
+              </div>
+              <div class="p-2.5 rounded bg-slate-50 border border-slate-100 text-lg text-slate-900 font-bold">
+                Texto de exemplo no alojamento
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2: INTEGRAÇÃO FIREBASE & ARQUITETURA DE DADOS -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-fire"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Integração com Firebase Firestore</h3>
+                <p class="text-xs text-slate-500">Sincronização em nuvem de todos os dados do canteiro de obras no projeto <strong class="font-mono text-slate-700">prefeitura-cc71b</strong>.</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <span id="firebaseStatusBadgeCard" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Conectado (Firestore Ativo)</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Banner Informativo de Arquitetura de Armazenamento -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <!-- Lado Local: Fotos -->
+            <div class="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200">
+              <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-hard-drive text-sm"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-slate-900 uppercase">Armazenamento Local das Fotos</h4>
+                <p class="text-xs text-slate-600 mt-0.5">As fotos recortadas dos colaboradores são salvas diretamente no <strong>computador local do Prefeito</strong> na pasta:</p>
+                <code class="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono mt-1 inline-block">prefeitura/uploads/fotos_alojados/</code>
+              </div>
+            </div>
+
+            <!-- Lado Nuvem: Dados Firebase -->
+            <div class="flex items-start gap-3 p-3 bg-white rounded-lg border border-slate-200">
+              <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-cloud text-sm"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-slate-900 uppercase">Banco de Dados em Nuvem (Firebase)</h4>
+                <p class="text-xs text-slate-600 mt-0.5">Todos os registros cadastrais (quartos, vagas, colaboradores, empresas, auditoria e vistorias) são sincronizados no:</p>
+                <code class="text-[11px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded font-mono mt-1 inline-block">Firebase Firestore (prefeitura-cc71b)</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Credenciais Firebase Configuradas -->
+          <div class="bg-slate-900 text-slate-200 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-2">
+              <span class="font-mono font-semibold text-amber-400"><i class="fa-solid fa-key mr-1"></i> Configuração Ativa do Firebase</span>
+              <span>Projeto Oficial: prefeitura-cc71b</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+              <div><span class="text-slate-500">projectId:</span> <span class="text-emerald-400">"prefeitura-cc71b"</span></div>
+              <div><span class="text-slate-500">authDomain:</span> <span class="text-sky-300">"prefeitura-cc71b.firebaseapp.com"</span></div>
+              <div><span class="text-slate-500">storageBucket:</span> <span class="text-amber-300">"prefeitura-cc71b.firebasestorage.app"</span></div>
+              <div><span class="text-slate-500">appId:</span> <span class="text-slate-300">"1:395936672533:web:d7d17537d2c38c47bc971c"</span></div>
+            </div>
+          <!-- ESTRATÉGIA DE ECONOMIA MÁXIMA DE DADOS FIREBASE (PARTE 1) -->
+          <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-leaf"></i>
+                </span>
+                <div>
+                  <h4 class="text-xs font-bold text-emerald-950 uppercase tracking-wide">Modo Economia Extrema de Dados Firebase (Ativo)</h4>
+                  <p class="text-[11px] text-emerald-700">Garante que você nunca pague nada e nunca estoure a cota gratuita do Firebase.</p>
+                </div>
+              </div>
+              <span id="firebaseCacheStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 border border-emerald-300">
+                <i class="fa-solid fa-bolt text-amber-600 mr-0.5"></i> Cache Offline Ativo (0 Leituras)
+              </span>
+            </div>
+
+            <!-- As 3 regras ativas de economia -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div class="p-3 bg-white rounded-lg border border-emerald-100 space-y-1">
+                <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-contract text-emerald-600"></i>
+                  <span>1. Documento Snapshot Único</span>
+                </div>
+                <p class="text-[11px] text-slate-500">
+                  Em vez de 400 leituras, o celular lê <strong>apenas 1 documento</strong> com todo o canteiro. Consome 0,002% da cota diária de 50.000.
+                </p>
+              </div>
+
+              <div class="p-3 bg-white rounded-lg border border-emerald-100 space-y-1">
+                <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                  <i class="fa-solid fa-hard-drive text-amber-600"></i>
+                  <span>2. Cache Offline no Celular</span>
+                </div>
+                <p class="text-[11px] text-slate-500">
+                  O navegador salva os dados na memória (IndexedDB). Se nada mudou na obra, gasta <strong>0 leituras</strong> na nuvem.
+                </p>
+              </div>
+
+              <div class="p-3 bg-white rounded-lg border border-emerald-100 space-y-1">
+                <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                  <i class="fa-solid fa-arrows-split-up-and-left text-sky-600"></i>
+                  <span>3. Sincronia Incremental</span>
+                </div>
+                <p class="text-[11px] text-slate-500">
+                  Só envia dados quando houver uma alteração real (Check-in, Check-out, etc.), sem reescrever o banco inteiro.
+                </p>
+              </div>
+            </div>
+
+            <!-- Botões de Ação do Snapshot -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-emerald-200/60">
+              <span class="text-[11px] text-emerald-800">
+                Último Snapshot gerado: <strong id="firebaseSnapshotTimeText" class="font-bold text-emerald-950">Ainda não gerado</strong>
+              </span>
+              <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button type="button" onclick="carregarDadosDoSnapshotFirebase()" class="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-300 shadow-xs transition" title="Lê apenas 1 documento do Firebase">
+                  <i class="fa-solid fa-eye text-emerald-600 mr-1"></i> Testar Leitura (1 Doc)
+                </button>
+                <button type="button" id="btnGerarSnapshot" onclick="gerarSnapshotConsolidadoFirebase(true)" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition" title="Gera o snapshot consolidado para o celular">
+                  <i class="fa-solid fa-bolt mr-1"></i> Atualizar Snapshot na Nuvem
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ações de Sincronização -->
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100">
+            <div class="text-xs text-slate-500 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+              <span>Última sincronização: <strong id="firebaseLastSyncText" class="text-slate-700">Ao carregar o sistema</strong></span>
+            </div>
+            <button id="btnSyncFirebase" onclick="sincronizarTudoComFirebase(true)" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Sincronizar Tudo com Firebase Agora
+            </button>
+          </div>
+        </div>
+
+        <!-- SEÇÃO: HOSPEDAGEM IMGBB & CACHE LOCAL NO CELULAR E PC -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-images"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Hospedagem ImgBB & Cache no Aparelho</h3>
+                <p class="text-xs text-slate-500">Fotos salvas na nuvem gratuita permanente (ImgBB) e salvas na memória interna deste aparelho para abrir instantaneamente sem gastar dados.</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-300">
+                <i class="fa-solid fa-circle-check text-purple-600"></i>
+                <span>ImgBB API Ativa</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Cards de Detalhes: ImgBB + Cache Local -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- ImgBB Config -->
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                  <i class="fa-solid fa-cloud-arrow-up text-purple-600"></i> Nuvem Gratuita ImgBB
+                </span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">100% Grátis & Sem Cartão</span>
+              </div>
+              <p class="text-xs text-slate-600">
+                Cada foto recortada é enviada automaticamente para o ImgBB e salva em cópia local no PC do Prefeito.
+              </p>
+              <div class="bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-mono text-slate-700 flex items-center justify-between">
+                <span>Chave API:</span>
+                <span class="font-bold text-purple-700">655783f08b2e45a3cd6b1b7a7e6ce91b</span>
+              </div>
+            </div>
+
+            <!-- Cache Offline no Aparelho -->
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                  <i class="fa-solid fa-bolt text-amber-500"></i> Memória do Aparelho (Cache Offline)
+                </span>
+                <span id="badgeCacheStatus" class="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Ativado</span>
+              </div>
+              <p class="text-xs text-slate-600">
+                As fotos já carregadas ficam guardadas na memória do navegador (IndexedDB) deste celular/PC. Você não gasta internet ao reabrir o app!
+              </p>
+              <div class="bg-white p-2.5 rounded-lg border border-slate-200 text-xs flex items-center justify-between">
+                <span class="text-slate-600">Fotos Salvas Neste Aparelho:</span>
+                <span id="cacheFotosCountText" class="font-bold text-slate-900">0 fotos salvas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ações do Cache -->
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <div class="text-xs text-slate-500 flex items-center gap-1.5">
+              <i class="fa-solid fa-mobile-screen text-slate-400"></i>
+              <span>Economia máxima de dados móveis no 4G/5G da obra.</span>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <button onclick="limparCacheFotos()" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-trash-can text-red-500"></i> Limpar Cache
+              </button>
+              <button id="btnPreloadFotos" onclick="baixarTodasFotosParaCache()" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition">
+                <i class="fa-solid fa-download"></i> Salvar Todas Fotos no Aparelho
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 3: PADRÃO DE MÓVEIS DOS QUARTOS -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-couch"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-base">Padrão de Móveis em Todos os Quartos</h3>
+              <p class="text-xs text-slate-500">Regra de mobiliário obrigatória aplicada uniformemente aos 220 quartos do canteiro.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <div class="w-12 h-12 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xl font-bold">
+                2
+              </div>
+              <div>
+                <h4 class="font-bold text-slate-900 text-sm">Beliches / Camas</h4>
+                <p class="text-xs text-slate-500">2 beliches metálicas (4 camas individuais por quarto)</p>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <div class="w-12 h-12 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl font-bold">
+                4
+              </div>
+              <div>
+                <h4 class="font-bold text-slate-900 text-sm">Armários / Guarda-roupas</h4>
+                <p class="text-xs text-slate-500">4 armários com chave (1 por trabalhador)</p>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <div class="w-12 h-12 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center text-xl font-bold">
+                1
+              </div>
+              <div>
+                <h4 class="font-bold text-slate-900 text-sm">Ar-Condicionado</h4>
+                <p class="text-xs text-slate-500">1 climatizador / ar-condicionado instalado</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ================= MODAIS ================= -->
+
+  <!-- Modal Detalhes do Quarto & Móveis -->
+  <div id="modalQuartoDetalhes" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <!-- Header do Modal -->
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 id="modalQuartoTitulo" class="text-lg font-bold">Quarto --</h2>
+            <span id="modalQuartoBadgeBloco" class="text-xs px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-semibold border border-slate-700">--</span>
+          </div>
+          <p id="modalQuartoSubtitulo" class="text-xs text-slate-400 mt-0.5">Capacidade: 4 vagas</p>
+        </div>
+        <button onclick="fecharModal('modalQuartoDetalhes')" class="text-slate-400 hover:text-white text-lg p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Conteúdo do Modal com Scroll -->
+      <div class="p-6 overflow-y-auto space-y-6 custom-scrollbar flex-1">
+        <!-- Mapa de Camas do Quarto -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-bed text-sky-600"></i> Camas e Alojados Atuais
+            </h4>
+            <span class="text-xs text-slate-400">Total de Camas: <span id="modalQuartoQtdCamas" class="font-bold text-slate-700">4</span></span>
+          </div>
+          <div id="modalQuartoGridCamas" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Populado via Javascript -->
+          </div>
+        </div>
+
+        <!-- Inventário de Móveis e Vistorias do Quarto -->
+        <div class="pt-4 border-t border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-couch text-amber-600"></i> Móveis & Itens do Quarto
+              </h4>
+              <p class="text-xs text-slate-400">Controle de conservação e vistorias da Prefeitura.</p>
+            </div>
+            <button onclick="abrirNovoMovelNoQuartoAtual()" class="btn-prefeito px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-plus"></i> Adicionar Item
+            </button>
+          </div>
+
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 font-semibold text-slate-600 uppercase border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-3">Item</th>
+                  <th class="py-2.5 px-3 text-center">Qtd</th>
+                  <th class="py-2.5 px-3">Estado</th>
+                  <th class="py-2.5 px-3 text-center">Manutenção?</th>
+                  <th class="py-2.5 px-3">Última Vistoria</th>
+                  <th class="py-2.5 px-3">Observações</th>
+                  <th class="py-2.5 px-3 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="modalQuartoTabelaMoveis" class="divide-y divide-slate-100">
+                <!-- Populado via Javascript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer do Modal -->
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button onclick="fecharModal('modalQuartoDetalhes')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Novo / Editar Alojado -->
+  <div id="modalAlojadoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modalAlojadoTitulo" class="text-base font-bold">Cadastrar Novo Alojado</h3>
+        <button onclick="fecharModal('modalAlojadoForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formAlojado" onsubmit="salvarAlojado(event)" class="p-6 space-y-4">
+        <input type="hidden" id="alojadoFormId">
+
+        <!-- Seleção de Vaga (Somente se for novo ou reatribuindo) -->
+        <div id="secaoSelecaoVaga" class="space-y-1">
+          <label class="block text-xs font-semibold text-slate-700">Selecione o Quarto e Vaga Livre *</label>
+          <select id="alojadoFormVagaId" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50">
+            <option value="">Carregando vagas livres...</option>
+          </select>
+          <p class="text-[11px] text-slate-400">Mostra apenas vagas desocupadas disponíveis.</p>
+        </div>
+
+        <!-- Nome Completo -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nome Completo *</label>
+          <input type="text" id="alojadoFormNome" required placeholder="Ex: JOÃO SILVA PEREIRA" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Matrícula -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Matrícula (REG.)</label>
+            <input type="text" id="alojadoFormMatricula" placeholder="Ex: 19845" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+
+          <!-- Empresa -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Empresa *</label>
+            <select id="alojadoFormEmpresa" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <!-- Populado via Javascript -->
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Função -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Função / Cargo</label>
+            <input type="text" id="alojadoFormFuncao" placeholder="Ex: PEDREIRO, ELETRICISTA..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase">
+          </div>
+
+          <!-- Data Entrada -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Data de Entrada</label>
+            <input type="date" id="alojadoFormDataEntrada" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+        </div>
+
+        <!-- Foto do Trabalhador -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-4">
+          <div class="relative w-16 h-16 rounded-full overflow-hidden bg-slate-200 border-2 border-amber-500/50 flex-shrink-0 flex items-center justify-center">
+            <img id="alojadoFormFotoPreview" src="" alt="Foto" class="w-full h-full object-cover hidden">
+            <i id="alojadoFormFotoPlaceholder" class="fa-solid fa-user text-2xl text-slate-400"></i>
+          </div>
+          <div class="flex-1 space-y-1">
+            <label class="block text-xs font-semibold text-slate-700">Foto do Alojado (opcional)</label>
+            <div class="flex items-center gap-2">
+              <label class="cursor-pointer px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-camera"></i>
+                <span>Tirar Foto / Escolher</span>
+                <input type="file" id="alojadoFormFotoInput" accept="image/*" class="hidden" onchange="previewFotoAlojado(this)">
+              </label>
+              <button type="button" id="btnRemoverFotoForm" onclick="limparFotoForm()" class="hidden px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-[11px] font-semibold transition">
+                Remover
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400">JPG, PNG ou foto direta da câmera do celular/tablet.</p>
+            <input type="hidden" id="alojadoFormFotoUrl">
+          </div>
+        </div>
+
+        <!-- Observações -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Observações</label>
+          <textarea id="alojadoFormObs" rows="2" placeholder="Restrições, turno de trabalho, observações médicas..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalAlojadoForm')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition">
+            Salvar Alojado
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Realocar Alojado -->
+  <div id="modalRealocar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 class="text-base font-bold">Realocar Alojado de Vaga</h3>
+        <button onclick="fecharModal('modalRealocar')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formRealocar" onsubmit="confirmarRealocacao(event)" class="p-6 space-y-4">
+        <input type="hidden" id="realocarAlojadoId">
+        
+        <div class="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
+          <div>Alojado: <span id="realocarNome" class="font-bold">--</span></div>
+          <div>Local Atual: <span id="realocarLocalAtual" class="font-bold">--</span></div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nova Vaga Disponível *</label>
+          <select id="realocarNovaVaga" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+            <!-- Vagas livres -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Motivo da Realocação</label>
+          <input type="text" id="realocarMotivo" placeholder="Ex: Mudança de turno, pedido da contratada..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalRealocar')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition">
+            Confirmar Mudança
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Desligamento / Saída -->
+  <div id="modalDesligar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-6 py-4 bg-red-600 text-white flex items-center justify-between">
+        <h3 class="text-base font-bold flex items-center gap-2">
+          <i class="fa-solid fa-person-walking-dashed-line-arrow-right"></i> Registrar Saída / Desligamento
+        </h3>
+        <button onclick="fecharModal('modalDesligar')" class="text-red-200 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formDesligar" onsubmit="confirmarDesligamento(event)" class="p-6 space-y-4">
+        <input type="hidden" id="desligarAlojadoId">
+        
+        <p class="text-xs text-slate-600">
+          Ao registrar a saída de <b id="desligarNome" class="text-slate-900">--</b>, a vaga ocupada será <b class="text-emerald-700">liberada imediatamente</b> e o histórico do colaborador será mantido para consultas.
+        </p>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Data de Saída *</label>
+          <input type="date" id="desligarData" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Motivo da Saída</label>
+          <input type="text" id="desligarMotivo" placeholder="Ex: Conclusão de contrato, transferência de obra..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalDesligar')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition">
+            Liberar Vaga e Desligar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Novo / Editar Móvel -->
+  <div id="modalMovelForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modalMovelTitulo" class="text-base font-bold">Cadastrar Item / Móvel</h3>
+        <button onclick="fecharModal('modalMovelForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formMovel" onsubmit="salvarMovel(event)" class="p-6 space-y-4">
+        <input type="hidden" id="movelFormId">
+        
+        <!-- Seleção de Quarto (se não foi aberto dentro do modal do quarto) -->
+        <div id="secaoMovelQuarto">
+          <label class="block text-xs font-semibold text-slate-700">Quarto *</label>
+          <select id="movelFormQuartoId" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <!-- Populado via Javascript -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Tipo de Item / Equipamento *</label>
+          <select id="movelFormTipo" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="Beliche / Cama">Beliche / Cama</option>
+            <option value="Colchão D33">Colchão D33</option>
+            <option value="Guarda-roupa / Armário">Guarda-roupa / Armário</option>
+            <option value="Ventilador de Parede">Ventilador de Parede</option>
+            <option value="Ar-Condicionado">Ar-Condicionado</option>
+            <option value="Lâmpada LED">Lâmpada LED</option>
+            <option value="Tomadas">Tomadas</option>
+            <option value="Espelho">Espelho</option>
+            <option value="Trinco / Fechadura">Trinco / Fechadura</option>
+            <option value="Outro Item">Outro Item</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Quantidade *</label>
+            <input type="number" id="movelFormQtd" min="1" max="50" value="1" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Estado de Conservação *</label>
+            <select id="movelFormEstado" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <option value="Bom">Bom</option>
+              <option value="Regular">Regular</option>
+              <option value="Ruim">Ruim</option>
+              <option value="Danificado">Danificado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Data da Vistoria</label>
+            <input type="date" id="movelFormDataVistoria" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+
+          <div class="flex items-center pt-5">
+            <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-red-600">
+              <input type="checkbox" id="movelFormPrecisaManut" class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500">
+              <span>Precisa de Manutenção?</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Observações da Vistoria</label>
+          <textarea id="movelFormObs" rows="2" placeholder="Detalhes de danos, peças a substituir..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalMovelForm')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition">
+            Salvar Item
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Novo / Editar Bloco -->
+  <div id="modalBlocoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modalBlocoTitulo" class="text-base font-bold">Cadastrar Novo Bloco</h3>
+        <button onclick="fecharModal('modalBlocoForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formBloco" onsubmit="salvarBloco(event)" class="p-6 space-y-4">
+        <input type="hidden" id="blocoFormId">
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nome do Bloco *</label>
+          <input type="text" id="blocoFormNome" required placeholder="Ex: Bloco 6, ADM 4, Contêiner 3" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Tipo de Estrutura *</label>
+          <select id="blocoFormTipo" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <option value="alojamento">Alojamento Padrão (Alvenaria)</option>
+            <option value="adm">Bloco ADM (Administração / Supervisores)</option>
+            <option value="conteiner">Módulo Contêiner</option>
+          </select>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalBlocoForm')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">
+            Salvar Bloco
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Novo Quarto -->
+  <div id="modalQuartoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 class="text-base font-bold">Adicionar Novo Quarto</h3>
+        <button onclick="fecharModal('modalQuartoForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formQuarto" onsubmit="salvarQuarto(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Bloco de Destino *</label>
+          <select id="quartoFormBlocoId" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <!-- Populado via Javascript -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Número do Quarto *</label>
+            <input type="text" id="quartoFormNumero" required placeholder="Ex: 25, 178..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Capacidade (Camas) *</label>
+            <input type="number" id="quartoFormCapacidade" min="1" max="16" value="4" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Observações</label>
+          <input type="text" id="quartoFormObs" placeholder="Ex: Próximo ao refeitório..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalQuartoForm')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition">
+            Criar Quarto & Gerar Vagas
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nova Empresa -->
+  <div id="modalEmpresaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modalEmpresaTitulo" class="text-base font-bold">Cadastrar Empresa / Contratada</h3>
+        <button onclick="fecharModal('modalEmpresaForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="formEmpresa" onsubmit="salvarEmpresa(event)" class="p-6 space-y-4">
+        <input type="hidden" id="empresaFormId">
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Nome da Empresa *</label>
+          <input type="text" id="empresaFormNome" required placeholder="Ex: CONSTRUTORA ALVORADA" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Cor do Badge de Identificação</label>
+          <div class="flex items-center gap-3 mt-1">
+            <input type="color" id="empresaFormCor" value="#2563eb" class="w-10 h-10 rounded border border-slate-300 cursor-pointer">
+            <span class="text-xs text-slate-500">Usada nos crachás e mapas visuais de quartos</span>
+          </div>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalEmpresaForm')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition">
+            Salvar Empresa
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Foto do Alojado -->
+  <div id="modalFotoAlojado" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <h3 id="modalFotoNome" class="text-sm font-bold truncate max-w-[240px]">Foto do Colaborador</h3>
+          <p id="modalFotoSub" class="text-[11px] text-slate-400">Identificação no Canteiro</p>
+        </div>
+        <button onclick="fecharModal('modalFotoAlojado')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 flex flex-col items-center space-y-4">
+        <!-- Foto em alta resolução ou placeholder -->
+        <div class="w-48 h-48 rounded-2xl overflow-hidden bg-slate-100 border-2 border-slate-200 shadow-inner flex items-center justify-center relative">
+          <img id="modalFotoImg" src="" alt="Foto Alojado" class="w-full h-full object-cover hidden">
+          <div id="modalFotoVazio" class="flex flex-col items-center justify-center text-slate-400 space-y-2">
+            <i class="fa-solid fa-user text-5xl"></i>
+            <span class="text-xs">Sem foto cadastrada</span>
+          </div>
+        </div>
+
+        <input type="hidden" id="modalFotoAlojadoId">
+
+        <!-- Informações do Alojado -->
+        <div class="text-center space-y-1 w-full">
+          <div id="modalFotoInfoEmpresa" class="inline-block px-2.5 py-0.5 rounded text-xs font-bold text-white mb-1">EMPRESA</div>
+          <div id="modalFotoInfoCargo" class="text-xs text-slate-600 font-semibold">Função / Matrícula</div>
+          <div id="modalFotoInfoLocal" class="text-[11px] text-slate-400">Bloco • Quarto • Cama</div>
+        </div>
+
+        <!-- Ações: Upload e Remoção de Foto -->
+        <div class="w-full pt-2 flex flex-col gap-2">
+          <label class="btn-prefeito w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition">
+            <i class="fa-solid fa-camera"></i>
+            <span>Tirar Foto / Trocar Foto</span>
+            <input type="file" id="modalFotoInputFile" accept="image/*" class="hidden" onchange="uploadFotoModalAlojado(this)">
+          </label>
+          <button id="modalFotoBtnRemover" onclick="removerFotoModalAlojado()" class="btn-prefeito w-full py-2 px-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs flex items-center justify-center gap-2 transition hidden">
+            <i class="fa-solid fa-trash"></i> Remover Foto
+          </button>
+        </div>
+      </div>
+
+      <div class="px-5 py-2.5 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button onclick="fecharModal('modalFotoAlojado')" class="px-3.5 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Recortar Foto com Cropper.js (Proporção 1:1 Quadrada) -->
+  <div id="modalCropFoto" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-700 flex flex-col max-h-[92vh]">
+      <!-- Header -->
+      <div class="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i class="fa-solid fa-crop-simple text-sm"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Editar & Cortar Foto</h3>
+            <p class="text-[11px] text-slate-400">Enquadre o rosto (salvo no computador do Prefeito)</p>
+          </div>
+        </div>
+        <button onclick="cancelarCropFoto()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Área de Edição/Corte (Cropper Container) -->
+      <div class="bg-slate-950 p-2 sm:p-4 flex items-center justify-center flex-1 overflow-hidden min-h-[260px] max-h-[50vh]">
+        <div class="w-full h-full max-h-[46vh] flex items-center justify-center overflow-hidden">
+          <img id="imageToCrop" src="" alt="Cortar Foto" class="max-h-[45vh] max-w-full block">
+        </div>
+      </div>
+
+      <!-- Barra de Ferramentas de Ajuste -->
+      <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="cropperRotate(-90)" class="p-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold shadow-sm" title="Girar 90° à Esquerda">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+          <button type="button" onclick="cropperRotate(90)" class="p-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold shadow-sm" title="Girar 90° à Direita">
+            <i class="fa-solid fa-rotate-right"></i>
+          </button>
+          <button type="button" onclick="cropperZoom(0.1)" class="p-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold shadow-sm" title="Aproximar Zoom">
+            <i class="fa-solid fa-magnifying-glass-plus"></i>
+          </button>
+          <button type="button" onclick="cropperZoom(-0.1)" class="p-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold shadow-sm" title="Afastar Zoom">
+            <i class="fa-solid fa-magnifying-glass-minus"></i>
+          </button>
+          <button type="button" onclick="cropperReset()" class="p-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold shadow-sm" title="Redefinir Enquadramento">
+            <i class="fa-solid fa-arrow-rotate-left"></i>
+          </button>
+        </div>
+        <span class="text-[11px] text-slate-500 font-medium hidden sm:inline">1:1 Quadrado Padrão</span>
+      </div>
+
+      <!-- Footer com Ações -->
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-end gap-2.5 flex-shrink-0">
+        <button type="button" onclick="cancelarCropFoto()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+          Cancelar
+        </button>
+        <button type="button" id="btnConfirmarCrop" onclick="confirmarCropFoto()" class="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-sm transition">
+          <i class="fa-solid fa-check"></i> Cortar & Salvar Foto
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Modal Alerta / Mensagem Simples -->
+  <div id="modalNotificacao" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center space-y-3">
+      <div id="notifIcon" class="w-12 h-12 rounded-full mx-auto flex items-center justify-center text-2xl">
+        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+      </div>
+      <h3 id="notifTitulo" class="font-bold text-slate-900 text-base">Sucesso!</h3>
+      <p id="notifMensagem" class="text-xs text-slate-500">Operação concluída com sucesso.</p>
+      <button onclick="fecharModal('modalNotificacao')" class="w-full py-2 rounded-lg bg-slate-900 text-white text-xs font-bold mt-2">
+        OK
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Script da Aplicação -->
+  <script src="app.js"></script>
+</body>
+</html>
