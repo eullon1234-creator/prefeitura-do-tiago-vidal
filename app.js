@@ -23,6 +23,721 @@ let debounceTimerAlojados = null;
 let quartoSelecionadoId = null;
 
 // ========================================================
+// ENGINE CLIENTE ESTÁTICO (GITHUB PAGES & NUVEM SEM BACKEND)
+// ========================================================
+const originalFetch = window.fetch.bind(window);
+const IS_GITHUB_PAGES = window.location.hostname.includes('github.io') || window.location.hostname.includes('github.dev') || window.location.protocol === 'file:' || !window.location.port || window.location.port === '5500';
+let staticModeActive = IS_GITHUB_PAGES;
+
+const StaticApiEngine = {
+  dbState: {
+    geral: null,
+    blocos: [],
+    empresas: [],
+    quartos: [],
+    alojados: [],
+    auditoria: []
+  },
+  initialized: false,
+  initPromise: null,
+
+  async init() {
+    if (this.initialized) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async () => {
+      try {
+        // 1. Tentar ler do localStorage primeiro (para manter edições do usuário no navegador)
+        const localSaved = localStorage.getItem('prefeitura_taboca_snapshot');
+        if (localSaved) {
+          try {
+            const parsed = JSON.parse(localSaved);
+            if (parsed && parsed.quartos && parsed.quartos.length > 0) {
+              this.dbState = parsed;
+              this.recomputeStats();
+              this.initialized = true;
+              console.log("StaticApiEngine: Estado carregado do localStorage com sucesso.");
+              return;
+            }
+          } catch(e) { /* fallback */ }
+        }
+
+        // 2. Carregar do arquivo estático dados_iniciais_taboca.json
+        const res = await originalFetch('dados_iniciais_taboca.json');
+        if (!res.ok) throw new Error('Falha ao obter dados_iniciais_taboca.json');
+        const data = await res.json();
+        
+        this.dbState.geral = data.geral;
+        this.dbState.blocos = data.blocos || [];
+        this.dbState.empresas = data.empresas || [];
+        this.dbState.quartos = data.quartos || [];
+        this.dbState.alojados = data.alojados || [];
+        this.dbState.auditoria = [];
+
+        this.recomputeStats();
+        this.saveToStorage();
+        this.initialized = true;
+        console.log("StaticApiEngine: Banco de dados em memória inicializado (387 alojados, 220 quartos, 10 blocos).");
+      } catch (err) {
+        console.error("StaticApiEngine init falhou:", err);
+      }
+    })();
+
+    return this.initPromise;
+  },
+
+  saveToStorage() {
+    try {
+      localStorage.setItem('prefeitura_taboca_snapshot', JSON.stringify(this.dbState));
+    } catch(e) {
+      console.warn("Storage quota excedida ou erro ao salvar snapshot:", e);
+    }
+  },
+
+  recomputeStats() {
+    const quartos = this.dbState.quartos || [];
+    const alojados = this.dbState.alojados || [];
+    const blocos = this.dbState.blocos || [];
+    const empresas = this.dbState.empresas || [];
+
+    // Recalcular status por quarto
+    quartos.forEach(q => {
+      const vagas = q.vagas || [];
+      const cap = q.capacidade || vagas.length || 4;
+      const oc = vagas.filter(v => v.status === 'ocupada').length;
+      const liv = cap - oc;
+      q.total_camas = cap;
+      q.vagas_ocupadas = oc;
+      q.vagas_livres = liv >= 0 ? liv : 0;
+      
+      const moveisAlerta = (q.moveis || []).filter(m => m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado').length;
+      q.itens_alerta = moveisAlerta;
+
+      if (liv <= 0) {
+        q.status_visual = 'lotado';
+        q.cor_status = 'red';
+      } else if (oc >= cap - 1 && liv > 0) {
+        q.status_visual = 'quase_cheio';
+        q.cor_status = 'amber';
+      } else if (oc === 0) {
+        q.status_visual = 'vazio';
+        q.cor_status = 'slate';
+      } else {
+        q.status_visual = 'com_vagas';
+        q.cor_status = 'emerald';
+      }
+    });
+
+    // Recalcular blocos
+    blocos.forEach(b => {
+      const qBloco = quartos.filter(q => q.bloco_id == b.id);
+      b.total_quartos = qBloco.length;
+      b.total_vagas = qBloco.reduce((s, q) => s + (q.capacidade || 4), 0);
+      b.ocupadas = qBloco.reduce((s, q) => s + (q.vagas_ocupadas || 0), 0);
+      b.livres = b.total_vagas - b.ocupadas;
+      b.taxa_ocupacao = b.total_vagas > 0 ? Number(((b.ocupadas / b.total_vagas) * 100).toFixed(1)) : 0;
+      b.itens_alerta = qBloco.reduce((s, q) => s + (q.itens_alerta || 0), 0);
+    });
+
+    // Recalcular empresas
+    empresas.forEach(e => {
+      e.total_alojados = alojados.filter(a => a.status === 'ativo' && (a.empresa_id == e.id || a.empresa_nome === e.nome)).length;
+    });
+
+    // Recalcular Geral
+    const totVagas = blocos.reduce((s, b) => s + b.total_vagas, 0);
+    const totOcup = alojados.filter(a => a.status === 'ativo').length;
+    const totDesl = alojados.filter(a => a.status === 'desligado').length;
+    const totAlertas = quartos.reduce((s, q) => s + (q.itens_alerta || 0), 0);
+
+    this.dbState.geral = {
+      total_vagas: totVagas || 880,
+      ocupadas: totOcup,
+      disponiveis: (totVagas - totOcup) >= 0 ? (totVagas - totOcup) : 0,
+      taxa_ocupacao: totVagas > 0 ? Number(((totOcup / totVagas) * 100).toFixed(1)) : 0,
+      total_blocos: blocos.length,
+      total_quartos: quartos.length,
+      total_alojados_ativos: totOcup,
+      total_desligados: totDesl,
+      total_alertas_manutencao: totAlertas
+    };
+  },
+
+  async handle(url, init = {}) {
+    await this.init();
+    const method = (init.method || 'GET').toUpperCase();
+    const u = new URL(url, window.location.href);
+    const path = u.pathname;
+    const params = u.searchParams;
+    let body = null;
+    if (init.body) {
+      try { body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body; } catch(e) {}
+    }
+
+    // 1. Dashboard
+    if (path.includes('/api/dashboard/stats')) {
+      this.recomputeStats();
+      const alertas = [];
+      this.dbState.quartos.forEach(q => {
+        (q.moveis || []).forEach(m => {
+          if (m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado') {
+            alertas.push({
+              ...m,
+              bloco_nome: q.bloco_nome,
+              quarto_numero: q.numero
+            });
+          }
+        });
+      });
+      return {
+        geral: this.dbState.geral,
+        blocos: this.dbState.blocos,
+        empresas: this.dbState.empresas,
+        alertas_moveis: alertas
+      };
+    }
+
+    // 2. Blocos
+    if (path.endsWith('/api/blocos') || path.includes('/api/blocos?')) {
+      if (method === 'POST') {
+        const novoBloco = {
+          id: Date.now(),
+          nome: body.nome.trim(),
+          tipo: body.tipo || 'alojamento',
+          ordem: Number(body.ordem) || 0,
+          total_quartos: 0,
+          total_vagas: 0,
+          ocupadas: 0,
+          livres: 0,
+          taxa_ocupacao: 0,
+          itens_alerta: 0
+        };
+        this.dbState.blocos.push(novoBloco);
+        this.recomputeStats();
+        this.saveToStorage();
+        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        return { id: novoBloco.id, message: "Bloco criado com sucesso" };
+      }
+      this.recomputeStats();
+      return this.dbState.blocos;
+    }
+    const matchBlocoId = path.match(/\/api\/blocos\/(\d+)/);
+    if (matchBlocoId) {
+      const bId = Number(matchBlocoId[1]);
+      if (method === 'PUT') {
+        const b = this.dbState.blocos.find(x => x.id === bId);
+        if (b) {
+          b.nome = body.nome || b.nome;
+          b.tipo = body.tipo || b.tipo;
+          b.ordem = Number(body.ordem) || b.ordem;
+          this.recomputeStats();
+          this.saveToStorage();
+        }
+        return { message: "Bloco atualizado" };
+      }
+      if (method === 'DELETE') {
+        this.dbState.blocos = this.dbState.blocos.filter(x => x.id !== bId);
+        this.recomputeStats();
+        this.saveToStorage();
+        return { message: "Bloco excluído" };
+      }
+    }
+
+    // 3. Empresas
+    if (path.endsWith('/api/empresas') || path.includes('/api/empresas?')) {
+      if (method === 'POST') {
+        const novaEmp = {
+          id: Date.now(),
+          nome: body.nome.trim(),
+          cor: body.cor || '#3b82f6',
+          total_alojados: 0
+        };
+        this.dbState.empresas.push(novaEmp);
+        this.saveToStorage();
+        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        return { id: novaEmp.id, message: "Empresa criada com sucesso" };
+      }
+      this.recomputeStats();
+      return this.dbState.empresas;
+    }
+    const matchEmpId = path.match(/\/api\/empresas\/(\d+)/);
+    if (matchEmpId) {
+      const eId = Number(matchEmpId[1]);
+      if (method === 'PUT') {
+        const e = this.dbState.empresas.find(x => x.id === eId);
+        if (e) {
+          e.nome = body.nome || e.nome;
+          e.cor = body.cor || e.cor;
+          this.saveToStorage();
+        }
+        return { message: "Empresa atualizada" };
+      }
+      if (method === 'DELETE') {
+        this.dbState.empresas = this.dbState.empresas.filter(x => x.id !== eId);
+        this.saveToStorage();
+        return { message: "Empresa excluída" };
+      }
+    }
+
+    // 4. Vagas Livres
+    if (path.includes('/api/vagas/livres')) {
+      this.recomputeStats();
+      const livres = [];
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (v.status === 'livre') {
+            livres.push({
+              vaga_id: v.id,
+              quarto_id: q.id,
+              quarto_numero: q.numero,
+              bloco_id: q.bloco_id,
+              bloco_nome: q.bloco_nome,
+              numero_cama: v.numero_cama
+            });
+          }
+        });
+      });
+      return livres;
+    }
+
+    // 5. Quartos
+    const matchQuartoDetalhe = path.match(/\/api\/quartos\/(\d+)$/);
+    if (matchQuartoDetalhe && method === 'GET') {
+      const qId = Number(matchQuartoDetalhe[1]);
+      const q = this.dbState.quartos.find(x => x.id === qId);
+      if (q) return q;
+      throw new Error("Quarto não encontrado");
+    }
+    if (matchQuartoDetalhe && method === 'PUT') {
+      const qId = Number(matchQuartoDetalhe[1]);
+      const q = this.dbState.quartos.find(x => x.id === qId);
+      if (q) {
+        q.numero = body.numero || q.numero;
+        q.capacidade = Number(body.capacidade) || q.capacidade;
+        q.observacoes = body.observacoes !== undefined ? body.observacoes : q.observacoes;
+        this.recomputeStats();
+        this.saveToStorage();
+      }
+      return { message: "Quarto atualizado" };
+    }
+    if (matchQuartoDetalhe && method === 'DELETE') {
+      const qId = Number(matchQuartoDetalhe[1]);
+      this.dbState.quartos = this.dbState.quartos.filter(x => x.id !== qId);
+      this.recomputeStats();
+      this.saveToStorage();
+      return { message: "Quarto excluído" };
+    }
+    if (path.includes('/api/quartos')) {
+      if (method === 'POST') {
+        const novoId = Date.now();
+        const bloco = this.dbState.blocos.find(b => b.id == body.bloco_id) || { nome: 'Bloco', tipo: 'alojamento' };
+        const cap = Number(body.capacidade) || 4;
+        const vagas = [];
+        for (let i = 1; i <= cap; i++) {
+          vagas.push({ id: novoId + i, numero_cama: i, status: 'livre', alojado: null });
+        }
+        const moveis = [
+          { id: novoId + 10, tipo_item: 'Ar-Condicionado', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Funcionando' },
+          { id: novoId + 11, tipo_item: 'Beliche / Camas', quantidade: 2, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' },
+          { id: novoId + 12, tipo_item: 'Guarda-roupa / Armário', quantidade: 4, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' }
+        ];
+        const novoQ = {
+          id: novoId,
+          bloco_id: Number(body.bloco_id),
+          bloco_nome: bloco.nome,
+          bloco_tipo: bloco.tipo,
+          numero: body.numero,
+          capacidade: cap,
+          observacoes: body.observacoes || '',
+          vagas: vagas,
+          moveis: moveis
+        };
+        this.dbState.quartos.push(novoQ);
+        this.recomputeStats();
+        this.saveToStorage();
+        return { id: novoId, message: "Quarto criado com sucesso" };
+      }
+      this.recomputeStats();
+      let res = [...this.dbState.quartos];
+      const blocoId = params.get('bloco_id');
+      const statusOcup = params.get('status_ocupacao');
+      const filtroAlerta = params.get('filtro_alerta');
+      const qQuery = params.get('q');
+
+      if (blocoId) res = res.filter(q => q.bloco_id == blocoId);
+      if (qQuery) {
+        const s = qQuery.toLowerCase();
+        res = res.filter(q => (q.numero && q.numero.toLowerCase().includes(s)) || (q.bloco_nome && q.bloco_nome.toLowerCase().includes(s)));
+      }
+      if (statusOcup) {
+        if (statusOcup === 'com_vagas') res = res.filter(q => q.vagas_livres > 0);
+        else if (statusOcup === 'lotado') res = res.filter(q => q.status_visual === 'lotado');
+        else if (statusOcup === 'quase_cheio') res = res.filter(q => q.status_visual === 'quase_cheio');
+        else if (statusOcup === 'vazio') res = res.filter(q => q.status_visual === 'vazio');
+      }
+      if (filtroAlerta === 'true') {
+        res = res.filter(q => q.itens_alerta > 0);
+      }
+      return res;
+    }
+
+    // 6. Alojados
+    // 6.1 Desligar
+    const matchDesligar = path.match(/\/api\/alojados\/(\d+)\/desligar/);
+    if (matchDesligar && method === 'POST') {
+      const aId = Number(matchDesligar[1]);
+      const alojado = this.dbState.alojados.find(x => x.id === aId);
+      if (alojado) {
+        alojado.status = 'desligado';
+        alojado.data_saida = new Date().toISOString().split('T')[0];
+        // Liberar vaga
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.id === alojado.vaga_id || (v.alojado && v.alojado.id === aId)) {
+              v.status = 'livre';
+              v.alojado = null;
+            }
+          });
+        });
+        this.recomputeStats();
+        this.saveToStorage();
+        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+      }
+      return { message: "Alojado desligado e vaga liberada com sucesso" };
+    }
+
+    // 6.2 Realocar
+    const matchRealocar = path.match(/\/api\/alojados\/(\d+)\/realocar/);
+    if (matchRealocar && method === 'POST') {
+      const aId = Number(matchRealocar[1]);
+      const alojado = this.dbState.alojados.find(x => x.id === aId);
+      const novaVagaId = Number(body.nova_vaga_id);
+      if (alojado && novaVagaId) {
+        // Liberar antiga
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.id === alojado.vaga_id || (v.alojado && v.alojado.id === aId)) {
+              v.status = 'livre';
+              v.alojado = null;
+            }
+          });
+        });
+        // Ocupar nova
+        let foundRoom = null;
+        let foundBed = null;
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.id === novaVagaId) {
+              v.status = 'ocupada';
+              v.alojado = alojado;
+              foundRoom = q;
+              foundBed = v;
+            }
+          });
+        });
+        if (foundRoom && foundBed) {
+          alojado.vaga_id = novaVagaId;
+          alojado.bloco_nome = foundRoom.bloco_nome;
+          alojado.quarto_numero = foundRoom.numero;
+          alojado.numero_cama = foundBed.numero_cama;
+        }
+        this.recomputeStats();
+        this.saveToStorage();
+        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+      }
+      return { message: "Alojado realocado com sucesso" };
+    }
+
+    // 6.3 PUT Alojado
+    const matchAlojadoPut = path.match(/\/api\/alojados\/(\d+)$/);
+    if (matchAlojadoPut && method === 'PUT') {
+      const aId = Number(matchAlojadoPut[1]);
+      const a = this.dbState.alojados.find(x => x.id === aId);
+      if (a) {
+        if (body.nome_completo) a.nome_completo = body.nome_completo.toUpperCase();
+        if (body.matricula) a.matricula = body.matricula;
+        if (body.funcao) a.funcao = body.funcao.toUpperCase();
+        if (body.observacoes !== undefined) a.observacoes = body.observacoes;
+        if (body.foto_url !== undefined) a.foto_url = body.foto_url;
+        // Atualiza na vaga
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.alojado && v.alojado.id === aId) {
+              v.alojado = { ...a };
+            }
+          });
+        });
+        this.saveToStorage();
+        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+      }
+      return { message: "Alojado atualizado com sucesso" };
+    }
+
+    // 6.4 Listar/Cadastrar Alojados
+    if (path.includes('/api/alojados')) {
+      if (method === 'POST') {
+        const novoId = Date.now();
+        const emp = this.dbState.empresas.find(e => e.id == body.empresa_id) || { nome: 'N/A', cor: '#3b82f6' };
+        let foundRoom = null;
+        let foundBed = null;
+        const vagaId = Number(body.vaga_id);
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.id === vagaId) {
+              foundRoom = q;
+              foundBed = v;
+            }
+          });
+        });
+
+        const novoAlojado = {
+          id: novoId,
+          vaga_id: vagaId,
+          matricula: body.matricula || '',
+          nome_completo: (body.nome_completo || '').toUpperCase(),
+          empresa_id: Number(body.empresa_id),
+          empresa_nome: emp.nome,
+          empresa_cor: emp.cor,
+          funcao: (body.funcao || '').toUpperCase(),
+          data_entrada: body.data_entrada || new Date().toISOString().split('T')[0],
+          data_saida: null,
+          status: 'ativo',
+          observacoes: body.observacoes || '',
+          foto_url: body.foto_url || null,
+          bloco_nome: foundRoom ? foundRoom.bloco_nome : '',
+          quarto_numero: foundRoom ? foundRoom.numero : '',
+          numero_cama: foundBed ? foundBed.numero_cama : 1
+        };
+
+        if (foundBed) {
+          foundBed.status = 'ocupada';
+          foundBed.alojado = novoAlojado;
+        }
+
+        this.dbState.alojados.unshift(novoAlojado);
+        this.recomputeStats();
+        this.saveToStorage();
+        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        return { id: novoId, message: "Alojado cadastrado com sucesso" };
+      }
+
+      // GET
+      let lista = [...this.dbState.alojados];
+      const statusAlojado = params.get('status_alojado') || 'ativo';
+      const blocoId = params.get('bloco_id');
+      const empresaId = params.get('empresa_id');
+      const qQuery = params.get('q');
+      const page = parseInt(params.get('page') || '1', 10);
+      const limit = parseInt(params.get('limit') || '50', 10);
+
+      if (statusAlojado && statusAlojado !== 'todos') {
+        lista = lista.filter(a => a.status === statusAlojado);
+      }
+      if (empresaId) {
+        lista = lista.filter(a => a.empresa_id == empresaId);
+      }
+      if (blocoId) {
+        const bloco = this.dbState.blocos.find(b => b.id == blocoId);
+        if (bloco) {
+          lista = lista.filter(a => a.bloco_nome === bloco.nome);
+        }
+      }
+      if (qQuery) {
+        const s = qQuery.toLowerCase();
+        lista = lista.filter(a => 
+          (a.nome_completo && a.nome_completo.toLowerCase().includes(s)) ||
+          (a.matricula && a.matricula.toLowerCase().includes(s)) ||
+          (a.funcao && a.funcao.toLowerCase().includes(s))
+        );
+      }
+
+      const total = lista.length;
+      const startIndex = (page - 1) * limit;
+      const paginated = lista.slice(startIndex, startIndex + limit);
+
+      return {
+        items: paginated,
+        total: total,
+        page: page,
+        limit: limit
+      };
+    }
+
+    // 7. Móveis
+    if (path.includes('/api/moveis')) {
+      if (path.includes('/vistoria') && method === 'POST') {
+        const movelId = Number(body.movel_id);
+        this.dbState.quartos.forEach(q => {
+          (q.moveis || []).forEach(m => {
+            if (m.id === movelId) {
+              m.estado_conservacao = body.estado_conservacao;
+              m.precisa_manutencao = Number(body.precisa_manutencao);
+              m.data_vistoria = body.data_vistoria || new Date().toISOString().split('T')[0];
+              m.observacoes = body.observacoes || '';
+            }
+          });
+        });
+        this.recomputeStats();
+        this.saveToStorage();
+        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        return { message: "Vistoria atualizada com sucesso" };
+      }
+
+      if (method === 'POST') {
+        const novoMId = Date.now();
+        const quartoId = Number(body.quarto_id);
+        const q = this.dbState.quartos.find(x => x.id === quartoId);
+        if (q) {
+          if (!q.moveis) q.moveis = [];
+          q.moveis.push({
+            id: novoMId,
+            quarto_id: quartoId,
+            tipo_item: body.tipo_item,
+            quantidade: Number(body.quantidade) || 1,
+            estado_conservacao: body.estado_conservacao || 'Bom',
+            precisa_manutencao: Number(body.precisa_manutencao) || 0,
+            data_vistoria: body.data_vistoria || new Date().toISOString().split('T')[0],
+            observacoes: body.observacoes || ''
+          });
+          this.recomputeStats();
+          this.saveToStorage();
+        }
+        return { id: novoMId, message: "Móvel cadastrado com sucesso" };
+      }
+
+      const matchMovelId = path.match(/\/api\/moveis\/(\d+)$/);
+      if (matchMovelId) {
+        const mId = Number(matchMovelId[1]);
+        if (method === 'PUT') {
+          this.dbState.quartos.forEach(q => {
+            (q.moveis || []).forEach(m => {
+              if (m.id === mId) {
+                m.tipo_item = body.tipo_item || m.tipo_item;
+                m.quantidade = Number(body.quantidade) || m.quantidade;
+                m.estado_conservacao = body.estado_conservacao || m.estado_conservacao;
+                m.precisa_manutencao = Number(body.precisa_manutencao) || 0;
+                m.data_vistoria = body.data_vistoria || m.data_vistoria;
+                m.observacoes = body.observacoes || m.observacoes;
+              }
+            });
+          });
+          this.recomputeStats();
+          this.saveToStorage();
+          return { message: "Móvel atualizado" };
+        }
+        if (method === 'DELETE') {
+          this.dbState.quartos.forEach(q => {
+            if (q.moveis) q.moveis = q.moveis.filter(m => m.id !== mId);
+          });
+          this.recomputeStats();
+          this.saveToStorage();
+          return { message: "Móvel excluído" };
+        }
+      }
+
+      // GET móveis
+      const allMoveis = [];
+      this.dbState.quartos.forEach(q => {
+        (q.moveis || []).forEach(m => {
+          allMoveis.push({
+            ...m,
+            bloco_id: q.bloco_id,
+            bloco_nome: q.bloco_nome,
+            quarto_id: q.id,
+            quarto_numero: q.numero
+          });
+        });
+      });
+
+      let filtrados = allMoveis;
+      const bId = params.get('bloco_id');
+      const tipo = params.get('tipo_item');
+      const estado = params.get('estado');
+      const precisaM = params.get('precisa_manutencao');
+      const qQuery = params.get('q');
+
+      if (bId) filtrados = filtrados.filter(m => m.bloco_id == bId);
+      if (tipo) filtrados = filtrados.filter(m => m.tipo_item === tipo);
+      if (estado) filtrados = filtrados.filter(m => m.estado_conservacao === estado);
+      if (precisaM !== null && precisaM !== '') filtrados = filtrados.filter(m => String(m.precisa_manutencao) === String(precisaM));
+      if (qQuery) {
+        const s = qQuery.toLowerCase();
+        filtrados = filtrados.filter(m => 
+          (m.tipo_item && m.tipo_item.toLowerCase().includes(s)) ||
+          (m.bloco_nome && m.bloco_nome.toLowerCase().includes(s)) ||
+          (m.quarto_numero && m.quarto_numero.toLowerCase().includes(s))
+        );
+      }
+      return filtrados;
+    }
+
+    // 8. Relatórios Resumo Geral
+    if (path.includes('/api/relatorios/resumo-geral')) {
+      this.recomputeStats();
+      const linhas = this.dbState.blocos.map(b => ({
+        alojamento: b.nome,
+        tipo: b.tipo,
+        descricao: b.tipo === 'alojamento' ? 'PRODUÇÃO' : (b.tipo === 'adm' ? 'ADMINISTRAÇÃO' : 'CONTÊINERES'),
+        total_vagas: b.total_vagas,
+        ocupadas: b.ocupadas,
+        vagas_livres: b.livres,
+        taxa_ocupacao: b.taxa_ocupacao
+      }));
+      return {
+        linhas,
+        totais: this.dbState.geral
+      };
+    }
+
+    // 9. Auditoria
+    if (path.includes('/api/auditoria')) {
+      return this.dbState.auditoria || [];
+    }
+
+    // 10. Restaurar Padrão
+    if (path.includes('/api/restaurar-padrao')) {
+      localStorage.removeItem('prefeitura_taboca_snapshot');
+      this.initialized = false;
+      this.initPromise = null;
+      await this.init();
+      return { message: "Dados restaurados para o padrão original da obra com sucesso!" };
+    }
+
+    return { message: "OK" };
+  }
+};
+window.StaticApiEngine = StaticApiEngine;
+
+// INTERCEPTOR UNIVERSAL FETCH: Impede qualquer 404 de API no GitHub Pages
+window.fetch = async function(resource, init = {}) {
+  const url = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
+  
+  // Requisições externas ou arquivos estáticos passam direto
+  if (url.includes('dados_iniciais_taboca.json') || url.includes('.json') || url.includes('api.imgbb.com') || url.includes('firestore.googleapis.com')) {
+    return originalFetch.apply(this, arguments);
+  }
+
+  // Se o modo estático estiver ativo e a URL for uma rota da API (/api/...)
+  if (staticModeActive && (url.includes('/api/') || url.startsWith('api/'))) {
+    try {
+      const responseData = await StaticApiEngine.handle(url, init);
+      return new Response(JSON.stringify(responseData), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (err) {
+      console.warn("StaticApiEngine erro na rota:", url, err);
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  return originalFetch.apply(this, arguments);
+};
+
+// ========================================================
 // CACHE INTELIGENTE DE FOTOS NO APARELHO (IndexedDB)
 // ========================================================
 class LocalPhotoCache {
@@ -362,7 +1077,7 @@ async function gerarSnapshotConsolidadoFirebase(manual = false) {
         livres: b.livres,
         taxa_ocupacao: b.taxa_ocupacao
       })),
-      alojados: resAlojados.map(a => ({
+      alojados: (Array.isArray(resAlojados) ? resAlojados : (resAlojados?.items || [])).map(a => ({
         id: a.id,
         mat: a.matricula || '',
         nome: a.nome_completo || '',
@@ -858,40 +1573,38 @@ function initMobileMenu() {
 
 // Carregamento de dados para Modo GitHub Pages / Offline
 async function carregarDadosSnapshotEstatico() {
-  try {
-    const res = await fetch('dados_iniciais_taboca.json');
-    if (!res.ok) throw new Error('Falha ao carregar snapshot estático');
-    const data = await res.json();
-    
-    globalStats = data;
-    globalBlocos = data.blocos || [];
-    globalEmpresas = data.empresas || [];
-    globalQuartos = data.quartos || [];
-    globalAlojados = data.alojados || [];
-    
-    renderDashboardStats(data.geral);
-    renderCharts(data.blocos, data.empresas);
-    if (activeTab === 'blocos') renderQuartosCards(data.quartos);
-    if (activeTab === 'alojados') renderTabelaAlojados(data.alojados);
-    
-    const banner = document.getElementById('firebaseCacheStatusBadge');
-    if (banner) banner.textContent = 'Modo GitHub Pages / Nuvem Ativo';
-    
-    console.log("Snapshot do canteiro carregado com sucesso (Modo GitHub Pages)");
-  } catch (e) {
-    console.error("Erro ao carregar snapshot estático:", e);
-  }
+  await StaticApiEngine.init();
+  globalStats = StaticApiEngine.dbState.geral;
+  globalBlocos = StaticApiEngine.dbState.blocos || [];
+  globalEmpresas = StaticApiEngine.dbState.empresas || [];
+  globalQuartos = StaticApiEngine.dbState.quartos || [];
+  globalAlojados = StaticApiEngine.dbState.alojados || [];
+  
+  const banner = document.getElementById('firebaseCacheStatusBadge');
+  if (banner) banner.textContent = 'Modo GitHub Pages / Nuvem Ativo';
 }
 
 // Carregar Dados Iniciais
 async function loadInitialData() {
   setRefreshAnimation(true);
   try {
-    const resCheck = await fetch(`${API_BASE}/api/dashboard/stats`).catch(() => null);
-    if (!resCheck || !resCheck.ok) {
-      console.log("Ambiente GitHub Pages ou offline detectado. Carregando dados da obra...");
-      await carregarDadosSnapshotEstatico();
-      return;
+    if (staticModeActive) {
+      console.log("Ambiente GitHub Pages ou nuvem estática detectado. Inicializando dados da obra...");
+      await StaticApiEngine.init();
+      const banner = document.getElementById('firebaseCacheStatusBadge');
+      if (banner) banner.textContent = 'Modo GitHub Pages / Nuvem Ativo';
+    } else {
+      // Testar se backend local responde
+      try {
+        const probe = await originalFetch(`${API_BASE}/api/dashboard/stats`);
+        if (!probe.ok) {
+          staticModeActive = true;
+          await StaticApiEngine.init();
+        }
+      } catch (e) {
+        staticModeActive = true;
+        await StaticApiEngine.init();
+      }
     }
 
     await Promise.all([
@@ -900,14 +1613,15 @@ async function loadInitialData() {
       carregarBlocosLista(),
       carregarVagasLivresLista()
     ]);
+
     setTimeout(() => {
       if (firebaseInitialized) {
         sincronizarTudoComFirebase(false);
       }
     }, 1500);
   } catch (err) {
-    console.warn('Backend local inacessível, carregando snapshot:', err);
-    await carregarDadosSnapshotEstatico();
+    console.error('Erro ao carregar dados iniciais:', err);
+    showToast('Erro ao carregar dados da obra', 'error');
   } finally {
     setRefreshAnimation(false);
   }
@@ -2602,10 +3316,52 @@ async function carregarRelatoriosPreview() {
 }
 
 function exportarResumoExcel() {
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    const wb = XLSX.utils.book_new();
+    const data = (StaticApiEngine.dbState.blocos || []).map(b => ({
+      "Bloco": b.nome,
+      "Tipo": b.tipo.toUpperCase(),
+      "Total Vagas": b.total_vagas,
+      "Ocupadas": b.ocupadas,
+      "Vagas Livres": b.livres,
+      "Taxa de Ocupação": `${b.taxa_ocupacao}%`
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, "Resumo Ocupacao");
+    XLSX.writeFile(wb, "resumo_ocupacao_canteiro.xlsx");
+    showToast('Planilha de resumo baixada!', 'success');
+    return;
+  }
   window.open(`${API_BASE}/api/relatorios/exportar-resumo-excel`, '_blank');
 }
 
 function exportarAlojadosExcel() {
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    const blocoId = document.getElementById('filtroAlojadosBloco')?.value || '';
+    const empresaId = document.getElementById('filtroAlojadosEmpresa')?.value || '';
+    let lista = (StaticApiEngine.dbState.alojados || []).filter(a => a.status === 'ativo');
+    if (empresaId) lista = lista.filter(a => a.empresa_id == empresaId);
+    if (blocoId) {
+      const b = StaticApiEngine.dbState.blocos.find(x => x.id == blocoId);
+      if (b) lista = lista.filter(a => a.bloco_nome === b.nome);
+    }
+    const wb = XLSX.utils.book_new();
+    const data = lista.map(a => ({
+      "Matrícula": a.matricula,
+      "Nome Completo": a.nome_completo,
+      "Empresa": a.empresa_nome,
+      "Função": a.funcao,
+      "Bloco": a.bloco_nome,
+      "Quarto": a.quarto_numero,
+      "Cama": a.numero_cama,
+      "Data Entrada": a.data_entrada || ""
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, "Alojados Ativos");
+    XLSX.writeFile(wb, "alojados_ativos_canteiro.xlsx");
+    showToast('Planilha de alojados baixada!', 'success');
+    return;
+  }
   const blocoId = document.getElementById('filtroAlojadosBloco')?.value || '';
   const empresaId = document.getElementById('filtroAlojadosEmpresa')?.value || '';
   let url = `${API_BASE}/api/relatorios/exportar-alojados-excel?`;
@@ -2615,10 +3371,108 @@ function exportarAlojadosExcel() {
 }
 
 function exportarMoveisDanificadosExcel() {
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    const danificados = [];
+    (StaticApiEngine.dbState.quartos || []).forEach(q => {
+      (q.moveis || []).forEach(m => {
+        if (m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado') {
+          danificados.push({
+            "Bloco": q.bloco_nome,
+            "Quarto": q.numero,
+            "Item": m.tipo_item,
+            "Quantidade": m.quantidade,
+            "Estado": m.estado_conservacao,
+            "Manutenção": m.precisa_manutencao ? "Sim" : "Não",
+            "Data Vistoria": m.data_vistoria || "",
+            "Observações": m.observacoes || ""
+          });
+        }
+      });
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(danificados);
+    XLSX.utils.book_append_sheet(wb, ws, "Moveis com Alerta");
+    XLSX.writeFile(wb, "moveis_manutencao_canteiro.xlsx");
+    showToast('Planilha de manutenção baixada!', 'success');
+    return;
+  }
   window.open(`${API_BASE}/api/relatorios/exportar-moveis-danificados-excel`, '_blank');
 }
 
 function exportarPlanilhaOficial() {
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('📗 Gerando Planilha Oficial Taboca 2 (modelo idêntico com 4 abas)...', 'info');
+    const wb = XLSX.utils.book_new();
+
+    // 1. RESUMO
+    const resumoData = (StaticApiEngine.dbState.blocos || []).map(b => ({
+      "Alojamento": b.nome,
+      "Tipo": b.tipo.toUpperCase(),
+      "Total de Vagas": b.total_vagas,
+      "Ocupadas": b.ocupadas,
+      "Vagas Livres": b.livres,
+      "Taxa de Ocupação": `${b.taxa_ocupacao}%`
+    }));
+    const wsResumo = XLSX.utils.json_to_sheet(resumoData);
+    XLSX.utils.book_append_sheet(wb, wsResumo, "RESUMO DE OCUPAÇÃO");
+
+    // 2. MAPA DE CAMAS
+    const camasData = [];
+    (StaticApiEngine.dbState.quartos || []).forEach(q => {
+      (q.vagas || []).forEach(v => {
+        camasData.push({
+          "Bloco": q.bloco_nome,
+          "Quarto": q.numero,
+          "Cama": v.numero_cama,
+          "Status": v.status.toUpperCase(),
+          "Matrícula": v.alojado ? v.alojado.matricula : "-",
+          "Nome do Alojado": v.alojado ? v.alojado.nome_completo : "VAGA LIVRE",
+          "Empresa": v.alojado ? v.alojado.empresa_nome : "-",
+          "Função": v.alojado ? v.alojado.funcao : "-"
+        });
+      });
+    });
+    const wsCamas = XLSX.utils.json_to_sheet(camasData);
+    XLSX.utils.book_append_sheet(wb, wsCamas, "MAPA DE CAMAS");
+
+    // 3. ALOJADOS ATIVOS
+    const ativosData = (StaticApiEngine.dbState.alojados || []).filter(a => a.status === 'ativo').map(a => ({
+      "Matrícula": a.matricula,
+      "Nome Completo": a.nome_completo,
+      "Empresa": a.empresa_nome,
+      "Função": a.funcao,
+      "Bloco": a.bloco_nome,
+      "Quarto": a.quarto_numero,
+      "Cama": a.numero_cama,
+      "Data de Entrada": a.data_entrada || "-",
+      "Observações": a.observacoes || ""
+    }));
+    const wsAtivos = XLSX.utils.json_to_sheet(ativosData);
+    XLSX.utils.book_append_sheet(wb, wsAtivos, "ALOJADOS ATIVOS");
+
+    // 4. MÓVEIS E VISTORIAS
+    const moveisData = [];
+    (StaticApiEngine.dbState.quartos || []).forEach(q => {
+      (q.moveis || []).forEach(m => {
+        moveisData.push({
+          "Bloco": q.bloco_nome,
+          "Quarto": q.numero,
+          "Item / Móvel": m.tipo_item,
+          "Quantidade": m.quantidade,
+          "Estado": m.estado_conservacao,
+          "Precisa Manutenção": m.precisa_manutencao ? "SIM (ALERTA)" : "NÃO",
+          "Data da Vistoria": m.data_vistoria || "-",
+          "Observações": m.observacoes || ""
+        });
+      });
+    });
+    const wsMoveis = XLSX.utils.json_to_sheet(moveisData);
+    XLSX.utils.book_append_sheet(wb, wsMoveis, "MÓVEIS E VISTORIAS");
+
+    XLSX.writeFile(wb, "controle_alojamento_oficial_taboca2.xlsx");
+    showToast('Planilha baixada com sucesso!', 'success');
+    return;
+  }
   showToast('📗 Gerando Planilha Oficial Taboca 2 (modelo idêntico com 4 abas)...', 'info');
   window.open(`${API_BASE}/api/relatorios/exportar-planilha-oficial`, '_blank');
 }
