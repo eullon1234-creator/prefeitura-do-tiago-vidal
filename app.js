@@ -2135,8 +2135,15 @@ async function carregarDashboard() {
 
     // Sidebar counts
     document.getElementById('sideCountVagas').textContent = data.geral.total_vagas;
-    document.getElementById('sideCountAlojados').textContent = data.geral.total_alojados_ativos;
-    document.getElementById('sideCountAlertas').textContent = data.geral.total_alertas_manutencao;
+    const sideBadge = document.getElementById('sideCountAlertas');
+    if (sideBadge) {
+      sideBadge.textContent = data.geral.total_alertas_manutencao;
+      if (data.geral.total_alertas_manutencao > 0) {
+        sideBadge.classList.remove('hidden');
+      } else {
+        sideBadge.classList.add('hidden');
+      }
+    }
 
     // Badge Alertas Top Navbar
     const badgeAlertas = document.getElementById('badgeAlertasNav');
