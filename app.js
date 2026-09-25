@@ -97,6 +97,20 @@ const StaticApiEngine = {
                 this.saveToStorage();
               }
 
+              // Migração de fotos antigas para ImgBB se existirem no snapshot local
+              (this.dbState.alojados || []).forEach(a => {
+                if (a.foto_url && a.foto_url.includes('alojado_1043_4d23f848.jpg')) {
+                  a.foto_url = 'https://i.ibb.co/sppGW7kB/alojado-1043-4d23f848.jpg';
+                }
+              });
+              (this.dbState.quartos || []).forEach(q => {
+                (q.vagas || []).forEach(v => {
+                  if (v.alojado && v.alojado.foto_url && v.alojado.foto_url.includes('alojado_1043_4d23f848.jpg')) {
+                    v.alojado.foto_url = 'https://i.ibb.co/sppGW7kB/alojado-1043-4d23f848.jpg';
+                  }
+                });
+              });
+
               this.recomputeStats();
               this.initialized = true;
               console.log("StaticApiEngine: Estado carregado do localStorage com sucesso.");
