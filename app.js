@@ -29,6 +29,27 @@ const originalFetch = window.fetch.bind(window);
 const IS_GITHUB_PAGES = window.location.hostname.includes('github.io') || window.location.hostname.includes('github.dev') || window.location.protocol === 'file:' || !window.location.port || window.location.port === '5500';
 let staticModeActive = IS_GITHUB_PAGES;
 
+// Sincronização leve de alteração individual com Firebase (Economia de dados)
+function sincronizarAlteracaoLeveFirebase(colecao, docId, dados) {
+  if (typeof firebaseInitialized !== 'undefined' && firebaseInitialized && typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      firestoreDb.collection(colecao).doc(String(docId)).set({
+        ...dados,
+        atualizado_em: new Date().toISOString()
+      }, { merge: true }).catch(err => {
+        if (err && (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission')))) {
+          console.warn("⚠️ Firebase Firestore: Permissão negada nas regras de segurança do console.");
+          if (typeof atualizarBadgeFirebaseUI === 'function') atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+          const alertEl = document.getElementById('firebaseRulesAlert');
+          if (alertEl) alertEl.classList.remove('hidden');
+        }
+      });
+    } catch (e) {
+      // Offline fallback silencioso
+    }
+  }
+}
+
 const StaticApiEngine = {
   dbState: {
     geral: null,
@@ -237,7 +258,7 @@ const StaticApiEngine = {
         this.dbState.blocos.push(novoBloco);
         this.recomputeStats();
         this.saveToStorage();
-        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        sincronizarAlteracaoLeveFirebase('blocos', novoBloco.id, novoBloco);
         return { id: novoBloco.id, message: "Bloco criado com sucesso" };
       }
       this.recomputeStats();
@@ -254,6 +275,7 @@ const StaticApiEngine = {
           b.ordem = Number(body.ordem) || b.ordem;
           this.recomputeStats();
           this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('blocos', b.id, b);
         }
         return { message: "Bloco atualizado" };
       }
@@ -276,7 +298,7 @@ const StaticApiEngine = {
         };
         this.dbState.empresas.push(novaEmp);
         this.saveToStorage();
-        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        sincronizarAlteracaoLeveFirebase('empresas', novaEmp.id, novaEmp);
         return { id: novaEmp.id, message: "Empresa criada com sucesso" };
       }
       this.recomputeStats();
@@ -423,7 +445,7 @@ const StaticApiEngine = {
         });
         this.recomputeStats();
         this.saveToStorage();
-        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        sincronizarAlteracaoLeveFirebase('alojados', aId, { status: 'desligado', data_saida: new Date().toISOString().split('T')[0] });
       }
       return { message: "Alojado desligado e vaga liberada com sucesso" };
     }
@@ -465,7 +487,7 @@ const StaticApiEngine = {
         }
         this.recomputeStats();
         this.saveToStorage();
-        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        sincronizarAlteracaoLeveFirebase('alojados', aId, { vaga_id: alojado.vaga_id, bloco_nome: alojado.bloco_nome, quarto_numero: alojado.quarto_numero, numero_cama: alojado.numero_cama });
       }
       return { message: "Alojado realocado com sucesso" };
     }
@@ -490,7 +512,7 @@ const StaticApiEngine = {
           });
         });
         this.saveToStorage();
-        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        sincronizarAlteracaoLeveFirebase('alojados', aId, a);
       }
       return { message: "Alojado atualizado com sucesso" };
     }
@@ -512,7 +534,7 @@ const StaticApiEngine = {
             });
           });
           this.saveToStorage();
-          if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+          sincronizarAlteracaoLeveFirebase('alojados', aId, { foto_url: a.foto_url });
         }
         return { success: true, foto_url: a ? a.foto_url : fotoUrl, message: "Foto atualizada com sucesso" };
       }
@@ -527,7 +549,7 @@ const StaticApiEngine = {
             });
           });
           this.saveToStorage();
-          if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+          sincronizarAlteracaoLeveFirebase('alojados', aId, { foto_url: null });
         }
         return { success: true, message: "Foto removida com sucesso" };
       }
@@ -581,7 +603,7 @@ const StaticApiEngine = {
       this.dbState.alojados.unshift(novoAlojado);
       this.recomputeStats();
       this.saveToStorage();
-      if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+      sincronizarAlteracaoLeveFirebase('alojados', novoAlojado.id, novoAlojado);
       return { id: novoId, message: "Alojado cadastrado com sucesso" };
     }
 
@@ -644,7 +666,7 @@ const StaticApiEngine = {
         });
         this.recomputeStats();
         this.saveToStorage();
-        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        sincronizarAlteracaoLeveFirebase('moveis_vistorias', movelId, body);
         return { message: "Vistoria atualizada com sucesso" };
       }
 
@@ -1170,8 +1192,23 @@ async function gerarSnapshotConsolidadoFirebase(manual = false) {
       showToast('⚡ Snapshot único gerado com sucesso! Apenas 1 leitura necessária no celular (economia de 99%).', 'success');
     }
   } catch (err) {
-    console.error("Erro ao gerar snapshot:", err);
-    if (manual) showToast(`Erro ao gerar snapshot: ${err.message}`, 'error');
+    const isPermissionError = err && (err.code === 'permission-denied' || 
+      (err.message && (err.message.toLowerCase().includes('permission') || err.message.toLowerCase().includes('insufficient'))));
+    if (isPermissionError) {
+      console.warn("⚠️ Firebase Firestore: Permissão negada para gerar snapshot no Console.");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+      const alertEl = document.getElementById('firebaseRulesAlert');
+      if (alertEl) alertEl.classList.remove('hidden');
+    } else {
+      console.error("Erro ao gerar snapshot:", err);
+    }
+    if (manual) {
+      if (isPermissionError) {
+        showToast("⚠️ Firebase: Permissões insuficientes no Firestore. Acesse o Console e configure as Regras (veja na aba Configurações).", "warning");
+      } else {
+        showToast(`Erro ao gerar snapshot: ${err.message}`, 'error');
+      }
+    }
   } finally {
     if (btn && manual) {
       btn.disabled = false;
@@ -1197,7 +1234,16 @@ async function carregarDadosDoSnapshotFirebase() {
     const data = doc.data();
     showToast(`✅ Sucesso! 1 leitura consumida. Carregados ${data.alojados?.length || 0} operários e ${data.blocos?.length || 0} blocos da nuvem!`, 'success');
   } catch (err) {
-    showToast(`Erro ao ler snapshot: ${err.message}`, 'error');
+    const isPermissionError = err && (err.code === 'permission-denied' || 
+      (err.message && (err.message.toLowerCase().includes('permission') || err.message.toLowerCase().includes('insufficient'))));
+    if (isPermissionError) {
+      showToast("⚠️ Firebase: Leitura negada pelas Regras do Firestore. Configure as regras no Console.", "warning");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+      const alertEl = document.getElementById('firebaseRulesAlert');
+      if (alertEl) alertEl.classList.remove('hidden');
+    } else {
+      showToast(`Erro ao ler snapshot: ${err.message}`, 'error');
+    }
   }
 }
 
@@ -1315,8 +1361,25 @@ async function sincronizarTudoComFirebase(manual = true) {
       showToast(`🔥 Sucesso! ${resAlojados.length} colaboradores e ${resBlocos.length} blocos sincronizados no Firebase!`, 'success');
     }
   } catch (err) {
-    console.error("Erro na sincronização Firebase:", err);
-    if (manual) showToast(`Erro ao sincronizar com Firebase: ${err.message}`, 'error');
+    const isPermissionError = err && (err.code === 'permission-denied' || 
+      (err.message && (err.message.toLowerCase().includes('permission') || err.message.toLowerCase().includes('insufficient'))));
+    
+    if (isPermissionError) {
+      console.warn("⚠️ Firebase Firestore: Permissões insuficientes no Firestore. As regras no Console do Firebase precisam ser configuradas.");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+      const alertEl = document.getElementById('firebaseRulesAlert');
+      if (alertEl) alertEl.classList.remove('hidden');
+    } else {
+      console.error("Erro na sincronização Firebase:", err);
+    }
+    
+    if (manual) {
+      if (isPermissionError) {
+        showToast("⚠️ Firebase: Permissão negada no Firestore. Ajuste as Regras no Console do Firebase (veja instruções na aba Configurações).", "warning");
+      } else {
+        showToast(`Erro ao sincronizar com Firebase: ${err.message}`, "error");
+      }
+    }
   } finally {
     if (btnSync) {
       btnSync.disabled = false;
@@ -1756,12 +1819,6 @@ async function loadInitialData() {
       carregarBlocosLista(),
       carregarVagasLivresLista()
     ]);
-
-    setTimeout(() => {
-      if (firebaseInitialized) {
-        sincronizarTudoComFirebase(false);
-      }
-    }, 1500);
   } catch (err) {
     console.error('Erro ao carregar dados iniciais:', err);
     showToast('Erro ao carregar dados da obra', 'error');

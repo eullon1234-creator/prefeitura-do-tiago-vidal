@@ -1194,6 +1194,41 @@
               <div><span class="text-slate-500">storageBucket:</span> <span class="text-amber-300">"prefeitura-cc71b.firebasestorage.app"</span></div>
               <div><span class="text-slate-500">appId:</span> <span class="text-slate-300">"1:395936672533:web:d7d17537d2c38c47bc971c"</span></div>
             </div>
+          </div>
+
+          <!-- Alerta e Instruções das Regras do Firestore (Permissões) -->
+          <div id="firebaseRulesAlert" class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs space-y-2.5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200 pb-2">
+              <div class="flex items-center gap-2 font-bold text-amber-950 text-xs">
+                <span class="w-6 h-6 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </span>
+                <span>Regras de Segurança do Firebase Firestore (Acesso Livre)</span>
+              </div>
+              <a href="https://console.firebase.google.com/project/prefeitura-cc71b/firestore/rules" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-xs">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir Regras no Console Firebase
+              </a>
+            </div>
+            <p class="text-amber-900 leading-relaxed text-[11.5px]">
+              Se aparecer o erro <b>"Missing or insufficient permissions"</b>, é porque o Google bloqueia gravações por padrão no Console do Firebase. Para liberar em 20 segundos:
+            </p>
+            <div class="space-y-1.5 text-amber-950 text-[11.5px]">
+              <div>1. Clique no botão acima <b>"Abrir Regras no Console Firebase"</b>.</div>
+              <div>2. Na aba <b>Regras (Rules)</b>, substitua o texto pelo código abaixo:</div>
+            </div>
+            <pre class="bg-slate-900 text-emerald-400 p-3 rounded-lg font-mono text-[11px] overflow-x-auto select-all leading-relaxed">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+            <p class="text-amber-800 text-[11px]">
+              3. Clique no botão azul <b>Publicar (Publish)</b> no topo do Console. As permissões ficam ativas na mesma hora!
+            </p>
+          </div>
+
           <!-- ESTRATÉGIA DE ECONOMIA MÁXIMA DE DADOS FIREBASE (PARTE 1) -->
           <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between">
@@ -2179,6 +2214,6 @@
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=1.5"></script>
+  <script src="app.js?v=1.6"></script>
 </body>
 </html>
