@@ -85,16 +85,16 @@
         <button id="mobileMenuBtn" class="md:hidden text-slate-300 hover:text-white p-1 rounded hover:bg-slate-800">
           <i class="fa-solid fa-bars text-lg"></i>
         </button>
-        <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchTab('dashboard')">
-          <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-bold shadow-sm">
-            <i class="fa-solid fa-hotel text-lg"></i>
+        <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('dashboard')">
+          <div class="h-10 px-2 py-1 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_cropped.png" alt="GEL - Goetze Lobato Engenharia" class="h-8 w-auto object-contain">
           </div>
           <div>
-            <div class="flex items-center gap-2">
-              <span class="font-bold tracking-tight text-base text-white">PREFEITURA DE CANTEIRO</span>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold tracking-tight text-sm sm:text-base text-white">PREFEITURA DE CANTEIRO</span>
               <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
             </div>
-            <p class="text-xs text-slate-400">Controle Integrado de Alojamentos & Vistorias</p>
+            <p class="text-[11px] sm:text-xs text-slate-400 leading-none mt-0.5">GEL • Goetze Lobato Engenharia S.A.</p>
           </div>
         </div>
       </div>
@@ -220,12 +220,20 @@
       </div>
 
       <!-- Sidebar Footer -->
-      <div class="p-3 border-t border-slate-800 bg-slate-950/50">
+      <div class="p-3 border-t border-slate-800 bg-slate-950/60">
+        <div class="flex items-center gap-2 mb-2 p-1.5 rounded-lg bg-slate-900 border border-slate-800">
+          <div class="h-6 px-1.5 py-0.5 rounded bg-white flex items-center justify-center flex-shrink-0 shadow-xs">
+            <img src="logo_gel_cropped.png" alt="GEL" class="h-4 w-auto object-contain">
+          </div>
+          <div class="text-[10px] text-slate-300 font-semibold truncate leading-tight">
+            Goetze Lobato Eng. S.A.
+          </div>
+        </div>
         <div class="flex items-center gap-2 text-xs text-slate-400">
           <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span>Banco Conectado (SQLite)</span>
+          <span>Sistema Integrado Ativo</span>
         </div>
-        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro v1.0 • Taboca 2</p>
+        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro • Taboca 2</p>
       </div>
     </aside>
 
@@ -237,14 +245,19 @@
         
         <!-- Header / Salutation & Action Buttons -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div>
-            <div class="flex items-center gap-2">
-              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Painel Geral de Ocupação</h1>
-              <span id="roleBadgeInPage" class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-                Acesso: Prefeito
-              </span>
+          <div class="flex items-center gap-4">
+            <div class="hidden sm:flex h-14 w-auto px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 items-center justify-center flex-shrink-0 shadow-xs">
+              <img src="logo_gel_cropped.png" alt="GEL - Goetze Lobato Engenharia" class="h-10 w-auto object-contain">
             </div>
-            <p class="text-sm text-slate-500 mt-0.5">Visão consolidada dos blocos, quartos, vagas e estado de conservação das instalações.</p>
+            <div>
+              <div class="flex items-center gap-2">
+                <h1 class="text-xl md:text-2xl font-bold text-slate-900">Painel Geral de Ocupação</h1>
+                <span id="roleBadgeInPage" class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                  Acesso: Prefeito
+                </span>
+              </div>
+              <p class="text-sm text-slate-500 mt-0.5">Gestão de Alojamentos • Obra Taboca 2 • Goetze Lobato Engenharia S.A.</p>
+            </div>
           </div>
           
           <div class="flex flex-wrap items-center gap-2.5">
@@ -1970,12 +1983,12 @@
       
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">
-            <i class="fa-solid fa-layer-group"></i>
+          <div class="h-9 px-2 py-0.5 rounded-lg bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_cropped.png" alt="GEL Logo" class="h-6 w-auto object-contain">
           </div>
           <div>
             <h4 class="font-bold text-white text-sm">Mais Funcionalidades</h4>
-            <p class="text-[11px] text-slate-400">Prefeitura de Canteiro • Taboca 2</p>
+            <p class="text-[11px] text-slate-400">GEL • Goetze Lobato Engenharia S.A.</p>
           </div>
         </div>
         <button onclick="fecharMenuMobileMais()" class="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white">
@@ -2052,11 +2065,11 @@
         <button onclick="fecharModalInstalacao()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg">
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center text-3xl mx-auto shadow-lg mb-3 border-2 border-amber-400/50">
-          <i class="fa-solid fa-hotel"></i>
+        <div class="w-24 h-16 rounded-2xl bg-white p-2 flex items-center justify-center mx-auto shadow-lg mb-3 border-2 border-amber-400/50">
+          <img src="logo_gel_cropped.png" alt="GEL Logo" class="max-h-12 w-auto object-contain">
         </div>
         <h3 class="font-extrabold text-lg text-white">Instalar Aplicativo Oficial</h3>
-        <p class="text-xs text-slate-300 mt-1 max-w-xs mx-auto">Prefeitura de Canteiro • Taboca 2</p>
+        <p class="text-xs text-slate-300 mt-1 max-w-xs mx-auto">GEL • Goetze Lobato Engenharia S.A. • Taboca 2</p>
         <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30 mt-2.5">
           <i class="fa-solid fa-bolt"></i> Abre em 0s • Sem barras de navegador • Offline
         </div>
