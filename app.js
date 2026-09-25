@@ -585,7 +585,8 @@ const StaticApiEngine = {
       return { id: novoId, message: "Alojado cadastrado com sucesso" };
     }
 
-      // GET
+    // 6.6 Listar Alojados (GET)
+    if (path.includes('/api/alojados') && method === 'GET') {
       let lista = [...this.dbState.alojados];
       const statusAlojado = params.get('status_alojado') || 'ativo';
       const blocoId = params.get('bloco_id');
