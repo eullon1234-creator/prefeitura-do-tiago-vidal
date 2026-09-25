@@ -54,6 +54,28 @@ const StaticApiEngine = {
             const parsed = JSON.parse(localSaved);
             if (parsed && parsed.quartos && parsed.quartos.length > 0) {
               this.dbState = parsed;
+              
+              // LIMPEZA AUTOMÁTICA: Purgar registros fantasmas sem nome gerados acidentalmente
+              const antesAlojados = (this.dbState.alojados || []).length;
+              this.dbState.alojados = (this.dbState.alojados || []).filter(a => {
+                if (!a || !a.nome_completo) return false;
+                const n = a.nome_completo.trim();
+                return n !== '' && n !== '??' && n !== '?' && n !== 'SEM NOME' && n !== 'N/A';
+              });
+              if (this.dbState.alojados.length !== antesAlojados) {
+                console.log(`[LIMPEZA] Removidos ${antesAlojados - this.dbState.alojados.length} registros fantasmas do cache local.`);
+                const validIds = new Set(this.dbState.alojados.map(a => a.id));
+                (this.dbState.quartos || []).forEach(q => {
+                  (q.vagas || []).forEach(v => {
+                    if (v.alojado && (!validIds.has(v.alojado.id) || !v.alojado.nome_completo || v.alojado.nome_completo.trim() === '')) {
+                      v.status = 'livre';
+                      v.alojado = null;
+                    }
+                  });
+                });
+                this.saveToStorage();
+              }
+
               this.recomputeStats();
               this.initialized = true;
               console.log("StaticApiEngine: Estado carregado do localStorage com sucesso.");
@@ -473,53 +495,95 @@ const StaticApiEngine = {
       return { message: "Alojado atualizado com sucesso" };
     }
 
-    // 6.4 Listar/Cadastrar Alojados
-    if (path.includes('/api/alojados')) {
+    // 6.4 Foto do Alojado (POST / DELETE)
+    const matchAlojadoFoto = path.match(/\/api\/alojados\/(\d+)\/foto/);
+    if (matchAlojadoFoto) {
+      const aId = Number(matchAlojadoFoto[1]);
+      const a = this.dbState.alojados.find(x => x.id === aId);
       if (method === 'POST') {
-        const novoId = Date.now();
-        const emp = this.dbState.empresas.find(e => e.id == body.empresa_id) || { nome: 'N/A', cor: '#3b82f6' };
-        let foundRoom = null;
-        let foundBed = null;
-        const vagaId = Number(body.vaga_id);
-        this.dbState.quartos.forEach(q => {
-          (q.vagas || []).forEach(v => {
-            if (v.id === vagaId) {
-              foundRoom = q;
-              foundBed = v;
-            }
+        const fotoUrl = (body && body.foto_url) ? body.foto_url : null;
+        if (a && fotoUrl) {
+          a.foto_url = fotoUrl;
+          this.dbState.quartos.forEach(q => {
+            (q.vagas || []).forEach(v => {
+              if (v.alojado && v.alojado.id === aId) {
+                v.alojado.foto_url = fotoUrl;
+              }
+            });
           });
-        });
-
-        const novoAlojado = {
-          id: novoId,
-          vaga_id: vagaId,
-          matricula: body.matricula || '',
-          nome_completo: (body.nome_completo || '').toUpperCase(),
-          empresa_id: Number(body.empresa_id),
-          empresa_nome: emp.nome,
-          empresa_cor: emp.cor,
-          funcao: (body.funcao || '').toUpperCase(),
-          data_entrada: body.data_entrada || new Date().toISOString().split('T')[0],
-          data_saida: null,
-          status: 'ativo',
-          observacoes: body.observacoes || '',
-          foto_url: body.foto_url || null,
-          bloco_nome: foundRoom ? foundRoom.bloco_nome : '',
-          quarto_numero: foundRoom ? foundRoom.numero : '',
-          numero_cama: foundBed ? foundBed.numero_cama : 1
-        };
-
-        if (foundBed) {
-          foundBed.status = 'ocupada';
-          foundBed.alojado = novoAlojado;
+          this.saveToStorage();
+          if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
         }
-
-        this.dbState.alojados.unshift(novoAlojado);
-        this.recomputeStats();
-        this.saveToStorage();
-        if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
-        return { id: novoId, message: "Alojado cadastrado com sucesso" };
+        return { success: true, foto_url: a ? a.foto_url : fotoUrl, message: "Foto atualizada com sucesso" };
       }
+      if (method === 'DELETE') {
+        if (a) {
+          a.foto_url = null;
+          this.dbState.quartos.forEach(q => {
+            (q.vagas || []).forEach(v => {
+              if (v.alojado && v.alojado.id === aId) {
+                v.alojado.foto_url = null;
+              }
+            });
+          });
+          this.saveToStorage();
+          if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+        }
+        return { success: true, message: "Foto removida com sucesso" };
+      }
+    }
+
+    // 6.5 Cadastrar Novo Alojado (somente rota raiz /api/alojados)
+    if (path.match(/\/api\/alojados\/?$/) && method === 'POST') {
+      // VALIDAÇÃO: Bloquear cadastros sem nome ou fantasmas
+      if (!body || !body.nome_completo || body.nome_completo.trim() === '' || body.nome_completo.trim() === '??') {
+        throw new Error("Nome do colaborador é obrigatório para cadastrar.");
+      }
+
+      const novoId = Date.now();
+      const emp = this.dbState.empresas.find(e => e.id == body.empresa_id) || { nome: 'N/A', cor: '#3b82f6' };
+      let foundRoom = null;
+      let foundBed = null;
+      const vagaId = Number(body.vaga_id);
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (v.id === vagaId) {
+            foundRoom = q;
+            foundBed = v;
+          }
+        });
+      });
+
+      const novoAlojado = {
+        id: novoId,
+        vaga_id: vagaId,
+        matricula: body.matricula || '',
+        nome_completo: body.nome_completo.trim().toUpperCase(),
+        empresa_id: Number(body.empresa_id),
+        empresa_nome: emp.nome,
+        empresa_cor: emp.cor,
+        funcao: (body.funcao || '').toUpperCase(),
+        data_entrada: body.data_entrada || new Date().toISOString().split('T')[0],
+        data_saida: null,
+        status: 'ativo',
+        observacoes: body.observacoes || '',
+        foto_url: body.foto_url || null,
+        bloco_nome: foundRoom ? foundRoom.bloco_nome : '',
+        quarto_numero: foundRoom ? foundRoom.numero : '',
+        numero_cama: foundBed ? foundBed.numero_cama : 1
+      };
+
+      if (foundBed) {
+        foundBed.status = 'ocupada';
+        foundBed.alojado = novoAlojado;
+      }
+
+      this.dbState.alojados.unshift(novoAlojado);
+      this.recomputeStats();
+      this.saveToStorage();
+      if (typeof sincronizarTudoComFirebase === 'function' && firebaseInitialized) sincronizarTudoComFirebase(false);
+      return { id: novoId, message: "Alojado cadastrado com sucesso" };
+    }
 
       // GET
       let lista = [...this.dbState.alojados];
@@ -1364,12 +1428,14 @@ function cancelarCropFoto() {
   if (input) input.value = '';
 }
 
+const IMGBB_API_KEY = '655783f08b2e45a3cd6b1b7a7e6ce91b';
+
 async function confirmarCropFoto() {
   if (!currentCropper) return;
   const btn = document.getElementById('btnConfirmarCrop');
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Salvando no PC...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Enviando para nuvem...';
   }
 
   try {
@@ -1379,6 +1445,8 @@ async function confirmarCropFoto() {
       imageSmoothingEnabled: true,
       imageSmoothingQuality: 'high'
     });
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
     canvas.toBlob(async (blob) => {
       if (!blob) {
@@ -1390,24 +1458,68 @@ async function confirmarCropFoto() {
         return;
       }
 
-      const file = new File([blob], 'foto_alojado.jpg', { type: 'image/jpeg' });
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('usuario', currentUserName);
-
       const alojadoId = currentCropAlojadoId || document.getElementById('modalFotoAlojadoId').value;
-      const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/foto`, {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Erro ao salvar foto');
+      let finalFotoUrl = null;
 
-      showToast('📸 Foto recortada com sucesso e salva no PC local do Prefeito!', 'success');
-      
+      // 1. Upload direto para ImgBB com chave oficial da API
+      try {
+        const formData = new FormData();
+        formData.append('image', blob, `alojado_${alojadoId}.jpg`);
+        const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: formData
+        });
+        const imgbbData = await resImgbb.json();
+        if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+          finalFotoUrl = imgbbData.data.display_url;
+          console.log("Foto salva no ImgBB com sucesso:", finalFotoUrl);
+        } else {
+          console.warn("Retorno ImgBB não foi sucesso:", imgbbData);
+        }
+      } catch (errImgbb) {
+        console.warn("Falha no upload do ImgBB (usando fallback local):", errImgbb);
+      }
+
+      // Fallback: se falhar ou estiver offline, usa dataUrl base64
+      if (!finalFotoUrl) {
+        finalFotoUrl = dataUrl;
+      }
+
+      // 2. Salvar no cache local do dispositivo (IndexedDB) para nunca mais gastar dados ao abrir
+      try {
+        await photoCacheManager.savePhoto(finalFotoUrl, dataUrl);
+        atualizarContadorCacheUI();
+      } catch (e) {
+        console.warn("Erro ao salvar no cache IndexedDB:", e);
+      }
+
+      // 3. Atualizar no banco de dados local da aplicação (StaticApiEngine)
+      await StaticApiEngine.init();
+      const alojado = (StaticApiEngine.dbState.alojados || []).find(x => x.id == alojadoId);
+      if (alojado) {
+        alojado.foto_url = finalFotoUrl;
+        (StaticApiEngine.dbState.quartos || []).forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.alojado && v.alojado.id == alojadoId) {
+              v.alojado.foto_url = finalFotoUrl;
+            }
+          });
+        });
+        StaticApiEngine.saveToStorage();
+      }
+
+      // 4. Salvar no Firestore se conectado
+      if (firebaseInitialized && firestoreDb) {
+        firestoreDb.collection('alojados').doc(String(alojadoId)).set({
+          foto_url: finalFotoUrl,
+          atualizado_em: new Date().toISOString()
+        }, { merge: true }).catch(() => {});
+      }
+
+      // 5. Atualizar imagem no modal de foto se aberto
       const imgEl = document.getElementById('modalFotoImg');
       if (imgEl) {
-        imgEl.src = data.foto_url;
+        imgEl.src = dataUrl;
         imgEl.classList.remove('hidden');
       }
       const vazioEl = document.getElementById('modalFotoVazio');
@@ -1415,16 +1527,20 @@ async function confirmarCropFoto() {
       const btnRem = document.getElementById('modalFotoBtnRemover');
       if (btnRem) btnRem.classList.remove('hidden');
 
-      cancelarCropFoto();
-      refreshAllData();
+      showToast(`📸 Foto salva com sucesso e armazenada neste aparelho!`, 'success');
 
-      if (firebaseInitialized && firestoreDb) {
-        firestoreDb.collection('alojados').doc(String(alojadoId)).set({
-          tem_foto_local: true,
-          atualizado_em: new Date().toISOString()
-        }, { merge: true }).catch(() => {});
+      cancelarCropFoto();
+      
+      if (activeTab === 'alojados') carregarAlojados();
+      if (activeTab === 'blocos') carregarQuartos();
+      if (activeTab === 'dashboard') carregarDashboard();
+      aplicarCacheEmFotosNaTela();
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Cortar & Salvar Foto';
       }
-    }, 'image/jpeg', 0.9);
+    }, 'image/jpeg', 0.88);
   } catch (err) {
     showToast(err.message, 'error');
     if (btn) {
@@ -2255,6 +2371,19 @@ function debounceCarregarAlojados() {
 }
 
 async function carregarAlojados() {
+  // Purga proativa de registros fantasmas antes de ler
+  if (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+    const antes = window.StaticApiEngine.dbState.alojados.length;
+    window.StaticApiEngine.dbState.alojados = window.StaticApiEngine.dbState.alojados.filter(a => {
+      if (!a || !a.nome_completo) return false;
+      const n = a.nome_completo.trim();
+      return n !== '' && n !== '??' && n !== '?' && n !== 'SEM NOME' && n !== 'N/A';
+    });
+    if (window.StaticApiEngine.dbState.alojados.length !== antes) {
+      window.StaticApiEngine.saveToStorage();
+    }
+  }
+
   const busca = document.getElementById('filtroAlojadosBusca').value.trim();
   const blocoId = document.getElementById('filtroAlojadosBloco').value;
   const empresaId = document.getElementById('filtroAlojadosEmpresa').value;
@@ -2282,8 +2411,8 @@ function renderTabelaAlojados(data) {
   const paginacao = document.getElementById('alojadosPaginacao');
   if (!tbody && !mobileList) return;
 
-  const total = data.total;
-  const items = data.items;
+  const items = (data.items || []).filter(a => a && a.nome_completo && a.nome_completo.trim() !== '' && a.nome_completo.trim() !== '??');
+  const total = items.length;
 
   if (contador) contador.textContent = `Mostrando ${items.length} de ${total} registros (Página ${data.page})`;
 
@@ -2572,15 +2701,34 @@ async function salvarAlojado(e) {
       if (!res.ok) throw new Error(data.detail || 'Erro ao cadastrar alojado');
       targetAlojadoId = data.id;
 
-      // Se selecionou arquivo de foto, enviar upload
+      // Se selecionou arquivo de foto, enviar upload para ImgBB
       if (fotoInput && fotoInput.files && fotoInput.files[0]) {
-        const formData = new FormData();
-        formData.append('file', fotoInput.files[0]);
-        formData.append('usuario', currentUserName);
-        await fetch(`${API_BASE}/api/alojados/${targetAlojadoId}/foto`, {
-          method: 'POST',
-          body: formData
-        });
+        try {
+          const file = fotoInput.files[0];
+          const formData = new FormData();
+          formData.append('image', file);
+          const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+          });
+          const imgbbData = await resImgbb.json();
+          if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+            const novaUrl = imgbbData.data.display_url;
+            const al = (StaticApiEngine.dbState.alojados || []).find(x => x.id == targetAlojadoId);
+            if (al) {
+              al.foto_url = novaUrl;
+              StaticApiEngine.saveToStorage();
+            }
+            if (firebaseInitialized && firestoreDb) {
+              firestoreDb.collection('alojados').doc(String(targetAlojadoId)).set({
+                foto_url: novaUrl,
+                atualizado_em: new Date().toISOString()
+              }, { merge: true }).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn("Erro upload foto no cadastro:", e);
+        }
       }
 
       showToast('Alojado cadastrado com sucesso!', 'success');
@@ -2609,15 +2757,34 @@ async function salvarAlojado(e) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Erro ao atualizar dados');
 
-      // Se selecionou arquivo de foto nova, enviar upload
+      // Se selecionou arquivo de foto nova, enviar upload para ImgBB
       if (fotoInput && fotoInput.files && fotoInput.files[0]) {
-        const formData = new FormData();
-        formData.append('file', fotoInput.files[0]);
-        formData.append('usuario', currentUserName);
-        await fetch(`${API_BASE}/api/alojados/${id}/foto`, {
-          method: 'POST',
-          body: formData
-        });
+        try {
+          const file = fotoInput.files[0];
+          const formData = new FormData();
+          formData.append('image', file);
+          const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+          });
+          const imgbbData = await resImgbb.json();
+          if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+            const novaUrl = imgbbData.data.display_url;
+            const al = (StaticApiEngine.dbState.alojados || []).find(x => x.id == id);
+            if (al) {
+              al.foto_url = novaUrl;
+              StaticApiEngine.saveToStorage();
+            }
+            if (firebaseInitialized && firestoreDb) {
+              firestoreDb.collection('alojados').doc(String(id)).set({
+                foto_url: novaUrl,
+                atualizado_em: new Date().toISOString()
+              }, { merge: true }).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn("Erro upload foto na edição:", e);
+        }
       }
 
       showToast('Dados e foto do alojado atualizados!', 'success');
@@ -2647,8 +2814,20 @@ function abrirModalFotoAlojado(alojadoId, nome, fotoUrl, empresaNome, empresaCor
   const vazioEl = document.getElementById('modalFotoVazio');
   const btnRemover = document.getElementById('modalFotoBtnRemover');
   
-  if (fotoUrl && fotoUrl.trim() !== '') {
-    imgEl.src = fotoUrl;
+  // Buscar a foto mais atualizada no banco em memória
+  let fotoAtual = fotoUrl;
+  if (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+    const al = window.StaticApiEngine.dbState.alojados.find(x => x.id == alojadoId);
+    if (al && al.foto_url) {
+      fotoAtual = al.foto_url;
+    }
+  }
+
+  if (fotoAtual && fotoAtual.trim() !== '') {
+    photoCacheManager.getPhoto(fotoAtual).then(cached => {
+      if (cached && imgEl) imgEl.src = cached;
+    });
+    imgEl.src = fotoAtual;
     imgEl.classList.remove('hidden');
     vazioEl.classList.add('hidden');
     btnRemover.classList.remove('hidden');
@@ -2676,18 +2855,42 @@ async function removerFotoModalAlojado() {
   if (!confirm('Deseja realmente remover a foto deste colaborador?')) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/foto?usuario=${encodeURIComponent(currentUserName)}`, {
-      method: 'DELETE'
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro ao remover foto');
+    await StaticApiEngine.init();
+    const alojado = (StaticApiEngine.dbState.alojados || []).find(x => x.id == alojadoId);
+    if (alojado) {
+      alojado.foto_url = null;
+      (StaticApiEngine.dbState.quartos || []).forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (v.alojado && v.alojado.id == alojadoId) {
+            v.alojado.foto_url = null;
+          }
+        });
+      });
+      StaticApiEngine.saveToStorage();
+    }
+
+    if (firebaseInitialized && firestoreDb) {
+      firestoreDb.collection('alojados').doc(String(alojadoId)).set({
+        foto_url: null,
+        atualizado_em: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
 
     showToast('Foto removida!', 'success');
-    document.getElementById('modalFotoImg').src = '';
-    document.getElementById('modalFotoImg').classList.add('hidden');
-    document.getElementById('modalFotoVazio').classList.remove('hidden');
-    document.getElementById('modalFotoBtnRemover').classList.add('hidden');
-    refreshAllData();
+    const imgEl = document.getElementById('modalFotoImg');
+    if (imgEl) {
+      imgEl.src = '';
+      imgEl.classList.add('hidden');
+    }
+    const vazioEl = document.getElementById('modalFotoVazio');
+    if (vazioEl) vazioEl.classList.remove('hidden');
+    const btnRem = document.getElementById('modalFotoBtnRemover');
+    if (btnRem) btnRem.classList.add('hidden');
+
+    if (activeTab === 'alojados') carregarAlojados();
+    if (activeTab === 'blocos') carregarQuartos();
+    if (activeTab === 'dashboard') carregarDashboard();
+    aplicarCacheEmFotosNaTela();
   } catch (err) {
     showToast(err.message, 'error');
   }
