@@ -1342,6 +1342,28 @@ function iniciarListenerTempoRealFirebase() {
       atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
     }
   });
+
+  // Ouvinte em tempo real para Identidade Visual e Logomarca
+  try {
+    firestoreDb.collection('configuracoes').doc('identidade_visual').onSnapshot((doc) => {
+      if (doc && doc.exists) {
+        const data = doc.data();
+        if (data) {
+          if (data.logo_url) localStorage.setItem('appCustomLogo', data.logo_url);
+          if (data.empresa_nome) localStorage.setItem('appCustomEmpresaNome', data.empresa_nome);
+          if (data.obra_nome) localStorage.setItem('appCustomObraNome', data.obra_nome);
+          aplicarIdentidadeVisual(data);
+          if (typeof activeTab !== 'undefined' && activeTab === 'configuracoes') {
+            carregarConfigIdentidadeVisual();
+          }
+        }
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar identidade visual no Firestore:", err);
+    });
+  } catch (errSnap) {
+    console.warn("Aviso ao iniciar snapshot da identidade visual:", errSnap);
+  }
 }
 
 // Botão Sincronizar Nuvem no Header (Força verificação e atualização mútua)
@@ -1725,6 +1747,301 @@ function inicializarTamanhoFonte() {
 }
 
 // ========================================================
+// 0.15 IDENTIDADE VISUAL E GESTÃO DA EMPRESA / LOGO
+// ========================================================
+const DEFAULT_APP_LOGO = 'logo_gel_cropped.png';
+const DEFAULT_EMPRESA_NOME = 'GEL • Goetze Lobato Engenharia S.A.';
+const DEFAULT_EMPRESA_CURTO = 'Goetze Lobato Eng. S.A.';
+const DEFAULT_OBRA_NOME = 'Taboca 2';
+
+let windowTempCustomLogoFile = null;
+
+function aplicarIdentidadeVisual(config = null) {
+  const customLogo = (config && config.logo_url) || localStorage.getItem('appCustomLogo') || DEFAULT_APP_LOGO;
+  const customEmpresa = (config && config.empresa_nome) || localStorage.getItem('appCustomEmpresaNome') || DEFAULT_EMPRESA_NOME;
+  const customObra = (config && config.obra_nome) || localStorage.getItem('appCustomObraNome') || DEFAULT_OBRA_NOME;
+
+  // 1. Atualizar todas as instâncias da Logomarca
+  document.querySelectorAll('.app-logo-img').forEach(img => {
+    img.src = customLogo;
+  });
+
+  // 2. Atualizar o preview na aba de configurações se existir
+  const previewImg = document.getElementById('configLogoPreview');
+  if (previewImg && !windowTempCustomLogoFile) {
+    previewImg.src = customLogo;
+  }
+
+  // 3. Atualizar o nome da empresa
+  document.querySelectorAll('.app-empresa-nome').forEach(el => {
+    el.textContent = customEmpresa;
+  });
+
+  // 4. Atualizar versão curta do nome da empresa no footer da sidebar
+  let curto = customEmpresa;
+  if (curto.length > 26) {
+    const parts = curto.split(/[•\-|]/);
+    curto = (parts.length > 1 ? parts[1] : parts[0]).trim();
+    if (curto.length > 26) curto = curto.substring(0, 24) + '...';
+  }
+  document.querySelectorAll('.app-empresa-curto').forEach(el => {
+    el.textContent = curto;
+  });
+
+  // 5. Atualizar tag/nome da obra
+  document.querySelectorAll('.app-obra-tag').forEach(el => {
+    el.textContent = customObra;
+  });
+
+  // 6. Atualizar título da aba do navegador
+  try {
+    const empresaPrefix = customEmpresa.split('•')[0].trim();
+    document.title = `Prefeitura de Canteiro • ${customObra} (${empresaPrefix})`;
+  } catch (e) {}
+}
+
+function carregarConfigIdentidadeVisual() {
+  const customLogo = localStorage.getItem('appCustomLogo') || DEFAULT_APP_LOGO;
+  const customEmpresa = localStorage.getItem('appCustomEmpresaNome') || DEFAULT_EMPRESA_NOME;
+  const customObra = localStorage.getItem('appCustomObraNome') || DEFAULT_OBRA_NOME;
+
+  const inputEmpresa = document.getElementById('configEmpresaNome');
+  if (inputEmpresa) inputEmpresa.value = customEmpresa;
+
+  const inputObra = document.getElementById('configObraNome');
+  if (inputObra) inputObra.value = customObra;
+
+  const preview = document.getElementById('configLogoPreview');
+  if (preview && !windowTempCustomLogoFile) preview.src = customLogo;
+
+  const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+  if (statusMsg) statusMsg.textContent = 'Pronto para salvar alterações';
+}
+
+function previewLogoConfig(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WebP).', 'warning');
+    return;
+  }
+
+  windowTempCustomLogoFile = file;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const preview = document.getElementById('configLogoPreview');
+    if (preview) {
+      preview.src = e.target.result;
+    }
+    const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+    if (statusMsg) {
+      statusMsg.innerHTML = '<span class="text-amber-600 font-semibold"><i class="fa-solid fa-circle-exclamation"></i> Nova logo selecionada. Clique em "Salvar Identidade Visual" para confirmar.</span>';
+    }
+    showToast('Prévia carregada! Clique em "Salvar Identidade Visual" para gravar.', 'info');
+  };
+  reader.readAsDataURL(file);
+}
+
+function redimensionarImagemLogo(file, maxDimension = 500) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/png');
+        canvas.toBlob((blob) => {
+          resolve({ blob, dataUrl });
+        }, 'image/png');
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function salvarConfigIdentidadeVisual(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  if (!checkPrefeitoAccess()) return;
+
+  const btn = document.getElementById('btnSalvarIdentidadeVisual');
+  const originalBtnHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Salvando na nuvem...';
+  }
+
+  const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+  if (statusMsg) statusMsg.textContent = 'Processando identidade visual...';
+
+  try {
+    let finalLogoUrl = localStorage.getItem('appCustomLogo') || DEFAULT_APP_LOGO;
+
+    // 1. Se o usuário selecionou uma nova foto de logo
+    if (windowTempCustomLogoFile) {
+      if (statusMsg) statusMsg.textContent = 'Otimizando imagem da logomarca...';
+      const { blob, dataUrl } = await redimensionarImagemLogo(windowTempCustomLogoFile, 500);
+
+      // Tenta upload para ImgBB para URL global e leve
+      let uploadSucesso = false;
+      try {
+        if (statusMsg) statusMsg.textContent = 'Enviando logo para servidor em nuvem...';
+        const formData = new FormData();
+        formData.append('image', blob, `logo_custom_${Date.now()}.png`);
+        const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: formData
+        });
+        const imgbbData = await resImgbb.json();
+        if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+          finalLogoUrl = imgbbData.data.display_url;
+          uploadSucesso = true;
+          console.log("Logo customizada salva no ImgBB com sucesso:", finalLogoUrl);
+        }
+      } catch (errUpload) {
+        console.warn("Falha no upload do ImgBB para a logo (usando fallback dataURL):", errUpload);
+      }
+
+      // Se o upload falhou ou sem internet, usa base64 comprimido
+      if (!uploadSucesso) {
+        finalLogoUrl = dataUrl;
+      }
+
+      windowTempCustomLogoFile = null;
+    }
+
+    // 2. Obter textos digitados
+    const inputEmpresa = document.getElementById('configEmpresaNome');
+    const inputObra = document.getElementById('configObraNome');
+
+    const empresaNome = (inputEmpresa && inputEmpresa.value.trim()) ? inputEmpresa.value.trim() : DEFAULT_EMPRESA_NOME;
+    const obraNome = (inputObra && inputObra.value.trim()) ? inputObra.value.trim() : DEFAULT_OBRA_NOME;
+
+    // 3. Persistir localmente
+    localStorage.setItem('appCustomLogo', finalLogoUrl);
+    localStorage.setItem('appCustomEmpresaNome', empresaNome);
+    localStorage.setItem('appCustomObraNome', obraNome);
+
+    // 4. Aplicar imediatamente na UI de todas as abas e componentes
+    aplicarIdentidadeVisual({
+      logo_url: finalLogoUrl,
+      empresa_nome: empresaNome,
+      obra_nome: obraNome
+    });
+
+    // 5. Sincronizar com Firebase Firestore (para todos os aparelhos receberem em tempo real)
+    if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+      if (statusMsg) statusMsg.textContent = 'Sincronizando com Firestore...';
+      try {
+        await firestoreDb.collection('configuracoes').doc('identidade_visual').set({
+          logo_url: finalLogoUrl,
+          empresa_nome: empresaNome,
+          obra_nome: obraNome,
+          atualizado_em: firebase.firestore.FieldValue.serverTimestamp(),
+          atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+        }, { merge: true });
+        console.log("Identidade visual salva e sincronizada com sucesso no Firestore!");
+      } catch (errFs) {
+        console.warn("Aviso ao salvar identidade visual no Firestore:", errFs);
+      }
+    }
+
+    if (statusMsg) {
+      statusMsg.innerHTML = '<span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Alterações salvas e sincronizadas!</span>';
+    }
+
+    showToast('Identidade visual atualizada com sucesso em todo o sistema!', 'success');
+  } catch (error) {
+    console.error("Erro ao salvar identidade visual:", error);
+    showToast('Erro ao salvar identidade visual: ' + error.message, 'error');
+    if (statusMsg) {
+      statusMsg.innerHTML = '<span class="text-rose-600 font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao salvar alterações.</span>';
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnHtml;
+    }
+  }
+}
+
+async function restaurarLogoPadrao() {
+  if (!checkPrefeitoAccess()) return;
+
+  if (!confirm("Deseja realmente restaurar a logomarca e nomes oficiais padrão da GEL?")) {
+    return;
+  }
+
+  windowTempCustomLogoFile = null;
+  const fileInput = document.getElementById('configLogoFileInput');
+  if (fileInput) fileInput.value = '';
+
+  localStorage.removeItem('appCustomLogo');
+  localStorage.removeItem('appCustomEmpresaNome');
+  localStorage.removeItem('appCustomObraNome');
+
+  const inputEmpresa = document.getElementById('configEmpresaNome');
+  if (inputEmpresa) inputEmpresa.value = DEFAULT_EMPRESA_NOME;
+
+  const inputObra = document.getElementById('configObraNome');
+  if (inputObra) inputObra.value = DEFAULT_OBRA_NOME;
+
+  const preview = document.getElementById('configLogoPreview');
+  if (preview) preview.src = DEFAULT_APP_LOGO;
+
+  aplicarIdentidadeVisual({
+    logo_url: DEFAULT_APP_LOGO,
+    empresa_nome: DEFAULT_EMPRESA_NOME,
+    obra_nome: DEFAULT_OBRA_NOME
+  });
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      await firestoreDb.collection('configuracoes').doc('identidade_visual').set({
+        logo_url: DEFAULT_APP_LOGO,
+        empresa_nome: DEFAULT_EMPRESA_NOME,
+        obra_nome: DEFAULT_OBRA_NOME,
+        atualizado_em: firebase.firestore.FieldValue.serverTimestamp(),
+        atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+      }, { merge: true });
+    } catch (e) {
+      console.warn("Erro ao restaurar no Firestore:", e);
+    }
+  }
+
+  const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+  if (statusMsg) {
+    statusMsg.innerHTML = '<span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Padrões da GEL restaurados com sucesso!</span>';
+  }
+
+  showToast('Padrão da GEL restaurado com sucesso!', 'info');
+}
+
+// ========================================================
 // 0.2 CROPPER.JS - CORTE E EDIÇÃO DE FOTOS 1:1
 // ========================================================
 let currentCropper = null;
@@ -1912,6 +2229,7 @@ async function confirmarCropFoto() {
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
+  aplicarIdentidadeVisual();
   inicializarTamanhoFonte();
   initFirebase();
   initMobileMenu();
@@ -2026,6 +2344,7 @@ function switchTab(tabId) {
   } else if (tabId === 'auditoria') {
     carregarAuditoria();
   } else if (tabId === 'configuracoes') {
+    carregarConfigIdentidadeVisual();
     const salvo = localStorage.getItem('canteiro_font_size') || 'md';
     alterarTamanhoFonte(salvo);
     atualizarContadorCacheUI();

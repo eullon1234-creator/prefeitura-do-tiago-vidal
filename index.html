@@ -96,14 +96,14 @@
         </button>
         <div class="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" onclick="switchTab('dashboard')">
           <div class="h-9 sm:h-10 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
-            <img src="logo_gel_cropped.png" alt="GEL" class="h-7 sm:h-8 w-auto object-contain">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-7 sm:h-8 w-auto object-contain">
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 flex-nowrap">
               <span class="font-extrabold tracking-tight text-xs sm:text-base text-white truncate">PREFEITURA</span>
-              <span class="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex-shrink-0">Taboca 2</span>
+              <span class="app-obra-tag text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex-shrink-0">Taboca 2</span>
             </div>
-            <p class="hidden sm:block text-[11px] sm:text-xs text-slate-400 truncate leading-none mt-0.5">GEL • Goetze Lobato Engenharia S.A.</p>
+            <p class="app-empresa-nome hidden sm:block text-[11px] sm:text-xs text-slate-400 truncate leading-none mt-0.5">GEL • Goetze Lobato Engenharia S.A.</p>
           </div>
         </div>
       </div>
@@ -186,11 +186,11 @@
       <div class="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/90 flex-shrink-0">
         <div class="flex items-center gap-2.5">
           <div class="h-9 px-2 py-0.5 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
-            <img src="logo_gel_cropped.png" alt="GEL Logo" class="h-7 w-auto object-contain">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-7 w-auto object-contain">
           </div>
           <div>
             <h4 class="font-extrabold text-white text-sm leading-tight">Prefeitura de Canteiro</h4>
-            <p class="text-[10px] text-slate-400">GEL • Goetze Lobato Eng. S.A.</p>
+            <p class="app-empresa-nome text-[10px] text-slate-400">GEL • Goetze Lobato Eng. S.A.</p>
           </div>
         </div>
         <button onclick="toggleSidebarMobile(false)" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" aria-label="Fechar menu lateral">
@@ -272,9 +272,9 @@
       <div class="p-3 border-t border-slate-800 bg-slate-950/60 flex-shrink-0">
         <div class="flex items-center gap-2 mb-2 p-1.5 rounded-lg bg-slate-900 border border-slate-800">
           <div class="h-6 px-1.5 py-0.5 rounded bg-white flex items-center justify-center flex-shrink-0 shadow-xs">
-            <img src="logo_gel_cropped.png" alt="GEL" class="h-4 w-auto object-contain">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-4 w-auto object-contain">
           </div>
-          <div class="text-[10px] text-slate-300 font-semibold truncate leading-tight">
+          <div class="app-empresa-curto text-[10px] text-slate-300 font-semibold truncate leading-tight">
             Goetze Lobato Eng. S.A.
           </div>
         </div>
@@ -282,7 +282,7 @@
           <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
           <span>Sistema Integrado Ativo</span>
         </div>
-        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro • Taboca 2</p>
+        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro • <span class="app-obra-tag">Taboca 2</span></p>
       </div>
     </aside>
 
@@ -296,7 +296,7 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <div class="flex items-center gap-4">
             <div class="hidden sm:flex h-14 w-auto px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 items-center justify-center flex-shrink-0 shadow-xs">
-              <img src="logo_gel_cropped.png" alt="GEL - Goetze Lobato Engenharia" class="h-10 w-auto object-contain">
+              <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-10 w-auto object-contain">
             </div>
             <div>
               <div class="flex items-center gap-2">
@@ -305,7 +305,7 @@
                   Acesso: Prefeito
                 </span>
               </div>
-              <p class="text-sm text-slate-500 mt-0.5">Gestão de Alojamentos • Obra Taboca 2 • Goetze Lobato Engenharia S.A.</p>
+              <p class="text-sm text-slate-500 mt-0.5">Gestão de Alojamentos • Obra <span class="app-obra-tag font-semibold text-slate-700">Taboca 2</span> • <span class="app-empresa-nome font-semibold text-slate-700">GEL • Goetze Lobato Engenharia S.A.</span></p>
             </div>
           </div>
           
@@ -1060,6 +1060,92 @@
             <button onclick="exportarPlanilhaOficial()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-2 transition shadow-sm">
               <i class="fa-solid fa-file-excel"></i> Exportar Planilha Oficial
             </button>
+          </div>
+        </div>
+
+        <!-- SEÇÃO: IDENTIDADE VISUAL & EMPRESA -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-lg font-bold flex-shrink-0">
+                <i class="fa-solid fa-building-user"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Identidade Visual & Empresa</h3>
+                <p class="text-xs text-slate-500">Personalize a logomarca da construtora, o nome da empresa e o nome do canteiro/obra. Atualizado em tempo real no app e em todos os aparelhos.</p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1.5 self-start sm:self-center">
+              <i class="fa-solid fa-shield-halved text-amber-500"></i> Exclusivo Prefeito
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            <!-- Coluna da Logo (Preview e Upload) -->
+            <div class="md:col-span-4 flex flex-col items-center sm:items-start space-y-3">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Logomarca Oficial
+              </label>
+              
+              <div class="w-full h-32 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-amber-400 p-3 flex flex-col items-center justify-center relative group transition bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:12px_12px]">
+                <img id="configLogoPreview" src="logo_gel_cropped.png" alt="Prévia da Logomarca" class="max-h-20 max-w-full object-contain filter drop-shadow-sm transition-transform group-hover:scale-105">
+                <div class="absolute inset-0 bg-slate-900/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer" onclick="document.getElementById('configLogoFileInput').click()">
+                  <span class="text-white text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur-xs flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-camera"></i> Trocar Logo
+                  </span>
+                </div>
+              </div>
+
+              <!-- Input File Oculto -->
+              <input type="file" id="configLogoFileInput" accept="image/*" class="hidden" onchange="previewLogoConfig(this)">
+
+              <!-- Botões de Ação da Logo -->
+              <div class="flex items-center gap-2 w-full">
+                <button type="button" onclick="document.getElementById('configLogoFileInput').click()" class="btn-prefeito flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs">
+                  <i class="fa-solid fa-upload"></i> Escolher Imagem
+                </button>
+                <button type="button" onclick="restaurarLogoPadrao()" title="Restaurar logotipo original GEL" class="btn-prefeito py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-slate-200">
+                  <i class="fa-solid fa-rotate-left"></i> Padrão
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400 leading-tight">Formatos PNG, JPG ou WebP. Recomendamos imagem horizontal com fundo transparente.</p>
+            </div>
+
+            <!-- Coluna dos Textos (Nome da Empresa & Nome da Obra) -->
+            <div class="md:col-span-8 space-y-4">
+              <div>
+                <label for="configEmpresaNome" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nome Completo da Empresa / Construtora
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-building"></i>
+                  </div>
+                  <input type="text" id="configEmpresaNome" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm font-semibold text-slate-800 placeholder-slate-400 transition" placeholder="Ex: GEL • Goetze Lobato Engenharia S.A.">
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Exibido na barra superior, menus e cabeçalhos de relatórios.</p>
+              </div>
+
+              <div>
+                <label for="configObraNome" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Identificação do Canteiro / Obra (Tag)
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-location-dot"></i>
+                  </div>
+                  <input type="text" id="configObraNome" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm font-semibold text-slate-800 placeholder-slate-400 transition" placeholder="Ex: Taboca 2">
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Tag amarela destacada no topo da tela e nas fichas dos quartos.</p>
+              </div>
+
+              <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span id="identidadeVisualStatusMsg" class="text-xs text-slate-500 italic">Pronto para salvar alterações</span>
+                <button type="button" id="btnSalvarIdentidadeVisual" onclick="salvarConfigIdentidadeVisual(event)" class="btn-prefeito w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition transform active:scale-98">
+                  <i class="fa-solid fa-floppy-disk"></i> Salvar Identidade Visual
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2096,11 +2182,11 @@ service cloud.firestore {
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2.5">
           <div class="h-9 px-2 py-0.5 rounded-lg bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
-            <img src="logo_gel_cropped.png" alt="GEL Logo" class="h-6 w-auto object-contain">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-6 w-auto object-contain">
           </div>
           <div>
             <h4 class="font-bold text-white text-sm">Mais Funcionalidades</h4>
-            <p class="text-[11px] text-slate-400">GEL • Goetze Lobato Engenharia S.A.</p>
+            <p class="app-empresa-nome text-[11px] text-slate-400">GEL • Goetze Lobato Engenharia S.A.</p>
           </div>
         </div>
         <button onclick="fecharMenuMobileMais()" class="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white">
@@ -2178,10 +2264,10 @@ service cloud.firestore {
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
         <div class="w-24 h-16 rounded-2xl bg-white p-2 flex items-center justify-center mx-auto shadow-lg mb-3 border-2 border-amber-400/50">
-          <img src="logo_gel_cropped.png" alt="GEL Logo" class="max-h-12 w-auto object-contain">
+          <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img max-h-12 w-auto object-contain">
         </div>
         <h3 class="font-extrabold text-lg text-white">Instalar Aplicativo Oficial</h3>
-        <p class="text-xs text-slate-300 mt-1 max-w-xs mx-auto">GEL • Goetze Lobato Engenharia S.A. • Taboca 2</p>
+        <p class="text-xs text-slate-300 mt-1 max-w-xs mx-auto"><span class="app-empresa-nome">GEL • Goetze Lobato Engenharia S.A.</span> • <span class="app-obra-tag">Taboca 2</span></p>
         <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30 mt-2.5">
           <i class="fa-solid fa-bolt"></i> Abre em 0s • Sem barras de navegador • Offline
         </div>
@@ -2249,6 +2335,6 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=2.2"></script>
+  <script src="app.js?v=2.3"></script>
 </body>
 </html>
