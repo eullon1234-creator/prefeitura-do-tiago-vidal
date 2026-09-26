@@ -34,6 +34,7 @@ function sincronizarAlteracaoLeveFirebase(colecao, docId, dados) {
   if (typeof firebaseInitialized !== 'undefined' && firebaseInitialized && typeof firestoreDb !== 'undefined' && firestoreDb) {
     try {
       firestoreDb.collection(colecao).doc(String(docId)).set({
+        id: Number(docId) || docId,
         ...dados,
         atualizado_em: new Date().toISOString()
       }, { merge: true }).catch(err => {
@@ -200,19 +201,34 @@ const StaticApiEngine = {
         if (!v.vaga_id && v.id) v.vaga_id = v.id;
         if (!v.id && v.vaga_id) v.id = v.vaga_id;
 
-        let a = null;
+        // Blindagem: Se a vaga ainda aponta para um alojado, verificar se esse alojado não foi mudado ou desligado
         if (v.alojado_id) {
-          a = activeAlojados.find(x => x.id === v.alojado_id);
+          const alAtual = activeAlojados.find(x => Number(x.id) === Number(v.alojado_id));
+          if (!alAtual || (Number(alAtual.vaga_id) !== Number(v.id) && (String(alAtual.quarto_numero).trim() !== String(q.numero).trim() || Number(alAtual.numero_cama) !== Number(v.numero_cama)))) {
+            // Este colaborador não pertence mais a esta vaga (foi movido ou desligado) -> Liberar vaga antiga imediatamente
+            v.status = 'livre';
+            v.alojado = null;
+            v.alojado_id = null;
+            v.nome_completo = null;
+            v.matricula = null;
+            v.funcao = null;
+            v.empresa_nome = null;
+            v.empresa_cor = null;
+            v.foto_url = null;
+            v.whatsapp = null;
+          }
         }
-        if (!a && v.alojado && v.alojado.id) {
-          a = activeAlojados.find(x => x.id === v.alojado.id) || v.alojado;
-        }
-        if (!a && v.id) {
+
+        let a = null;
+        if (v.id) {
           a = alojadoMapByVaga.get(Number(v.id));
         }
         if (!a && q.numero && v.numero_cama) {
           const key = `${(q.bloco_nome || '').trim().toLowerCase()}_${String(q.numero).trim()}_${Number(v.numero_cama)}`;
           a = alojadoMapByQuartoCama.get(key);
+        }
+        if (!a && v.alojado_id) {
+          a = activeAlojados.find(x => Number(x.id) === Number(v.alojado_id));
         }
 
         if (a && a.status === 'ativo') {
@@ -568,7 +584,7 @@ const StaticApiEngine = {
     const isRealocarEndpoint = (path === '/api/alojados/realocar' || path.endsWith('/api/alojados/realocar'));
     if ((matchRealocar || isRealocarEndpoint) && method === 'POST') {
       const aId = matchRealocar ? Number(matchRealocar[1]) : Number(body.alojado_id);
-      const alojado = this.dbState.alojados.find(x => x.id === aId);
+      const alojado = this.dbState.alojados.find(x => Number(x.id) === aId);
       const novaVagaId = Number(body.nova_vaga_id);
       if (!alojado) {
         throw new Error("Colaborador não encontrado para realocação.");
@@ -577,11 +593,13 @@ const StaticApiEngine = {
         throw new Error("Vaga de destino não informada.");
       }
 
-      // 1. Liberar vaga antiga em todos os quartos
-      const vagaAntigaId = alojado.vaga_id;
+      // 1. Liberar vaga antiga em todos os quartos (comparando por vaga_id anterior, ID do alojado e nome)
+      const vagaAntigaId = Number(alojado.vaga_id);
       this.dbState.quartos.forEach(q => {
         (q.vagas || []).forEach(v => {
-          if (v.id === vagaAntigaId || v.alojado_id === aId || (v.alojado && v.alojado.id === aId)) {
+          const ehVagaAntiga = (vagaAntigaId && (Number(v.id) === vagaAntigaId || Number(v.vaga_id) === vagaAntigaId));
+          const ehDesteAlojado = (Number(v.alojado_id) === aId || (v.alojado && Number(v.alojado.id) === aId) || (v.nome_completo && v.nome_completo.trim().toUpperCase() === alojado.nome_completo.trim().toUpperCase()));
+          if (ehVagaAntiga || ehDesteAlojado) {
             v.status = 'livre';
             v.alojado = null;
             v.alojado_id = null;
@@ -591,6 +609,7 @@ const StaticApiEngine = {
             v.empresa_nome = null;
             v.empresa_cor = null;
             v.foto_url = null;
+            v.whatsapp = null;
           }
         });
       });
@@ -600,7 +619,7 @@ const StaticApiEngine = {
       let foundBed = null;
       this.dbState.quartos.forEach(q => {
         (q.vagas || []).forEach(v => {
-          if (Number(v.id) === novaVagaId) {
+          if (Number(v.id) === novaVagaId || Number(v.vaga_id) === novaVagaId) {
             foundRoom = q;
             foundBed = v;
           }
@@ -612,10 +631,10 @@ const StaticApiEngine = {
       }
 
       // Atualizar dados no alojado
-      alojado.vaga_id = novaVagaId;
+      alojado.vaga_id = Number(foundBed.id || novaVagaId);
       alojado.bloco_nome = foundRoom.bloco_nome;
-      alojado.quarto_numero = foundRoom.numero;
-      alojado.numero_cama = foundBed.numero_cama;
+      alojado.quarto_numero = String(foundRoom.numero);
+      alojado.numero_cama = Number(foundBed.numero_cama);
       alojado.status = 'ativo';
 
       // Atualizar dados na nova vaga
@@ -627,12 +646,24 @@ const StaticApiEngine = {
       foundBed.empresa_nome = alojado.empresa_nome || '';
       foundBed.empresa_cor = alojado.empresa_cor || '#2563eb';
       foundBed.foto_url = alojado.foto_url || null;
+      foundBed.whatsapp = alojado.whatsapp || '';
       foundBed.alojado = { ...alojado };
+
+      // Auditoria
+      if (!this.dbState.auditoria) this.dbState.auditoria = [];
+      this.dbState.auditoria.unshift({
+        id: Date.now(),
+        acao: 'REALOCAR',
+        usuario: body.usuario || currentUserName || 'Prefeito Vidal',
+        data_hora: new Date().toLocaleString('pt-BR'),
+        detalhes: `Colaborador '${alojado.nome_completo}' realocado para ${foundRoom.bloco_nome} - Quarto ${foundRoom.numero} (Cama ${foundBed.numero_cama}). Motivo: ${body.motivo || 'Administração'}`
+      });
 
       this.recomputeStats();
       this.saveToStorage();
 
       sincronizarAlteracaoLeveFirebase('alojados', aId, {
+        id: aId,
         vaga_id: alojado.vaga_id,
         bloco_nome: alojado.bloco_nome,
         quarto_numero: alojado.quarto_numero,
@@ -1382,17 +1413,19 @@ const firebaseConfig = {
 function sincronizarVagaAlojadoEmMemoria(alojadoId) {
   if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.quartos) return;
   const aId = Number(alojadoId);
-  const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
+  const al = (window.StaticApiEngine.dbState.alojados || []).find(x => Number(x.id) === aId);
   if (!al) return;
 
-  // 1. Limpar das vagas onde ele estava antes caso tenha mudado ou sido desligado
+  // 1. Limpar de QUALQUER vaga onde ele não deveria estar
   window.StaticApiEngine.dbState.quartos.forEach(q => {
     (q.vagas || []).forEach(v => {
-      const ehDesteAlojado = (v.alojado_id === aId || (v.alojado && v.alojado.id === aId));
+      const ehDesteAlojado = (Number(v.alojado_id) === aId || (v.alojado && Number(v.alojado.id) === aId) || (v.nome_completo && v.nome_completo.trim().toUpperCase() === al.nome_completo.trim().toUpperCase()));
       if (ehDesteAlojado) {
-        const quartoDiferente = String(q.numero) !== String(al.quarto_numero) || (al.bloco_nome && q.bloco_nome && al.bloco_nome.trim().toLowerCase() !== q.bloco_nome.trim().toLowerCase());
-        const camaDiferente = Number(v.numero_cama) !== Number(al.numero_cama);
-        if (al.status === 'desligado' || quartoDiferente || camaDiferente) {
+        const mesmoQuarto = String(q.numero).trim() === String(al.quarto_numero).trim();
+        const mesmaCama = Number(v.numero_cama) === Number(al.numero_cama);
+        const mesmoBloco = !al.bloco_nome || (q.bloco_nome && q.bloco_nome.trim().toLowerCase() === al.bloco_nome.trim().toLowerCase());
+        
+        if (al.status === 'desligado' || !mesmoQuarto || !mesmaCama || !mesmoBloco) {
           v.status = 'livre';
           v.alojado = null;
           v.alojado_id = null;
@@ -1402,6 +1435,7 @@ function sincronizarVagaAlojadoEmMemoria(alojadoId) {
           v.empresa_nome = null;
           v.empresa_cor = null;
           v.foto_url = null;
+          v.whatsapp = null;
         } else {
           v.nome_completo = al.nome_completo;
           v.matricula = al.matricula || '';
@@ -1409,17 +1443,18 @@ function sincronizarVagaAlojadoEmMemoria(alojadoId) {
           v.empresa_nome = al.empresa_nome || '';
           v.empresa_cor = al.empresa_cor || '#2563eb';
           v.foto_url = al.foto_url || null;
+          v.whatsapp = al.whatsapp || '';
           v.alojado = { ...al };
         }
       }
     });
   });
 
-  // 2. Se estiver ativo e com quarto/cama definidos, ocupar na vaga correta
+  // 2. Se estiver ativo e com quarto/cama definidos, ocupar na vaga correta de destino
   if (al.status !== 'desligado' && al.quarto_numero && al.numero_cama) {
     window.StaticApiEngine.dbState.quartos.forEach(q => {
       const matchBloco = !al.bloco_nome || (q.bloco_nome && q.bloco_nome.trim().toLowerCase() === al.bloco_nome.trim().toLowerCase());
-      if (String(q.numero) === String(al.quarto_numero) && matchBloco) {
+      if (String(q.numero).trim() === String(al.quarto_numero).trim() && matchBloco) {
         (q.vagas || []).forEach(v => {
           if (Number(v.numero_cama) === Number(al.numero_cama)) {
             v.status = 'ocupada';
@@ -1430,6 +1465,7 @@ function sincronizarVagaAlojadoEmMemoria(alojadoId) {
             v.empresa_nome = al.empresa_nome || '';
             v.empresa_cor = al.empresa_cor || '#2563eb';
             v.foto_url = al.foto_url || null;
+            v.whatsapp = al.whatsapp || '';
             v.alojado = { ...al };
             al.vaga_id = v.id;
           }
@@ -1497,10 +1533,13 @@ function iniciarListenerTempoRealFirebase() {
       let alteracoes = 0;
       snapshot.docChanges().forEach((change) => {
         const data = change.doc.data();
-        if (!data || !data.id) return;
+        if (!data) return;
+        const rawId = data.id || change.doc.id;
+        if (!rawId) return;
         
-        const aId = Number(data.id);
-        const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
+        const aId = Number(rawId);
+        data.id = aId;
+        const al = (window.StaticApiEngine.dbState.alojados || []).find(x => Number(x.id) === aId);
         if (al) {
           let mudou = false;
           if (data.foto_url !== undefined && data.foto_url !== al.foto_url) {
@@ -1519,16 +1558,20 @@ function iniciarListenerTempoRealFirebase() {
             al.status = data.status;
             mudou = true;
           }
-          if (data.quarto_numero && data.quarto_numero !== al.quarto_numero) {
-            al.quarto_numero = data.quarto_numero;
+          if (data.vaga_id !== undefined && Number(data.vaga_id) !== Number(al.vaga_id)) {
+            al.vaga_id = Number(data.vaga_id);
             mudou = true;
           }
-          if (data.bloco_nome && data.bloco_nome !== al.bloco_nome) {
-            al.bloco_nome = data.bloco_nome;
+          if (data.quarto_numero !== undefined && String(data.quarto_numero).trim() !== String(al.quarto_numero).trim()) {
+            al.quarto_numero = String(data.quarto_numero);
             mudou = true;
           }
-          if (data.numero_cama && data.numero_cama !== al.numero_cama) {
-            al.numero_cama = data.numero_cama;
+          if (data.bloco_nome !== undefined && String(data.bloco_nome).trim() !== String(al.bloco_nome).trim()) {
+            al.bloco_nome = String(data.bloco_nome);
+            mudou = true;
+          }
+          if (data.numero_cama !== undefined && Number(data.numero_cama) !== Number(al.numero_cama)) {
+            al.numero_cama = Number(data.numero_cama);
             mudou = true;
           }
           if (data.whatsapp !== undefined && data.whatsapp !== al.whatsapp) {
@@ -1543,6 +1586,7 @@ function iniciarListenerTempoRealFirebase() {
         } else if (change.type === 'added' && data.nome_completo) {
           window.StaticApiEngine.dbState.alojados.unshift(data);
           alteracoes++;
+          sincronizarVagaAlojadoEmMemoria(aId);
         }
       });
 
@@ -3055,8 +3099,12 @@ function renderQuartosCards(quartos) {
       const alId = v.alojado_id || (v.alojado && v.alojado.id);
       const isOcupada = (v.status === 'ocupada') && (alId || v.nome_completo || v.alojado);
       if (isOcupada) {
-        const finalId = alId || (v.alojado && v.alojado.id) || 0;
         const nomeAl = v.nome_completo || (v.alojado && v.alojado.nome_completo) || 'Colaborador';
+        let finalId = alId || (v.alojado && v.alojado.id) || 0;
+        if ((!finalId || finalId === 0) && window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+          const alFound = window.StaticApiEngine.dbState.alojados.find(a => a.nome_completo && a.nome_completo.trim().toUpperCase() === nomeAl.trim().toUpperCase());
+          if (alFound) finalId = alFound.id;
+        }
         const safeNome = nomeAl.replace(/'/g, "\\'");
         const empNome = v.empresa_nome || (v.alojado && v.alojado.empresa_nome) || 'GEL';
         const safeEmpresa = empNome.replace(/'/g, "\\'");
@@ -3069,7 +3117,7 @@ function renderQuartosCards(quartos) {
 
         // Buscar telefone atualizado
         const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
-          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === finalId)
+          ? window.StaticApiEngine.dbState.alojados.find(x => Number(x.id) === Number(finalId))
           : null;
         const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
         const waUrl = getWhatsappUrl(zapNum);
@@ -3217,8 +3265,12 @@ async function abrirModalQuartoDetalhes(quartoId) {
       const alId = v.alojado_id || (v.alojado && v.alojado.id);
       const isOcupada = (v.status === 'ocupada') && (alId || v.nome_completo || v.alojado);
       if (isOcupada) {
-        const finalId = alId || (v.alojado && v.alojado.id) || 0;
         const nomeAl = v.nome_completo || (v.alojado && v.alojado.nome_completo) || 'Colaborador';
+        let finalId = alId || (v.alojado && v.alojado.id) || 0;
+        if ((!finalId || finalId === 0) && window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+          const alFound = window.StaticApiEngine.dbState.alojados.find(a => a.nome_completo && a.nome_completo.trim().toUpperCase() === nomeAl.trim().toUpperCase());
+          if (alFound) finalId = alFound.id;
+        }
         const safeNome = nomeAl.replace(/'/g, "\\'");
         const empNome = v.empresa_nome || (v.alojado && v.alojado.empresa_nome) || 'GEL';
         const safeEmpresa = empNome.replace(/'/g, "\\'");
@@ -3231,7 +3283,7 @@ async function abrirModalQuartoDetalhes(quartoId) {
 
         // Buscar telefone atualizado
         const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
-          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === finalId)
+          ? window.StaticApiEngine.dbState.alojados.find(x => Number(x.id) === Number(finalId))
           : null;
         const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
         const waUrl = getWhatsappUrl(zapNum);
@@ -3259,17 +3311,25 @@ async function abrirModalQuartoDetalhes(quartoId) {
               </div>
             </div>
 
-            <div class="pt-1.5 border-t border-slate-200 flex items-center justify-between">
-              <div>
+            <div class="pt-2 border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-2">
                 ${waUrl ? `
                   <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[11px] font-bold transition">
                     <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i> WhatsApp
                   </a>
                 ` : ''}
+                <button onclick="${clickFoto}" class="text-[11px] font-semibold text-slate-500 hover:text-amber-600 flex items-center gap-1">
+                  <i class="fa-solid fa-camera"></i> Foto
+                </button>
               </div>
-              <button onclick="${clickFoto}" class="text-[11px] font-semibold text-amber-600 hover:text-amber-800 flex items-center gap-1">
-                <i class="fa-solid fa-camera"></i> Ver / Trocar Foto
-              </button>
+              <div class="flex items-center gap-1.5">
+                <button onclick="abrirModalRealocar(${finalId}, '${safeNome}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})" class="btn-prefeito px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[11px] flex items-center gap-1" title="Mover para outro quarto">
+                  <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
+                </button>
+                <button onclick="abrirModalDesligar(${finalId}, '${safeNome}')" class="btn-prefeito px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-[11px] flex items-center gap-1" title="Liberar vaga">
+                  <i class="fa-solid fa-person-walking-arrow-right"></i> Liberar
+                </button>
+              </div>
             </div>
           </div>
         `;
