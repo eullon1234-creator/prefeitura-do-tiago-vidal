@@ -4787,21 +4787,205 @@ async function carregarRelatoriosPreview() {
   }
 }
 
+// ========================================================
+// 6. RELATÓRIOS & EXPORTAÇÕES EXCEL PROFISSIONAIS (COM FÓRMULAS E ESTILOS)
+// ========================================================
+
+const ExcelProGenerator = {
+  estilos: {
+    title: {
+      font: { bold: true, color: { rgb: '0F172A' }, sz: 14, name: 'Calibri' },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    },
+    subtitle: {
+      font: { italic: true, color: { rgb: '475569' }, sz: 10, name: 'Calibri' },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    },
+    th: {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11, name: 'Calibri' },
+      fill: { fgColor: { rgb: '1E293B' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: {
+        top: { style: 'thin', color: { rgb: '94A3B8' } },
+        bottom: { style: 'medium', color: { rgb: '0F172A' } },
+        left: { style: 'thin', color: { rgb: '94A3B8' } },
+        right: { style: 'thin', color: { rgb: '94A3B8' } }
+      }
+    },
+    td: (zebra = false, align = 'left') => ({
+      font: { sz: 10, color: { rgb: '0F172A' }, name: 'Calibri' },
+      fill: zebra ? { fgColor: { rgb: 'F8FAFC' } } : { fgColor: { rgb: 'FFFFFF' } },
+      alignment: { horizontal: align, vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+      }
+    }),
+    total: (align = 'center') => ({
+      font: { bold: true, sz: 11, color: { rgb: '0F172A' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'E2E8F0' } },
+      alignment: { horizontal: align, vertical: 'center' },
+      border: {
+        top: { style: 'medium', color: { rgb: '475569' } },
+        bottom: { style: 'double', color: { rgb: '0F172A' } },
+        left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+        right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+      }
+    }),
+    statusLivre: {
+      font: { bold: true, sz: 9, color: { rgb: '166534' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'DCFCE7' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'BBF7D0' } },
+        bottom: { style: 'thin', color: { rgb: 'BBF7D0' } },
+        left: { style: 'thin', color: { rgb: 'BBF7D0' } },
+        right: { style: 'thin', color: { rgb: 'BBF7D0' } }
+      }
+    },
+    statusOcupada: {
+      font: { bold: true, sz: 9, color: { rgb: '1E40AF' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'DBEAFE' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        bottom: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        left: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        right: { style: 'thin', color: { rgb: 'BFDBFE' } }
+      }
+    },
+    statusAlerta: {
+      font: { bold: true, sz: 9, color: { rgb: '991B1B' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'FEE2E2' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'FECACA' } },
+        bottom: { style: 'thin', color: { rgb: 'FECACA' } },
+        left: { style: 'thin', color: { rgb: 'FECACA' } },
+        right: { style: 'thin', color: { rgb: 'FECACA' } }
+      }
+    }
+  },
+
+  addCell(ws, r, c, val, opts = {}) {
+    const ref = XLSX.utils.encode_cell({ r, c });
+    const cell = { v: val };
+    if (opts.f) cell.f = opts.f;
+    if (opts.z) cell.z = opts.z;
+    if (opts.s) cell.s = opts.s;
+    if (opts.t) cell.t = opts.t;
+    else cell.t = typeof val === 'number' ? 'n' : 's';
+    ws[ref] = cell;
+  },
+
+  addCabecalhoObra(ws, titulo, subtitulo, totalCols) {
+    this.addCell(ws, 0, 0, titulo, { s: this.estilos.title });
+    this.addCell(ws, 1, 0, subtitulo, { s: this.estilos.subtitle });
+    if (!ws['!merges']) ws['!merges'] = [];
+    ws['!merges'].push(
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } }
+    );
+  }
+};
+
 function exportarResumoExcel() {
   if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('📊 Gerando Resumo Executivo em Excel com fórmulas...', 'info');
     const wb = XLSX.utils.book_new();
-    const data = (StaticApiEngine.dbState.blocos || []).map(b => ({
-      "Bloco": b.nome,
-      "Tipo": b.tipo.toUpperCase(),
-      "Total Vagas": b.total_vagas,
-      "Ocupadas": b.ocupadas,
-      "Vagas Livres": b.livres,
-      "Taxa de Ocupação": `${b.taxa_ocupacao}%`
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, "Resumo Ocupacao");
-    XLSX.writeFile(wb, "resumo_ocupacao_canteiro.xlsx");
-    showToast('Planilha de resumo baixada!', 'success');
+    const db = StaticApiEngine.dbState;
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    // 1. ABA RESUMO EXECUTIVO
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — RESUMO EXECUTIVO DE OCUPAÇÃO`, `${empresaNome} • Responsável: Tiago Vidal (Prefeito de Canteiro) • Emissão: ${dataHora}`, 7);
+    const h1 = ['Bloco / Alojamento', 'Finalidade', 'Total Quartos', 'Capacidade (Vagas)', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    h1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const blocos = db.blocos || [];
+    const quartos = db.quartos || [];
+
+    blocos.forEach((b, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtsBloco = quartos.filter(q => q.bloco_id === b.id);
+      const cap = b.total_vagas || (qtsBloco.reduce((acc, q) => acc + (q.capacidade || 4), 0));
+      const oc = b.ocupadas !== undefined ? b.ocupadas : (qtsBloco.reduce((acc, q) => acc + (q.vagas_ocupadas || 0), 0));
+      const liv = cap - oc;
+      const taxa = cap > 0 ? (oc / cap) : 0;
+
+      ExcelProGenerator.addCell(ws1, r, 0, b.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 1, (b.tipo || 'alojamento').toUpperCase(), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 2, qtsBloco.length || 22, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 3, cap, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 4, oc, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 5, liv, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `E${rowEx}/D${rowEx}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow1 = 4 + blocos.length;
+    const totEx1 = totRow1 + 1;
+    const firstRow1 = 5;
+    const lastRow1 = totRow1;
+    const totalGeralCap = db.geral?.total_vagas || 880;
+    const totalGeralOc = db.geral?.ocupadas || 387;
+    const totalGeralLiv = totalGeralCap - totalGeralOc;
+
+    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRow1, 1, 'OBRA GERAL', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 2, quartos.length || 220, { f: `SUM(C${firstRow1}:C${lastRow1})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 3, totalGeralCap, { f: `SUM(D${firstRow1}:D${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 4, totalGeralOc, { f: `SUM(E${firstRow1}:E${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 5, totalGeralLiv, { f: `D${totEx1}-E${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 6, (totalGeralOc / totalGeralCap), { f: `E${totEx1}/D${totEx1}`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+    ws1['!ref'] = `A1:G${totEx1}`;
+    ws1['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "RESUMO DE OCUPAÇÃO");
+
+    // 2. ABA EMPRESAS
+    const wsEmp = {};
+    ExcelProGenerator.addCabecalhoObra(wsEmp, `${obraNome.toUpperCase()} — DISTRIBUIÇÃO POR EMPRESA`, `${empresaNome} • Alojados Ativos por Empreiteira / Parceira • Emissão: ${dataHora}`, 4);
+    const hEmp = ['Empresa Parceira', 'Total Alojados', '% Participação na Obra (Fórmula)', 'Status'];
+    hEmp.forEach((h, col) => ExcelProGenerator.addCell(wsEmp, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const empresas = db.empresas || [];
+    const alojadosAtivos = (db.alojados || []).filter(a => a.status === 'ativo');
+    const totAtivos = alojadosAtivos.length || 387;
+
+    empresas.forEach((emp, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtdEmp = alojadosAtivos.filter(a => Number(a.empresa_id) === Number(emp.id)).length;
+      const part = totAtivos > 0 ? (qtdEmp / totAtivos) : 0;
+
+      ExcelProGenerator.addCell(wsEmp, r, 0, emp.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(wsEmp, r, 1, qtdEmp, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(wsEmp, r, 2, part, { f: `B${rowEx}/$B$${4 + empresas.length + 1}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(wsEmp, r, 3, 'PARCEIRA ATIVA', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRowEmp = 4 + empresas.length;
+    const totExEmp = totRowEmp + 1;
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 0, 'TOTAL GERAL DA OBRA', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 1, totAtivos, { f: `SUM(B5:B${totRowEmp})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 2, 1.0, { f: `SUM(C5:C${totRowEmp})`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 3, '100% REGISTRADO', { s: ExcelProGenerator.estilos.total('center') });
+
+    wsEmp['!ref'] = `A1:D${totExEmp}`;
+    wsEmp['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 30 }, { wch: 20 }];
+    wsEmp['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, wsEmp, "POR EMPRESA");
+
+    XLSX.writeFile(wb, "resumo_executivo_ocupacao_canteiro.xlsx");
+    showToast('Planilha executiva baixada com sucesso!', 'success');
     return;
   }
   window.open(`${API_BASE}/api/relatorios/exportar-resumo-excel`, '_blank');
@@ -4809,29 +4993,58 @@ function exportarResumoExcel() {
 
 function exportarAlojadosExcel() {
   if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('📋 Gerando Lista Completa de Alojados com fórmulas...', 'info');
     const blocoId = document.getElementById('filtroAlojadosBloco')?.value || '';
     const empresaId = document.getElementById('filtroAlojadosEmpresa')?.value || '';
     let lista = (StaticApiEngine.dbState.alojados || []).filter(a => a.status === 'ativo');
-    if (empresaId) lista = lista.filter(a => a.empresa_id == empresaId);
+    if (empresaId) lista = lista.filter(a => Number(a.empresa_id) === Number(empresaId));
     if (blocoId) {
-      const b = StaticApiEngine.dbState.blocos.find(x => x.id == blocoId);
+      const b = StaticApiEngine.dbState.blocos.find(x => Number(x.id) === Number(blocoId));
       if (b) lista = lista.filter(a => a.bloco_nome === b.nome);
     }
+
     const wb = XLSX.utils.book_new();
-    const data = lista.map(a => ({
-      "Matrícula": a.matricula,
-      "Nome Completo": a.nome_completo,
-      "Empresa": a.empresa_nome,
-      "Função": a.funcao,
-      "Bloco": a.bloco_nome,
-      "Quarto": a.quarto_numero,
-      "Cama": a.numero_cama,
-      "Data Entrada": a.data_entrada || ""
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, "Alojados Ativos");
-    XLSX.writeFile(wb, "alojados_ativos_canteiro.xlsx");
-    showToast('Planilha de alojados baixada!', 'success');
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    const ws = {};
+    ExcelProGenerator.addCabecalhoObra(ws, `${obraNome.toUpperCase()} — RELAÇÃO DE ALOJADOS ATIVOS`, `${empresaNome} • Total Listado: ${lista.length} colaboradores • Emissão: ${dataHora}`, 10);
+    const headers = ['Matrícula', 'Nome Completo', 'Empresa', 'Função / Cargo', 'WhatsApp', 'Bloco', 'Quarto', 'Cama', 'Data de Entrada', 'Observações'];
+    headers.forEach((h, col) => ExcelProGenerator.addCell(ws, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    lista.forEach((a, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const zapFormatado = a.whatsapp ? formatarTelefoneTexto(a.whatsapp) : '-';
+
+      ExcelProGenerator.addCell(ws, r, 0, a.matricula || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 1, a.nome_completo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 2, a.empresa_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 3, a.funcao || 'Alojado', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 4, zapFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 5, a.bloco_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 6, String(a.quarto_numero || '-'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 7, a.numero_cama || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 8, a.data_entrada || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 9, a.observacoes || '', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow = 4 + lista.length;
+    const totEx = totRow + 1;
+    ExcelProGenerator.addCell(ws, totRow, 0, 'TOTAL ATIVOS', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws, totRow, 1, lista.length, { f: `COUNTA(B5:B${totRow})`, s: ExcelProGenerator.estilos.total('left') });
+    for (let c = 2; c < 10; c++) {
+      ExcelProGenerator.addCell(ws, totRow, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws['!ref'] = `A1:J${totEx}`;
+    ws['!cols'] = [{ wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 30 }];
+    ws['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws, "ALOJADOS ATIVOS");
+
+    XLSX.writeFile(wb, "alojados_ativos_canteiro_taboca2.xlsx");
+    showToast('Planilha de alojados baixada com sucesso!', 'success');
     return;
   }
   const blocoId = document.getElementById('filtroAlojadosBloco')?.value || '';
@@ -4844,28 +5057,65 @@ function exportarAlojadosExcel() {
 
 function exportarMoveisDanificadosExcel() {
   if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('🛠️ Gerando Relatório de Móveis e Manutenções...', 'info');
     const danificados = [];
     (StaticApiEngine.dbState.quartos || []).forEach(q => {
       (q.moveis || []).forEach(m => {
         if (m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado') {
           danificados.push({
-            "Bloco": q.bloco_nome,
-            "Quarto": q.numero,
-            "Item": m.tipo_item,
-            "Quantidade": m.quantidade,
-            "Estado": m.estado_conservacao,
-            "Manutenção": m.precisa_manutencao ? "Sim" : "Não",
-            "Data Vistoria": m.data_vistoria || "",
-            "Observações": m.observacoes || ""
+            bloco_nome: q.bloco_nome,
+            quarto_numero: q.numero,
+            tipo_item: m.tipo_item,
+            quantidade: m.quantidade || 1,
+            estado_conservacao: m.estado_conservacao || 'Ruim',
+            precisa_manutencao: m.precisa_manutencao ? 'SIM (ALERTA)' : 'NÃO',
+            data_vistoria: m.data_vistoria || '-',
+            observacoes: m.observacoes || ''
           });
         }
       });
     });
+
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(danificados);
-    XLSX.utils.book_append_sheet(wb, ws, "Moveis com Alerta");
-    XLSX.writeFile(wb, "moveis_manutencao_canteiro.xlsx");
-    showToast('Planilha de manutenção baixada!', 'success');
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    const ws = {};
+    ExcelProGenerator.addCabecalhoObra(ws, `${obraNome.toUpperCase()} — MÓVEIS EM ALERTA & MANUTENÇÃO`, `${empresaNome} • Itens Danificados ou com Reparo Solicitado • Emissão: ${dataHora}`, 8);
+    const headers = ['Bloco', 'Quarto', 'Item / Patrimônio', 'Qtd', 'Estado de Conservação', 'Necessita Manutenção', 'Data da Vistoria', 'Observações / Ação Necessária'];
+    headers.forEach((h, col) => ExcelProGenerator.addCell(ws, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    danificados.forEach((m, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      ExcelProGenerator.addCell(ws, r, 0, m.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 1, String(m.quarto_numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 2, m.tipo_item, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 3, m.quantidade, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 4, m.estado_conservacao, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 5, m.precisa_manutencao, { s: ExcelProGenerator.estilos.statusAlerta });
+      ExcelProGenerator.addCell(ws, r, 6, m.data_vistoria, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 7, m.observacoes, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow = 4 + danificados.length;
+    const totEx = totRow + 1;
+    ExcelProGenerator.addCell(ws, totRow, 0, 'TOTAL ITENS EM ALERTA', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws, totRow, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws, totRow, 2, `${danificados.length} itens com avaria`, { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws, totRow, 3, danificados.reduce((a, b) => a + Number(b.quantidade || 1), 0), { f: `SUM(D5:D${totRow})`, s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 4; c < 8; c++) {
+      ExcelProGenerator.addCell(ws, totRow, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws['!ref'] = `A1:H${totEx}`;
+    ws['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 28 }, { wch: 10 }, { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
+    ws['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws, "MOVEIS COM ALERTA");
+
+    XLSX.writeFile(wb, "moveis_manutencao_canteiro_taboca2.xlsx");
+    showToast('Planilha de manutenção baixada com sucesso!', 'success');
     return;
   }
   window.open(`${API_BASE}/api/relatorios/exportar-moveis-danificados-excel`, '_blank');
@@ -4873,79 +5123,237 @@ function exportarMoveisDanificadosExcel() {
 
 function exportarPlanilhaOficial() {
   if (staticModeActive && typeof XLSX !== 'undefined') {
-    showToast('📗 Gerando Planilha Oficial Taboca 2 (modelo idêntico com 4 abas)...', 'info');
+    showToast('📗 Gerando Planilha Oficial Taboca 2 (5 abas com fórmulas e layout profissional)...', 'info');
     const wb = XLSX.utils.book_new();
+    const db = StaticApiEngine.dbState;
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
 
-    // 1. RESUMO
-    const resumoData = (StaticApiEngine.dbState.blocos || []).map(b => ({
-      "Alojamento": b.nome,
-      "Tipo": b.tipo.toUpperCase(),
-      "Total de Vagas": b.total_vagas,
-      "Ocupadas": b.ocupadas,
-      "Vagas Livres": b.livres,
-      "Taxa de Ocupação": `${b.taxa_ocupacao}%`
-    }));
-    const wsResumo = XLSX.utils.json_to_sheet(resumoData);
-    XLSX.utils.book_append_sheet(wb, wsResumo, "RESUMO DE OCUPAÇÃO");
+    const blocos = db.blocos || [];
+    const quartos = db.quartos || [];
+    const alojados = db.alojados || [];
+    const empresas = db.empresas || [];
+    const alojadosAtivos = alojados.filter(a => a.status === 'ativo');
 
-    // 2. MAPA DE CAMAS
-    const camasData = [];
-    (StaticApiEngine.dbState.quartos || []).forEach(q => {
+    // ==========================================
+    // ABA 1: RESUMO DE OCUPAÇÃO (COM FÓRMULAS)
+    // ==========================================
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CONTROLE OFICIAL DE HABITAÇÃO & OCUPAÇÃO`, `${empresaNome} • Responsável: Tiago Vidal (Prefeito de Canteiro) • Emissão: ${dataHora}`, 7);
+    const h1 = ['Bloco / Alojamento', 'Finalidade', 'Total Quartos', 'Capacidade Total', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    h1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    blocos.forEach((b, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtsBloco = quartos.filter(q => q.bloco_id === b.id);
+      const cap = b.total_vagas || (qtsBloco.reduce((acc, q) => acc + (q.capacidade || 4), 0));
+      const oc = b.ocupadas !== undefined ? b.ocupadas : (qtsBloco.reduce((acc, q) => acc + (q.vagas_ocupadas || 0), 0));
+      const liv = cap - oc;
+      const taxa = cap > 0 ? (oc / cap) : 0;
+
+      ExcelProGenerator.addCell(ws1, r, 0, b.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 1, (b.tipo || 'alojamento').toUpperCase(), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 2, qtsBloco.length || 22, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 3, cap, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 4, oc, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 5, liv, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `E${rowEx}/D${rowEx}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow1 = 4 + blocos.length;
+    const totEx1 = totRow1 + 1;
+    const totalGeralCap = db.geral?.total_vagas || 880;
+    const totalGeralOc = alojadosAtivos.length || 387;
+    const totalGeralLiv = totalGeralCap - totalGeralOc;
+
+    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRow1, 1, 'OBRA GERAL', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 2, quartos.length || 220, { f: `SUM(C5:C${totRow1})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 3, totalGeralCap, { f: `SUM(D5:D${totRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 4, totalGeralOc, { f: `SUM(E5:E${totRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 5, totalGeralLiv, { f: `D${totEx1}-E${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 6, (totalGeralOc / totalGeralCap), { f: `E${totEx1}/D${totEx1}`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+    ws1['!ref'] = `A1:G${totEx1}`;
+    ws1['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "RESUMO DE OCUPAÇÃO");
+
+    // ==========================================
+    // ABA 2: MAPA DE CAMAS
+    // ==========================================
+    const ws2 = {};
+    ExcelProGenerator.addCabecalhoObra(ws2, `${obraNome.toUpperCase()} — MAPA DETALHADO DE LEITOS E VAGAS`, `${empresaNome} • Status Individual de Cada Cama dos 220 Quartos • Emissão: ${dataHora}`, 9);
+    const h2 = ['Bloco', 'Quarto', 'Cama', 'Status da Vaga', 'Matrícula', 'Colaborador Alojado', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp'];
+    h2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    let r2 = 4;
+    quartos.forEach(q => {
       (q.vagas || []).forEach(v => {
-        camasData.push({
-          "Bloco": q.bloco_nome,
-          "Quarto": q.numero,
-          "Cama": v.numero_cama,
-          "Status": v.status.toUpperCase(),
-          "Matrícula": v.alojado ? v.alojado.matricula : "-",
-          "Nome do Alojado": v.alojado ? v.alojado.nome_completo : "VAGA LIVRE",
-          "Empresa": v.alojado ? v.alojado.empresa_nome : "-",
-          "Função": v.alojado ? v.alojado.funcao : "-"
-        });
+        const zebra = r2 % 2 === 1;
+        const al = v.alojado || (v.alojado_id ? alojados.find(x => Number(x.id) === Number(v.alojado_id)) : null);
+        const isOc = v.status === 'ocupada' && (al || v.nome_completo);
+        const statusTexto = isOc ? 'OCUPADA' : 'LIVRE';
+        const statusEstilo = isOc ? ExcelProGenerator.estilos.statusOcupada : ExcelProGenerator.estilos.statusLivre;
+        const nomeAl = isOc ? (al?.nome_completo || v.nome_completo || 'Colaborador') : 'VAGA LIVRE';
+        const matAl = isOc ? (al?.matricula || v.matricula || '-') : '-';
+        const empAl = isOc ? (al?.empresa_nome || v.empresa_nome || '-') : '-';
+        const funcAl = isOc ? (al?.funcao || v.funcao || '-') : '-';
+        const zapAl = isOc && (al?.whatsapp || v.whatsapp) ? formatarTelefoneTexto(al?.whatsapp || v.whatsapp) : '-';
+
+        ExcelProGenerator.addCell(ws2, r2, 0, q.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 1, String(q.numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 2, v.numero_cama, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 3, statusTexto, { s: statusEstilo });
+        ExcelProGenerator.addCell(ws2, r2, 4, matAl, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 5, nomeAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws2, r2, 6, empAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws2, r2, 7, funcAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws2, r2, 8, zapAl, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+
+        r2++;
       });
     });
-    const wsCamas = XLSX.utils.json_to_sheet(camasData);
-    XLSX.utils.book_append_sheet(wb, wsCamas, "MAPA DE CAMAS");
 
-    // 3. ALOJADOS ATIVOS
-    const ativosData = (StaticApiEngine.dbState.alojados || []).filter(a => a.status === 'ativo').map(a => ({
-      "Matrícula": a.matricula,
-      "Nome Completo": a.nome_completo,
-      "Empresa": a.empresa_nome,
-      "Função": a.funcao,
-      "Bloco": a.bloco_nome,
-      "Quarto": a.quarto_numero,
-      "Cama": a.numero_cama,
-      "Data de Entrada": a.data_entrada || "-",
-      "Observações": a.observacoes || ""
-    }));
-    const wsAtivos = XLSX.utils.json_to_sheet(ativosData);
-    XLSX.utils.book_append_sheet(wb, wsAtivos, "ALOJADOS ATIVOS");
+    const totEx2 = r2 + 1;
+    ExcelProGenerator.addCell(ws2, r2, 0, 'TOTAL DE LEITOS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, r2, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws2, r2, 2, r2 - 4, { f: `COUNTA(A5:A${r2})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws2, r2, 3, '880 LEITOS', { s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 4; c < 9; c++) {
+      ExcelProGenerator.addCell(ws2, r2, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
 
-    // 4. MÓVEIS E VISTORIAS
-    const moveisData = [];
-    (StaticApiEngine.dbState.quartos || []).forEach(q => {
+    ws2['!ref'] = `A1:I${totEx2}`;
+    ws2['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }];
+    ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "MAPA DE CAMAS");
+
+    // ==========================================
+    // ABA 3: ALOJADOS ATIVOS
+    // ==========================================
+    const ws3 = {};
+    ExcelProGenerator.addCabecalhoObra(ws3, `${obraNome.toUpperCase()} — LISTAGEM OFICIAL DE ALOJADOS ATIVOS`, `${empresaNome} • Cadastro Completo de Moradores do Canteiro • Emissão: ${dataHora}`, 10);
+    const h3 = ['Matrícula', 'Nome Completo', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp', 'Bloco', 'Quarto', 'Cama', 'Data de Entrada', 'Observações'];
+    h3.forEach((h, col) => ExcelProGenerator.addCell(ws3, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    alojadosAtivos.forEach((a, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const zapFormatado = a.whatsapp ? formatarTelefoneTexto(a.whatsapp) : '-';
+
+      ExcelProGenerator.addCell(ws3, r, 0, a.matricula || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 1, a.nome_completo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 2, a.empresa_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 3, a.funcao || 'Alojado', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 4, zapFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 5, a.bloco_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 6, String(a.quarto_numero || '-'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 7, a.numero_cama || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 8, a.data_entrada || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 9, a.observacoes || '', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow3 = 4 + alojadosAtivos.length;
+    const totEx3 = totRow3 + 1;
+    ExcelProGenerator.addCell(ws3, totRow3, 0, 'TOTAL ATIVOS', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws3, totRow3, 1, alojadosAtivos.length, { f: `COUNTA(B5:B${totRow3})`, s: ExcelProGenerator.estilos.total('left') });
+    for (let c = 2; c < 10; c++) {
+      ExcelProGenerator.addCell(ws3, totRow3, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws3['!ref'] = `A1:J${totEx3}`;
+    ws3['!cols'] = [{ wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 30 }];
+    ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws3, "ALOJADOS ATIVOS");
+
+    // ==========================================
+    // ABA 4: MÓVEIS E VISTORIAS
+    // ==========================================
+    const ws4 = {};
+    ExcelProGenerator.addCabecalhoObra(ws4, `${obraNome.toUpperCase()} — INVENTÁRIO DE MÓVEIS & VISTORIAS`, `${empresaNome} • Conservação do Patrimônio e Itens para Reparo • Emissão: ${dataHora}`, 8);
+    const h4 = ['Bloco', 'Quarto', 'Item / Móvel', 'Quantidade', 'Estado de Conservação', 'Necessita Manutenção', 'Data da Vistoria', 'Observações'];
+    h4.forEach((h, col) => ExcelProGenerator.addCell(ws4, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    let r4 = 4;
+    quartos.forEach(q => {
       (q.moveis || []).forEach(m => {
-        moveisData.push({
-          "Bloco": q.bloco_nome,
-          "Quarto": q.numero,
-          "Item / Móvel": m.tipo_item,
-          "Quantidade": m.quantidade,
-          "Estado": m.estado_conservacao,
-          "Precisa Manutenção": m.precisa_manutencao ? "SIM (ALERTA)" : "NÃO",
-          "Data da Vistoria": m.data_vistoria || "-",
-          "Observações": m.observacoes || ""
-        });
+        const zebra = r4 % 2 === 1;
+        const alerta = m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado';
+        const statusTexto = alerta ? 'SIM (ALERTA)' : 'NÃO';
+        const statusEstilo = alerta ? ExcelProGenerator.estilos.statusAlerta : ExcelProGenerator.estilos.statusLivre;
+
+        ExcelProGenerator.addCell(ws4, r4, 0, q.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 1, String(q.numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 2, m.tipo_item, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws4, r4, 3, m.quantidade || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 4, m.estado_conservacao || 'Bom', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 5, statusTexto, { s: statusEstilo });
+        ExcelProGenerator.addCell(ws4, r4, 6, m.data_vistoria || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 7, m.observacoes || '', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+
+        r4++;
       });
     });
-    const wsMoveis = XLSX.utils.json_to_sheet(moveisData);
-    XLSX.utils.book_append_sheet(wb, wsMoveis, "MÓVEIS E VISTORIAS");
 
+    const totEx4 = r4 + 1;
+    ExcelProGenerator.addCell(ws4, r4, 0, 'TOTAL ITENS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws4, r4, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 2, `${r4 - 4} registros patrimoniais`, { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws4, r4, 3, r4 - 4, { f: `SUM(D5:D${r4})`, s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 4; c < 8; c++) {
+      ExcelProGenerator.addCell(ws4, r4, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws4['!ref'] = `A1:H${totEx4}`;
+    ws4['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
+    ws4['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws4, "MÓVEIS E VISTORIAS");
+
+    // ==========================================
+    // ABA 5: DISTRIBUIÇÃO POR EMPRESA (COM FÓRMULAS)
+    // ==========================================
+    const ws5 = {};
+    ExcelProGenerator.addCabecalhoObra(ws5, `${obraNome.toUpperCase()} — OCUPAÇÃO POR EMPRESA PARCEIRA`, `${empresaNome} • Participação de Cada Contratada no Total de Leitos • Emissão: ${dataHora}`, 4);
+    const h5 = ['Empresa Parceira', 'Total Alojados', '% Participação na Obra (Fórmula)', 'Situação'];
+    h5.forEach((h, col) => ExcelProGenerator.addCell(ws5, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const totAtivosOficial = alojadosAtivos.length || 387;
+
+    empresas.forEach((emp, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtdEmp = alojadosAtivos.filter(a => Number(a.empresa_id) === Number(emp.id)).length;
+      const part = totAtivosOficial > 0 ? (qtdEmp / totAtivosOficial) : 0;
+
+      ExcelProGenerator.addCell(ws5, r, 0, emp.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws5, r, 1, qtdEmp, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws5, r, 2, part, { f: `B${rowEx}/$B$${4 + empresas.length + 1}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws5, r, 3, 'PARCEIRA ATIVA', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow5 = 4 + empresas.length;
+    const totEx5 = totRow5 + 1;
+    ExcelProGenerator.addCell(ws5, totRow5, 0, 'TOTAL GERAL DA OBRA', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws5, totRow5, 1, totAtivosOficial, { f: `SUM(B5:B${totRow5})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws5, totRow5, 2, 1.0, { f: `SUM(C5:C${totRow5})`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws5, totRow5, 3, '100% REGISTRADO', { s: ExcelProGenerator.estilos.total('center') });
+
+    ws5['!ref'] = `A1:D${totEx5}`;
+    ws5['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 32 }, { wch: 20 }];
+    ws5['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws5, "DISTRIBUIÇÃO POR EMPRESA");
+
+    // Gerar e salvar arquivo XLSX oficial
     XLSX.writeFile(wb, "controle_alojamento_oficial_taboca2.xlsx");
-    showToast('Planilha baixada com sucesso!', 'success');
+    showToast('📗 Planilha Oficial baixada com sucesso (5 abas completas com fórmulas)!', 'success');
     return;
   }
-  showToast('📗 Gerando Planilha Oficial Taboca 2 (modelo idêntico com 4 abas)...', 'info');
+  showToast('📗 Gerando Planilha Oficial Taboca 2...', 'info');
   window.open(`${API_BASE}/api/relatorios/exportar-planilha-oficial`, '_blank');
 }
 
