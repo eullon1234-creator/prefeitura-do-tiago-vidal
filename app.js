@@ -467,68 +467,186 @@ const StaticApiEngine = {
     // 6. Alojados
     // 6.1 Desligar
     const matchDesligar = path.match(/\/api\/alojados\/(\d+)\/desligar/);
-    if (matchDesligar && method === 'POST') {
-      const aId = Number(matchDesligar[1]);
+    const isDesligarEndpoint = (path === '/api/alojados/desligar' || path.endsWith('/api/alojados/desligar'));
+    if ((matchDesligar || isDesligarEndpoint) && method === 'POST') {
+      const aId = matchDesligar ? Number(matchDesligar[1]) : Number(body.alojado_id);
       const alojado = this.dbState.alojados.find(x => x.id === aId);
       if (alojado) {
         alojado.status = 'desligado';
-        alojado.data_saida = new Date().toISOString().split('T')[0];
+        alojado.data_saida = body.data_saida || new Date().toISOString().split('T')[0];
+        const vagaAntigaId = alojado.vaga_id;
+        alojado.vaga_id = null;
+        alojado.quarto_numero = null;
+        alojado.bloco_nome = null;
+        alojado.numero_cama = null;
+
         // Liberar vaga
         this.dbState.quartos.forEach(q => {
           (q.vagas || []).forEach(v => {
-            if (v.id === alojado.vaga_id || (v.alojado && v.alojado.id === aId)) {
+            if (v.id === vagaAntigaId || v.alojado_id === aId || (v.alojado && v.alojado.id === aId)) {
               v.status = 'livre';
               v.alojado = null;
+              v.alojado_id = null;
+              v.nome_completo = null;
+              v.matricula = null;
+              v.funcao = null;
+              v.empresa_nome = null;
+              v.empresa_cor = null;
+              v.foto_url = null;
             }
           });
         });
         this.recomputeStats();
         this.saveToStorage();
-        sincronizarAlteracaoLeveFirebase('alojados', aId, { status: 'desligado', data_saida: new Date().toISOString().split('T')[0] });
+        sincronizarAlteracaoLeveFirebase('alojados', aId, {
+          status: 'desligado',
+          data_saida: alojado.data_saida,
+          vaga_id: null,
+          quarto_numero: null,
+          bloco_nome: null,
+          numero_cama: null
+        });
       }
       return { message: "Alojado desligado e vaga liberada com sucesso" };
     }
 
     // 6.2 Realocar
     const matchRealocar = path.match(/\/api\/alojados\/(\d+)\/realocar/);
-    if (matchRealocar && method === 'POST') {
-      const aId = Number(matchRealocar[1]);
+    const isRealocarEndpoint = (path === '/api/alojados/realocar' || path.endsWith('/api/alojados/realocar'));
+    if ((matchRealocar || isRealocarEndpoint) && method === 'POST') {
+      const aId = matchRealocar ? Number(matchRealocar[1]) : Number(body.alojado_id);
       const alojado = this.dbState.alojados.find(x => x.id === aId);
       const novaVagaId = Number(body.nova_vaga_id);
-      if (alojado && novaVagaId) {
-        // Liberar antiga
-        this.dbState.quartos.forEach(q => {
-          (q.vagas || []).forEach(v => {
-            if (v.id === alojado.vaga_id || (v.alojado && v.alojado.id === aId)) {
-              v.status = 'livre';
-              v.alojado = null;
-            }
-          });
-        });
-        // Ocupar nova
-        let foundRoom = null;
-        let foundBed = null;
-        this.dbState.quartos.forEach(q => {
-          (q.vagas || []).forEach(v => {
-            if (v.id === novaVagaId) {
-              v.status = 'ocupada';
-              v.alojado = alojado;
-              foundRoom = q;
-              foundBed = v;
-            }
-          });
-        });
-        if (foundRoom && foundBed) {
-          alojado.vaga_id = novaVagaId;
-          alojado.bloco_nome = foundRoom.bloco_nome;
-          alojado.quarto_numero = foundRoom.numero;
-          alojado.numero_cama = foundBed.numero_cama;
-        }
-        this.recomputeStats();
-        this.saveToStorage();
-        sincronizarAlteracaoLeveFirebase('alojados', aId, { vaga_id: alojado.vaga_id, bloco_nome: alojado.bloco_nome, quarto_numero: alojado.quarto_numero, numero_cama: alojado.numero_cama });
+      if (!alojado) {
+        throw new Error("Colaborador não encontrado para realocação.");
       }
+      if (!novaVagaId) {
+        throw new Error("Vaga de destino não informada.");
+      }
+
+      // 1. Liberar vaga antiga em todos os quartos
+      const vagaAntigaId = alojado.vaga_id;
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (v.id === vagaAntigaId || v.alojado_id === aId || (v.alojado && v.alojado.id === aId)) {
+            v.status = 'livre';
+            v.alojado = null;
+            v.alojado_id = null;
+            v.nome_completo = null;
+            v.matricula = null;
+            v.funcao = null;
+            v.empresa_nome = null;
+            v.empresa_cor = null;
+            v.foto_url = null;
+          }
+        });
+      });
+
+      // 2. Localizar e ocupar nova vaga
+      let foundRoom = null;
+      let foundBed = null;
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (Number(v.id) === novaVagaId) {
+            foundRoom = q;
+            foundBed = v;
+          }
+        });
+      });
+
+      if (!foundRoom || !foundBed) {
+        throw new Error("A nova vaga selecionada não foi encontrada no canteiro.");
+      }
+
+      // Atualizar dados no alojado
+      alojado.vaga_id = novaVagaId;
+      alojado.bloco_nome = foundRoom.bloco_nome;
+      alojado.quarto_numero = foundRoom.numero;
+      alojado.numero_cama = foundBed.numero_cama;
+      alojado.status = 'ativo';
+
+      // Atualizar dados na nova vaga
+      foundBed.status = 'ocupada';
+      foundBed.alojado_id = aId;
+      foundBed.nome_completo = alojado.nome_completo;
+      foundBed.matricula = alojado.matricula || '';
+      foundBed.funcao = alojado.funcao || '';
+      foundBed.empresa_nome = alojado.empresa_nome || '';
+      foundBed.empresa_cor = alojado.empresa_cor || '#2563eb';
+      foundBed.foto_url = alojado.foto_url || null;
+      foundBed.alojado = { ...alojado };
+
+      this.recomputeStats();
+      this.saveToStorage();
+
+      sincronizarAlteracaoLeveFirebase('alojados', aId, {
+        vaga_id: alojado.vaga_id,
+        bloco_nome: alojado.bloco_nome,
+        quarto_numero: alojado.quarto_numero,
+        numero_cama: alojado.numero_cama,
+        status: 'ativo'
+      });
+
       return { message: "Alojado realocado com sucesso" };
+    }
+
+    // 6.25 Reativar
+    const matchReativar = path.match(/\/api\/alojados\/(\d+)\/reativar/);
+    const isReativarEndpoint = (path === '/api/alojados/reativar' || path.endsWith('/api/alojados/reativar'));
+    if ((matchReativar || isReativarEndpoint) && method === 'POST') {
+      const aId = matchReativar ? Number(matchReativar[1]) : Number(body.alojado_id);
+      const alojado = this.dbState.alojados.find(x => x.id === aId);
+      const novaVagaId = Number(body.nova_vaga_id);
+      if (!alojado) throw new Error("Colaborador não encontrado.");
+      if (!novaVagaId) throw new Error("Vaga de destino não informada.");
+
+      let foundRoom = null;
+      let foundBed = null;
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (Number(v.id) === novaVagaId) {
+            foundRoom = q;
+            foundBed = v;
+          }
+        });
+      });
+
+      if (!foundRoom || !foundBed) {
+        throw new Error("A vaga selecionada não foi encontrada.");
+      }
+
+      alojado.status = 'ativo';
+      alojado.data_saida = null;
+      alojado.data_entrada = body.data_entrada || new Date().toISOString().split('T')[0];
+      alojado.vaga_id = novaVagaId;
+      alojado.bloco_nome = foundRoom.bloco_nome;
+      alojado.quarto_numero = foundRoom.numero;
+      alojado.numero_cama = foundBed.numero_cama;
+
+      foundBed.status = 'ocupada';
+      foundBed.alojado_id = aId;
+      foundBed.nome_completo = alojado.nome_completo;
+      foundBed.matricula = alojado.matricula || '';
+      foundBed.funcao = alojado.funcao || '';
+      foundBed.empresa_nome = alojado.empresa_nome || '';
+      foundBed.empresa_cor = alojado.empresa_cor || '#2563eb';
+      foundBed.foto_url = alojado.foto_url || null;
+      foundBed.alojado = { ...alojado };
+
+      this.recomputeStats();
+      this.saveToStorage();
+
+      sincronizarAlteracaoLeveFirebase('alojados', aId, {
+        status: 'ativo',
+        data_saida: null,
+        data_entrada: alojado.data_entrada,
+        vaga_id: alojado.vaga_id,
+        bloco_nome: alojado.bloco_nome,
+        quarto_numero: alojado.quarto_numero,
+        numero_cama: alojado.numero_cama
+      });
+
+      return { message: "Alojado reativado com sucesso" };
     }
 
     // 6.3 PUT Alojado
@@ -1200,9 +1318,65 @@ const firebaseConfig = {
   measurementId: "G-YYXMDWCM4Q"
 };
 
-let firebaseApp = null;
-let firestoreDb = null;
-let firebaseInitialized = false;
+function sincronizarVagaAlojadoEmMemoria(alojadoId) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.quartos) return;
+  const aId = Number(alojadoId);
+  const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
+  if (!al) return;
+
+  // 1. Limpar das vagas onde ele estava antes caso tenha mudado ou sido desligado
+  window.StaticApiEngine.dbState.quartos.forEach(q => {
+    (q.vagas || []).forEach(v => {
+      const ehDesteAlojado = (v.alojado_id === aId || (v.alojado && v.alojado.id === aId));
+      if (ehDesteAlojado) {
+        const quartoDiferente = String(q.numero) !== String(al.quarto_numero) || (al.bloco_nome && q.bloco_nome && al.bloco_nome.trim().toLowerCase() !== q.bloco_nome.trim().toLowerCase());
+        const camaDiferente = Number(v.numero_cama) !== Number(al.numero_cama);
+        if (al.status === 'desligado' || quartoDiferente || camaDiferente) {
+          v.status = 'livre';
+          v.alojado = null;
+          v.alojado_id = null;
+          v.nome_completo = null;
+          v.matricula = null;
+          v.funcao = null;
+          v.empresa_nome = null;
+          v.empresa_cor = null;
+          v.foto_url = null;
+        } else {
+          v.nome_completo = al.nome_completo;
+          v.matricula = al.matricula || '';
+          v.funcao = al.funcao || '';
+          v.empresa_nome = al.empresa_nome || '';
+          v.empresa_cor = al.empresa_cor || '#2563eb';
+          v.foto_url = al.foto_url || null;
+          v.alojado = { ...al };
+        }
+      }
+    });
+  });
+
+  // 2. Se estiver ativo e com quarto/cama definidos, ocupar na vaga correta
+  if (al.status !== 'desligado' && al.quarto_numero && al.numero_cama) {
+    window.StaticApiEngine.dbState.quartos.forEach(q => {
+      const matchBloco = !al.bloco_nome || (q.bloco_nome && q.bloco_nome.trim().toLowerCase() === al.bloco_nome.trim().toLowerCase());
+      if (String(q.numero) === String(al.quarto_numero) && matchBloco) {
+        (q.vagas || []).forEach(v => {
+          if (Number(v.numero_cama) === Number(al.numero_cama)) {
+            v.status = 'ocupada';
+            v.alojado_id = aId;
+            v.nome_completo = al.nome_completo;
+            v.matricula = al.matricula || '';
+            v.funcao = al.funcao || '';
+            v.empresa_nome = al.empresa_nome || '';
+            v.empresa_cor = al.empresa_cor || '#2563eb';
+            v.foto_url = al.foto_url || null;
+            v.alojado = { ...al };
+            al.vaga_id = v.id;
+          }
+        });
+      }
+    });
+  }
+}
 
 function initFirebase() {
   try {
@@ -1303,18 +1477,7 @@ function iniciarListenerTempoRealFirebase() {
 
           if (mudou) {
             alteracoes++;
-            (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
-              (q.vagas || []).forEach(v => {
-                if (v.alojado && v.alojado.id === aId) {
-                  if (data.status === 'desligado') {
-                    v.status = 'livre';
-                    v.alojado = null;
-                  } else {
-                    v.alojado = { ...v.alojado, ...al };
-                  }
-                }
-              });
-            });
+            sincronizarVagaAlojadoEmMemoria(aId);
           }
         } else if (change.type === 'added' && data.nome_completo) {
           window.StaticApiEngine.dbState.alojados.unshift(data);
@@ -1403,18 +1566,7 @@ async function sincronizarComNuvemHeader() {
             });
             if (mudou) {
               atualizados++;
-              (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
-                (q.vagas || []).forEach(v => {
-                  if (v.alojado && v.alojado.id === aId) {
-                    if (data.status === 'desligado') {
-                      v.status = 'livre';
-                      v.alojado = null;
-                    } else {
-                      v.alojado = { ...v.alojado, ...al };
-                    }
-                  }
-                });
-              });
+              sincronizarVagaAlojadoEmMemoria(aId);
             }
           }
         }
@@ -3356,6 +3508,8 @@ async function openModalNovoAlojado(vagaPreId = null) {
   document.getElementById('formAlojado').reset();
   document.getElementById('alojadoFormId').value = '';
   document.getElementById('secaoSelecaoVaga').classList.remove('hidden');
+  const secaoLocalNovo = document.getElementById('secaoLocalAtualEdicao');
+  if (secaoLocalNovo) secaoLocalNovo.classList.add('hidden');
   limparFotoForm();
 
   // Limpa campo de WhatsApp
@@ -3378,6 +3532,17 @@ function openModalNovoAlojadoComVaga(vagaId) {
   openModalNovoAlojado(vagaId);
 }
 
+function atalhoMudarQuartoDoForm() {
+  const id = document.getElementById('alojadoFormId').value;
+  if (!id) return;
+  const al = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
+    ? window.StaticApiEngine.dbState.alojados.find(x => x.id == id) : null;
+  fecharModal('modalAlojadoForm');
+  if (al) {
+    abrirModalRealocar(al.id, al.nome_completo, al.bloco_nome || '', al.quarto_numero || '', al.numero_cama || 1);
+  }
+}
+
 function abrirModalEditarAlojado(id, matricula = '', nome = '', empresaId = null, funcao = '', dataEntrada = '', obs = '', fotoUrl = '', whatsapp = '') {
   if (!checkPrefeitoAccess()) return;
 
@@ -3389,6 +3554,17 @@ function abrirModalEditarAlojado(id, matricula = '', nome = '', empresaId = null
   document.getElementById('modalAlojadoTitulo').textContent = 'Editar Dados do Alojado';
   document.getElementById('alojadoFormId').value = id;
   document.getElementById('secaoSelecaoVaga').classList.add('hidden'); // Vaga é alterada por realocação
+
+  const secaoLocal = document.getElementById('secaoLocalAtualEdicao');
+  const txtLocal = document.getElementById('alojadoFormLocalAtualTexto');
+  if (secaoLocal && txtLocal) {
+    secaoLocal.classList.remove('hidden');
+    if (al && al.bloco_nome && al.quarto_numero) {
+      txtLocal.textContent = `${al.bloco_nome} • Quarto ${al.quarto_numero} (Cama ${al.numero_cama || 1})`;
+    } else {
+      txtLocal.textContent = 'Não alocado em quarto no momento';
+    }
+  }
 
   const empIdFinal = (al && al.empresa_id) ? al.empresa_id : empresaId;
   preencherSelectEmpresas('alojadoFormEmpresa', empIdFinal);
@@ -3751,8 +3927,15 @@ async function confirmarRealocacao(e) {
     return;
   }
 
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Mudando de quarto...';
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/realocar`, {
+    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/realocar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3763,13 +3946,21 @@ async function confirmarRealocacao(e) {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro na realocação');
+    if (!res.ok) throw new Error(data.detail || data.message || 'Erro na realocação');
 
-    showToast('Alojado realocado com sucesso!', 'success');
+    showToast('Colaborador mudado de quarto com sucesso!', 'success');
     fecharModal('modalRealocar');
-    refreshAllData();
+    fecharModal('modalQuartoDetalhes');
+    await refreshAllData();
+    carregarQuartos();
+    carregarAlojados();
   } catch (err) {
     showToast(err.message, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnText;
+    }
   }
 }
 
@@ -3791,8 +3982,15 @@ async function confirmarDesligamento(e) {
   const dataSaida = document.getElementById('desligarData').value;
   const motivo = document.getElementById('desligarMotivo').value.trim();
 
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Registrando saída...';
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/desligar`, {
+    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/desligar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3803,13 +4001,21 @@ async function confirmarDesligamento(e) {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro no desligamento');
+    if (!res.ok) throw new Error(data.detail || data.message || 'Erro no desligamento');
 
     showToast('Saída registrada e vaga liberada com sucesso!', 'success');
     fecharModal('modalDesligar');
-    refreshAllData();
+    fecharModal('modalQuartoDetalhes');
+    await refreshAllData();
+    carregarQuartos();
+    carregarAlojados();
   } catch (err) {
     showToast(err.message, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnText;
+    }
   }
 }
 
@@ -3820,7 +4026,7 @@ async function abrirModalReativar(alojadoId, nome) {
   if (!vagaId) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/reativar`, {
+    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/reativar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3831,10 +4037,12 @@ async function abrirModalReativar(alojadoId, nome) {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro ao reativar');
+    if (!res.ok) throw new Error(data.detail || data.message || 'Erro ao reativar');
 
     showToast('Alojado reativado com sucesso!', 'success');
-    refreshAllData();
+    await refreshAllData();
+    carregarQuartos();
+    carregarAlojados();
   } catch (err) {
     showToast(err.message, 'error');
   }
