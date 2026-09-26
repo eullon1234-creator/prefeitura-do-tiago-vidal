@@ -136,6 +136,24 @@ const StaticApiEngine = {
                 this.saveToStorage();
               }
 
+              // Reconciliação imediata dos 12 reparos concluídos pelo prefeito na nuvem
+              const reparadosIds = new Set([2650, 2668, 2709, 2728, 2866, 2908, 3057, 3208, 3585, 3598, 3634, 3694]);
+              let reparosLocaisAplicados = 0;
+              (this.dbState.quartos || []).forEach(q => {
+                (q.moveis || []).forEach(m => {
+                  if (reparadosIds.has(Number(m.id)) && (Number(m.precisa_manutencao) === 1 || m.estado_conservacao !== 'Bom')) {
+                    m.precisa_manutencao = 0;
+                    m.estado_conservacao = 'Bom';
+                    m.data_vistoria = '2026-09-26';
+                    reparosLocaisAplicados++;
+                  }
+                });
+              });
+              if (reparosLocaisAplicados > 0) {
+                console.log(`[REPAROS] ${reparosLocaisAplicados} móveis reparados reconciliados com sucesso do cache local.`);
+                this.saveToStorage();
+              }
+
               this.recomputeStats();
               this.initialized = true;
               console.log("StaticApiEngine: Estado carregado do localStorage com sucesso.");
@@ -390,6 +408,7 @@ const StaticApiEngine = {
         this.dbState.blocos = this.dbState.blocos.filter(x => x.id !== bId);
         this.recomputeStats();
         this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('blocos', bId, { id: bId, excluido: true });
         return { message: "Bloco excluído" };
       }
     }
@@ -420,12 +439,14 @@ const StaticApiEngine = {
           e.nome = body.nome || e.nome;
           e.cor = body.cor || e.cor;
           this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('empresas', e.id, e);
         }
         return { message: "Empresa atualizada" };
       }
       if (method === 'DELETE') {
         this.dbState.empresas = this.dbState.empresas.filter(x => x.id !== eId);
         this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('empresas', eId, { id: eId, excluido: true });
         return { message: "Empresa excluída" };
       }
     }
@@ -468,6 +489,14 @@ const StaticApiEngine = {
         q.observacoes = body.observacoes !== undefined ? body.observacoes : q.observacoes;
         this.recomputeStats();
         this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('quartos', q.id, {
+          id: q.id,
+          numero: q.numero,
+          capacidade: q.capacidade,
+          observacoes: q.observacoes,
+          bloco_id: q.bloco_id,
+          bloco_nome: q.bloco_nome
+        });
       }
       return { message: "Quarto atualizado" };
     }
@@ -476,6 +505,7 @@ const StaticApiEngine = {
       this.dbState.quartos = this.dbState.quartos.filter(x => x.id !== qId);
       this.recomputeStats();
       this.saveToStorage();
+      sincronizarAlteracaoLeveFirebase('quartos', qId, { id: qId, excluido: true });
       return { message: "Quarto excluído" };
     }
     if (path.includes('/api/quartos')) {
@@ -507,6 +537,7 @@ const StaticApiEngine = {
         this.dbState.quartos.push(novoQ);
         this.recomputeStats();
         this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('quartos', novoQ.id, novoQ);
         return { id: novoId, message: "Quarto criado com sucesso" };
       }
       this.recomputeStats();
@@ -733,7 +764,7 @@ const StaticApiEngine = {
       return { message: "Alojado reativado com sucesso" };
     }
 
-    // 6.3 PUT Alojado
+    // 6.3 PUT / DELETE Alojado
     const matchAlojadoPut = path.match(/\/api\/alojados\/(\d+)$/);
     if (matchAlojadoPut && method === 'PUT') {
       const aId = Number(matchAlojadoPut[1]);
@@ -766,6 +797,34 @@ const StaticApiEngine = {
         sincronizarAlteracaoLeveFirebase('alojados', aId, a);
       }
       return { message: "Alojado atualizado com sucesso" };
+    }
+    if (matchAlojadoPut && method === 'DELETE') {
+      const aId = Number(matchAlojadoPut[1]);
+      const a = this.dbState.alojados.find(x => x.id === aId);
+      if (a) {
+        // Liberar vaga
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.alojado_id === aId || (v.alojado && v.alojado.id === aId)) {
+              v.status = 'livre';
+              v.alojado = null;
+              v.alojado_id = null;
+              v.nome_completo = null;
+              v.matricula = null;
+              v.funcao = null;
+              v.empresa_nome = null;
+              v.empresa_cor = null;
+              v.foto_url = null;
+              v.whatsapp = null;
+            }
+          });
+        });
+        this.dbState.alojados = this.dbState.alojados.filter(x => x.id !== aId);
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('alojados', aId, { id: aId, excluido: true });
+      }
+      return { message: "Alojado excluído permanentemente com sucesso" };
     }
 
     // 6.4 Foto do Alojado (POST / DELETE)
@@ -957,7 +1016,8 @@ const StaticApiEngine = {
             movel_id: mId,
             estado_conservacao: 'Bom',
             precisa_manutencao: 0,
-            data_vistoria: hoje
+            data_vistoria: hoje,
+            observacoes: (this.dbState.quartos.flatMap(q => q.moveis || []).find(m => m.id === mId)?.observacoes || '')
           });
         }
 
@@ -1030,6 +1090,10 @@ const StaticApiEngine = {
           });
           this.recomputeStats();
           this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('moveis_vistorias', mId, {
+            movel_id: mId,
+            excluido: true
+          });
           return { message: "Móvel excluído" };
         }
       }
@@ -1475,6 +1539,163 @@ function sincronizarVagaAlojadoEmMemoria(alojadoId) {
   }
 }
 
+// Sincronizar alteração individual de móvel (reparo, manutenção, vistoria ou exclusão) na memória local
+function sincronizarMovelEmMemoria(movelId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.quartos) return false;
+  if (!movelId || !dados) return false;
+  const idNum = Number(movelId);
+  let alterou = false;
+
+  // Se o item foi excluído
+  if (dados.excluido) {
+    (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
+      if (q.moveis && q.moveis.length > 0) {
+        const antes = q.moveis.length;
+        q.moveis = q.moveis.filter(m => Number(m.id) !== idNum);
+        if (q.moveis.length !== antes) alterou = true;
+      }
+    });
+    return alterou;
+  }
+
+  // Atualizar propriedades do móvel (como estado_conservacao e precisa_manutencao)
+  (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
+    (q.moveis || []).forEach(m => {
+      if (Number(m.id) === idNum) {
+        if (dados.estado_conservacao !== undefined && m.estado_conservacao !== dados.estado_conservacao) {
+          m.estado_conservacao = dados.estado_conservacao;
+          alterou = true;
+        }
+        if (dados.precisa_manutencao !== undefined && Number(m.precisa_manutencao) !== Number(dados.precisa_manutencao)) {
+          m.precisa_manutencao = Number(dados.precisa_manutencao);
+          alterou = true;
+        }
+        if (dados.data_vistoria !== undefined && m.data_vistoria !== dados.data_vistoria) {
+          m.data_vistoria = dados.data_vistoria;
+          alterou = true;
+        }
+        if (dados.observacoes !== undefined && m.observacoes !== dados.observacoes) {
+          m.observacoes = dados.observacoes;
+          alterou = true;
+        }
+        if (dados.quantidade !== undefined && Number(m.quantidade) !== Number(dados.quantidade)) {
+          m.quantidade = Number(dados.quantidade);
+          alterou = true;
+        }
+      }
+    });
+  });
+
+  return alterou;
+}
+
+// Sincronizar alteração de bloco em memória
+function sincronizarBlocoEmMemoria(blocoId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.blocos) return false;
+  if (!blocoId || !dados) return false;
+  const bId = Number(blocoId);
+  let alterou = false;
+
+  if (dados.excluido) {
+    const antes = window.StaticApiEngine.dbState.blocos.length;
+    window.StaticApiEngine.dbState.blocos = window.StaticApiEngine.dbState.blocos.filter(b => Number(b.id) !== bId);
+    return window.StaticApiEngine.dbState.blocos.length !== antes;
+  }
+
+  const b = window.StaticApiEngine.dbState.blocos.find(x => Number(x.id) === bId);
+  if (b) {
+    if (dados.nome && b.nome !== dados.nome) { b.nome = dados.nome; alterou = true; }
+    if (dados.tipo && b.tipo !== dados.tipo) { b.tipo = dados.tipo; alterou = true; }
+    if (dados.ordem !== undefined && Number(b.ordem) !== Number(dados.ordem)) { b.ordem = Number(dados.ordem); alterou = true; }
+  } else if (dados.nome) {
+    window.StaticApiEngine.dbState.blocos.push({
+      id: bId,
+      nome: dados.nome,
+      tipo: dados.tipo || 'alojamento',
+      ordem: Number(dados.ordem) || 0,
+      total_quartos: 0,
+      total_vagas: 0,
+      ocupadas: 0,
+      livres: 0,
+      taxa_ocupacao: 0,
+      itens_alerta: 0
+    });
+    alterou = true;
+  }
+  return alterou;
+}
+
+// Sincronizar alteração de empresa em memória
+function sincronizarEmpresaEmMemoria(empId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.empresas) return false;
+  if (!empId || !dados) return false;
+  const eId = Number(empId);
+  let alterou = false;
+
+  if (dados.excluido) {
+    const antes = window.StaticApiEngine.dbState.empresas.length;
+    window.StaticApiEngine.dbState.empresas = window.StaticApiEngine.dbState.empresas.filter(e => Number(e.id) !== eId);
+    return window.StaticApiEngine.dbState.empresas.length !== antes;
+  }
+
+  const e = window.StaticApiEngine.dbState.empresas.find(x => Number(x.id) === eId);
+  if (e) {
+    if (dados.nome && e.nome !== dados.nome) { e.nome = dados.nome; alterou = true; }
+    if (dados.cor && e.cor !== dados.cor) { e.cor = dados.cor; alterou = true; }
+  } else if (dados.nome) {
+    window.StaticApiEngine.dbState.empresas.push({
+      id: eId,
+      nome: dados.nome,
+      cor: dados.cor || '#3b82f6',
+      total_alojados: 0
+    });
+    alterou = true;
+  }
+  return alterou;
+}
+
+// Sincronizar alteração de quarto em memória
+function sincronizarQuartoEmMemoria(quartoId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.quartos) return false;
+  if (!quartoId || !dados) return false;
+  const qId = Number(quartoId);
+  let alterou = false;
+
+  if (dados.excluido) {
+    const antes = window.StaticApiEngine.dbState.quartos.length;
+    window.StaticApiEngine.dbState.quartos = window.StaticApiEngine.dbState.quartos.filter(q => Number(q.id) !== qId);
+    return window.StaticApiEngine.dbState.quartos.length !== antes;
+  }
+
+  const q = window.StaticApiEngine.dbState.quartos.find(x => Number(x.id) === qId);
+  if (q) {
+    if (dados.numero && q.numero !== dados.numero) { q.numero = dados.numero; alterou = true; }
+    if (dados.capacidade && Number(q.capacidade) !== Number(dados.capacidade)) { q.capacidade = Number(dados.capacidade); alterou = true; }
+    if (dados.observacoes !== undefined && q.observacoes !== dados.observacoes) { q.observacoes = dados.observacoes; alterou = true; }
+    if (dados.bloco_nome && q.bloco_nome !== dados.bloco_nome) { q.bloco_nome = dados.bloco_nome; alterou = true; }
+    if (dados.bloco_id && Number(q.bloco_id) !== Number(dados.bloco_id)) { q.bloco_id = Number(dados.bloco_id); alterou = true; }
+  } else if (dados.numero) {
+    const cap = Number(dados.capacidade) || 4;
+    const vagas = [];
+    for (let i = 1; i <= cap; i++) {
+      vagas.push({ id: qId + i, numero_cama: i, status: 'livre', alojado: null });
+    }
+    window.StaticApiEngine.dbState.quartos.push({
+      id: qId,
+      bloco_id: Number(dados.bloco_id) || 1,
+      bloco_nome: dados.bloco_nome || 'Bloco',
+      bloco_tipo: dados.bloco_tipo || 'alojamento',
+      numero: dados.numero,
+      capacidade: cap,
+      observacoes: dados.observacoes || '',
+      vagas: dados.vagas || vagas,
+      moveis: dados.moveis || []
+    });
+    alterou = true;
+  }
+  return alterou;
+}
+
 function initFirebase() {
   try {
     if (typeof firebase !== 'undefined') {
@@ -1539,45 +1760,42 @@ function iniciarListenerTempoRealFirebase() {
         
         const aId = Number(rawId);
         data.id = aId;
+
+        // Se foi removido na nuvem ou marcado como excluído
+        if (change.type === 'removed' || data.excluido) {
+          const antes = (window.StaticApiEngine.dbState.alojados || []).length;
+          window.StaticApiEngine.dbState.alojados = (window.StaticApiEngine.dbState.alojados || []).filter(x => Number(x.id) !== aId);
+          window.StaticApiEngine.dbState.quartos.forEach(q => {
+            (q.vagas || []).forEach(v => {
+              if (Number(v.alojado_id) === aId || (v.alojado && Number(v.alojado.id) === aId)) {
+                v.status = 'livre';
+                v.alojado = null;
+                v.alojado_id = null;
+                v.nome_completo = null;
+                v.matricula = null;
+                v.funcao = null;
+                v.empresa_nome = null;
+                v.empresa_cor = null;
+                v.foto_url = null;
+                v.whatsapp = null;
+              }
+            });
+          });
+          if (window.StaticApiEngine.dbState.alojados.length !== antes) {
+            alteracoes++;
+          }
+          return;
+        }
+
         const al = (window.StaticApiEngine.dbState.alojados || []).find(x => Number(x.id) === aId);
         if (al) {
           let mudou = false;
-          if (data.foto_url !== undefined && data.foto_url !== al.foto_url) {
-            al.foto_url = data.foto_url;
-            mudou = true;
-          }
-          if (data.nome_completo && data.nome_completo !== al.nome_completo) {
-            al.nome_completo = data.nome_completo;
-            mudou = true;
-          }
-          if (data.funcao && data.funcao !== al.funcao) {
-            al.funcao = data.funcao;
-            mudou = true;
-          }
-          if (data.status && data.status !== al.status) {
-            al.status = data.status;
-            mudou = true;
-          }
-          if (data.vaga_id !== undefined && Number(data.vaga_id) !== Number(al.vaga_id)) {
-            al.vaga_id = Number(data.vaga_id);
-            mudou = true;
-          }
-          if (data.quarto_numero !== undefined && String(data.quarto_numero).trim() !== String(al.quarto_numero).trim()) {
-            al.quarto_numero = String(data.quarto_numero);
-            mudou = true;
-          }
-          if (data.bloco_nome !== undefined && String(data.bloco_nome).trim() !== String(al.bloco_nome).trim()) {
-            al.bloco_nome = String(data.bloco_nome);
-            mudou = true;
-          }
-          if (data.numero_cama !== undefined && Number(data.numero_cama) !== Number(al.numero_cama)) {
-            al.numero_cama = Number(data.numero_cama);
-            mudou = true;
-          }
-          if (data.whatsapp !== undefined && data.whatsapp !== al.whatsapp) {
-            al.whatsapp = data.whatsapp;
-            mudou = true;
-          }
+          ['foto_url', 'nome_completo', 'funcao', 'status', 'vaga_id', 'quarto_numero', 'bloco_nome', 'numero_cama', 'whatsapp', 'matricula', 'empresa_id', 'empresa_nome', 'empresa_cor', 'data_entrada', 'data_saida', 'observacoes'].forEach(k => {
+            if (data[k] !== undefined && data[k] !== al[k]) {
+              al[k] = data[k];
+              mudou = true;
+            }
+          });
 
           if (mudou) {
             alteracoes++;
@@ -1599,7 +1817,7 @@ function iniciarListenerTempoRealFirebase() {
         if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
         if (typeof carregarBlocosLista === 'function') carregarBlocosLista();
         if (typeof carregarVagasLivresLista === 'function') carregarVagasLivresLista();
-        showToast(`⚡ Nuvem: ${alteracoes} alteração(ões) sincronizada(s) automaticamente!`, 'info');
+        showToast(`⚡ Nuvem: ${alteracoes} alteração(ões) de colaboradores sincronizada(s)!`, 'info');
       }
     } catch (err) {
       console.warn("Aviso ao processar atualização em tempo real:", err);
@@ -1610,6 +1828,92 @@ function iniciarListenerTempoRealFirebase() {
       atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
     }
   });
+
+  // Ouvinte em tempo real para Blocos (criar, editar, excluir)
+  try {
+    firestoreDb.collection('blocos').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesBlocos = 0;
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          if (data) {
+            const bId = Number(change.doc.id) || Number(data.id);
+            if (change.type === 'removed') data.excluido = true;
+            if (sincronizarBlocoEmMemoria(bId, data)) alteracoesBlocos++;
+          }
+        });
+        if (alteracoesBlocos > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesBlocos} bloco(s) sincronizados em tempo real!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarBlocosLista === 'function') carregarBlocosLista();
+          if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+          if (typeof carregarGestaoCadastros === 'function' && activeTab === 'cadastros') carregarGestaoCadastros();
+        }
+      } catch (errB) { console.warn("Aviso ao sincronizar blocos:", errB); }
+    }, (err) => { console.warn("Aviso listener blocos:", err); });
+  } catch (errBl) { console.warn("Aviso snapshot blocos:", errBl); }
+
+  // Ouvinte em tempo real para Empresas (criar, editar, excluir)
+  try {
+    firestoreDb.collection('empresas').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesEmp = 0;
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          if (data) {
+            const eId = Number(change.doc.id) || Number(data.id);
+            if (change.type === 'removed') data.excluido = true;
+            if (sincronizarEmpresaEmMemoria(eId, data)) alteracoesEmp++;
+          }
+        });
+        if (alteracoesEmp > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesEmp} empresa(s) sincronizadas em tempo real!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarEmpresasLista === 'function') carregarEmpresasLista();
+          if (typeof carregarGestaoCadastros === 'function' && activeTab === 'cadastros') carregarGestaoCadastros();
+        }
+      } catch (errE) { console.warn("Aviso ao sincronizar empresas:", errE); }
+    }, (err) => { console.warn("Aviso listener empresas:", err); });
+  } catch (errEm) { console.warn("Aviso snapshot empresas:", errEm); }
+
+  // Ouvinte em tempo real para Quartos (criar, editar, excluir)
+  try {
+    firestoreDb.collection('quartos').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesQuartos = 0;
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          if (data) {
+            const qId = Number(change.doc.id) || Number(data.id);
+            if (change.type === 'removed') data.excluido = true;
+            if (sincronizarQuartoEmMemoria(qId, data)) alteracoesQuartos++;
+          }
+        });
+        if (alteracoesQuartos > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesQuartos} quarto(s) sincronizados em tempo real!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+          if (typeof carregarVagasLivresLista === 'function') carregarVagasLivresLista();
+          if (typeof carregarGestaoCadastros === 'function' && activeTab === 'cadastros') carregarGestaoCadastros();
+        }
+      } catch (errQ) { console.warn("Aviso ao sincronizar quartos:", errQ); }
+    }, (err) => { console.warn("Aviso listener quartos:", err); });
+  } catch (errQu) { console.warn("Aviso snapshot quartos:", errQu); }
 
   // Ouvinte em tempo real para Identidade Visual e Logomarca
   try {
@@ -1632,6 +1936,49 @@ function iniciarListenerTempoRealFirebase() {
   } catch (errSnap) {
     console.warn("Aviso ao iniciar snapshot da identidade visual:", errSnap);
   }
+
+  // Ouvinte em tempo real para Móveis, Vistorias e Manutenções Resolvidas/Reparadas
+  try {
+    firestoreDb.collection('moveis_vistorias').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesMoveis = 0;
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data) {
+            const mId = Number(doc.id) || Number(data.id) || Number(data.movel_id);
+            if (sincronizarMovelEmMemoria(mId, data)) {
+              alteracoesMoveis++;
+            }
+          }
+        });
+
+        if (alteracoesMoveis > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesMoveis} vistoria(s)/manutenção(ões) atualizada(s) em tempo real da nuvem!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarMoveis === 'function') carregarMoveis();
+          if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+          if (quartoSelecionadoId && typeof abrirModalQuartoDetalhes === 'function') {
+            const modalEl = document.getElementById('modalQuarto');
+            if (modalEl && !modalEl.classList.contains('hidden')) {
+              abrirModalQuartoDetalhes(quartoSelecionadoId);
+            }
+          }
+          showToast(`⚡ Nuvem: Manutenção(ões) atualizada(s) com sucesso!`, 'info');
+        }
+      } catch (errM) {
+        console.warn("Aviso ao processar atualização de vistorias/móveis:", errM);
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar moveis_vistorias no Firestore:", err);
+    });
+  } catch (errMov) {
+    console.warn("Aviso ao iniciar snapshot de móveis:", errMov);
+  }
 }
 
 // Botão Sincronizar Nuvem no Header (Força verificação e atualização mútua)
@@ -1651,19 +1998,24 @@ async function sincronizarComNuvemHeader() {
 
     await window.StaticApiEngine.init();
 
-    // Puxar todos os registros de alojados que já estão na nuvem
-    const snap = await firestoreDb.collection('alojados').get();
     let atualizados = 0;
-    
+
+    // 1. Puxar todos os registros de alojados que já estão na nuvem
+    const snap = await firestoreDb.collection('alojados').get();
     if (!snap.empty) {
       snap.forEach(doc => {
         const data = doc.data();
         if (data && data.id) {
           const aId = Number(data.id);
+          if (data.excluido) {
+            window.StaticApiEngine.dbState.alojados = (window.StaticApiEngine.dbState.alojados || []).filter(x => Number(x.id) !== aId);
+            atualizados++;
+            return;
+          }
           const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
           if (al) {
             let mudou = false;
-            ['foto_url', 'nome_completo', 'funcao', 'status', 'quarto_numero', 'bloco_nome', 'numero_cama', 'whatsapp'].forEach(k => {
+            ['foto_url', 'nome_completo', 'funcao', 'status', 'quarto_numero', 'bloco_nome', 'numero_cama', 'whatsapp', 'matricula', 'empresa_id', 'empresa_nome', 'empresa_cor', 'data_entrada', 'data_saida', 'observacoes'].forEach(k => {
               if (data[k] !== undefined && data[k] !== null && data[k] !== al[k]) {
                 al[k] = data[k];
                 mudou = true;
@@ -1678,13 +2030,73 @@ async function sincronizarComNuvemHeader() {
       });
     }
 
+    // 2. Puxar todas as vistorias/reparos de móveis da nuvem
+    try {
+      const snapMoveis = await firestoreDb.collection('moveis_vistorias').get();
+      if (!snapMoveis.empty) {
+        snapMoveis.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const mId = Number(doc.id) || Number(data.id) || Number(data.movel_id);
+            if (sincronizarMovelEmMemoria(mId, data)) {
+              atualizados++;
+            }
+          }
+        });
+      }
+    } catch (eMoveis) {
+      console.warn("Aviso ao puxar moveis_vistorias na sincronização:", eMoveis);
+    }
+
+    // 3. Puxar blocos da nuvem
+    try {
+      const snapBlocos = await firestoreDb.collection('blocos').get();
+      if (!snapBlocos.empty) {
+        snapBlocos.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const bId = Number(doc.id) || Number(data.id);
+            if (sincronizarBlocoEmMemoria(bId, data)) atualizados++;
+          }
+        });
+      }
+    } catch (eB) { console.warn("Aviso ao puxar blocos:", eB); }
+
+    // 4. Puxar empresas da nuvem
+    try {
+      const snapEmp = await firestoreDb.collection('empresas').get();
+      if (!snapEmp.empty) {
+        snapEmp.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const eId = Number(doc.id) || Number(data.id);
+            if (sincronizarEmpresaEmMemoria(eId, data)) atualizados++;
+          }
+        });
+      }
+    } catch (eEmp) { console.warn("Aviso ao puxar empresas:", eEmp); }
+
+    // 5. Puxar quartos da nuvem
+    try {
+      const snapQ = await firestoreDb.collection('quartos').get();
+      if (!snapQ.empty) {
+        snapQ.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const qId = Number(doc.id) || Number(data.id);
+            if (sincronizarQuartoEmMemoria(qId, data)) atualizados++;
+          }
+        });
+      }
+    } catch (eQ) { console.warn("Aviso ao puxar quartos:", eQ); }
+
     if (atualizados > 0) {
       window.StaticApiEngine.recomputeStats();
       window.StaticApiEngine.saveToStorage();
       refreshAllData();
-      showToast(`✅ ${atualizados} colaborador(es) sincronizado(s) com sucesso da nuvem!`, 'success');
+      showToast(`✅ ${atualizados} alteração(ões) sincronizada(s) com sucesso da nuvem!`, 'success');
     } else {
-      showToast('✅ Seus dados já estão sincronizados com a nuvem!', 'success');
+      showToast('✅ Seus dados já estão 100% sincronizados com a nuvem!', 'success');
     }
   } catch (err) {
     console.error("Erro ao sincronizar com nuvem:", err);

@@ -23,6 +23,1184 @@ let debounceTimerAlojados = null;
 let quartoSelecionadoId = null;
 
 // ========================================================
+// ENGINE CLIENTE ESTÁTICO (GITHUB PAGES & NUVEM SEM BACKEND)
+// ========================================================
+const originalFetch = window.fetch.bind(window);
+const IS_GITHUB_PAGES = window.location.hostname.includes('github.io') || window.location.hostname.includes('github.dev') || window.location.protocol === 'file:' || !window.location.port || window.location.port === '5500';
+let staticModeActive = IS_GITHUB_PAGES;
+
+// Sincronização leve de alteração individual com Firebase (Economia de dados)
+function sincronizarAlteracaoLeveFirebase(colecao, docId, dados) {
+  if (typeof firebaseInitialized !== 'undefined' && firebaseInitialized && typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      firestoreDb.collection(colecao).doc(String(docId)).set({
+        id: Number(docId) || docId,
+        ...dados,
+        atualizado_em: new Date().toISOString()
+      }, { merge: true }).catch(err => {
+        if (err && (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission')))) {
+          console.warn("⚠️ Firebase Firestore: Permissão negada nas regras de segurança do console.");
+          if (typeof atualizarBadgeFirebaseUI === 'function') atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+          const alertEl = document.getElementById('firebaseRulesAlert');
+          if (alertEl) alertEl.classList.remove('hidden');
+        }
+      });
+    } catch (e) {
+      // Offline fallback silencioso
+    }
+  }
+}
+
+const StaticApiEngine = {
+  dbState: {
+    geral: null,
+    blocos: [],
+    empresas: [],
+    quartos: [],
+    alojados: [],
+    auditoria: []
+  },
+  initialized: false,
+  initPromise: null,
+
+  async init() {
+    if (this.initialized) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async () => {
+      try {
+        // 1. Tentar ler do localStorage primeiro (para manter edições do usuário no navegador)
+        const localSaved = localStorage.getItem('prefeitura_taboca_snapshot');
+        if (localSaved) {
+          try {
+            const parsed = JSON.parse(localSaved);
+            if (parsed && parsed.quartos && parsed.quartos.length > 0) {
+              this.dbState = parsed;
+              
+              // LIMPEZA AUTOMÁTICA: Purgar registros fantasmas sem nome gerados acidentalmente
+              const antesAlojados = (this.dbState.alojados || []).length;
+              this.dbState.alojados = (this.dbState.alojados || []).filter(a => {
+                if (!a || !a.nome_completo) return false;
+                const n = a.nome_completo.trim();
+                return n !== '' && n !== '??' && n !== '?' && n !== 'SEM NOME' && n !== 'N/A';
+              });
+              if (this.dbState.alojados.length !== antesAlojados) {
+                console.log(`[LIMPEZA] Removidos ${antesAlojados - this.dbState.alojados.length} registros fantasmas do cache local.`);
+                const validIds = new Set(this.dbState.alojados.map(a => a.id));
+                (this.dbState.quartos || []).forEach(q => {
+                  (q.vagas || []).forEach(v => {
+                    if (v.alojado && (!validIds.has(v.alojado.id) || !v.alojado.nome_completo || v.alojado.nome_completo.trim() === '')) {
+                      v.status = 'livre';
+                      v.alojado = null;
+                    }
+                  });
+                });
+                this.saveToStorage();
+              }
+
+              // Migração de fotos antigas para ImgBB se existirem no snapshot local
+              (this.dbState.alojados || []).forEach(a => {
+                if (a.foto_url && a.foto_url.includes('alojado_1043_4d23f848.jpg')) {
+                  a.foto_url = 'https://i.ibb.co/sppGW7kB/alojado-1043-4d23f848.jpg';
+                }
+              });
+              (this.dbState.quartos || []).forEach(q => {
+                (q.vagas || []).forEach(v => {
+                  if (v.alojado && v.alojado.foto_url && v.alojado.foto_url.includes('alojado_1043_4d23f848.jpg')) {
+                    v.alojado.foto_url = 'https://i.ibb.co/sppGW7kB/alojado-1043-4d23f848.jpg';
+                  }
+                });
+              });
+
+              // Migração: Garantir que todos os quartos possuam 'Fechadura' cadastrada em seus móveis
+              let fechadurasAdicionadas = 0;
+              const hojeData = new Date().toISOString().split('T')[0];
+              (this.dbState.quartos || []).forEach(q => {
+                if (!q.moveis) q.moveis = [];
+                const temFechadura = q.moveis.some(m => m.tipo_item === 'Fechadura' || m.tipo_item === 'Trinco / Fechadura');
+                if (!temFechadura) {
+                  q.moveis.push({
+                    id: (q.id * 100) + 13,
+                    tipo_item: 'Fechadura',
+                    quantidade: 1,
+                    estado_conservacao: 'Bom',
+                    precisa_manutencao: 0,
+                    data_vistoria: hojeData,
+                    observacoes: 'Fechadura da porta funcionando'
+                  });
+                  fechadurasAdicionadas++;
+                }
+              });
+              if (fechadurasAdicionadas > 0) {
+                console.log(`[MIGRAÇÃO] Fechadura adicionada em ${fechadurasAdicionadas} quartos no cache local.`);
+                this.saveToStorage();
+              }
+
+              // Reconciliação imediata dos 12 reparos concluídos pelo prefeito na nuvem
+              const reparadosIds = new Set([2650, 2668, 2709, 2728, 2866, 2908, 3057, 3208, 3585, 3598, 3634, 3694]);
+              let reparosLocaisAplicados = 0;
+              (this.dbState.quartos || []).forEach(q => {
+                (q.moveis || []).forEach(m => {
+                  if (reparadosIds.has(Number(m.id)) && (Number(m.precisa_manutencao) === 1 || m.estado_conservacao !== 'Bom')) {
+                    m.precisa_manutencao = 0;
+                    m.estado_conservacao = 'Bom';
+                    m.data_vistoria = '2026-09-26';
+                    reparosLocaisAplicados++;
+                  }
+                });
+              });
+              if (reparosLocaisAplicados > 0) {
+                console.log(`[REPAROS] ${reparosLocaisAplicados} móveis reparados reconciliados com sucesso do cache local.`);
+                this.saveToStorage();
+              }
+
+              this.recomputeStats();
+              this.initialized = true;
+              console.log("StaticApiEngine: Estado carregado do localStorage com sucesso.");
+              return;
+            }
+          } catch(e) { /* fallback */ }
+        }
+
+        // 2. Carregar do arquivo estático dados_iniciais_taboca.json
+        const res = await originalFetch('dados_iniciais_taboca.json');
+        if (!res.ok) throw new Error('Falha ao obter dados_iniciais_taboca.json');
+        const data = await res.json();
+        
+        this.dbState.geral = data.geral;
+        this.dbState.blocos = data.blocos || [];
+        this.dbState.empresas = data.empresas || [];
+        this.dbState.quartos = data.quartos || [];
+        this.dbState.alojados = data.alojados || [];
+        this.dbState.auditoria = [];
+
+        this.recomputeStats();
+        this.saveToStorage();
+        this.initialized = true;
+        console.log("StaticApiEngine: Banco de dados em memória inicializado (387 alojados, 220 quartos, 10 blocos).");
+      } catch (err) {
+        console.error("StaticApiEngine init falhou:", err);
+      }
+    })();
+
+    return this.initPromise;
+  },
+
+  saveToStorage() {
+    try {
+      localStorage.setItem('prefeitura_taboca_snapshot', JSON.stringify(this.dbState));
+    } catch(e) {
+      console.warn("Storage quota excedida ou erro ao salvar snapshot:", e);
+    }
+  },
+
+  recomputeStats() {
+    const quartos = this.dbState.quartos || [];
+    const alojados = this.dbState.alojados || [];
+    const blocos = this.dbState.blocos || [];
+    const empresas = this.dbState.empresas || [];
+
+    // Reconciliar vagas com alojados para garantir consistência de ID e metadados
+    const activeAlojados = alojados.filter(a => a.status === 'ativo');
+    const alojadoMapByVaga = new Map();
+    const alojadoMapByQuartoCama = new Map();
+    activeAlojados.forEach(a => {
+      if (a.vaga_id) alojadoMapByVaga.set(Number(a.vaga_id), a);
+      if (a.quarto_numero && a.numero_cama) {
+        const key = `${(a.bloco_nome || '').trim().toLowerCase()}_${String(a.quarto_numero).trim()}_${Number(a.numero_cama)}`;
+        alojadoMapByQuartoCama.set(key, a);
+      }
+    });
+
+    // Recalcular status por quarto
+    quartos.forEach(q => {
+      const vagas = q.vagas || [];
+      vagas.forEach(v => {
+        if (!v.vaga_id && v.id) v.vaga_id = v.id;
+        if (!v.id && v.vaga_id) v.id = v.vaga_id;
+
+        // Blindagem: Se a vaga ainda aponta para um alojado, verificar se esse alojado não foi mudado ou desligado
+        if (v.alojado_id) {
+          const alAtual = activeAlojados.find(x => Number(x.id) === Number(v.alojado_id));
+          if (!alAtual || (Number(alAtual.vaga_id) !== Number(v.id) && (String(alAtual.quarto_numero).trim() !== String(q.numero).trim() || Number(alAtual.numero_cama) !== Number(v.numero_cama)))) {
+            // Este colaborador não pertence mais a esta vaga (foi movido ou desligado) -> Liberar vaga antiga imediatamente
+            v.status = 'livre';
+            v.alojado = null;
+            v.alojado_id = null;
+            v.nome_completo = null;
+            v.matricula = null;
+            v.funcao = null;
+            v.empresa_nome = null;
+            v.empresa_cor = null;
+            v.foto_url = null;
+            v.whatsapp = null;
+          }
+        }
+
+        let a = null;
+        if (v.id) {
+          a = alojadoMapByVaga.get(Number(v.id));
+        }
+        if (!a && q.numero && v.numero_cama) {
+          const key = `${(q.bloco_nome || '').trim().toLowerCase()}_${String(q.numero).trim()}_${Number(v.numero_cama)}`;
+          a = alojadoMapByQuartoCama.get(key);
+        }
+        if (!a && v.alojado_id) {
+          a = activeAlojados.find(x => Number(x.id) === Number(v.alojado_id));
+        }
+
+        if (a && a.status === 'ativo') {
+          v.status = 'ocupada';
+          v.alojado_id = a.id;
+          v.nome_completo = a.nome_completo;
+          v.matricula = a.matricula || '';
+          v.funcao = a.funcao || '';
+          v.empresa_nome = a.empresa_nome || '';
+          v.empresa_cor = a.empresa_cor || '#2563eb';
+          v.foto_url = a.foto_url || null;
+          v.whatsapp = a.whatsapp || '';
+          v.alojado = { ...a };
+          a.vaga_id = v.id;
+          a.quarto_numero = q.numero;
+          a.bloco_nome = q.bloco_nome;
+          a.numero_cama = v.numero_cama;
+        } else if (v.status === 'ocupada' && !a && !v.alojado && !v.nome_completo) {
+          v.status = 'livre';
+          v.alojado = null;
+          v.alojado_id = null;
+        }
+      });
+
+      const cap = q.capacidade || vagas.length || 4;
+      const oc = vagas.filter(v => v.status === 'ocupada').length;
+      const liv = cap - oc;
+      q.total_camas = cap;
+      q.vagas_ocupadas = oc;
+      q.vagas_livres = liv >= 0 ? liv : 0;
+      
+      const moveisAlerta = (q.moveis || []).filter(m => m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado').length;
+      q.itens_alerta = moveisAlerta;
+
+      if (liv <= 0) {
+        q.status_visual = 'lotado';
+        q.cor_status = 'red';
+      } else if (oc >= cap - 1 && liv > 0) {
+        q.status_visual = 'quase_cheio';
+        q.cor_status = 'amber';
+      } else if (oc === 0) {
+        q.status_visual = 'vazio';
+        q.cor_status = 'slate';
+      } else {
+        q.status_visual = 'com_vagas';
+        q.cor_status = 'emerald';
+      }
+    });
+
+    // Recalcular blocos
+    blocos.forEach(b => {
+      const qBloco = quartos.filter(q => q.bloco_id == b.id);
+      b.total_quartos = qBloco.length;
+      b.total_vagas = qBloco.reduce((s, q) => s + (q.capacidade || 4), 0);
+      b.ocupadas = qBloco.reduce((s, q) => s + (q.vagas_ocupadas || 0), 0);
+      b.livres = b.total_vagas - b.ocupadas;
+      b.taxa_ocupacao = b.total_vagas > 0 ? Number(((b.ocupadas / b.total_vagas) * 100).toFixed(1)) : 0;
+      b.itens_alerta = qBloco.reduce((s, q) => s + (q.itens_alerta || 0), 0);
+    });
+
+    // Recalcular empresas
+    empresas.forEach(e => {
+      e.total_alojados = alojados.filter(a => a.status === 'ativo' && (a.empresa_id == e.id || a.empresa_nome === e.nome)).length;
+    });
+
+    // Recalcular Geral
+    const totVagas = blocos.reduce((s, b) => s + b.total_vagas, 0);
+    const totOcup = alojados.filter(a => a.status === 'ativo').length;
+    const totDesl = alojados.filter(a => a.status === 'desligado').length;
+    const totAlertas = quartos.reduce((s, q) => s + (q.itens_alerta || 0), 0);
+
+    this.dbState.geral = {
+      total_vagas: totVagas || 880,
+      ocupadas: totOcup,
+      disponiveis: (totVagas - totOcup) >= 0 ? (totVagas - totOcup) : 0,
+      taxa_ocupacao: totVagas > 0 ? Number(((totOcup / totVagas) * 100).toFixed(1)) : 0,
+      total_blocos: blocos.length,
+      total_quartos: quartos.length,
+      total_alojados_ativos: totOcup,
+      total_desligados: totDesl,
+      total_alertas_manutencao: totAlertas
+    };
+  },
+
+  async handle(url, init = {}) {
+    await this.init();
+    const method = (init.method || 'GET').toUpperCase();
+    const u = new URL(url, window.location.href);
+    const path = u.pathname;
+    const params = u.searchParams;
+    let body = null;
+    if (init.body) {
+      try { body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body; } catch(e) {}
+    }
+
+    // 1. Dashboard
+    if (path.includes('/api/dashboard/stats')) {
+      this.recomputeStats();
+      const alertas = [];
+      this.dbState.quartos.forEach(q => {
+        (q.moveis || []).forEach(m => {
+          if (m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado') {
+            alertas.push({
+              ...m,
+              bloco_nome: q.bloco_nome,
+              quarto_numero: q.numero
+            });
+          }
+        });
+      });
+      return {
+        geral: this.dbState.geral,
+        blocos: this.dbState.blocos,
+        empresas: this.dbState.empresas,
+        alertas_moveis: alertas
+      };
+    }
+
+    // 2. Blocos
+    if (path.endsWith('/api/blocos') || path.includes('/api/blocos?')) {
+      if (method === 'POST') {
+        const novoBloco = {
+          id: Date.now(),
+          nome: body.nome.trim(),
+          tipo: body.tipo || 'alojamento',
+          ordem: Number(body.ordem) || 0,
+          total_quartos: 0,
+          total_vagas: 0,
+          ocupadas: 0,
+          livres: 0,
+          taxa_ocupacao: 0,
+          itens_alerta: 0
+        };
+        this.dbState.blocos.push(novoBloco);
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('blocos', novoBloco.id, novoBloco);
+        return { id: novoBloco.id, message: "Bloco criado com sucesso" };
+      }
+      this.recomputeStats();
+      return this.dbState.blocos;
+    }
+    const matchBlocoId = path.match(/\/api\/blocos\/(\d+)/);
+    if (matchBlocoId) {
+      const bId = Number(matchBlocoId[1]);
+      if (method === 'PUT') {
+        const b = this.dbState.blocos.find(x => x.id === bId);
+        if (b) {
+          b.nome = body.nome || b.nome;
+          b.tipo = body.tipo || b.tipo;
+          b.ordem = Number(body.ordem) || b.ordem;
+          this.recomputeStats();
+          this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('blocos', b.id, b);
+        }
+        return { message: "Bloco atualizado" };
+      }
+      if (method === 'DELETE') {
+        this.dbState.blocos = this.dbState.blocos.filter(x => x.id !== bId);
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('blocos', bId, { id: bId, excluido: true });
+        return { message: "Bloco excluído" };
+      }
+    }
+
+    // 3. Empresas
+    if (path.endsWith('/api/empresas') || path.includes('/api/empresas?')) {
+      if (method === 'POST') {
+        const novaEmp = {
+          id: Date.now(),
+          nome: body.nome.trim(),
+          cor: body.cor || '#3b82f6',
+          total_alojados: 0
+        };
+        this.dbState.empresas.push(novaEmp);
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('empresas', novaEmp.id, novaEmp);
+        return { id: novaEmp.id, message: "Empresa criada com sucesso" };
+      }
+      this.recomputeStats();
+      return this.dbState.empresas;
+    }
+    const matchEmpId = path.match(/\/api\/empresas\/(\d+)/);
+    if (matchEmpId) {
+      const eId = Number(matchEmpId[1]);
+      if (method === 'PUT') {
+        const e = this.dbState.empresas.find(x => x.id === eId);
+        if (e) {
+          e.nome = body.nome || e.nome;
+          e.cor = body.cor || e.cor;
+          this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('empresas', e.id, e);
+        }
+        return { message: "Empresa atualizada" };
+      }
+      if (method === 'DELETE') {
+        this.dbState.empresas = this.dbState.empresas.filter(x => x.id !== eId);
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('empresas', eId, { id: eId, excluido: true });
+        return { message: "Empresa excluída" };
+      }
+    }
+
+    // 4. Vagas Livres
+    if (path.includes('/api/vagas/livres')) {
+      this.recomputeStats();
+      const livres = [];
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (v.status === 'livre') {
+            livres.push({
+              vaga_id: v.id,
+              quarto_id: q.id,
+              quarto_numero: q.numero,
+              bloco_id: q.bloco_id,
+              bloco_nome: q.bloco_nome,
+              numero_cama: v.numero_cama
+            });
+          }
+        });
+      });
+      return livres;
+    }
+
+    // 5. Quartos
+    const matchQuartoDetalhe = path.match(/\/api\/quartos\/(\d+)$/);
+    if (matchQuartoDetalhe && method === 'GET') {
+      const qId = Number(matchQuartoDetalhe[1]);
+      const q = this.dbState.quartos.find(x => x.id === qId);
+      if (q) return q;
+      throw new Error("Quarto não encontrado");
+    }
+    if (matchQuartoDetalhe && method === 'PUT') {
+      const qId = Number(matchQuartoDetalhe[1]);
+      const q = this.dbState.quartos.find(x => x.id === qId);
+      if (q) {
+        q.numero = body.numero || q.numero;
+        q.capacidade = Number(body.capacidade) || q.capacidade;
+        q.observacoes = body.observacoes !== undefined ? body.observacoes : q.observacoes;
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('quartos', q.id, {
+          id: q.id,
+          numero: q.numero,
+          capacidade: q.capacidade,
+          observacoes: q.observacoes,
+          bloco_id: q.bloco_id,
+          bloco_nome: q.bloco_nome
+        });
+      }
+      return { message: "Quarto atualizado" };
+    }
+    if (matchQuartoDetalhe && method === 'DELETE') {
+      const qId = Number(matchQuartoDetalhe[1]);
+      this.dbState.quartos = this.dbState.quartos.filter(x => x.id !== qId);
+      this.recomputeStats();
+      this.saveToStorage();
+      sincronizarAlteracaoLeveFirebase('quartos', qId, { id: qId, excluido: true });
+      return { message: "Quarto excluído" };
+    }
+    if (path.includes('/api/quartos')) {
+      if (method === 'POST') {
+        const novoId = Date.now();
+        const bloco = this.dbState.blocos.find(b => b.id == body.bloco_id) || { nome: 'Bloco', tipo: 'alojamento' };
+        const cap = Number(body.capacidade) || 4;
+        const vagas = [];
+        for (let i = 1; i <= cap; i++) {
+          vagas.push({ id: novoId + i, numero_cama: i, status: 'livre', alojado: null });
+        }
+        const moveis = [
+          { id: novoId + 10, tipo_item: 'Ar-Condicionado', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Funcionando' },
+          { id: novoId + 11, tipo_item: 'Beliche / Camas', quantidade: 2, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' },
+          { id: novoId + 12, tipo_item: 'Guarda-roupa / Armário', quantidade: 4, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' },
+          { id: novoId + 13, tipo_item: 'Fechadura', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Fechadura da porta funcionando' }
+        ];
+        const novoQ = {
+          id: novoId,
+          bloco_id: Number(body.bloco_id),
+          bloco_nome: bloco.nome,
+          bloco_tipo: bloco.tipo,
+          numero: body.numero,
+          capacidade: cap,
+          observacoes: body.observacoes || '',
+          vagas: vagas,
+          moveis: moveis
+        };
+        this.dbState.quartos.push(novoQ);
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('quartos', novoQ.id, novoQ);
+        return { id: novoId, message: "Quarto criado com sucesso" };
+      }
+      this.recomputeStats();
+      let res = [...this.dbState.quartos];
+      const blocoId = params.get('bloco_id');
+      const statusOcup = params.get('status_ocupacao');
+      const filtroAlerta = params.get('filtro_alerta');
+      const qQuery = params.get('q');
+
+      if (blocoId) res = res.filter(q => q.bloco_id == blocoId);
+      if (qQuery) {
+        const s = qQuery.toLowerCase();
+        res = res.filter(q => (q.numero && q.numero.toLowerCase().includes(s)) || (q.bloco_nome && q.bloco_nome.toLowerCase().includes(s)));
+      }
+      if (statusOcup) {
+        if (statusOcup === 'com_vagas') res = res.filter(q => q.vagas_livres > 0);
+        else if (statusOcup === 'lotado') res = res.filter(q => q.status_visual === 'lotado');
+        else if (statusOcup === 'quase_cheio') res = res.filter(q => q.status_visual === 'quase_cheio');
+        else if (statusOcup === 'vazio') res = res.filter(q => q.status_visual === 'vazio');
+      }
+      if (filtroAlerta === 'true') {
+        res = res.filter(q => q.itens_alerta > 0);
+      }
+      return res;
+    }
+
+    // 6. Alojados
+    // 6.1 Desligar
+    const matchDesligar = path.match(/\/api\/alojados\/(\d+)\/desligar/);
+    const isDesligarEndpoint = (path === '/api/alojados/desligar' || path.endsWith('/api/alojados/desligar'));
+    if ((matchDesligar || isDesligarEndpoint) && method === 'POST') {
+      const aId = matchDesligar ? Number(matchDesligar[1]) : Number(body.alojado_id);
+      const alojado = this.dbState.alojados.find(x => x.id === aId);
+      if (alojado) {
+        alojado.status = 'desligado';
+        alojado.data_saida = body.data_saida || new Date().toISOString().split('T')[0];
+        const vagaAntigaId = alojado.vaga_id;
+        alojado.vaga_id = null;
+        alojado.quarto_numero = null;
+        alojado.bloco_nome = null;
+        alojado.numero_cama = null;
+
+        // Liberar vaga
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.id === vagaAntigaId || v.alojado_id === aId || (v.alojado && v.alojado.id === aId)) {
+              v.status = 'livre';
+              v.alojado = null;
+              v.alojado_id = null;
+              v.nome_completo = null;
+              v.matricula = null;
+              v.funcao = null;
+              v.empresa_nome = null;
+              v.empresa_cor = null;
+              v.foto_url = null;
+            }
+          });
+        });
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('alojados', aId, {
+          status: 'desligado',
+          data_saida: alojado.data_saida,
+          vaga_id: null,
+          quarto_numero: null,
+          bloco_nome: null,
+          numero_cama: null
+        });
+      }
+      return { message: "Alojado desligado e vaga liberada com sucesso" };
+    }
+
+    // 6.2 Realocar
+    const matchRealocar = path.match(/\/api\/alojados\/(\d+)\/realocar/);
+    const isRealocarEndpoint = (path === '/api/alojados/realocar' || path.endsWith('/api/alojados/realocar'));
+    if ((matchRealocar || isRealocarEndpoint) && method === 'POST') {
+      const aId = matchRealocar ? Number(matchRealocar[1]) : Number(body.alojado_id);
+      const alojado = this.dbState.alojados.find(x => Number(x.id) === aId);
+      const novaVagaId = Number(body.nova_vaga_id);
+      if (!alojado) {
+        throw new Error("Colaborador não encontrado para realocação.");
+      }
+      if (!novaVagaId) {
+        throw new Error("Vaga de destino não informada.");
+      }
+
+      // 1. Liberar vaga antiga em todos os quartos (comparando por vaga_id anterior, ID do alojado e nome)
+      const vagaAntigaId = Number(alojado.vaga_id);
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          const ehVagaAntiga = (vagaAntigaId && (Number(v.id) === vagaAntigaId || Number(v.vaga_id) === vagaAntigaId));
+          const ehDesteAlojado = (Number(v.alojado_id) === aId || (v.alojado && Number(v.alojado.id) === aId) || (v.nome_completo && v.nome_completo.trim().toUpperCase() === alojado.nome_completo.trim().toUpperCase()));
+          if (ehVagaAntiga || ehDesteAlojado) {
+            v.status = 'livre';
+            v.alojado = null;
+            v.alojado_id = null;
+            v.nome_completo = null;
+            v.matricula = null;
+            v.funcao = null;
+            v.empresa_nome = null;
+            v.empresa_cor = null;
+            v.foto_url = null;
+            v.whatsapp = null;
+          }
+        });
+      });
+
+      // 2. Localizar e ocupar nova vaga
+      let foundRoom = null;
+      let foundBed = null;
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (Number(v.id) === novaVagaId || Number(v.vaga_id) === novaVagaId) {
+            foundRoom = q;
+            foundBed = v;
+          }
+        });
+      });
+
+      if (!foundRoom || !foundBed) {
+        throw new Error("A nova vaga selecionada não foi encontrada no canteiro.");
+      }
+
+      // Atualizar dados no alojado
+      alojado.vaga_id = Number(foundBed.id || novaVagaId);
+      alojado.bloco_nome = foundRoom.bloco_nome;
+      alojado.quarto_numero = String(foundRoom.numero);
+      alojado.numero_cama = Number(foundBed.numero_cama);
+      alojado.status = 'ativo';
+
+      // Atualizar dados na nova vaga
+      foundBed.status = 'ocupada';
+      foundBed.alojado_id = aId;
+      foundBed.nome_completo = alojado.nome_completo;
+      foundBed.matricula = alojado.matricula || '';
+      foundBed.funcao = alojado.funcao || '';
+      foundBed.empresa_nome = alojado.empresa_nome || '';
+      foundBed.empresa_cor = alojado.empresa_cor || '#2563eb';
+      foundBed.foto_url = alojado.foto_url || null;
+      foundBed.whatsapp = alojado.whatsapp || '';
+      foundBed.alojado = { ...alojado };
+
+      // Auditoria
+      if (!this.dbState.auditoria) this.dbState.auditoria = [];
+      this.dbState.auditoria.unshift({
+        id: Date.now(),
+        acao: 'REALOCAR',
+        usuario: body.usuario || currentUserName || 'Prefeito Vidal',
+        data_hora: new Date().toLocaleString('pt-BR'),
+        detalhes: `Colaborador '${alojado.nome_completo}' realocado para ${foundRoom.bloco_nome} - Quarto ${foundRoom.numero} (Cama ${foundBed.numero_cama}). Motivo: ${body.motivo || 'Administração'}`
+      });
+
+      this.recomputeStats();
+      this.saveToStorage();
+
+      sincronizarAlteracaoLeveFirebase('alojados', aId, {
+        id: aId,
+        vaga_id: alojado.vaga_id,
+        bloco_nome: alojado.bloco_nome,
+        quarto_numero: alojado.quarto_numero,
+        numero_cama: alojado.numero_cama,
+        status: 'ativo'
+      });
+
+      return { message: "Alojado realocado com sucesso" };
+    }
+
+    // 6.25 Reativar
+    const matchReativar = path.match(/\/api\/alojados\/(\d+)\/reativar/);
+    const isReativarEndpoint = (path === '/api/alojados/reativar' || path.endsWith('/api/alojados/reativar'));
+    if ((matchReativar || isReativarEndpoint) && method === 'POST') {
+      const aId = matchReativar ? Number(matchReativar[1]) : Number(body.alojado_id);
+      const alojado = this.dbState.alojados.find(x => x.id === aId);
+      const novaVagaId = Number(body.nova_vaga_id);
+      if (!alojado) throw new Error("Colaborador não encontrado.");
+      if (!novaVagaId) throw new Error("Vaga de destino não informada.");
+
+      let foundRoom = null;
+      let foundBed = null;
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (Number(v.id) === novaVagaId) {
+            foundRoom = q;
+            foundBed = v;
+          }
+        });
+      });
+
+      if (!foundRoom || !foundBed) {
+        throw new Error("A vaga selecionada não foi encontrada.");
+      }
+
+      alojado.status = 'ativo';
+      alojado.data_saida = null;
+      alojado.data_entrada = body.data_entrada || new Date().toISOString().split('T')[0];
+      alojado.vaga_id = novaVagaId;
+      alojado.bloco_nome = foundRoom.bloco_nome;
+      alojado.quarto_numero = foundRoom.numero;
+      alojado.numero_cama = foundBed.numero_cama;
+
+      foundBed.status = 'ocupada';
+      foundBed.alojado_id = aId;
+      foundBed.nome_completo = alojado.nome_completo;
+      foundBed.matricula = alojado.matricula || '';
+      foundBed.funcao = alojado.funcao || '';
+      foundBed.empresa_nome = alojado.empresa_nome || '';
+      foundBed.empresa_cor = alojado.empresa_cor || '#2563eb';
+      foundBed.foto_url = alojado.foto_url || null;
+      foundBed.alojado = { ...alojado };
+
+      this.recomputeStats();
+      this.saveToStorage();
+
+      sincronizarAlteracaoLeveFirebase('alojados', aId, {
+        status: 'ativo',
+        data_saida: null,
+        data_entrada: alojado.data_entrada,
+        vaga_id: alojado.vaga_id,
+        bloco_nome: alojado.bloco_nome,
+        quarto_numero: alojado.quarto_numero,
+        numero_cama: alojado.numero_cama
+      });
+
+      return { message: "Alojado reativado com sucesso" };
+    }
+
+    // 6.3 PUT / DELETE Alojado
+    const matchAlojadoPut = path.match(/\/api\/alojados\/(\d+)$/);
+    if (matchAlojadoPut && method === 'PUT') {
+      const aId = Number(matchAlojadoPut[1]);
+      const a = this.dbState.alojados.find(x => x.id === aId);
+      if (a) {
+        if (body.nome_completo) a.nome_completo = body.nome_completo.toUpperCase();
+        if (body.matricula !== undefined) a.matricula = body.matricula;
+        if (body.funcao !== undefined) a.funcao = body.funcao.toUpperCase();
+        if (body.whatsapp !== undefined) a.whatsapp = body.whatsapp ? body.whatsapp.trim() : '';
+        if (body.data_entrada !== undefined) a.data_entrada = body.data_entrada;
+        if (body.observacoes !== undefined) a.observacoes = body.observacoes;
+        if (body.foto_url !== undefined) a.foto_url = body.foto_url;
+        if (body.empresa_id) {
+          a.empresa_id = Number(body.empresa_id);
+          const emp = this.dbState.empresas.find(e => e.id == a.empresa_id);
+          if (emp) {
+            a.empresa_nome = emp.nome;
+            a.empresa_cor = emp.cor;
+          }
+        }
+        // Atualiza na vaga
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.alojado && v.alojado.id === aId) {
+              v.alojado = { ...a };
+            }
+          });
+        });
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('alojados', aId, a);
+      }
+      return { message: "Alojado atualizado com sucesso" };
+    }
+    if (matchAlojadoPut && method === 'DELETE') {
+      const aId = Number(matchAlojadoPut[1]);
+      const a = this.dbState.alojados.find(x => x.id === aId);
+      if (a) {
+        // Liberar vaga
+        this.dbState.quartos.forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.alojado_id === aId || (v.alojado && v.alojado.id === aId)) {
+              v.status = 'livre';
+              v.alojado = null;
+              v.alojado_id = null;
+              v.nome_completo = null;
+              v.matricula = null;
+              v.funcao = null;
+              v.empresa_nome = null;
+              v.empresa_cor = null;
+              v.foto_url = null;
+              v.whatsapp = null;
+            }
+          });
+        });
+        this.dbState.alojados = this.dbState.alojados.filter(x => x.id !== aId);
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('alojados', aId, { id: aId, excluido: true });
+      }
+      return { message: "Alojado excluído permanentemente com sucesso" };
+    }
+
+    // 6.4 Foto do Alojado (POST / DELETE)
+    const matchAlojadoFoto = path.match(/\/api\/alojados\/(\d+)\/foto/);
+    if (matchAlojadoFoto) {
+      const aId = Number(matchAlojadoFoto[1]);
+      const a = this.dbState.alojados.find(x => x.id === aId);
+      if (method === 'POST') {
+        const fotoUrl = (body && body.foto_url) ? body.foto_url : null;
+        if (a && fotoUrl) {
+          a.foto_url = fotoUrl;
+          this.dbState.quartos.forEach(q => {
+            (q.vagas || []).forEach(v => {
+              if (v.alojado && v.alojado.id === aId) {
+                v.alojado.foto_url = fotoUrl;
+              }
+            });
+          });
+          this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('alojados', aId, { foto_url: a.foto_url });
+        }
+        return { success: true, foto_url: a ? a.foto_url : fotoUrl, message: "Foto atualizada com sucesso" };
+      }
+      if (method === 'DELETE') {
+        if (a) {
+          a.foto_url = null;
+          this.dbState.quartos.forEach(q => {
+            (q.vagas || []).forEach(v => {
+              if (v.alojado && v.alojado.id === aId) {
+                v.alojado.foto_url = null;
+              }
+            });
+          });
+          this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('alojados', aId, { foto_url: null });
+        }
+        return { success: true, message: "Foto removida com sucesso" };
+      }
+    }
+
+    // 6.5 Cadastrar Novo Alojado (somente rota raiz /api/alojados)
+    if (path.match(/\/api\/alojados\/?$/) && method === 'POST') {
+      // VALIDAÇÃO: Bloquear cadastros sem nome ou fantasmas
+      if (!body || !body.nome_completo || body.nome_completo.trim() === '' || body.nome_completo.trim() === '??') {
+        throw new Error("Nome do colaborador é obrigatório para cadastrar.");
+      }
+
+      const novoId = Date.now();
+      const emp = this.dbState.empresas.find(e => e.id == body.empresa_id) || { nome: 'N/A', cor: '#3b82f6' };
+      let foundRoom = null;
+      let foundBed = null;
+      const vagaId = Number(body.vaga_id);
+      this.dbState.quartos.forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (v.id === vagaId) {
+            foundRoom = q;
+            foundBed = v;
+          }
+        });
+      });
+
+      const novoAlojado = {
+        id: novoId,
+        vaga_id: vagaId,
+        matricula: body.matricula || '',
+        nome_completo: body.nome_completo.trim().toUpperCase(),
+        empresa_id: Number(body.empresa_id),
+        empresa_nome: emp.nome,
+        empresa_cor: emp.cor,
+        funcao: (body.funcao || '').toUpperCase(),
+        whatsapp: body.whatsapp ? body.whatsapp.trim() : '',
+        data_entrada: body.data_entrada || new Date().toISOString().split('T')[0],
+        data_saida: null,
+        status: 'ativo',
+        observacoes: body.observacoes || '',
+        foto_url: body.foto_url || null,
+        bloco_nome: foundRoom ? foundRoom.bloco_nome : '',
+        quarto_numero: foundRoom ? foundRoom.numero : '',
+        numero_cama: foundBed ? foundBed.numero_cama : 1
+      };
+
+      if (foundBed) {
+        foundBed.status = 'ocupada';
+        foundBed.alojado_id = novoId;
+        foundBed.nome_completo = novoAlojado.nome_completo;
+        foundBed.matricula = novoAlojado.matricula || '';
+        foundBed.funcao = novoAlojado.funcao || '';
+        foundBed.empresa_nome = novoAlojado.empresa_nome || '';
+        foundBed.empresa_cor = novoAlojado.empresa_cor || '#2563eb';
+        foundBed.foto_url = novoAlojado.foto_url || null;
+        foundBed.whatsapp = novoAlojado.whatsapp || '';
+        foundBed.alojado = { ...novoAlojado };
+      }
+
+      this.dbState.alojados.unshift(novoAlojado);
+      this.recomputeStats();
+      this.saveToStorage();
+      sincronizarAlteracaoLeveFirebase('alojados', novoAlojado.id, novoAlojado);
+      return { id: novoId, message: "Alojado cadastrado com sucesso" };
+    }
+
+    // 6.6 Listar Alojados (GET)
+    if (path.includes('/api/alojados') && method === 'GET') {
+      let lista = [...this.dbState.alojados];
+      const statusAlojado = params.get('status_alojado') || 'ativo';
+      const blocoId = params.get('bloco_id');
+      const empresaId = params.get('empresa_id');
+      const qQuery = params.get('q');
+      const page = parseInt(params.get('page') || '1', 10);
+      const limit = parseInt(params.get('limit') || '50', 10);
+
+      if (statusAlojado && statusAlojado !== 'todos') {
+        lista = lista.filter(a => a.status === statusAlojado);
+      }
+      if (empresaId) {
+        lista = lista.filter(a => a.empresa_id == empresaId);
+      }
+      if (blocoId) {
+        const bloco = this.dbState.blocos.find(b => b.id == blocoId);
+        if (bloco) {
+          lista = lista.filter(a => a.bloco_nome === bloco.nome);
+        }
+      }
+      if (qQuery) {
+        const s = qQuery.toLowerCase();
+        lista = lista.filter(a => 
+          (a.nome_completo && a.nome_completo.toLowerCase().includes(s)) ||
+          (a.matricula && a.matricula.toLowerCase().includes(s)) ||
+          (a.funcao && a.funcao.toLowerCase().includes(s))
+        );
+      }
+
+      const total = lista.length;
+      const startIndex = (page - 1) * limit;
+      const paginated = lista.slice(startIndex, startIndex + limit);
+
+      return {
+        items: paginated,
+        total: total,
+        page: page,
+        limit: limit
+      };
+    }
+
+    // 7. Móveis
+    if (path.includes('/api/moveis')) {
+      // 7.1 Resolver Manutenção (Marcar como Reparado)
+      const matchResolver = path.match(/\/api\/moveis\/(\d+)\/resolver-manutencao/);
+      if (matchResolver && method === 'POST') {
+        const mId = Number(matchResolver[1]);
+        const hoje = new Date().toISOString().split('T')[0];
+        const dataFormatada = new Date().toLocaleDateString('pt-BR');
+        const user = params.get('usuario') || currentUserName || 'Prefeito';
+        let itemNome = 'Item';
+        let quartoNum = '';
+        let blocoNome = '';
+        let found = false;
+
+        this.dbState.quartos.forEach(q => {
+          (q.moveis || []).forEach(m => {
+            if (m.id === mId) {
+              m.estado_conservacao = 'Bom';
+              m.precisa_manutencao = 0;
+              m.data_vistoria = hoje;
+              m.observacoes = (m.observacoes && m.observacoes.trim() !== '' ? m.observacoes + ' • ' : '') + `[Reparado em ${dataFormatada} por ${user}]`;
+              itemNome = m.tipo_item || 'Item';
+              quartoNum = q.numero;
+              blocoNome = q.bloco_nome;
+              found = true;
+            }
+          });
+        });
+
+        if (found) {
+          if (!this.dbState.auditoria) this.dbState.auditoria = [];
+          this.dbState.auditoria.unshift({
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            usuario: user,
+            acao: "RESOLVER_MANUTENCAO",
+            entidade: "movel",
+            entidade_id: mId,
+            detalhes: `Manutenção resolvida no item '${itemNome}' do Quarto ${quartoNum} (${blocoNome})`
+          });
+
+          this.recomputeStats();
+          this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('moveis_vistorias', mId, {
+            movel_id: mId,
+            estado_conservacao: 'Bom',
+            precisa_manutencao: 0,
+            data_vistoria: hoje,
+            observacoes: (this.dbState.quartos.flatMap(q => q.moveis || []).find(m => m.id === mId)?.observacoes || '')
+          });
+        }
+
+        return { message: "Manutenção marcada como resolvida com sucesso" };
+      }
+
+      if (path.includes('/vistoria') && method === 'POST') {
+        const movelId = Number(body.movel_id);
+        this.dbState.quartos.forEach(q => {
+          (q.moveis || []).forEach(m => {
+            if (m.id === movelId) {
+              m.estado_conservacao = body.estado_conservacao;
+              m.precisa_manutencao = Number(body.precisa_manutencao);
+              m.data_vistoria = body.data_vistoria || new Date().toISOString().split('T')[0];
+              m.observacoes = body.observacoes || '';
+            }
+          });
+        });
+        this.recomputeStats();
+        this.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('moveis_vistorias', movelId, body);
+        return { message: "Vistoria atualizada com sucesso" };
+      }
+
+      if ((path.endsWith('/api/moveis') || path.endsWith('/api/moveis/')) && method === 'POST') {
+        const novoMId = Date.now();
+        const quartoId = Number(body.quarto_id);
+        const q = this.dbState.quartos.find(x => x.id === quartoId);
+        if (q) {
+          if (!q.moveis) q.moveis = [];
+          q.moveis.push({
+            id: novoMId,
+            quarto_id: quartoId,
+            tipo_item: body.tipo_item,
+            quantidade: Number(body.quantidade) || 1,
+            estado_conservacao: body.estado_conservacao || 'Bom',
+            precisa_manutencao: Number(body.precisa_manutencao) || 0,
+            data_vistoria: body.data_vistoria || new Date().toISOString().split('T')[0],
+            observacoes: body.observacoes || ''
+          });
+          this.recomputeStats();
+          this.saveToStorage();
+        }
+        return { id: novoMId, message: "Móvel cadastrado com sucesso" };
+      }
+
+      const matchMovelId = path.match(/\/api\/moveis\/(\d+)$/);
+      if (matchMovelId) {
+        const mId = Number(matchMovelId[1]);
+        if (method === 'PUT') {
+          this.dbState.quartos.forEach(q => {
+            (q.moveis || []).forEach(m => {
+              if (m.id === mId) {
+                m.tipo_item = body.tipo_item || m.tipo_item;
+                m.quantidade = Number(body.quantidade) || m.quantidade;
+                m.estado_conservacao = body.estado_conservacao || m.estado_conservacao;
+                m.precisa_manutencao = Number(body.precisa_manutencao) || 0;
+                m.data_vistoria = body.data_vistoria || m.data_vistoria;
+                m.observacoes = body.observacoes || m.observacoes;
+              }
+            });
+          });
+          this.recomputeStats();
+          this.saveToStorage();
+          return { message: "Móvel atualizado" };
+        }
+        if (method === 'DELETE') {
+          this.dbState.quartos.forEach(q => {
+            if (q.moveis) q.moveis = q.moveis.filter(m => m.id !== mId);
+          });
+          this.recomputeStats();
+          this.saveToStorage();
+          sincronizarAlteracaoLeveFirebase('moveis_vistorias', mId, {
+            movel_id: mId,
+            excluido: true
+          });
+          return { message: "Móvel excluído" };
+        }
+      }
+
+      // GET móveis
+      const allMoveis = [];
+      this.dbState.quartos.forEach(q => {
+        (q.moveis || []).forEach(m => {
+          allMoveis.push({
+            ...m,
+            bloco_id: q.bloco_id,
+            bloco_nome: q.bloco_nome,
+            quarto_id: q.id,
+            quarto_numero: q.numero
+          });
+        });
+      });
+
+      let filtrados = allMoveis;
+      const bId = params.get('bloco_id');
+      const tipo = params.get('tipo_item');
+      const estado = params.get('estado');
+      const precisaM = params.get('precisa_manutencao');
+      const qQuery = params.get('q');
+
+      if (bId) filtrados = filtrados.filter(m => m.bloco_id == bId);
+      if (tipo) filtrados = filtrados.filter(m => m.tipo_item === tipo);
+      if (estado) filtrados = filtrados.filter(m => m.estado_conservacao === estado);
+      if (precisaM !== null && precisaM !== '') filtrados = filtrados.filter(m => String(m.precisa_manutencao) === String(precisaM));
+      if (qQuery) {
+        const s = qQuery.toLowerCase();
+        filtrados = filtrados.filter(m => 
+          (m.tipo_item && m.tipo_item.toLowerCase().includes(s)) ||
+          (m.bloco_nome && m.bloco_nome.toLowerCase().includes(s)) ||
+          (m.quarto_numero && m.quarto_numero.toLowerCase().includes(s))
+        );
+      }
+      return filtrados;
+    }
+
+    // 8. Relatórios Resumo Geral
+    if (path.includes('/api/relatorios/resumo-geral')) {
+      this.recomputeStats();
+      const linhas = this.dbState.blocos.map(b => ({
+        alojamento: b.nome,
+        tipo: b.tipo,
+        descricao: b.tipo === 'alojamento' ? 'PRODUÇÃO' : (b.tipo === 'adm' ? 'ADMINISTRAÇÃO' : 'CONTÊINERES'),
+        total_vagas: b.total_vagas,
+        ocupadas: b.ocupadas,
+        vagas_livres: b.livres,
+        taxa_ocupacao: b.taxa_ocupacao
+      }));
+      return {
+        linhas,
+        totais: this.dbState.geral
+      };
+    }
+
+    // 9. Auditoria
+    if (path.includes('/api/auditoria')) {
+      return this.dbState.auditoria || [];
+    }
+
+    // 10. Restaurar Padrão
+    if (path.includes('/api/restaurar-padrao')) {
+      localStorage.removeItem('prefeitura_taboca_snapshot');
+      this.initialized = false;
+      this.initPromise = null;
+      await this.init();
+      return { message: "Dados restaurados para o padrão original da obra com sucesso!" };
+    }
+
+    return { message: "OK" };
+  }
+};
+window.StaticApiEngine = StaticApiEngine;
+
+// INTERCEPTOR UNIVERSAL FETCH: Impede qualquer 404 de API no GitHub Pages
+window.fetch = async function(resource, init = {}) {
+  const url = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
+  
+  // Requisições externas ou arquivos estáticos passam direto
+  if (url.includes('dados_iniciais_taboca.json') || url.includes('.json') || url.includes('api.imgbb.com') || url.includes('firestore.googleapis.com')) {
+    return originalFetch.apply(this, arguments);
+  }
+
+  // Se o modo estático estiver ativo e a URL for uma rota da API (/api/...)
+  if (staticModeActive && (url.includes('/api/') || url.startsWith('api/'))) {
+    try {
+      const responseData = await StaticApiEngine.handle(url, init);
+      return new Response(JSON.stringify(responseData), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (err) {
+      console.warn("StaticApiEngine erro na rota:", url, err);
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  return originalFetch.apply(this, arguments);
+};
+
+// ========================================================
 // CACHE INTELIGENTE DE FOTOS NO APARELHO (IndexedDB)
 // ========================================================
 class LocalPhotoCache {
@@ -249,16 +1427,33 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function formatFotoUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('/uploads/')) {
+    return '.' + trimmed;
+  }
+  return trimmed;
+}
+
 function renderAvatarHtml(nome, fotoUrl, sizeClass = 'w-9 h-9', textSize = 'text-xs', clickCall = '') {
   const cursor = clickCall ? 'cursor-pointer hover:ring-2 hover:ring-amber-500 transition' : '';
   const onclickAttr = clickCall ? `onclick="${clickCall}" title="Ver / alterar foto de ${nome.replace(/"/g, '&quot;')}"` : '';
+  const initials = getInitials(nome);
+  const formattedUrl = formatFotoUrl(fotoUrl);
 
-  if (fotoUrl && fotoUrl.trim() !== '') {
-    const cachedUrl = photoCacheManager.memCache.get(fotoUrl) || fotoUrl;
-    return `<img src="${cachedUrl}" data-cache-url="${fotoUrl}" onload="handleAvatarImgLoaded(this)" alt="${nome.replace(/"/g, '&quot;')}" ${onclickAttr} class="${sizeClass} rounded-full object-cover border border-slate-300 shadow-xs flex-shrink-0 ${cursor}">`;
+  if (formattedUrl && formattedUrl.trim() !== '') {
+    const cachedUrl = photoCacheManager.memCache.get(formattedUrl) || formattedUrl;
+    return `
+      <div class="${sizeClass} rounded-full overflow-hidden flex-shrink-0 relative ${cursor}" ${onclickAttr}>
+        <img src="${cachedUrl}" data-cache-url="${formattedUrl}" onload="handleAvatarImgLoaded(this)" onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');" alt="${nome.replace(/"/g, '&quot;')}" class="w-full h-full object-cover border border-slate-300 shadow-xs">
+        <div class="hidden w-full h-full bg-slate-800 text-amber-300 font-bold ${textSize} flex items-center justify-center border border-slate-700">
+          ${initials}
+        </div>
+      </div>
+    `;
   }
 
-  const initials = getInitials(nome);
   return `
     <div ${onclickAttr} class="${sizeClass} rounded-full bg-slate-800 text-amber-300 font-bold ${textSize} flex items-center justify-center flex-shrink-0 shadow-xs border border-slate-700 ${cursor}">
       ${initials}
@@ -279,9 +1474,227 @@ const firebaseConfig = {
   measurementId: "G-YYXMDWCM4Q"
 };
 
-let firebaseApp = null;
-let firestoreDb = null;
-let firebaseInitialized = false;
+function sincronizarVagaAlojadoEmMemoria(alojadoId) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.quartos) return;
+  const aId = Number(alojadoId);
+  const al = (window.StaticApiEngine.dbState.alojados || []).find(x => Number(x.id) === aId);
+  if (!al) return;
+
+  // 1. Limpar de QUALQUER vaga onde ele não deveria estar
+  window.StaticApiEngine.dbState.quartos.forEach(q => {
+    (q.vagas || []).forEach(v => {
+      const ehDesteAlojado = (Number(v.alojado_id) === aId || (v.alojado && Number(v.alojado.id) === aId) || (v.nome_completo && v.nome_completo.trim().toUpperCase() === al.nome_completo.trim().toUpperCase()));
+      if (ehDesteAlojado) {
+        const mesmoQuarto = String(q.numero).trim() === String(al.quarto_numero).trim();
+        const mesmaCama = Number(v.numero_cama) === Number(al.numero_cama);
+        const mesmoBloco = !al.bloco_nome || (q.bloco_nome && q.bloco_nome.trim().toLowerCase() === al.bloco_nome.trim().toLowerCase());
+        
+        if (al.status === 'desligado' || !mesmoQuarto || !mesmaCama || !mesmoBloco) {
+          v.status = 'livre';
+          v.alojado = null;
+          v.alojado_id = null;
+          v.nome_completo = null;
+          v.matricula = null;
+          v.funcao = null;
+          v.empresa_nome = null;
+          v.empresa_cor = null;
+          v.foto_url = null;
+          v.whatsapp = null;
+        } else {
+          v.nome_completo = al.nome_completo;
+          v.matricula = al.matricula || '';
+          v.funcao = al.funcao || '';
+          v.empresa_nome = al.empresa_nome || '';
+          v.empresa_cor = al.empresa_cor || '#2563eb';
+          v.foto_url = al.foto_url || null;
+          v.whatsapp = al.whatsapp || '';
+          v.alojado = { ...al };
+        }
+      }
+    });
+  });
+
+  // 2. Se estiver ativo e com quarto/cama definidos, ocupar na vaga correta de destino
+  if (al.status !== 'desligado' && al.quarto_numero && al.numero_cama) {
+    window.StaticApiEngine.dbState.quartos.forEach(q => {
+      const matchBloco = !al.bloco_nome || (q.bloco_nome && q.bloco_nome.trim().toLowerCase() === al.bloco_nome.trim().toLowerCase());
+      if (String(q.numero).trim() === String(al.quarto_numero).trim() && matchBloco) {
+        (q.vagas || []).forEach(v => {
+          if (Number(v.numero_cama) === Number(al.numero_cama)) {
+            v.status = 'ocupada';
+            v.alojado_id = aId;
+            v.nome_completo = al.nome_completo;
+            v.matricula = al.matricula || '';
+            v.funcao = al.funcao || '';
+            v.empresa_nome = al.empresa_nome || '';
+            v.empresa_cor = al.empresa_cor || '#2563eb';
+            v.foto_url = al.foto_url || null;
+            v.whatsapp = al.whatsapp || '';
+            v.alojado = { ...al };
+            al.vaga_id = v.id;
+          }
+        });
+      }
+    });
+  }
+}
+
+// Sincronizar alteração individual de móvel (reparo, manutenção, vistoria ou exclusão) na memória local
+function sincronizarMovelEmMemoria(movelId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.quartos) return false;
+  if (!movelId || !dados) return false;
+  const idNum = Number(movelId);
+  let alterou = false;
+
+  // Se o item foi excluído
+  if (dados.excluido) {
+    (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
+      if (q.moveis && q.moveis.length > 0) {
+        const antes = q.moveis.length;
+        q.moveis = q.moveis.filter(m => Number(m.id) !== idNum);
+        if (q.moveis.length !== antes) alterou = true;
+      }
+    });
+    return alterou;
+  }
+
+  // Atualizar propriedades do móvel (como estado_conservacao e precisa_manutencao)
+  (window.StaticApiEngine.dbState.quartos || []).forEach(q => {
+    (q.moveis || []).forEach(m => {
+      if (Number(m.id) === idNum) {
+        if (dados.estado_conservacao !== undefined && m.estado_conservacao !== dados.estado_conservacao) {
+          m.estado_conservacao = dados.estado_conservacao;
+          alterou = true;
+        }
+        if (dados.precisa_manutencao !== undefined && Number(m.precisa_manutencao) !== Number(dados.precisa_manutencao)) {
+          m.precisa_manutencao = Number(dados.precisa_manutencao);
+          alterou = true;
+        }
+        if (dados.data_vistoria !== undefined && m.data_vistoria !== dados.data_vistoria) {
+          m.data_vistoria = dados.data_vistoria;
+          alterou = true;
+        }
+        if (dados.observacoes !== undefined && m.observacoes !== dados.observacoes) {
+          m.observacoes = dados.observacoes;
+          alterou = true;
+        }
+        if (dados.quantidade !== undefined && Number(m.quantidade) !== Number(dados.quantidade)) {
+          m.quantidade = Number(dados.quantidade);
+          alterou = true;
+        }
+      }
+    });
+  });
+
+  return alterou;
+}
+
+// Sincronizar alteração de bloco em memória
+function sincronizarBlocoEmMemoria(blocoId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.blocos) return false;
+  if (!blocoId || !dados) return false;
+  const bId = Number(blocoId);
+  let alterou = false;
+
+  if (dados.excluido) {
+    const antes = window.StaticApiEngine.dbState.blocos.length;
+    window.StaticApiEngine.dbState.blocos = window.StaticApiEngine.dbState.blocos.filter(b => Number(b.id) !== bId);
+    return window.StaticApiEngine.dbState.blocos.length !== antes;
+  }
+
+  const b = window.StaticApiEngine.dbState.blocos.find(x => Number(x.id) === bId);
+  if (b) {
+    if (dados.nome && b.nome !== dados.nome) { b.nome = dados.nome; alterou = true; }
+    if (dados.tipo && b.tipo !== dados.tipo) { b.tipo = dados.tipo; alterou = true; }
+    if (dados.ordem !== undefined && Number(b.ordem) !== Number(dados.ordem)) { b.ordem = Number(dados.ordem); alterou = true; }
+  } else if (dados.nome) {
+    window.StaticApiEngine.dbState.blocos.push({
+      id: bId,
+      nome: dados.nome,
+      tipo: dados.tipo || 'alojamento',
+      ordem: Number(dados.ordem) || 0,
+      total_quartos: 0,
+      total_vagas: 0,
+      ocupadas: 0,
+      livres: 0,
+      taxa_ocupacao: 0,
+      itens_alerta: 0
+    });
+    alterou = true;
+  }
+  return alterou;
+}
+
+// Sincronizar alteração de empresa em memória
+function sincronizarEmpresaEmMemoria(empId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.empresas) return false;
+  if (!empId || !dados) return false;
+  const eId = Number(empId);
+  let alterou = false;
+
+  if (dados.excluido) {
+    const antes = window.StaticApiEngine.dbState.empresas.length;
+    window.StaticApiEngine.dbState.empresas = window.StaticApiEngine.dbState.empresas.filter(e => Number(e.id) !== eId);
+    return window.StaticApiEngine.dbState.empresas.length !== antes;
+  }
+
+  const e = window.StaticApiEngine.dbState.empresas.find(x => Number(x.id) === eId);
+  if (e) {
+    if (dados.nome && e.nome !== dados.nome) { e.nome = dados.nome; alterou = true; }
+    if (dados.cor && e.cor !== dados.cor) { e.cor = dados.cor; alterou = true; }
+  } else if (dados.nome) {
+    window.StaticApiEngine.dbState.empresas.push({
+      id: eId,
+      nome: dados.nome,
+      cor: dados.cor || '#3b82f6',
+      total_alojados: 0
+    });
+    alterou = true;
+  }
+  return alterou;
+}
+
+// Sincronizar alteração de quarto em memória
+function sincronizarQuartoEmMemoria(quartoId, dados) {
+  if (!window.StaticApiEngine || !window.StaticApiEngine.dbState || !window.StaticApiEngine.dbState.quartos) return false;
+  if (!quartoId || !dados) return false;
+  const qId = Number(quartoId);
+  let alterou = false;
+
+  if (dados.excluido) {
+    const antes = window.StaticApiEngine.dbState.quartos.length;
+    window.StaticApiEngine.dbState.quartos = window.StaticApiEngine.dbState.quartos.filter(q => Number(q.id) !== qId);
+    return window.StaticApiEngine.dbState.quartos.length !== antes;
+  }
+
+  const q = window.StaticApiEngine.dbState.quartos.find(x => Number(x.id) === qId);
+  if (q) {
+    if (dados.numero && q.numero !== dados.numero) { q.numero = dados.numero; alterou = true; }
+    if (dados.capacidade && Number(q.capacidade) !== Number(dados.capacidade)) { q.capacidade = Number(dados.capacidade); alterou = true; }
+    if (dados.observacoes !== undefined && q.observacoes !== dados.observacoes) { q.observacoes = dados.observacoes; alterou = true; }
+    if (dados.bloco_nome && q.bloco_nome !== dados.bloco_nome) { q.bloco_nome = dados.bloco_nome; alterou = true; }
+    if (dados.bloco_id && Number(q.bloco_id) !== Number(dados.bloco_id)) { q.bloco_id = Number(dados.bloco_id); alterou = true; }
+  } else if (dados.numero) {
+    const cap = Number(dados.capacidade) || 4;
+    const vagas = [];
+    for (let i = 1; i <= cap; i++) {
+      vagas.push({ id: qId + i, numero_cama: i, status: 'livre', alojado: null });
+    }
+    window.StaticApiEngine.dbState.quartos.push({
+      id: qId,
+      bloco_id: Number(dados.bloco_id) || 1,
+      bloco_nome: dados.bloco_nome || 'Bloco',
+      bloco_tipo: dados.bloco_tipo || 'alojamento',
+      numero: dados.numero,
+      capacidade: cap,
+      observacoes: dados.observacoes || '',
+      vagas: dados.vagas || vagas,
+      moveis: dados.moveis || []
+    });
+    alterou = true;
+  }
+  return alterou;
+}
 
 function initFirebase() {
   try {
@@ -311,6 +1724,7 @@ function initFirebase() {
       firebaseInitialized = true;
       atualizarBadgeFirebaseUI(true, "Firebase Conectado");
       console.log("Firebase Firestore inicializado com sucesso:", firebaseConfig.projectId);
+      iniciarListenerTempoRealFirebase();
     } else {
       console.warn("SDK do Firebase não detectado.");
       atualizarBadgeFirebaseUI(false, "Offline");
@@ -318,6 +1732,381 @@ function initFirebase() {
   } catch (err) {
     console.error("Erro ao inicializar Firebase:", err);
     atualizarBadgeFirebaseUI(false, "Erro Firebase");
+  }
+}
+
+let listenerTempoRealAtivo = false;
+
+// Sincronização em tempo real entre Celular e PC via Firebase Firestore
+function iniciarListenerTempoRealFirebase() {
+  if (!firebaseInitialized || !firestoreDb || listenerTempoRealAtivo) return;
+  listenerTempoRealAtivo = true;
+
+  console.log("🔥 [FIREBASE] Iniciando listener em tempo real entre celular e PC...");
+
+  // Ouvir alterações em tempo real na coleção de alojados (fotos, check-in, realocação, status)
+  firestoreDb.collection('alojados').onSnapshot(async (snapshot) => {
+    try {
+      if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+        await window.StaticApiEngine.init();
+      }
+
+      let alteracoes = 0;
+      snapshot.docChanges().forEach((change) => {
+        const data = change.doc.data();
+        if (!data) return;
+        const rawId = data.id || change.doc.id;
+        if (!rawId) return;
+        
+        const aId = Number(rawId);
+        data.id = aId;
+
+        // Se foi removido na nuvem ou marcado como excluído
+        if (change.type === 'removed' || data.excluido) {
+          const antes = (window.StaticApiEngine.dbState.alojados || []).length;
+          window.StaticApiEngine.dbState.alojados = (window.StaticApiEngine.dbState.alojados || []).filter(x => Number(x.id) !== aId);
+          window.StaticApiEngine.dbState.quartos.forEach(q => {
+            (q.vagas || []).forEach(v => {
+              if (Number(v.alojado_id) === aId || (v.alojado && Number(v.alojado.id) === aId)) {
+                v.status = 'livre';
+                v.alojado = null;
+                v.alojado_id = null;
+                v.nome_completo = null;
+                v.matricula = null;
+                v.funcao = null;
+                v.empresa_nome = null;
+                v.empresa_cor = null;
+                v.foto_url = null;
+                v.whatsapp = null;
+              }
+            });
+          });
+          if (window.StaticApiEngine.dbState.alojados.length !== antes) {
+            alteracoes++;
+          }
+          return;
+        }
+
+        const al = (window.StaticApiEngine.dbState.alojados || []).find(x => Number(x.id) === aId);
+        if (al) {
+          let mudou = false;
+          ['foto_url', 'nome_completo', 'funcao', 'status', 'vaga_id', 'quarto_numero', 'bloco_nome', 'numero_cama', 'whatsapp', 'matricula', 'empresa_id', 'empresa_nome', 'empresa_cor', 'data_entrada', 'data_saida', 'observacoes'].forEach(k => {
+            if (data[k] !== undefined && data[k] !== al[k]) {
+              al[k] = data[k];
+              mudou = true;
+            }
+          });
+
+          if (mudou) {
+            alteracoes++;
+            sincronizarVagaAlojadoEmMemoria(aId);
+          }
+        } else if (change.type === 'added' && data.nome_completo) {
+          window.StaticApiEngine.dbState.alojados.unshift(data);
+          alteracoes++;
+          sincronizarVagaAlojadoEmMemoria(aId);
+        }
+      });
+
+      if (alteracoes > 0) {
+        console.log(`⚡ [FIREBASE] ${alteracoes} colaborador(es) sincronizado(s) em tempo real da nuvem!`);
+        window.StaticApiEngine.recomputeStats();
+        window.StaticApiEngine.saveToStorage();
+        if (typeof carregarDashboard === 'function') carregarDashboard();
+        if (typeof carregarAlojados === 'function') carregarAlojados();
+        if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+        if (typeof carregarBlocosLista === 'function') carregarBlocosLista();
+        if (typeof carregarVagasLivresLista === 'function') carregarVagasLivresLista();
+        showToast(`⚡ Nuvem: ${alteracoes} alteração(ões) de colaboradores sincronizada(s)!`, 'info');
+      }
+    } catch (err) {
+      console.warn("Aviso ao processar atualização em tempo real:", err);
+    }
+  }, (err) => {
+    if (err && (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission')))) {
+      console.warn("⚠️ Firebase Firestore: Permissões de leitura negadas pelas Regras.");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+    }
+  });
+
+  // Ouvinte em tempo real para Blocos (criar, editar, excluir)
+  try {
+    firestoreDb.collection('blocos').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesBlocos = 0;
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          if (data) {
+            const bId = Number(change.doc.id) || Number(data.id);
+            if (change.type === 'removed') data.excluido = true;
+            if (sincronizarBlocoEmMemoria(bId, data)) alteracoesBlocos++;
+          }
+        });
+        if (alteracoesBlocos > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesBlocos} bloco(s) sincronizados em tempo real!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarBlocosLista === 'function') carregarBlocosLista();
+          if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+          if (typeof carregarGestaoCadastros === 'function' && activeTab === 'cadastros') carregarGestaoCadastros();
+        }
+      } catch (errB) { console.warn("Aviso ao sincronizar blocos:", errB); }
+    }, (err) => { console.warn("Aviso listener blocos:", err); });
+  } catch (errBl) { console.warn("Aviso snapshot blocos:", errBl); }
+
+  // Ouvinte em tempo real para Empresas (criar, editar, excluir)
+  try {
+    firestoreDb.collection('empresas').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesEmp = 0;
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          if (data) {
+            const eId = Number(change.doc.id) || Number(data.id);
+            if (change.type === 'removed') data.excluido = true;
+            if (sincronizarEmpresaEmMemoria(eId, data)) alteracoesEmp++;
+          }
+        });
+        if (alteracoesEmp > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesEmp} empresa(s) sincronizadas em tempo real!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarEmpresasLista === 'function') carregarEmpresasLista();
+          if (typeof carregarGestaoCadastros === 'function' && activeTab === 'cadastros') carregarGestaoCadastros();
+        }
+      } catch (errE) { console.warn("Aviso ao sincronizar empresas:", errE); }
+    }, (err) => { console.warn("Aviso listener empresas:", err); });
+  } catch (errEm) { console.warn("Aviso snapshot empresas:", errEm); }
+
+  // Ouvinte em tempo real para Quartos (criar, editar, excluir)
+  try {
+    firestoreDb.collection('quartos').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesQuartos = 0;
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          if (data) {
+            const qId = Number(change.doc.id) || Number(data.id);
+            if (change.type === 'removed') data.excluido = true;
+            if (sincronizarQuartoEmMemoria(qId, data)) alteracoesQuartos++;
+          }
+        });
+        if (alteracoesQuartos > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesQuartos} quarto(s) sincronizados em tempo real!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+          if (typeof carregarVagasLivresLista === 'function') carregarVagasLivresLista();
+          if (typeof carregarGestaoCadastros === 'function' && activeTab === 'cadastros') carregarGestaoCadastros();
+        }
+      } catch (errQ) { console.warn("Aviso ao sincronizar quartos:", errQ); }
+    }, (err) => { console.warn("Aviso listener quartos:", err); });
+  } catch (errQu) { console.warn("Aviso snapshot quartos:", errQu); }
+
+  // Ouvinte em tempo real para Identidade Visual e Logomarca
+  try {
+    firestoreDb.collection('configuracoes').doc('identidade_visual').onSnapshot((doc) => {
+      if (doc && doc.exists) {
+        const data = doc.data();
+        if (data) {
+          if (data.logo_url) localStorage.setItem('appCustomLogo', data.logo_url);
+          if (data.empresa_nome) localStorage.setItem('appCustomEmpresaNome', data.empresa_nome);
+          if (data.obra_nome) localStorage.setItem('appCustomObraNome', data.obra_nome);
+          aplicarIdentidadeVisual(data);
+          if (typeof activeTab !== 'undefined' && activeTab === 'configuracoes') {
+            carregarConfigIdentidadeVisual();
+          }
+        }
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar identidade visual no Firestore:", err);
+    });
+  } catch (errSnap) {
+    console.warn("Aviso ao iniciar snapshot da identidade visual:", errSnap);
+  }
+
+  // Ouvinte em tempo real para Móveis, Vistorias e Manutenções Resolvidas/Reparadas
+  try {
+    firestoreDb.collection('moveis_vistorias').onSnapshot(async (snapshot) => {
+      try {
+        if (!window.StaticApiEngine || !window.StaticApiEngine.initialized) {
+          await window.StaticApiEngine.init();
+        }
+        let alteracoesMoveis = 0;
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data) {
+            const mId = Number(doc.id) || Number(data.id) || Number(data.movel_id);
+            if (sincronizarMovelEmMemoria(mId, data)) {
+              alteracoesMoveis++;
+            }
+          }
+        });
+
+        if (alteracoesMoveis > 0) {
+          console.log(`⚡ [FIREBASE] ${alteracoesMoveis} vistoria(s)/manutenção(ões) atualizada(s) em tempo real da nuvem!`);
+          window.StaticApiEngine.recomputeStats();
+          window.StaticApiEngine.saveToStorage();
+          if (typeof carregarDashboard === 'function') carregarDashboard();
+          if (typeof carregarMoveis === 'function') carregarMoveis();
+          if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
+          if (quartoSelecionadoId && typeof abrirModalQuartoDetalhes === 'function') {
+            const modalEl = document.getElementById('modalQuarto');
+            if (modalEl && !modalEl.classList.contains('hidden')) {
+              abrirModalQuartoDetalhes(quartoSelecionadoId);
+            }
+          }
+          showToast(`⚡ Nuvem: Manutenção(ões) atualizada(s) com sucesso!`, 'info');
+        }
+      } catch (errM) {
+        console.warn("Aviso ao processar atualização de vistorias/móveis:", errM);
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar moveis_vistorias no Firestore:", err);
+    });
+  } catch (errMov) {
+    console.warn("Aviso ao iniciar snapshot de móveis:", errMov);
+  }
+}
+
+// Botão Sincronizar Nuvem no Header (Força verificação e atualização mútua)
+async function sincronizarComNuvemHeader() {
+  const icon = document.getElementById('iconSyncNuvemHeader');
+  if (icon) icon.classList.add('fa-spin');
+  showToast('🔄 Verificando e sincronizando dados da nuvem...', 'info');
+
+  try {
+    if (!firebaseInitialized || !firestoreDb) {
+      initFirebase();
+      if (!firebaseInitialized || !firestoreDb) {
+        showToast('⚠️ Firebase não conectado. Verifique sua conexão com a internet.', 'warning');
+        return;
+      }
+    }
+
+    await window.StaticApiEngine.init();
+
+    let atualizados = 0;
+
+    // 1. Puxar todos os registros de alojados que já estão na nuvem
+    const snap = await firestoreDb.collection('alojados').get();
+    if (!snap.empty) {
+      snap.forEach(doc => {
+        const data = doc.data();
+        if (data && data.id) {
+          const aId = Number(data.id);
+          if (data.excluido) {
+            window.StaticApiEngine.dbState.alojados = (window.StaticApiEngine.dbState.alojados || []).filter(x => Number(x.id) !== aId);
+            atualizados++;
+            return;
+          }
+          const al = (window.StaticApiEngine.dbState.alojados || []).find(x => x.id === aId);
+          if (al) {
+            let mudou = false;
+            ['foto_url', 'nome_completo', 'funcao', 'status', 'quarto_numero', 'bloco_nome', 'numero_cama', 'whatsapp', 'matricula', 'empresa_id', 'empresa_nome', 'empresa_cor', 'data_entrada', 'data_saida', 'observacoes'].forEach(k => {
+              if (data[k] !== undefined && data[k] !== null && data[k] !== al[k]) {
+                al[k] = data[k];
+                mudou = true;
+              }
+            });
+            if (mudou) {
+              atualizados++;
+              sincronizarVagaAlojadoEmMemoria(aId);
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Puxar todas as vistorias/reparos de móveis da nuvem
+    try {
+      const snapMoveis = await firestoreDb.collection('moveis_vistorias').get();
+      if (!snapMoveis.empty) {
+        snapMoveis.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const mId = Number(doc.id) || Number(data.id) || Number(data.movel_id);
+            if (sincronizarMovelEmMemoria(mId, data)) {
+              atualizados++;
+            }
+          }
+        });
+      }
+    } catch (eMoveis) {
+      console.warn("Aviso ao puxar moveis_vistorias na sincronização:", eMoveis);
+    }
+
+    // 3. Puxar blocos da nuvem
+    try {
+      const snapBlocos = await firestoreDb.collection('blocos').get();
+      if (!snapBlocos.empty) {
+        snapBlocos.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const bId = Number(doc.id) || Number(data.id);
+            if (sincronizarBlocoEmMemoria(bId, data)) atualizados++;
+          }
+        });
+      }
+    } catch (eB) { console.warn("Aviso ao puxar blocos:", eB); }
+
+    // 4. Puxar empresas da nuvem
+    try {
+      const snapEmp = await firestoreDb.collection('empresas').get();
+      if (!snapEmp.empty) {
+        snapEmp.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const eId = Number(doc.id) || Number(data.id);
+            if (sincronizarEmpresaEmMemoria(eId, data)) atualizados++;
+          }
+        });
+      }
+    } catch (eEmp) { console.warn("Aviso ao puxar empresas:", eEmp); }
+
+    // 5. Puxar quartos da nuvem
+    try {
+      const snapQ = await firestoreDb.collection('quartos').get();
+      if (!snapQ.empty) {
+        snapQ.forEach(doc => {
+          const data = doc.data();
+          if (data) {
+            const qId = Number(doc.id) || Number(data.id);
+            if (sincronizarQuartoEmMemoria(qId, data)) atualizados++;
+          }
+        });
+      }
+    } catch (eQ) { console.warn("Aviso ao puxar quartos:", eQ); }
+
+    if (atualizados > 0) {
+      window.StaticApiEngine.recomputeStats();
+      window.StaticApiEngine.saveToStorage();
+      refreshAllData();
+      showToast(`✅ ${atualizados} alteração(ões) sincronizada(s) com sucesso da nuvem!`, 'success');
+    } else {
+      showToast('✅ Seus dados já estão 100% sincronizados com a nuvem!', 'success');
+    }
+  } catch (err) {
+    console.error("Erro ao sincronizar com nuvem:", err);
+    if (err && (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission')))) {
+      showToast("⚠️ Firebase: Permissão negada no Firestore. Ajuste as Regras no Console do Firebase.", "warning");
+    } else {
+      showToast(`Erro na sincronização: ${err.message}`, 'error');
+    }
+  } finally {
+    if (icon) icon.classList.remove('fa-spin');
   }
 }
 
@@ -362,7 +2151,7 @@ async function gerarSnapshotConsolidadoFirebase(manual = false) {
         livres: b.livres,
         taxa_ocupacao: b.taxa_ocupacao
       })),
-      alojados: resAlojados.map(a => ({
+      alojados: (Array.isArray(resAlojados) ? resAlojados : (resAlojados?.items || [])).map(a => ({
         id: a.id,
         mat: a.matricula || '',
         nome: a.nome_completo || '',
@@ -390,8 +2179,23 @@ async function gerarSnapshotConsolidadoFirebase(manual = false) {
       showToast('⚡ Snapshot único gerado com sucesso! Apenas 1 leitura necessária no celular (economia de 99%).', 'success');
     }
   } catch (err) {
-    console.error("Erro ao gerar snapshot:", err);
-    if (manual) showToast(`Erro ao gerar snapshot: ${err.message}`, 'error');
+    const isPermissionError = err && (err.code === 'permission-denied' || 
+      (err.message && (err.message.toLowerCase().includes('permission') || err.message.toLowerCase().includes('insufficient'))));
+    if (isPermissionError) {
+      console.warn("⚠️ Firebase Firestore: Permissão negada para gerar snapshot no Console.");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+      const alertEl = document.getElementById('firebaseRulesAlert');
+      if (alertEl) alertEl.classList.remove('hidden');
+    } else {
+      console.error("Erro ao gerar snapshot:", err);
+    }
+    if (manual) {
+      if (isPermissionError) {
+        showToast("⚠️ Firebase: Permissões insuficientes no Firestore. Acesse o Console e configure as Regras (veja na aba Configurações).", "warning");
+      } else {
+        showToast(`Erro ao gerar snapshot: ${err.message}`, 'error');
+      }
+    }
   } finally {
     if (btn && manual) {
       btn.disabled = false;
@@ -417,7 +2221,16 @@ async function carregarDadosDoSnapshotFirebase() {
     const data = doc.data();
     showToast(`✅ Sucesso! 1 leitura consumida. Carregados ${data.alojados?.length || 0} operários e ${data.blocos?.length || 0} blocos da nuvem!`, 'success');
   } catch (err) {
-    showToast(`Erro ao ler snapshot: ${err.message}`, 'error');
+    const isPermissionError = err && (err.code === 'permission-denied' || 
+      (err.message && (err.message.toLowerCase().includes('permission') || err.message.toLowerCase().includes('insufficient'))));
+    if (isPermissionError) {
+      showToast("⚠️ Firebase: Leitura negada pelas Regras do Firestore. Configure as regras no Console.", "warning");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+      const alertEl = document.getElementById('firebaseRulesAlert');
+      if (alertEl) alertEl.classList.remove('hidden');
+    } else {
+      showToast(`Erro ao ler snapshot: ${err.message}`, 'error');
+    }
   }
 }
 
@@ -535,8 +2348,25 @@ async function sincronizarTudoComFirebase(manual = true) {
       showToast(`🔥 Sucesso! ${resAlojados.length} colaboradores e ${resBlocos.length} blocos sincronizados no Firebase!`, 'success');
     }
   } catch (err) {
-    console.error("Erro na sincronização Firebase:", err);
-    if (manual) showToast(`Erro ao sincronizar com Firebase: ${err.message}`, 'error');
+    const isPermissionError = err && (err.code === 'permission-denied' || 
+      (err.message && (err.message.toLowerCase().includes('permission') || err.message.toLowerCase().includes('insufficient'))));
+    
+    if (isPermissionError) {
+      console.warn("⚠️ Firebase Firestore: Permissões insuficientes no Firestore. As regras no Console do Firebase precisam ser configuradas.");
+      atualizarBadgeFirebaseUI(false, "Permissões Pendentes");
+      const alertEl = document.getElementById('firebaseRulesAlert');
+      if (alertEl) alertEl.classList.remove('hidden');
+    } else {
+      console.error("Erro na sincronização Firebase:", err);
+    }
+    
+    if (manual) {
+      if (isPermissionError) {
+        showToast("⚠️ Firebase: Permissão negada no Firestore. Ajuste as Regras no Console do Firebase (veja instruções na aba Configurações).", "warning");
+      } else {
+        showToast(`Erro ao sincronizar com Firebase: ${err.message}`, "error");
+      }
+    }
   } finally {
     if (btnSync) {
       btnSync.disabled = false;
@@ -583,6 +2413,301 @@ function alterarTamanhoFonte(key) {
 function inicializarTamanhoFonte() {
   const salvo = localStorage.getItem('canteiro_font_size') || 'md';
   alterarTamanhoFonte(salvo);
+}
+
+// ========================================================
+// 0.15 IDENTIDADE VISUAL E GESTÃO DA EMPRESA / LOGO
+// ========================================================
+const DEFAULT_APP_LOGO = 'logo_gel_cropped.png';
+const DEFAULT_EMPRESA_NOME = 'GEL • Goetze Lobato Engenharia S.A.';
+const DEFAULT_EMPRESA_CURTO = 'Goetze Lobato Eng. S.A.';
+const DEFAULT_OBRA_NOME = 'Taboca 2';
+
+let windowTempCustomLogoFile = null;
+
+function aplicarIdentidadeVisual(config = null) {
+  const customLogo = (config && config.logo_url) || localStorage.getItem('appCustomLogo') || DEFAULT_APP_LOGO;
+  const customEmpresa = (config && config.empresa_nome) || localStorage.getItem('appCustomEmpresaNome') || DEFAULT_EMPRESA_NOME;
+  const customObra = (config && config.obra_nome) || localStorage.getItem('appCustomObraNome') || DEFAULT_OBRA_NOME;
+
+  // 1. Atualizar todas as instâncias da Logomarca
+  document.querySelectorAll('.app-logo-img').forEach(img => {
+    img.src = customLogo;
+  });
+
+  // 2. Atualizar o preview na aba de configurações se existir
+  const previewImg = document.getElementById('configLogoPreview');
+  if (previewImg && !windowTempCustomLogoFile) {
+    previewImg.src = customLogo;
+  }
+
+  // 3. Atualizar o nome da empresa
+  document.querySelectorAll('.app-empresa-nome').forEach(el => {
+    el.textContent = customEmpresa;
+  });
+
+  // 4. Atualizar versão curta do nome da empresa no footer da sidebar
+  let curto = customEmpresa;
+  if (curto.length > 26) {
+    const parts = curto.split(/[•\-|]/);
+    curto = (parts.length > 1 ? parts[1] : parts[0]).trim();
+    if (curto.length > 26) curto = curto.substring(0, 24) + '...';
+  }
+  document.querySelectorAll('.app-empresa-curto').forEach(el => {
+    el.textContent = curto;
+  });
+
+  // 5. Atualizar tag/nome da obra
+  document.querySelectorAll('.app-obra-tag').forEach(el => {
+    el.textContent = customObra;
+  });
+
+  // 6. Atualizar título da aba do navegador
+  try {
+    const empresaPrefix = customEmpresa.split('•')[0].trim();
+    document.title = `Prefeitura de Canteiro • ${customObra} (${empresaPrefix})`;
+  } catch (e) {}
+}
+
+function carregarConfigIdentidadeVisual() {
+  const customLogo = localStorage.getItem('appCustomLogo') || DEFAULT_APP_LOGO;
+  const customEmpresa = localStorage.getItem('appCustomEmpresaNome') || DEFAULT_EMPRESA_NOME;
+  const customObra = localStorage.getItem('appCustomObraNome') || DEFAULT_OBRA_NOME;
+
+  const inputEmpresa = document.getElementById('configEmpresaNome');
+  if (inputEmpresa) inputEmpresa.value = customEmpresa;
+
+  const inputObra = document.getElementById('configObraNome');
+  if (inputObra) inputObra.value = customObra;
+
+  const preview = document.getElementById('configLogoPreview');
+  if (preview && !windowTempCustomLogoFile) preview.src = customLogo;
+
+  const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+  if (statusMsg) statusMsg.textContent = 'Pronto para salvar alterações';
+}
+
+function previewLogoConfig(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WebP).', 'warning');
+    return;
+  }
+
+  windowTempCustomLogoFile = file;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const preview = document.getElementById('configLogoPreview');
+    if (preview) {
+      preview.src = e.target.result;
+    }
+    const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+    if (statusMsg) {
+      statusMsg.innerHTML = '<span class="text-amber-600 font-semibold"><i class="fa-solid fa-circle-exclamation"></i> Nova logo selecionada. Clique em "Salvar Identidade Visual" para confirmar.</span>';
+    }
+    showToast('Prévia carregada! Clique em "Salvar Identidade Visual" para gravar.', 'info');
+  };
+  reader.readAsDataURL(file);
+}
+
+function redimensionarImagemLogo(file, maxDimension = 500) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/png');
+        canvas.toBlob((blob) => {
+          resolve({ blob, dataUrl });
+        }, 'image/png');
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function salvarConfigIdentidadeVisual(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  if (!checkPrefeitoAccess()) return;
+
+  const btn = document.getElementById('btnSalvarIdentidadeVisual');
+  const originalBtnHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Salvando na nuvem...';
+  }
+
+  const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+  if (statusMsg) statusMsg.textContent = 'Processando identidade visual...';
+
+  try {
+    let finalLogoUrl = localStorage.getItem('appCustomLogo') || DEFAULT_APP_LOGO;
+
+    // 1. Se o usuário selecionou uma nova foto de logo
+    if (windowTempCustomLogoFile) {
+      if (statusMsg) statusMsg.textContent = 'Otimizando imagem da logomarca...';
+      const { blob, dataUrl } = await redimensionarImagemLogo(windowTempCustomLogoFile, 500);
+
+      // Tenta upload para ImgBB para URL global e leve
+      let uploadSucesso = false;
+      try {
+        if (statusMsg) statusMsg.textContent = 'Enviando logo para servidor em nuvem...';
+        const formData = new FormData();
+        formData.append('image', blob, `logo_custom_${Date.now()}.png`);
+        const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: formData
+        });
+        const imgbbData = await resImgbb.json();
+        if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+          finalLogoUrl = imgbbData.data.display_url;
+          uploadSucesso = true;
+          console.log("Logo customizada salva no ImgBB com sucesso:", finalLogoUrl);
+        }
+      } catch (errUpload) {
+        console.warn("Falha no upload do ImgBB para a logo (usando fallback dataURL):", errUpload);
+      }
+
+      // Se o upload falhou ou sem internet, usa base64 comprimido
+      if (!uploadSucesso) {
+        finalLogoUrl = dataUrl;
+      }
+
+      windowTempCustomLogoFile = null;
+    }
+
+    // 2. Obter textos digitados
+    const inputEmpresa = document.getElementById('configEmpresaNome');
+    const inputObra = document.getElementById('configObraNome');
+
+    const empresaNome = (inputEmpresa && inputEmpresa.value.trim()) ? inputEmpresa.value.trim() : DEFAULT_EMPRESA_NOME;
+    const obraNome = (inputObra && inputObra.value.trim()) ? inputObra.value.trim() : DEFAULT_OBRA_NOME;
+
+    // 3. Persistir localmente
+    localStorage.setItem('appCustomLogo', finalLogoUrl);
+    localStorage.setItem('appCustomEmpresaNome', empresaNome);
+    localStorage.setItem('appCustomObraNome', obraNome);
+
+    // 4. Aplicar imediatamente na UI de todas as abas e componentes
+    aplicarIdentidadeVisual({
+      logo_url: finalLogoUrl,
+      empresa_nome: empresaNome,
+      obra_nome: obraNome
+    });
+
+    // 5. Sincronizar com Firebase Firestore (para todos os aparelhos receberem em tempo real)
+    if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+      if (statusMsg) statusMsg.textContent = 'Sincronizando com Firestore...';
+      try {
+        await firestoreDb.collection('configuracoes').doc('identidade_visual').set({
+          logo_url: finalLogoUrl,
+          empresa_nome: empresaNome,
+          obra_nome: obraNome,
+          atualizado_em: firebase.firestore.FieldValue.serverTimestamp(),
+          atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+        }, { merge: true });
+        console.log("Identidade visual salva e sincronizada com sucesso no Firestore!");
+      } catch (errFs) {
+        console.warn("Aviso ao salvar identidade visual no Firestore:", errFs);
+      }
+    }
+
+    if (statusMsg) {
+      statusMsg.innerHTML = '<span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Alterações salvas e sincronizadas!</span>';
+    }
+
+    showToast('Identidade visual atualizada com sucesso em todo o sistema!', 'success');
+  } catch (error) {
+    console.error("Erro ao salvar identidade visual:", error);
+    showToast('Erro ao salvar identidade visual: ' + error.message, 'error');
+    if (statusMsg) {
+      statusMsg.innerHTML = '<span class="text-rose-600 font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> Erro ao salvar alterações.</span>';
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnHtml;
+    }
+  }
+}
+
+async function restaurarLogoPadrao() {
+  if (!checkPrefeitoAccess()) return;
+
+  if (!confirm("Deseja realmente restaurar a logomarca e nomes oficiais padrão da GEL?")) {
+    return;
+  }
+
+  windowTempCustomLogoFile = null;
+  const fileInput = document.getElementById('configLogoFileInput');
+  if (fileInput) fileInput.value = '';
+
+  localStorage.removeItem('appCustomLogo');
+  localStorage.removeItem('appCustomEmpresaNome');
+  localStorage.removeItem('appCustomObraNome');
+
+  const inputEmpresa = document.getElementById('configEmpresaNome');
+  if (inputEmpresa) inputEmpresa.value = DEFAULT_EMPRESA_NOME;
+
+  const inputObra = document.getElementById('configObraNome');
+  if (inputObra) inputObra.value = DEFAULT_OBRA_NOME;
+
+  const preview = document.getElementById('configLogoPreview');
+  if (preview) preview.src = DEFAULT_APP_LOGO;
+
+  aplicarIdentidadeVisual({
+    logo_url: DEFAULT_APP_LOGO,
+    empresa_nome: DEFAULT_EMPRESA_NOME,
+    obra_nome: DEFAULT_OBRA_NOME
+  });
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      await firestoreDb.collection('configuracoes').doc('identidade_visual').set({
+        logo_url: DEFAULT_APP_LOGO,
+        empresa_nome: DEFAULT_EMPRESA_NOME,
+        obra_nome: DEFAULT_OBRA_NOME,
+        atualizado_em: firebase.firestore.FieldValue.serverTimestamp(),
+        atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+      }, { merge: true });
+    } catch (e) {
+      console.warn("Erro ao restaurar no Firestore:", e);
+    }
+  }
+
+  const statusMsg = document.getElementById('identidadeVisualStatusMsg');
+  if (statusMsg) {
+    statusMsg.innerHTML = '<span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Padrões da GEL restaurados com sucesso!</span>';
+  }
+
+  showToast('Padrão da GEL restaurado com sucesso!', 'info');
 }
 
 // ========================================================
@@ -649,12 +2774,14 @@ function cancelarCropFoto() {
   if (input) input.value = '';
 }
 
+const IMGBB_API_KEY = '655783f08b2e45a3cd6b1b7a7e6ce91b';
+
 async function confirmarCropFoto() {
   if (!currentCropper) return;
   const btn = document.getElementById('btnConfirmarCrop');
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Salvando no PC...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Enviando para nuvem...';
   }
 
   try {
@@ -664,6 +2791,8 @@ async function confirmarCropFoto() {
       imageSmoothingEnabled: true,
       imageSmoothingQuality: 'high'
     });
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
     canvas.toBlob(async (blob) => {
       if (!blob) {
@@ -675,24 +2804,68 @@ async function confirmarCropFoto() {
         return;
       }
 
-      const file = new File([blob], 'foto_alojado.jpg', { type: 'image/jpeg' });
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('usuario', currentUserName);
-
       const alojadoId = currentCropAlojadoId || document.getElementById('modalFotoAlojadoId').value;
-      const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/foto`, {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Erro ao salvar foto');
+      let finalFotoUrl = null;
 
-      showToast('📸 Foto recortada com sucesso e salva no PC local do Prefeito!', 'success');
-      
+      // 1. Upload direto para ImgBB com chave oficial da API
+      try {
+        const formData = new FormData();
+        formData.append('image', blob, `alojado_${alojadoId}.jpg`);
+        const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+          method: 'POST',
+          body: formData
+        });
+        const imgbbData = await resImgbb.json();
+        if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+          finalFotoUrl = imgbbData.data.display_url;
+          console.log("Foto salva no ImgBB com sucesso:", finalFotoUrl);
+        } else {
+          console.warn("Retorno ImgBB não foi sucesso:", imgbbData);
+        }
+      } catch (errImgbb) {
+        console.warn("Falha no upload do ImgBB (usando fallback local):", errImgbb);
+      }
+
+      // Fallback: se falhar ou estiver offline, usa dataUrl base64
+      if (!finalFotoUrl) {
+        finalFotoUrl = dataUrl;
+      }
+
+      // 2. Salvar no cache local do dispositivo (IndexedDB) para nunca mais gastar dados ao abrir
+      try {
+        await photoCacheManager.savePhoto(finalFotoUrl, dataUrl);
+        atualizarContadorCacheUI();
+      } catch (e) {
+        console.warn("Erro ao salvar no cache IndexedDB:", e);
+      }
+
+      // 3. Atualizar no banco de dados local da aplicação (StaticApiEngine)
+      await StaticApiEngine.init();
+      const alojado = (StaticApiEngine.dbState.alojados || []).find(x => x.id == alojadoId);
+      if (alojado) {
+        alojado.foto_url = finalFotoUrl;
+        (StaticApiEngine.dbState.quartos || []).forEach(q => {
+          (q.vagas || []).forEach(v => {
+            if (v.alojado && v.alojado.id == alojadoId) {
+              v.alojado.foto_url = finalFotoUrl;
+            }
+          });
+        });
+        StaticApiEngine.saveToStorage();
+      }
+
+      // 4. Salvar no Firestore se conectado
+      if (firebaseInitialized && firestoreDb) {
+        firestoreDb.collection('alojados').doc(String(alojadoId)).set({
+          foto_url: finalFotoUrl,
+          atualizado_em: new Date().toISOString()
+        }, { merge: true }).catch(() => {});
+      }
+
+      // 5. Atualizar imagem no modal de foto se aberto
       const imgEl = document.getElementById('modalFotoImg');
       if (imgEl) {
-        imgEl.src = data.foto_url;
+        imgEl.src = dataUrl;
         imgEl.classList.remove('hidden');
       }
       const vazioEl = document.getElementById('modalFotoVazio');
@@ -700,16 +2873,20 @@ async function confirmarCropFoto() {
       const btnRem = document.getElementById('modalFotoBtnRemover');
       if (btnRem) btnRem.classList.remove('hidden');
 
-      cancelarCropFoto();
-      refreshAllData();
+      showToast(`📸 Foto salva com sucesso e armazenada neste aparelho!`, 'success');
 
-      if (firebaseInitialized && firestoreDb) {
-        firestoreDb.collection('alojados').doc(String(alojadoId)).set({
-          tem_foto_local: true,
-          atualizado_em: new Date().toISOString()
-        }, { merge: true }).catch(() => {});
+      cancelarCropFoto();
+      
+      if (activeTab === 'alojados') carregarAlojados();
+      if (activeTab === 'blocos') carregarQuartos();
+      if (activeTab === 'dashboard') carregarDashboard();
+      aplicarCacheEmFotosNaTela();
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Cortar & Salvar Foto';
       }
-    }, 'image/jpeg', 0.9);
+    }, 'image/jpeg', 0.88);
   } catch (err) {
     showToast(err.message, 'error');
     if (btn) {
@@ -721,6 +2898,7 @@ async function confirmarCropFoto() {
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
+  aplicarIdentidadeVisual();
   inicializarTamanhoFonte();
   initFirebase();
   initMobileMenu();
@@ -799,6 +2977,16 @@ function switchTab(tabId) {
     }
   });
 
+  // Atualiza botões da barra inferior mobile (celular)
+  document.querySelectorAll('.mobile-nav-btn').forEach(el => {
+    const mobTab = el.getAttribute('data-mob-tab');
+    if (mobTab === tabId) {
+      el.className = 'mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-amber-400 transition font-bold scale-105';
+    } else if (mobTab) {
+      el.className = 'mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium';
+    }
+  });
+
   // Esconde todas as abas e mostra a ativa
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   const activeEl = document.getElementById(`tab-${tabId}`);
@@ -807,10 +2995,7 @@ function switchTab(tabId) {
   }
 
   // Fecha menu mobile se aberto
-  const sidebar = document.getElementById('sidebar');
-  if (window.innerWidth < 768 && sidebar) {
-    sidebar.classList.add('-translate-x-full');
-  }
+  toggleSidebarMobile(false);
 
   // Executa carregamento sob demanda
   if (tabId === 'dashboard') {
@@ -828,6 +3013,7 @@ function switchTab(tabId) {
   } else if (tabId === 'auditoria') {
     carregarAuditoria();
   } else if (tabId === 'configuracoes') {
+    carregarConfigIdentidadeVisual();
     const salvo = localStorage.getItem('canteiro_font_size') || 'md';
     alterarTamanhoFonte(salvo);
     atualizarContadorCacheUI();
@@ -846,52 +3032,69 @@ function switchTab(tabId) {
   updateUserRoleUI();
 }
 
+function toggleSidebarMobile(forceState) {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+
+  const isClosed = sidebar.classList.contains('-translate-x-full');
+  const shouldOpen = forceState !== undefined ? forceState : isClosed;
+
+  if (shouldOpen) {
+    sidebar.classList.remove('-translate-x-full');
+    if (backdrop) backdrop.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+  } else {
+    sidebar.classList.add('-translate-x-full');
+    if (backdrop) backdrop.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  }
+}
+
 function initMobileMenu() {
   const btn = document.getElementById('mobileMenuBtn');
-  const sidebar = document.getElementById('sidebar');
-  if (btn && sidebar) {
-    btn.addEventListener('click', () => {
-      sidebar.classList.toggle('-translate-x-full');
-    });
+  if (btn) {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      toggleSidebarMobile();
+    };
   }
 }
 
 // Carregamento de dados para Modo GitHub Pages / Offline
 async function carregarDadosSnapshotEstatico() {
-  try {
-    const res = await fetch('dados_iniciais_taboca.json');
-    if (!res.ok) throw new Error('Falha ao carregar snapshot estático');
-    const data = await res.json();
-    
-    globalStats = data;
-    globalBlocos = data.blocos || [];
-    globalEmpresas = data.empresas || [];
-    globalQuartos = data.quartos || [];
-    globalAlojados = data.alojados || [];
-    
-    renderDashboardStats(data.geral);
-    renderCharts(data.blocos, data.empresas);
-    if (activeTab === 'blocos') renderQuartosCards(data.quartos);
-    if (activeTab === 'alojados') renderTabelaAlojados(data.alojados);
-    
-    const banner = document.getElementById('firebaseCacheStatusBadge');
-    if (banner) banner.textContent = 'Modo GitHub Pages / Nuvem Ativo';
-    
-    console.log("Snapshot do canteiro carregado com sucesso (Modo GitHub Pages)");
-  } catch (e) {
-    console.error("Erro ao carregar snapshot estático:", e);
-  }
+  await StaticApiEngine.init();
+  globalStats = StaticApiEngine.dbState.geral;
+  globalBlocos = StaticApiEngine.dbState.blocos || [];
+  globalEmpresas = StaticApiEngine.dbState.empresas || [];
+  globalQuartos = StaticApiEngine.dbState.quartos || [];
+  globalAlojados = StaticApiEngine.dbState.alojados || [];
+  
+  const banner = document.getElementById('firebaseCacheStatusBadge');
+  if (banner) banner.textContent = 'Modo GitHub Pages / Nuvem Ativo';
 }
 
 // Carregar Dados Iniciais
 async function loadInitialData() {
   setRefreshAnimation(true);
   try {
-    const resCheck = await fetch(`${API_BASE}/api/dashboard/stats`).catch(() => null);
-    if (!resCheck || !resCheck.ok) {
-      console.log("Ambiente GitHub Pages ou offline detectado. Carregando dados da obra...");
-      await carregarDadosSnapshotEstatico();
-      return;
+    if (staticModeActive) {
+      console.log("Ambiente GitHub Pages ou nuvem estática detectado. Inicializando dados da obra...");
+      await StaticApiEngine.init();
+      const banner = document.getElementById('firebaseCacheStatusBadge');
+      if (banner) banner.textContent = 'Modo GitHub Pages / Nuvem Ativo';
+    } else {
+      // Testar se backend local responde
+      try {
+        const probe = await originalFetch(`${API_BASE}/api/dashboard/stats`);
+        if (!probe.ok) {
+          staticModeActive = true;
+          await StaticApiEngine.init();
+        }
+      } catch (e) {
+        staticModeActive = true;
+        await StaticApiEngine.init();
+      }
     }
 
     await Promise.all([
@@ -900,14 +3103,9 @@ async function loadInitialData() {
       carregarBlocosLista(),
       carregarVagasLivresLista()
     ]);
-    setTimeout(() => {
-      if (firebaseInitialized) {
-        sincronizarTudoComFirebase(false);
-      }
-    }, 1500);
   } catch (err) {
-    console.warn('Backend local inacessível, carregando snapshot:', err);
-    await carregarDadosSnapshotEstatico();
+    console.error('Erro ao carregar dados iniciais:', err);
+    showToast('Erro ao carregar dados da obra', 'error');
   } finally {
     setRefreshAnimation(false);
   }
@@ -965,8 +3163,15 @@ async function carregarDashboard() {
 
     // Sidebar counts
     document.getElementById('sideCountVagas').textContent = data.geral.total_vagas;
-    document.getElementById('sideCountAlojados').textContent = data.geral.total_alojados_ativos;
-    document.getElementById('sideCountAlertas').textContent = data.geral.total_alertas_manutencao;
+    const sideBadge = document.getElementById('sideCountAlertas');
+    if (sideBadge) {
+      sideBadge.textContent = data.geral.total_alertas_manutencao;
+      if (data.geral.total_alertas_manutencao > 0) {
+        sideBadge.classList.remove('hidden');
+      } else {
+        sideBadge.classList.add('hidden');
+      }
+    }
 
     // Badge Alertas Top Navbar
     const badgeAlertas = document.getElementById('badgeAlertasNav');
@@ -1233,6 +3438,46 @@ function aplicarFiltrosQuartos() {
   carregarQuartos();
 }
 
+// ========================================================
+// FUNÇÕES UTILITÁRIAS DE TELEFONE E WHATSAPP
+// ========================================================
+function formatarTelefoneInput(input) {
+  if (!input) return;
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 10) {
+    input.value = `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
+  } else if (v.length > 6) {
+    input.value = `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
+  } else if (v.length > 2) {
+    input.value = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+  } else if (v.length > 0) {
+    input.value = `(${v}`;
+  } else {
+    input.value = '';
+  }
+}
+
+function formatarTelefoneTexto(val) {
+  if (!val) return '';
+  const digits = String(val).replace(/\D/g, '').slice(-11);
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  } else if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return val;
+}
+
+function getWhatsappUrl(telefone) {
+  if (!telefone) return null;
+  let digits = String(telefone).replace(/\D/g, '');
+  if (!digits || digits.length < 10) return null;
+  if (digits.length === 10 || digits.length === 11) {
+    digits = '55' + digits;
+  }
+  return `https://wa.me/${digits}`;
+}
+
 function renderQuartosCards(quartos) {
   const container = document.getElementById('gridQuartos');
   const vazioEl = document.getElementById('quartosVazio');
@@ -1263,11 +3508,31 @@ function renderQuartosCards(quartos) {
 
     // Camas dentro do quarto
     const camasHtml = q.vagas.map(v => {
-      if (v.status === 'ocupada' && v.alojado_id) {
-        const safeNome = (v.nome_completo || '').replace(/'/g, "\\'");
-        const safeEmpresa = (v.empresa_nome || '').replace(/'/g, "\\'");
-        const safeFuncao = (v.funcao || '').replace(/'/g, "\\'");
-        const clickFoto = `abrirModalFotoAlojado(${v.alojado_id}, '${safeNome}', '${v.foto_url || ''}', '${safeEmpresa}', '${v.empresa_cor || ''}', '${safeFuncao}', '${v.matricula || ''}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
+      const alId = v.alojado_id || (v.alojado && v.alojado.id);
+      const isOcupada = (v.status === 'ocupada') && (alId || v.nome_completo || v.alojado);
+      if (isOcupada) {
+        const nomeAl = v.nome_completo || (v.alojado && v.alojado.nome_completo) || 'Colaborador';
+        let finalId = alId || (v.alojado && v.alojado.id) || 0;
+        if ((!finalId || finalId === 0) && window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+          const alFound = window.StaticApiEngine.dbState.alojados.find(a => a.nome_completo && a.nome_completo.trim().toUpperCase() === nomeAl.trim().toUpperCase());
+          if (alFound) finalId = alFound.id;
+        }
+        const safeNome = nomeAl.replace(/'/g, "\\'");
+        const empNome = v.empresa_nome || (v.alojado && v.alojado.empresa_nome) || 'GEL';
+        const safeEmpresa = empNome.replace(/'/g, "\\'");
+        const funcaoAl = v.funcao || (v.alojado && v.alojado.funcao) || '';
+        const safeFuncao = funcaoAl.replace(/'/g, "\\'");
+        const fotoAl = v.foto_url || (v.alojado && v.alojado.foto_url) || '';
+        const matAl = v.matricula || (v.alojado && v.alojado.matricula) || '';
+        const corEmp = v.empresa_cor || (v.alojado && v.alojado.empresa_cor) || '#2563eb';
+        const clickFoto = `abrirModalFotoAlojado(${finalId}, '${safeNome}', '${fotoAl}', '${safeEmpresa}', '${corEmp}', '${safeFuncao}', '${matAl}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
+
+        // Buscar telefone atualizado
+        const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
+          ? window.StaticApiEngine.dbState.alojados.find(x => Number(x.id) === Number(finalId))
+          : null;
+        const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
+        const waUrl = getWhatsappUrl(zapNum);
 
         return `
           <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col justify-between text-xs">
@@ -1275,29 +3540,43 @@ function renderQuartosCards(quartos) {
               <span class="font-bold text-slate-800 flex items-center gap-1">
                 <i class="fa-solid fa-bed text-blue-600"></i> Cama ${v.numero_cama}
               </span>
-              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white truncate max-w-[100px]" style="background-color: ${v.empresa_cor || '#475569'}">
-                ${v.empresa_nome || 'CONTRATADA'}
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white truncate max-w-[100px]" style="background-color: ${corEmp}">
+                ${empNome}
               </span>
             </div>
             
             <div class="flex items-center gap-2 mb-1">
-              ${renderAvatarHtml(v.nome_completo, v.foto_url, 'w-8 h-8', 'text-[11px]', clickFoto)}
+              ${renderAvatarHtml(nomeAl, fotoAl, 'w-8 h-8', 'text-[11px]', clickFoto)}
               <div class="min-w-0 flex-1">
-                <div class="font-bold text-slate-900 truncate" title="${v.nome_completo}">${v.nome_completo}</div>
-                <div class="text-[11px] text-slate-500 truncate">${v.funcao || 'Alojado'} • Reg: ${v.matricula || '-'}</div>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="font-bold text-slate-900 truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${nomeAl}</span>
+                  ${waUrl ? `
+                    <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-[11px] flex-shrink-0 transition" title="Conversar no WhatsApp (${zapNum})">
+                      <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                  ` : ''}
+                </div>
+                <div class="text-[11px] text-slate-500 truncate">${funcaoAl || 'Alojado'} • Reg: ${matAl || '-'}</div>
               </div>
             </div>
 
             <!-- Ações rápidas na cama -->
             <div class="mt-2 pt-1.5 border-t border-slate-200 flex items-center justify-between">
-              <button onclick="${clickFoto}" class="text-[10px] font-semibold text-slate-500 hover:text-amber-600 flex items-center gap-1" title="Foto do trabalhador">
-                <i class="fa-solid fa-camera"></i> Foto
-              </button>
               <div class="flex items-center gap-2">
-                <button onclick="abrirModalRealocar(${v.alojado_id}, '${safeNome}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})" class="btn-prefeito text-[10px] font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1">
+                <button onclick="${clickFoto}" class="text-[10px] font-semibold text-slate-500 hover:text-amber-600 flex items-center gap-1" title="Foto do trabalhador">
+                  <i class="fa-solid fa-camera"></i> Foto
+                </button>
+                ${waUrl ? `
+                  <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 transition" title="Conversar no WhatsApp">
+                    <i class="fa-brands fa-whatsapp"></i> Zap
+                  </a>
+                ` : ''}
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="abrirModalRealocar(${finalId}, '${safeNome}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})" class="btn-prefeito text-[10px] font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1">
                   <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
                 </button>
-                <button onclick="abrirModalDesligar(${v.alojado_id}, '${safeNome}')" class="btn-prefeito text-[10px] font-semibold text-red-600 hover:text-red-800 flex items-center gap-1">
+                <button onclick="abrirModalDesligar(${finalId}, '${safeNome}')" class="btn-prefeito text-[10px] font-semibold text-red-600 hover:text-red-800 flex items-center gap-1">
                   <i class="fa-solid fa-person-walking-arrow-right"></i> Liberar
                 </button>
               </div>
@@ -1305,6 +3584,7 @@ function renderQuartosCards(quartos) {
           </div>
         `;
       } else {
+        const idVaga = v.id || v.vaga_id || '';
         return `
           <div class="p-2.5 rounded-lg bg-emerald-50/60 border border-dashed border-emerald-300 flex flex-col justify-between text-xs">
             <div class="flex items-center justify-between">
@@ -1318,7 +3598,7 @@ function renderQuartosCards(quartos) {
               Disponível para alojar
             </div>
 
-            <button onclick="openModalNovoAlojadoComVaga(${v.vaga_id})" class="btn-prefeito w-full py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold flex items-center justify-center gap-1 transition">
+            <button onclick="openModalNovoAlojadoComVaga(${idVaga})" class="btn-prefeito w-full py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold flex items-center justify-center gap-1 transition">
               <i class="fa-solid fa-plus"></i> Alojar
             </button>
           </div>
@@ -1394,43 +3674,86 @@ async function abrirModalQuartoDetalhes(quartoId) {
     // Renderiza camas no modal
     const camasGrid = document.getElementById('modalQuartoGridCamas');
     camasGrid.innerHTML = q.vagas.map(v => {
-      if (v.status === 'ocupada' && v.alojado_id) {
-        const safeNome = (v.nome_completo || '').replace(/'/g, "\\'");
-        const safeEmpresa = (v.empresa_nome || '').replace(/'/g, "\\'");
-        const safeFuncao = (v.funcao || '').replace(/'/g, "\\'");
-        const clickFoto = `abrirModalFotoAlojado(${v.alojado_id}, '${safeNome}', '${v.foto_url || ''}', '${safeEmpresa}', '${v.empresa_cor || ''}', '${safeFuncao}', '${v.matricula || ''}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
+      const alId = v.alojado_id || (v.alojado && v.alojado.id);
+      const isOcupada = (v.status === 'ocupada') && (alId || v.nome_completo || v.alojado);
+      if (isOcupada) {
+        const nomeAl = v.nome_completo || (v.alojado && v.alojado.nome_completo) || 'Colaborador';
+        let finalId = alId || (v.alojado && v.alojado.id) || 0;
+        if ((!finalId || finalId === 0) && window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+          const alFound = window.StaticApiEngine.dbState.alojados.find(a => a.nome_completo && a.nome_completo.trim().toUpperCase() === nomeAl.trim().toUpperCase());
+          if (alFound) finalId = alFound.id;
+        }
+        const safeNome = nomeAl.replace(/'/g, "\\'");
+        const empNome = v.empresa_nome || (v.alojado && v.alojado.empresa_nome) || 'GEL';
+        const safeEmpresa = empNome.replace(/'/g, "\\'");
+        const funcaoAl = v.funcao || (v.alojado && v.alojado.funcao) || '';
+        const safeFuncao = funcaoAl.replace(/'/g, "\\'");
+        const fotoAl = v.foto_url || (v.alojado && v.alojado.foto_url) || '';
+        const matAl = v.matricula || (v.alojado && v.alojado.matricula) || '';
+        const corEmp = v.empresa_cor || (v.alojado && v.alojado.empresa_cor) || '#2563eb';
+        const clickFoto = `abrirModalFotoAlojado(${finalId}, '${safeNome}', '${fotoAl}', '${safeEmpresa}', '${corEmp}', '${safeFuncao}', '${matAl}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
+
+        // Buscar telefone atualizado
+        const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
+          ? window.StaticApiEngine.dbState.alojados.find(x => Number(x.id) === Number(finalId))
+          : null;
+        const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
+        const waUrl = getWhatsappUrl(zapNum);
 
         return `
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-900"><i class="fa-solid fa-bed text-blue-600 mr-1"></i> Cama ${v.numero_cama}</span>
-              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white" style="background-color: ${v.empresa_cor || '#475569'}">${v.empresa_nome || 'GEL'}</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white" style="background-color: ${corEmp}">${empNome}</span>
             </div>
             
             <div class="flex items-center gap-3">
-              ${renderAvatarHtml(v.nome_completo, v.foto_url, 'w-11 h-11', 'text-xs', clickFoto)}
+              ${renderAvatarHtml(nomeAl, fotoAl, 'w-11 h-11', 'text-xs', clickFoto)}
               <div class="min-w-0 flex-1">
-                <div class="font-bold text-slate-900 text-sm truncate">${v.nome_completo}</div>
-                <div class="text-slate-500">Matrícula: <b>${v.matricula || '-'}</b> • Função: <b>${v.funcao || '-'}</b></div>
-                <div class="text-slate-400 text-[10px]">Entrada: ${v.data_entrada || '-'}</div>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="font-bold text-slate-900 text-sm truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${nomeAl}</span>
+                  ${waUrl ? `
+                    <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-xs flex-shrink-0 transition" title="Conversar no WhatsApp (${zapNum})">
+                      <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                  ` : ''}
+                </div>
+                <div class="text-slate-500">Matrícula: <b>${matAl || '-'}</b> • Função: <b>${funcaoAl || '-'}</b></div>
+                <div class="text-slate-400 text-[10px]">Entrada: ${v.data_entrada || (alObj && alObj.data_entrada) || '-'} ${zapNum ? `• <span class="text-emerald-700 font-mono font-medium">${formatarTelefoneTexto(zapNum)}</span>` : ''}</div>
               </div>
             </div>
 
-            <div class="pt-1.5 border-t border-slate-200 flex justify-end">
-              <button onclick="${clickFoto}" class="text-[11px] font-semibold text-amber-600 hover:text-amber-800 flex items-center gap-1">
-                <i class="fa-solid fa-camera"></i> Ver / Trocar Foto
-              </button>
+            <div class="pt-2 border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-2">
+                ${waUrl ? `
+                  <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[11px] font-bold transition">
+                    <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i> WhatsApp
+                  </a>
+                ` : ''}
+                <button onclick="${clickFoto}" class="text-[11px] font-semibold text-slate-500 hover:text-amber-600 flex items-center gap-1">
+                  <i class="fa-solid fa-camera"></i> Foto
+                </button>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button onclick="abrirModalRealocar(${finalId}, '${safeNome}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})" class="btn-prefeito px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[11px] flex items-center gap-1" title="Mover para outro quarto">
+                  <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
+                </button>
+                <button onclick="abrirModalDesligar(${finalId}, '${safeNome}')" class="btn-prefeito px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-[11px] flex items-center gap-1" title="Liberar vaga">
+                  <i class="fa-solid fa-person-walking-arrow-right"></i> Liberar
+                </button>
+              </div>
             </div>
           </div>
         `;
       } else {
+        const idVaga = v.id || v.vaga_id || '';
         return `
           <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex items-center justify-between">
             <div>
               <span class="font-bold text-emerald-900"><i class="fa-solid fa-bed text-emerald-600 mr-1"></i> Cama ${v.numero_cama}</span>
               <div class="text-emerald-700 text-[11px]">Vaga Livre</div>
             </div>
-            <button onclick="fecharModal('modalQuartoDetalhes'); openModalNovoAlojadoComVaga(${v.vaga_id})" class="btn-prefeito px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+            <button onclick="fecharModal('modalQuartoDetalhes'); openModalNovoAlojadoComVaga(${idVaga})" class="btn-prefeito px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
               Alojar
             </button>
           </div>
@@ -1515,6 +3838,19 @@ function debounceCarregarAlojados() {
 }
 
 async function carregarAlojados() {
+  // Purga proativa de registros fantasmas antes de ler
+  if (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+    const antes = window.StaticApiEngine.dbState.alojados.length;
+    window.StaticApiEngine.dbState.alojados = window.StaticApiEngine.dbState.alojados.filter(a => {
+      if (!a || !a.nome_completo) return false;
+      const n = a.nome_completo.trim();
+      return n !== '' && n !== '??' && n !== '?' && n !== 'SEM NOME' && n !== 'N/A';
+    });
+    if (window.StaticApiEngine.dbState.alojados.length !== antes) {
+      window.StaticApiEngine.saveToStorage();
+    }
+  }
+
   const busca = document.getElementById('filtroAlojadosBusca').value.trim();
   const blocoId = document.getElementById('filtroAlojadosBloco').value;
   const empresaId = document.getElementById('filtroAlojadosEmpresa').value;
@@ -1537,79 +3873,162 @@ async function carregarAlojados() {
 
 function renderTabelaAlojados(data) {
   const tbody = document.getElementById('tabelaAlojadosCorpo');
+  const mobileList = document.getElementById('listaAlojadosMobile');
   const contador = document.getElementById('alojadosContadorTexto');
   const paginacao = document.getElementById('alojadosPaginacao');
-  if (!tbody) return;
+  if (!tbody && !mobileList) return;
 
-  const total = data.total;
-  const items = data.items;
+  const items = (data.items || []).filter(a => a && a.nome_completo && a.nome_completo.trim() !== '' && a.nome_completo.trim() !== '??');
+  const total = items.length;
 
-  contador.textContent = `Mostrando ${items.length} de ${total} registros (Página ${data.page})`;
+  if (contador) contador.textContent = `Mostrando ${items.length} de ${total} registros (Página ${data.page})`;
 
   if (items.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">Nenhum trabalhador alojado encontrado com os filtros aplicados.</td></tr>`;
-    paginacao.innerHTML = '';
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">Nenhum trabalhador alojado encontrado com os filtros aplicados.</td></tr>`;
+    if (mobileList) mobileList.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Nenhum trabalhador alojado encontrado com os filtros aplicados.</div>`;
+    if (paginacao) paginacao.innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = items.map(a => {
-    const isAtivo = a.status === 'ativo';
-    const statusBadge = isAtivo 
-      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">ATIVO</span>'
-      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">DESLIGADO</span>';
+  // Render para Tabela (Computador / Tablet)
+  if (tbody) {
+    tbody.innerHTML = items.map(a => {
+      const isAtivo = a.status === 'ativo';
+      const statusBadge = isAtivo 
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">ATIVO</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">DESLIGADO</span>';
 
-    const localizacao = isAtivo 
-      ? `<b>${a.bloco_nome}</b> • Quarto ${a.quarto_numero} (Cama ${a.numero_cama})`
-      : `<span class="text-slate-400 italic">Desocupado (Saída: ${a.data_saida || '-'})</span>`;
+      const localizacao = isAtivo 
+        ? `<b>${a.bloco_nome}</b> • Quarto ${a.quarto_numero} (Cama ${a.numero_cama})`
+        : `<span class="text-slate-400 italic">Desocupado (Saída: ${a.data_saida || '-'})</span>`;
 
-    const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
-    const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
-    const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
-    const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
+      const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
+      const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
+      const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
+      const waUrl = getWhatsappUrl(a.whatsapp);
+      const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
 
-    return `
-      <tr class="hover:bg-slate-50 transition">
-        <td class="py-3 px-4 font-mono font-semibold text-slate-700">${a.matricula || '-'}</td>
-        <td class="py-3 px-4">
-          <div class="flex items-center gap-3">
-            ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-10 h-10', 'text-xs', clickFoto)}
-            <div>
-              <div class="font-bold text-slate-900 cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver detalhes e foto">${a.nome_completo}</div>
-              <div class="text-[11px] text-slate-400">Entrada: ${a.data_entrada || '-'}</div>
+      return `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-4 font-mono font-semibold text-slate-700">${a.matricula || '-'}</td>
+          <td class="py-3 px-4">
+            <div class="flex items-center gap-3">
+              ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-10 h-10', 'text-xs', clickFoto)}
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-900 cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver detalhes e foto">${a.nome_completo}</span>
+                  ${waUrl ? `
+                    <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-xs transition" title="Conversar no WhatsApp (${a.whatsapp})">
+                      <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                  ` : ''}
+                </div>
+                <div class="text-[11px] text-slate-400">Entrada: ${a.data_entrada || '-'} ${a.whatsapp ? `• <span class="text-emerald-700 font-mono font-medium">${formatarTelefoneTexto(a.whatsapp)}</span>` : ''}</div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3 px-4 text-slate-600 font-medium">${a.funcao || '-'}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-xs font-bold text-white shadow-xs" style="background-color: ${a.empresa_cor || '#475569'}">
+              ${a.empresa_nome || '-'}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-xs text-slate-800">${localizacao}</td>
+          <td class="py-3 px-4">${statusBadge}</td>
+          <td class="py-3 px-4 text-right whitespace-nowrap">
+            ${isAtivo ? `
+              <button onclick="abrirModalRealocar(${a.id}, '${a.nome_completo}', '${a.bloco_nome}', '${a.quarto_numero}', ${a.numero_cama})" class="btn-prefeito px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs mr-1" title="Realocar para outra vaga">
+                <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
+              </button>
+              <button onclick="abrirModalDesligar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 font-semibold text-xs mr-1" title="Registrar Saída / Desligamento">
+                <i class="fa-solid fa-person-walking-arrow-right"></i> Saída
+              </button>
+            ` : `
+              <button onclick="abrirModalReativar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs mr-1" title="Reativar colaborador">
+                <i class="fa-solid fa-rotate-left"></i> Reativar
+              </button>
+            `}
+            <button onclick="abrirModalEditarAlojado(${a.id})" class="btn-prefeito text-slate-500 hover:text-sky-600 p-1 mr-1" title="Editar Dados">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button onclick="confirmarExcluirAlojado(${a.id}, '${a.nome_completo}')" class="btn-prefeito text-slate-400 hover:text-red-600 p-1" title="Excluir Registro">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Render para Cards no Celular (Mobile Touch View)
+  if (mobileList) {
+    mobileList.innerHTML = items.map(a => {
+      const isAtivo = a.status === 'ativo';
+      const statusBadge = isAtivo 
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">ATIVO</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">DESLIGADO</span>';
+
+      const safeNome = (a.nome_completo || '').replace(/'/g, "\\'");
+      const safeEmpresa = (a.empresa_nome || '').replace(/'/g, "\\'");
+      const safeFuncao = (a.funcao || '').replace(/'/g, "\\'");
+      const waUrl = getWhatsappUrl(a.whatsapp);
+      const clickFoto = `abrirModalFotoAlojado(${a.id}, '${safeNome}', '${a.foto_url || ''}', '${safeEmpresa}', '${a.empresa_cor || ''}', '${safeFuncao}', '${a.matricula || ''}', '${a.bloco_nome || ''}', '${a.quarto_numero || ''}', ${a.numero_cama || 0})`;
+
+      return `
+        <div class="p-3.5 bg-white hover:bg-slate-50 transition flex items-center justify-between gap-3 border-b border-slate-100">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            ${renderAvatarHtml(a.nome_completo, a.foto_url, 'w-11 h-11 flex-shrink-0', 'text-xs', clickFoto)}
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="font-bold text-slate-900 text-sm leading-tight truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}">${a.nome_completo}</span>
+                ${waUrl ? `
+                  <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-xs flex-shrink-0 transition" title="Conversar no WhatsApp (${a.whatsapp})">
+                    <i class="fa-brands fa-whatsapp"></i>
+                  </a>
+                ` : ''}
+              </div>
+              <div class="text-xs text-slate-500 font-medium truncate mt-0.5">
+                ${a.funcao || 'Sem função'} • <span class="font-bold" style="color: ${a.empresa_cor || '#475569'}">${a.empresa_nome || '-'}</span>
+              </div>
+              <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-1.5 flex-wrap">
+                ${isAtivo ? `<span class="bg-slate-100 px-1.5 py-0.5 rounded font-semibold text-slate-700 text-[10px]">🏢 ${a.bloco_nome} • Q.${a.quarto_numero} (Cama ${a.numero_cama})</span>` : '<span class="text-slate-400 italic text-[10px]">Desocupado</span>'}
+                <span class="text-[10px] text-slate-400 font-mono">Reg: ${a.matricula || '-'}</span>
+                ${a.whatsapp ? `<span class="text-[10px] text-emerald-700 font-mono font-semibold">📞 ${formatarTelefoneTexto(a.whatsapp)}</span>` : ''}
+              </div>
             </div>
           </div>
-        </td>
-        <td class="py-3 px-4 text-slate-600 font-medium">${a.funcao || '-'}</td>
-        <td class="py-3 px-4">
-          <span class="px-2 py-0.5 rounded text-xs font-bold text-white shadow-xs" style="background-color: ${a.empresa_cor || '#475569'}">
-            ${a.empresa_nome || '-'}
-          </span>
-        </td>
-        <td class="py-3 px-4 text-xs text-slate-800">${localizacao}</td>
-        <td class="py-3 px-4">${statusBadge}</td>
-        <td class="py-3 px-4 text-right whitespace-nowrap">
-          ${isAtivo ? `
-            <button onclick="abrirModalRealocar(${a.id}, '${a.nome_completo}', '${a.bloco_nome}', '${a.quarto_numero}', ${a.numero_cama})" class="btn-prefeito px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs mr-1" title="Realocar para outra vaga">
-              <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
-            </button>
-            <button onclick="abrirModalDesligar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 font-semibold text-xs mr-1" title="Registrar Saída / Desligamento">
-              <i class="fa-solid fa-person-walking-arrow-right"></i> Saída
-            </button>
-          ` : `
-            <button onclick="abrirModalReativar(${a.id}, '${a.nome_completo}')" class="btn-prefeito px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs mr-1" title="Reativar colaborador">
-              <i class="fa-solid fa-rotate-left"></i> Reativar
-            </button>
-          `}
-          <button onclick="abrirModalEditarAlojado(${a.id}, '${a.matricula || ''}', '${a.nome_completo}', ${a.empresa_id || "null"}, '${a.funcao || ''}', '${a.data_entrada || ''}', '${a.observacoes || ''}')" class="btn-prefeito text-slate-500 hover:text-sky-600 p-1 mr-1" title="Editar Dados">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button onclick="confirmarExcluirAlojado(${a.id}, '${a.nome_completo}')" class="btn-prefeito text-slate-400 hover:text-red-600 p-1" title="Excluir Registro">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+          <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+            ${statusBadge}
+            <div class="flex items-center gap-1 mt-0.5">
+              ${waUrl ? `
+                <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-xs shadow-xs flex items-center justify-center transition" title="Conversar no WhatsApp (${a.whatsapp})">
+                  <i class="fa-brands fa-whatsapp text-sm"></i>
+                </a>
+              ` : ''}
+              <button onclick="${clickFoto}" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Ver foto">
+                <i class="fa-solid fa-camera"></i>
+              </button>
+              <button onclick="abrirModalEditarAlojado(${a.id})" class="btn-prefeito p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Editar">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              ${isAtivo ? `
+                <button onclick="abrirModalRealocar(${a.id}, '${safeNome}', '${a.bloco_nome}', '${a.quarto_numero}', ${a.numero_cama})" class="btn-prefeito p-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs shadow-xs" title="Mover vaga">
+                  <i class="fa-solid fa-arrows-turn-to-dots"></i>
+                </button>
+                <button onclick="abrirModalDesligar(${a.id}, '${safeNome}')" class="btn-prefeito p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs shadow-xs" title="Saída">
+                  <i class="fa-solid fa-person-walking-arrow-right"></i>
+                </button>
+              ` : `
+                <button onclick="abrirModalReativar(${a.id}, '${safeNome}')" class="btn-prefeito p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs shadow-xs" title="Reativar">
+                  <i class="fa-solid fa-rotate-left"></i>
+                </button>
+              `}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 
   // Botoes de paginação
   const totalPages = Math.ceil(total / 50);
@@ -1642,7 +4061,13 @@ async function openModalNovoAlojado(vagaPreId = null) {
   document.getElementById('formAlojado').reset();
   document.getElementById('alojadoFormId').value = '';
   document.getElementById('secaoSelecaoVaga').classList.remove('hidden');
+  const secaoLocalNovo = document.getElementById('secaoLocalAtualEdicao');
+  if (secaoLocalNovo) secaoLocalNovo.classList.add('hidden');
   limparFotoForm();
+
+  // Limpa campo de WhatsApp
+  const zapInput = document.getElementById('alojadoFormWhatsapp');
+  if (zapInput) zapInput.value = '';
 
   // Carrega opções de empresas
   preencherSelectEmpresas('alojadoFormEmpresa');
@@ -1660,19 +4085,54 @@ function openModalNovoAlojadoComVaga(vagaId) {
   openModalNovoAlojado(vagaId);
 }
 
-function abrirModalEditarAlojado(id, matricula, nome, empresaId, funcao, dataEntrada, obs, fotoUrl = '') {
+function atalhoMudarQuartoDoForm() {
+  const id = document.getElementById('alojadoFormId').value;
+  if (!id) return;
+  const al = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
+    ? window.StaticApiEngine.dbState.alojados.find(x => x.id == id) : null;
+  fecharModal('modalAlojadoForm');
+  if (al) {
+    abrirModalRealocar(al.id, al.nome_completo, al.bloco_nome || '', al.quarto_numero || '', al.numero_cama || 1);
+  }
+}
+
+function abrirModalEditarAlojado(id, matricula = '', nome = '', empresaId = null, funcao = '', dataEntrada = '', obs = '', fotoUrl = '', whatsapp = '') {
   if (!checkPrefeitoAccess()) return;
+
+  let al = null;
+  if (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+    al = window.StaticApiEngine.dbState.alojados.find(x => x.id == id);
+  }
+
   document.getElementById('modalAlojadoTitulo').textContent = 'Editar Dados do Alojado';
   document.getElementById('alojadoFormId').value = id;
   document.getElementById('secaoSelecaoVaga').classList.add('hidden'); // Vaga é alterada por realocação
 
-  preencherSelectEmpresas('alojadoFormEmpresa', empresaId);
+  const secaoLocal = document.getElementById('secaoLocalAtualEdicao');
+  const txtLocal = document.getElementById('alojadoFormLocalAtualTexto');
+  if (secaoLocal && txtLocal) {
+    secaoLocal.classList.remove('hidden');
+    if (al && al.bloco_nome && al.quarto_numero) {
+      txtLocal.textContent = `${al.bloco_nome} • Quarto ${al.quarto_numero} (Cama ${al.numero_cama || 1})`;
+    } else {
+      txtLocal.textContent = 'Não alocado em quarto no momento';
+    }
+  }
 
-  document.getElementById('alojadoFormNome').value = nome;
-  document.getElementById('alojadoFormMatricula').value = matricula;
-  document.getElementById('alojadoFormFuncao').value = funcao;
-  document.getElementById('alojadoFormDataEntrada').value = dataEntrada || '';
-  document.getElementById('alojadoFormObs').value = obs || '';
+  const empIdFinal = (al && al.empresa_id) ? al.empresa_id : empresaId;
+  preencherSelectEmpresas('alojadoFormEmpresa', empIdFinal);
+
+  document.getElementById('alojadoFormNome').value = (al && al.nome_completo) ? al.nome_completo : (nome || '');
+  document.getElementById('alojadoFormMatricula').value = (al && al.matricula) ? al.matricula : (matricula || '');
+  document.getElementById('alojadoFormFuncao').value = (al && al.funcao) ? al.funcao : (funcao || '');
+  document.getElementById('alojadoFormDataEntrada').value = (al && al.data_entrada) ? al.data_entrada : (dataEntrada || '');
+  document.getElementById('alojadoFormObs').value = (al && al.observacoes) ? al.observacoes : (obs || '');
+
+  const zapInput = document.getElementById('alojadoFormWhatsapp');
+  if (zapInput) {
+    const rawZap = (al && al.whatsapp) ? al.whatsapp : (whatsapp || '');
+    zapInput.value = formatarTelefoneTexto(rawZap);
+  }
 
   // Foto atual
   const imgPreview = document.getElementById('alojadoFormFotoPreview');
@@ -1681,12 +4141,13 @@ function abrirModalEditarAlojado(id, matricula, nome, empresaId, funcao, dataEnt
   const urlInput = document.getElementById('alojadoFormFotoUrl');
   document.getElementById('alojadoFormFotoInput').value = '';
 
-  if (fotoUrl && fotoUrl.trim() !== '') {
-    imgPreview.src = fotoUrl;
+  const fotoAtualFinal = (al && al.foto_url) ? al.foto_url : fotoUrl;
+  if (fotoAtualFinal && fotoAtualFinal.trim() !== '') {
+    imgPreview.src = fotoAtualFinal;
     imgPreview.classList.remove('hidden');
     placeholder.classList.add('hidden');
     btnRemover.classList.remove('hidden');
-    urlInput.value = fotoUrl;
+    urlInput.value = fotoAtualFinal;
   } else {
     limparFotoForm();
   }
@@ -1738,6 +4199,8 @@ async function salvarAlojado(e) {
   const funcao = document.getElementById('alojadoFormFuncao').value.trim();
   const dataEntrada = document.getElementById('alojadoFormDataEntrada').value;
   const obs = document.getElementById('alojadoFormObs').value.trim();
+  const zapInput = document.getElementById('alojadoFormWhatsapp');
+  const whatsapp = zapInput ? zapInput.value.trim() : '';
   const fotoUrlAtual = document.getElementById('alojadoFormFotoUrl').value;
   const fotoInput = document.getElementById('alojadoFormFotoInput');
 
@@ -1761,6 +4224,7 @@ async function salvarAlojado(e) {
           matricula: matricula,
           empresa_id: empresaId ? parseInt(empresaId) : null,
           funcao: funcao,
+          whatsapp: whatsapp,
           data_entrada: dataEntrada,
           observacoes: obs,
           foto_url: fotoUrlAtual,
@@ -1771,20 +4235,42 @@ async function salvarAlojado(e) {
       if (!res.ok) throw new Error(data.detail || 'Erro ao cadastrar alojado');
       targetAlojadoId = data.id;
 
-      // Se selecionou arquivo de foto, enviar upload
+      // Se selecionou arquivo de foto, enviar upload para ImgBB
       if (fotoInput && fotoInput.files && fotoInput.files[0]) {
-        const formData = new FormData();
-        formData.append('file', fotoInput.files[0]);
-        formData.append('usuario', currentUserName);
-        await fetch(`${API_BASE}/api/alojados/${targetAlojadoId}/foto`, {
-          method: 'POST',
-          body: formData
-        });
+        try {
+          const file = fotoInput.files[0];
+          const formData = new FormData();
+          formData.append('image', file);
+          const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+          });
+          const imgbbData = await resImgbb.json();
+          if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+            const novaUrl = imgbbData.data.display_url;
+            const al = (StaticApiEngine.dbState.alojados || []).find(x => x.id == targetAlojadoId);
+            if (al) {
+              al.foto_url = novaUrl;
+              StaticApiEngine.saveToStorage();
+            }
+            if (firebaseInitialized && firestoreDb) {
+              firestoreDb.collection('alojados').doc(String(targetAlojadoId)).set({
+                foto_url: novaUrl,
+                atualizado_em: new Date().toISOString()
+              }, { merge: true }).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn("Erro upload foto no cadastro:", e);
+        }
       }
 
       showToast('Alojado cadastrado com sucesso!', 'success');
       fecharModal('modalAlojadoForm');
-      refreshAllData();
+      fecharModal('modalQuartoDetalhes');
+      await refreshAllData();
+      carregarQuartos();
+      carregarAlojados();
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -1799,6 +4285,7 @@ async function salvarAlojado(e) {
           matricula: matricula,
           empresa_id: empresaId ? parseInt(empresaId) : null,
           funcao: funcao,
+          whatsapp: whatsapp,
           data_entrada: dataEntrada,
           observacoes: obs,
           foto_url: fotoUrlAtual,
@@ -1808,15 +4295,34 @@ async function salvarAlojado(e) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Erro ao atualizar dados');
 
-      // Se selecionou arquivo de foto nova, enviar upload
+      // Se selecionou arquivo de foto nova, enviar upload para ImgBB
       if (fotoInput && fotoInput.files && fotoInput.files[0]) {
-        const formData = new FormData();
-        formData.append('file', fotoInput.files[0]);
-        formData.append('usuario', currentUserName);
-        await fetch(`${API_BASE}/api/alojados/${id}/foto`, {
-          method: 'POST',
-          body: formData
-        });
+        try {
+          const file = fotoInput.files[0];
+          const formData = new FormData();
+          formData.append('image', file);
+          const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+          });
+          const imgbbData = await resImgbb.json();
+          if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+            const novaUrl = imgbbData.data.display_url;
+            const al = (StaticApiEngine.dbState.alojados || []).find(x => x.id == id);
+            if (al) {
+              al.foto_url = novaUrl;
+              StaticApiEngine.saveToStorage();
+            }
+            if (firebaseInitialized && firestoreDb) {
+              firestoreDb.collection('alojados').doc(String(id)).set({
+                foto_url: novaUrl,
+                atualizado_em: new Date().toISOString()
+              }, { merge: true }).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn("Erro upload foto na edição:", e);
+        }
       }
 
       showToast('Dados e foto do alojado atualizados!', 'success');
@@ -1846,8 +4352,19 @@ function abrirModalFotoAlojado(alojadoId, nome, fotoUrl, empresaNome, empresaCor
   const vazioEl = document.getElementById('modalFotoVazio');
   const btnRemover = document.getElementById('modalFotoBtnRemover');
   
-  if (fotoUrl && fotoUrl.trim() !== '') {
-    imgEl.src = fotoUrl;
+  // Buscar os dados atualizados do colaborador no banco em memória
+  let al = null;
+  if (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) {
+    al = window.StaticApiEngine.dbState.alojados.find(x => x.id == alojadoId);
+  }
+
+  let fotoAtual = (al && al.foto_url) ? al.foto_url : fotoUrl;
+
+  if (fotoAtual && fotoAtual.trim() !== '') {
+    photoCacheManager.getPhoto(fotoAtual).then(cached => {
+      if (cached && imgEl) imgEl.src = cached;
+    });
+    imgEl.src = fotoAtual;
     imgEl.classList.remove('hidden');
     vazioEl.classList.add('hidden');
     btnRemover.classList.remove('hidden');
@@ -1857,9 +4374,34 @@ function abrirModalFotoAlojado(alojadoId, nome, fotoUrl, empresaNome, empresaCor
     vazioEl.classList.remove('hidden');
     btnRemover.classList.add('hidden');
   }
+
+  // Configuração do botão direto para WhatsApp
+  const btnZap = document.getElementById('modalFotoBtnWhatsapp');
+  const txtZap = document.getElementById('modalFotoWhatsappTexto');
+  const zapNum = (al && al.whatsapp) ? al.whatsapp : '';
+  const waUrl = getWhatsappUrl(zapNum);
+
+  if (btnZap) {
+    if (waUrl) {
+      btnZap.href = waUrl;
+      const zapFormatado = formatarTelefoneTexto(zapNum);
+      if (txtZap) txtZap.textContent = `Conversar no WhatsApp (${zapFormatado})`;
+      btnZap.classList.remove('hidden');
+    } else {
+      btnZap.href = '#';
+      btnZap.classList.add('hidden');
+    }
+  }
   
   abrirModal('modalFotoAlojado');
   updateUserRoleUI();
+}
+
+function editarAlojadoDoModalFoto() {
+  const alojadoId = document.getElementById('modalFotoAlojadoId').value;
+  if (!alojadoId) return;
+  fecharModal('modalFotoAlojado');
+  abrirModalEditarAlojado(Number(alojadoId));
 }
 
 function uploadFotoModalAlojado(input) {
@@ -1875,18 +4417,42 @@ async function removerFotoModalAlojado() {
   if (!confirm('Deseja realmente remover a foto deste colaborador?')) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/foto?usuario=${encodeURIComponent(currentUserName)}`, {
-      method: 'DELETE'
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro ao remover foto');
+    await StaticApiEngine.init();
+    const alojado = (StaticApiEngine.dbState.alojados || []).find(x => x.id == alojadoId);
+    if (alojado) {
+      alojado.foto_url = null;
+      (StaticApiEngine.dbState.quartos || []).forEach(q => {
+        (q.vagas || []).forEach(v => {
+          if (v.alojado && v.alojado.id == alojadoId) {
+            v.alojado.foto_url = null;
+          }
+        });
+      });
+      StaticApiEngine.saveToStorage();
+    }
+
+    if (firebaseInitialized && firestoreDb) {
+      firestoreDb.collection('alojados').doc(String(alojadoId)).set({
+        foto_url: null,
+        atualizado_em: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
 
     showToast('Foto removida!', 'success');
-    document.getElementById('modalFotoImg').src = '';
-    document.getElementById('modalFotoImg').classList.add('hidden');
-    document.getElementById('modalFotoVazio').classList.remove('hidden');
-    document.getElementById('modalFotoBtnRemover').classList.add('hidden');
-    refreshAllData();
+    const imgEl = document.getElementById('modalFotoImg');
+    if (imgEl) {
+      imgEl.src = '';
+      imgEl.classList.add('hidden');
+    }
+    const vazioEl = document.getElementById('modalFotoVazio');
+    if (vazioEl) vazioEl.classList.remove('hidden');
+    const btnRem = document.getElementById('modalFotoBtnRemover');
+    if (btnRem) btnRem.classList.add('hidden');
+
+    if (activeTab === 'alojados') carregarAlojados();
+    if (activeTab === 'blocos') carregarQuartos();
+    if (activeTab === 'dashboard') carregarDashboard();
+    aplicarCacheEmFotosNaTela();
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -1917,8 +4483,15 @@ async function confirmarRealocacao(e) {
     return;
   }
 
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Mudando de quarto...';
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/realocar`, {
+    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/realocar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1929,13 +4502,21 @@ async function confirmarRealocacao(e) {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro na realocação');
+    if (!res.ok) throw new Error(data.detail || data.message || 'Erro na realocação');
 
-    showToast('Alojado realocado com sucesso!', 'success');
+    showToast('Colaborador mudado de quarto com sucesso!', 'success');
     fecharModal('modalRealocar');
-    refreshAllData();
+    fecharModal('modalQuartoDetalhes');
+    await refreshAllData();
+    carregarQuartos();
+    carregarAlojados();
   } catch (err) {
     showToast(err.message, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnText;
+    }
   }
 }
 
@@ -1957,8 +4538,15 @@ async function confirmarDesligamento(e) {
   const dataSaida = document.getElementById('desligarData').value;
   const motivo = document.getElementById('desligarMotivo').value.trim();
 
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Registrando saída...';
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/desligar`, {
+    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/desligar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1969,13 +4557,21 @@ async function confirmarDesligamento(e) {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro no desligamento');
+    if (!res.ok) throw new Error(data.detail || data.message || 'Erro no desligamento');
 
     showToast('Saída registrada e vaga liberada com sucesso!', 'success');
     fecharModal('modalDesligar');
-    refreshAllData();
+    fecharModal('modalQuartoDetalhes');
+    await refreshAllData();
+    carregarQuartos();
+    carregarAlojados();
   } catch (err) {
     showToast(err.message, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnText;
+    }
   }
 }
 
@@ -1986,7 +4582,7 @@ async function abrirModalReativar(alojadoId, nome) {
   if (!vagaId) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/alojados/reativar`, {
+    const res = await fetch(`${API_BASE}/api/alojados/${alojadoId}/reativar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1997,10 +4593,12 @@ async function abrirModalReativar(alojadoId, nome) {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Erro ao reativar');
+    if (!res.ok) throw new Error(data.detail || data.message || 'Erro ao reativar');
 
     showToast('Alojado reativado com sucesso!', 'success');
-    refreshAllData();
+    await refreshAllData();
+    carregarQuartos();
+    carregarAlojados();
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -2601,11 +5199,266 @@ async function carregarRelatoriosPreview() {
   }
 }
 
+// ========================================================
+// 6. RELATÓRIOS & EXPORTAÇÕES EXCEL PROFISSIONAIS (COM FÓRMULAS E ESTILOS)
+// ========================================================
+
+const ExcelProGenerator = {
+  estilos: {
+    title: {
+      font: { bold: true, color: { rgb: '0F172A' }, sz: 14, name: 'Calibri' },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    },
+    subtitle: {
+      font: { italic: true, color: { rgb: '475569' }, sz: 10, name: 'Calibri' },
+      alignment: { horizontal: 'left', vertical: 'center' }
+    },
+    th: {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11, name: 'Calibri' },
+      fill: { fgColor: { rgb: '1E293B' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: {
+        top: { style: 'thin', color: { rgb: '94A3B8' } },
+        bottom: { style: 'medium', color: { rgb: '0F172A' } },
+        left: { style: 'thin', color: { rgb: '94A3B8' } },
+        right: { style: 'thin', color: { rgb: '94A3B8' } }
+      }
+    },
+    td: (zebra = false, align = 'left') => ({
+      font: { sz: 10, color: { rgb: '0F172A' }, name: 'Calibri' },
+      fill: zebra ? { fgColor: { rgb: 'F8FAFC' } } : { fgColor: { rgb: 'FFFFFF' } },
+      alignment: { horizontal: align, vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+      }
+    }),
+    total: (align = 'center') => ({
+      font: { bold: true, sz: 11, color: { rgb: '0F172A' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'E2E8F0' } },
+      alignment: { horizontal: align, vertical: 'center' },
+      border: {
+        top: { style: 'medium', color: { rgb: '475569' } },
+        bottom: { style: 'double', color: { rgb: '0F172A' } },
+        left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+        right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+      }
+    }),
+    statusLivre: {
+      font: { bold: true, sz: 9, color: { rgb: '166534' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'DCFCE7' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'BBF7D0' } },
+        bottom: { style: 'thin', color: { rgb: 'BBF7D0' } },
+        left: { style: 'thin', color: { rgb: 'BBF7D0' } },
+        right: { style: 'thin', color: { rgb: 'BBF7D0' } }
+      }
+    },
+    statusOcupada: {
+      font: { bold: true, sz: 9, color: { rgb: '1E40AF' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'DBEAFE' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        bottom: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        left: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        right: { style: 'thin', color: { rgb: 'BFDBFE' } }
+      }
+    },
+    statusAlerta: {
+      font: { bold: true, sz: 9, color: { rgb: '991B1B' }, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'FEE2E2' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'FECACA' } },
+        bottom: { style: 'thin', color: { rgb: 'FECACA' } },
+        left: { style: 'thin', color: { rgb: 'FECACA' } },
+        right: { style: 'thin', color: { rgb: 'FECACA' } }
+      }
+    }
+  },
+
+  addCell(ws, r, c, val, opts = {}) {
+    const ref = XLSX.utils.encode_cell({ r, c });
+    const cell = { v: val };
+    if (opts.f) cell.f = opts.f;
+    if (opts.z) cell.z = opts.z;
+    if (opts.s) cell.s = opts.s;
+    if (opts.t) cell.t = opts.t;
+    else cell.t = typeof val === 'number' ? 'n' : 's';
+    ws[ref] = cell;
+  },
+
+  addCabecalhoObra(ws, titulo, subtitulo, totalCols) {
+    this.addCell(ws, 0, 0, titulo, { s: this.estilos.title });
+    this.addCell(ws, 1, 0, subtitulo, { s: this.estilos.subtitle });
+    if (!ws['!merges']) ws['!merges'] = [];
+    ws['!merges'].push(
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } }
+    );
+  }
+};
+
 function exportarResumoExcel() {
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('📊 Gerando Resumo Executivo em Excel com fórmulas...', 'info');
+    const wb = XLSX.utils.book_new();
+    const db = StaticApiEngine.dbState;
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    // 1. ABA RESUMO EXECUTIVO
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — RESUMO EXECUTIVO DE OCUPAÇÃO`, `${empresaNome} • Responsável: Tiago Vidal (Prefeito de Canteiro) • Emissão: ${dataHora}`, 7);
+    const h1 = ['Bloco / Alojamento', 'Finalidade', 'Total Quartos', 'Capacidade (Vagas)', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    h1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const blocos = db.blocos || [];
+    const quartos = db.quartos || [];
+
+    blocos.forEach((b, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtsBloco = quartos.filter(q => q.bloco_id === b.id);
+      const cap = b.total_vagas || (qtsBloco.reduce((acc, q) => acc + (q.capacidade || 4), 0));
+      const oc = b.ocupadas !== undefined ? b.ocupadas : (qtsBloco.reduce((acc, q) => acc + (q.vagas_ocupadas || 0), 0));
+      const liv = cap - oc;
+      const taxa = cap > 0 ? (oc / cap) : 0;
+
+      ExcelProGenerator.addCell(ws1, r, 0, b.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 1, (b.tipo || 'alojamento').toUpperCase(), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 2, qtsBloco.length || 22, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 3, cap, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 4, oc, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 5, liv, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `E${rowEx}/D${rowEx}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow1 = 4 + blocos.length;
+    const totEx1 = totRow1 + 1;
+    const firstRow1 = 5;
+    const lastRow1 = totRow1;
+    const totalGeralCap = db.geral?.total_vagas || 880;
+    const totalGeralOc = db.geral?.ocupadas || 387;
+    const totalGeralLiv = totalGeralCap - totalGeralOc;
+
+    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRow1, 1, 'OBRA GERAL', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 2, quartos.length || 220, { f: `SUM(C${firstRow1}:C${lastRow1})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 3, totalGeralCap, { f: `SUM(D${firstRow1}:D${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 4, totalGeralOc, { f: `SUM(E${firstRow1}:E${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 5, totalGeralLiv, { f: `D${totEx1}-E${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 6, (totalGeralOc / totalGeralCap), { f: `E${totEx1}/D${totEx1}`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+    ws1['!ref'] = `A1:G${totEx1}`;
+    ws1['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "RESUMO DE OCUPAÇÃO");
+
+    // 2. ABA EMPRESAS
+    const wsEmp = {};
+    ExcelProGenerator.addCabecalhoObra(wsEmp, `${obraNome.toUpperCase()} — DISTRIBUIÇÃO POR EMPRESA`, `${empresaNome} • Alojados Ativos por Empreiteira / Parceira • Emissão: ${dataHora}`, 4);
+    const hEmp = ['Empresa Parceira', 'Total Alojados', '% Participação na Obra (Fórmula)', 'Status'];
+    hEmp.forEach((h, col) => ExcelProGenerator.addCell(wsEmp, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const empresas = db.empresas || [];
+    const alojadosAtivos = (db.alojados || []).filter(a => a.status === 'ativo');
+    const totAtivos = alojadosAtivos.length || 387;
+
+    empresas.forEach((emp, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtdEmp = alojadosAtivos.filter(a => Number(a.empresa_id) === Number(emp.id)).length;
+      const part = totAtivos > 0 ? (qtdEmp / totAtivos) : 0;
+
+      ExcelProGenerator.addCell(wsEmp, r, 0, emp.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(wsEmp, r, 1, qtdEmp, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(wsEmp, r, 2, part, { f: `B${rowEx}/$B$${4 + empresas.length + 1}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(wsEmp, r, 3, 'PARCEIRA ATIVA', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRowEmp = 4 + empresas.length;
+    const totExEmp = totRowEmp + 1;
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 0, 'TOTAL GERAL DA OBRA', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 1, totAtivos, { f: `SUM(B5:B${totRowEmp})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 2, 1.0, { f: `SUM(C5:C${totRowEmp})`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(wsEmp, totRowEmp, 3, '100% REGISTRADO', { s: ExcelProGenerator.estilos.total('center') });
+
+    wsEmp['!ref'] = `A1:D${totExEmp}`;
+    wsEmp['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 30 }, { wch: 20 }];
+    wsEmp['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, wsEmp, "POR EMPRESA");
+
+    XLSX.writeFile(wb, "resumo_executivo_ocupacao_canteiro.xlsx");
+    showToast('Planilha executiva baixada com sucesso!', 'success');
+    return;
+  }
   window.open(`${API_BASE}/api/relatorios/exportar-resumo-excel`, '_blank');
 }
 
 function exportarAlojadosExcel() {
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('📋 Gerando Lista Completa de Alojados com fórmulas...', 'info');
+    const blocoId = document.getElementById('filtroAlojadosBloco')?.value || '';
+    const empresaId = document.getElementById('filtroAlojadosEmpresa')?.value || '';
+    let lista = (StaticApiEngine.dbState.alojados || []).filter(a => a.status === 'ativo');
+    if (empresaId) lista = lista.filter(a => Number(a.empresa_id) === Number(empresaId));
+    if (blocoId) {
+      const b = StaticApiEngine.dbState.blocos.find(x => Number(x.id) === Number(blocoId));
+      if (b) lista = lista.filter(a => a.bloco_nome === b.nome);
+    }
+
+    const wb = XLSX.utils.book_new();
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    const ws = {};
+    ExcelProGenerator.addCabecalhoObra(ws, `${obraNome.toUpperCase()} — RELAÇÃO DE ALOJADOS ATIVOS`, `${empresaNome} • Total Listado: ${lista.length} colaboradores • Emissão: ${dataHora}`, 10);
+    const headers = ['Matrícula', 'Nome Completo', 'Empresa', 'Função / Cargo', 'WhatsApp', 'Bloco', 'Quarto', 'Cama', 'Data de Entrada', 'Observações'];
+    headers.forEach((h, col) => ExcelProGenerator.addCell(ws, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    lista.forEach((a, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const zapFormatado = a.whatsapp ? formatarTelefoneTexto(a.whatsapp) : '-';
+
+      ExcelProGenerator.addCell(ws, r, 0, a.matricula || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 1, a.nome_completo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 2, a.empresa_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 3, a.funcao || 'Alojado', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 4, zapFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 5, a.bloco_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 6, String(a.quarto_numero || '-'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 7, a.numero_cama || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 8, a.data_entrada || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 9, a.observacoes || '', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow = 4 + lista.length;
+    const totEx = totRow + 1;
+    ExcelProGenerator.addCell(ws, totRow, 0, 'TOTAL ATIVOS', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws, totRow, 1, lista.length, { f: `COUNTA(B5:B${totRow})`, s: ExcelProGenerator.estilos.total('left') });
+    for (let c = 2; c < 10; c++) {
+      ExcelProGenerator.addCell(ws, totRow, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws['!ref'] = `A1:J${totEx}`;
+    ws['!cols'] = [{ wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 30 }];
+    ws['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws, "ALOJADOS ATIVOS");
+
+    XLSX.writeFile(wb, "alojados_ativos_canteiro_taboca2.xlsx");
+    showToast('Planilha de alojados baixada com sucesso!', 'success');
+    return;
+  }
   const blocoId = document.getElementById('filtroAlojadosBloco')?.value || '';
   const empresaId = document.getElementById('filtroAlojadosEmpresa')?.value || '';
   let url = `${API_BASE}/api/relatorios/exportar-alojados-excel?`;
@@ -2615,11 +5468,304 @@ function exportarAlojadosExcel() {
 }
 
 function exportarMoveisDanificadosExcel() {
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('🛠️ Gerando Relatório de Móveis e Manutenções...', 'info');
+    const danificados = [];
+    (StaticApiEngine.dbState.quartos || []).forEach(q => {
+      (q.moveis || []).forEach(m => {
+        if (m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado') {
+          danificados.push({
+            bloco_nome: q.bloco_nome,
+            quarto_numero: q.numero,
+            tipo_item: m.tipo_item,
+            quantidade: m.quantidade || 1,
+            estado_conservacao: m.estado_conservacao || 'Ruim',
+            precisa_manutencao: m.precisa_manutencao ? 'SIM (ALERTA)' : 'NÃO',
+            data_vistoria: m.data_vistoria || '-',
+            observacoes: m.observacoes || ''
+          });
+        }
+      });
+    });
+
+    const wb = XLSX.utils.book_new();
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    const ws = {};
+    ExcelProGenerator.addCabecalhoObra(ws, `${obraNome.toUpperCase()} — MÓVEIS EM ALERTA & MANUTENÇÃO`, `${empresaNome} • Itens Danificados ou com Reparo Solicitado • Emissão: ${dataHora}`, 8);
+    const headers = ['Bloco', 'Quarto', 'Item / Patrimônio', 'Qtd', 'Estado de Conservação', 'Necessita Manutenção', 'Data da Vistoria', 'Observações / Ação Necessária'];
+    headers.forEach((h, col) => ExcelProGenerator.addCell(ws, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    danificados.forEach((m, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      ExcelProGenerator.addCell(ws, r, 0, m.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 1, String(m.quarto_numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 2, m.tipo_item, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws, r, 3, m.quantidade, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 4, m.estado_conservacao, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 5, m.precisa_manutencao, { s: ExcelProGenerator.estilos.statusAlerta });
+      ExcelProGenerator.addCell(ws, r, 6, m.data_vistoria, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws, r, 7, m.observacoes, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow = 4 + danificados.length;
+    const totEx = totRow + 1;
+    ExcelProGenerator.addCell(ws, totRow, 0, 'TOTAL ITENS EM ALERTA', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws, totRow, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws, totRow, 2, `${danificados.length} itens com avaria`, { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws, totRow, 3, danificados.reduce((a, b) => a + Number(b.quantidade || 1), 0), { f: `SUM(D5:D${totRow})`, s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 4; c < 8; c++) {
+      ExcelProGenerator.addCell(ws, totRow, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws['!ref'] = `A1:H${totEx}`;
+    ws['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 28 }, { wch: 10 }, { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
+    ws['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws, "MOVEIS COM ALERTA");
+
+    XLSX.writeFile(wb, "moveis_manutencao_canteiro_taboca2.xlsx");
+    showToast('Planilha de manutenção baixada com sucesso!', 'success');
+    return;
+  }
   window.open(`${API_BASE}/api/relatorios/exportar-moveis-danificados-excel`, '_blank');
 }
 
 function exportarPlanilhaOficial() {
-  showToast('📗 Gerando Planilha Oficial Taboca 2 (modelo idêntico com 4 abas)...', 'info');
+  if (staticModeActive && typeof XLSX !== 'undefined') {
+    showToast('📗 Gerando Planilha Oficial Taboca 2 (5 abas com fórmulas e layout profissional)...', 'info');
+    const wb = XLSX.utils.book_new();
+    const db = StaticApiEngine.dbState;
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    const blocos = db.blocos || [];
+    const quartos = db.quartos || [];
+    const alojados = db.alojados || [];
+    const empresas = db.empresas || [];
+    const alojadosAtivos = alojados.filter(a => a.status === 'ativo');
+
+    // ==========================================
+    // ABA 1: RESUMO DE OCUPAÇÃO (COM FÓRMULAS)
+    // ==========================================
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CONTROLE OFICIAL DE HABITAÇÃO & OCUPAÇÃO`, `${empresaNome} • Responsável: Tiago Vidal (Prefeito de Canteiro) • Emissão: ${dataHora}`, 7);
+    const h1 = ['Bloco / Alojamento', 'Finalidade', 'Total Quartos', 'Capacidade Total', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    h1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    blocos.forEach((b, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtsBloco = quartos.filter(q => q.bloco_id === b.id);
+      const cap = b.total_vagas || (qtsBloco.reduce((acc, q) => acc + (q.capacidade || 4), 0));
+      const oc = b.ocupadas !== undefined ? b.ocupadas : (qtsBloco.reduce((acc, q) => acc + (q.vagas_ocupadas || 0), 0));
+      const liv = cap - oc;
+      const taxa = cap > 0 ? (oc / cap) : 0;
+
+      ExcelProGenerator.addCell(ws1, r, 0, b.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 1, (b.tipo || 'alojamento').toUpperCase(), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 2, qtsBloco.length || 22, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 3, cap, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 4, oc, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 5, liv, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `E${rowEx}/D${rowEx}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow1 = 4 + blocos.length;
+    const totEx1 = totRow1 + 1;
+    const totalGeralCap = db.geral?.total_vagas || 880;
+    const totalGeralOc = alojadosAtivos.length || 387;
+    const totalGeralLiv = totalGeralCap - totalGeralOc;
+
+    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRow1, 1, 'OBRA GERAL', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 2, quartos.length || 220, { f: `SUM(C5:C${totRow1})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 3, totalGeralCap, { f: `SUM(D5:D${totRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 4, totalGeralOc, { f: `SUM(E5:E${totRow1})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 5, totalGeralLiv, { f: `D${totEx1}-E${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRow1, 6, (totalGeralOc / totalGeralCap), { f: `E${totEx1}/D${totEx1}`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+    ws1['!ref'] = `A1:G${totEx1}`;
+    ws1['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "RESUMO DE OCUPAÇÃO");
+
+    // ==========================================
+    // ABA 2: MAPA DE CAMAS
+    // ==========================================
+    const ws2 = {};
+    ExcelProGenerator.addCabecalhoObra(ws2, `${obraNome.toUpperCase()} — MAPA DETALHADO DE LEITOS E VAGAS`, `${empresaNome} • Status Individual de Cada Cama dos 220 Quartos • Emissão: ${dataHora}`, 9);
+    const h2 = ['Bloco', 'Quarto', 'Cama', 'Status da Vaga', 'Matrícula', 'Colaborador Alojado', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp'];
+    h2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    let r2 = 4;
+    quartos.forEach(q => {
+      (q.vagas || []).forEach(v => {
+        const zebra = r2 % 2 === 1;
+        const al = v.alojado || (v.alojado_id ? alojados.find(x => Number(x.id) === Number(v.alojado_id)) : null);
+        const isOc = v.status === 'ocupada' && (al || v.nome_completo);
+        const statusTexto = isOc ? 'OCUPADA' : 'LIVRE';
+        const statusEstilo = isOc ? ExcelProGenerator.estilos.statusOcupada : ExcelProGenerator.estilos.statusLivre;
+        const nomeAl = isOc ? (al?.nome_completo || v.nome_completo || 'Colaborador') : 'VAGA LIVRE';
+        const matAl = isOc ? (al?.matricula || v.matricula || '-') : '-';
+        const empAl = isOc ? (al?.empresa_nome || v.empresa_nome || '-') : '-';
+        const funcAl = isOc ? (al?.funcao || v.funcao || '-') : '-';
+        const zapAl = isOc && (al?.whatsapp || v.whatsapp) ? formatarTelefoneTexto(al?.whatsapp || v.whatsapp) : '-';
+
+        ExcelProGenerator.addCell(ws2, r2, 0, q.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 1, String(q.numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 2, v.numero_cama, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 3, statusTexto, { s: statusEstilo });
+        ExcelProGenerator.addCell(ws2, r2, 4, matAl, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws2, r2, 5, nomeAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws2, r2, 6, empAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws2, r2, 7, funcAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws2, r2, 8, zapAl, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+
+        r2++;
+      });
+    });
+
+    const totEx2 = r2 + 1;
+    ExcelProGenerator.addCell(ws2, r2, 0, 'TOTAL DE LEITOS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, r2, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws2, r2, 2, r2 - 4, { f: `COUNTA(A5:A${r2})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws2, r2, 3, '880 LEITOS', { s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 4; c < 9; c++) {
+      ExcelProGenerator.addCell(ws2, r2, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws2['!ref'] = `A1:I${totEx2}`;
+    ws2['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }];
+    ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "MAPA DE CAMAS");
+
+    // ==========================================
+    // ABA 3: ALOJADOS ATIVOS
+    // ==========================================
+    const ws3 = {};
+    ExcelProGenerator.addCabecalhoObra(ws3, `${obraNome.toUpperCase()} — LISTAGEM OFICIAL DE ALOJADOS ATIVOS`, `${empresaNome} • Cadastro Completo de Moradores do Canteiro • Emissão: ${dataHora}`, 10);
+    const h3 = ['Matrícula', 'Nome Completo', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp', 'Bloco', 'Quarto', 'Cama', 'Data de Entrada', 'Observações'];
+    h3.forEach((h, col) => ExcelProGenerator.addCell(ws3, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    alojadosAtivos.forEach((a, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const zapFormatado = a.whatsapp ? formatarTelefoneTexto(a.whatsapp) : '-';
+
+      ExcelProGenerator.addCell(ws3, r, 0, a.matricula || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 1, a.nome_completo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 2, a.empresa_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 3, a.funcao || 'Alojado', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 4, zapFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 5, a.bloco_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 6, String(a.quarto_numero || '-'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 7, a.numero_cama || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 8, a.data_entrada || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 9, a.observacoes || '', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow3 = 4 + alojadosAtivos.length;
+    const totEx3 = totRow3 + 1;
+    ExcelProGenerator.addCell(ws3, totRow3, 0, 'TOTAL ATIVOS', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws3, totRow3, 1, alojadosAtivos.length, { f: `COUNTA(B5:B${totRow3})`, s: ExcelProGenerator.estilos.total('left') });
+    for (let c = 2; c < 10; c++) {
+      ExcelProGenerator.addCell(ws3, totRow3, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws3['!ref'] = `A1:J${totEx3}`;
+    ws3['!cols'] = [{ wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 30 }];
+    ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws3, "ALOJADOS ATIVOS");
+
+    // ==========================================
+    // ABA 4: MÓVEIS E VISTORIAS
+    // ==========================================
+    const ws4 = {};
+    ExcelProGenerator.addCabecalhoObra(ws4, `${obraNome.toUpperCase()} — INVENTÁRIO DE MÓVEIS & VISTORIAS`, `${empresaNome} • Conservação do Patrimônio e Itens para Reparo • Emissão: ${dataHora}`, 8);
+    const h4 = ['Bloco', 'Quarto', 'Item / Móvel', 'Quantidade', 'Estado de Conservação', 'Necessita Manutenção', 'Data da Vistoria', 'Observações'];
+    h4.forEach((h, col) => ExcelProGenerator.addCell(ws4, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    let r4 = 4;
+    quartos.forEach(q => {
+      (q.moveis || []).forEach(m => {
+        const zebra = r4 % 2 === 1;
+        const alerta = m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado';
+        const statusTexto = alerta ? 'SIM (ALERTA)' : 'NÃO';
+        const statusEstilo = alerta ? ExcelProGenerator.estilos.statusAlerta : ExcelProGenerator.estilos.statusLivre;
+
+        ExcelProGenerator.addCell(ws4, r4, 0, q.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 1, String(q.numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 2, m.tipo_item, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws4, r4, 3, m.quantidade || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 4, m.estado_conservacao || 'Bom', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 5, statusTexto, { s: statusEstilo });
+        ExcelProGenerator.addCell(ws4, r4, 6, m.data_vistoria || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws4, r4, 7, m.observacoes || '', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+
+        r4++;
+      });
+    });
+
+    const totEx4 = r4 + 1;
+    ExcelProGenerator.addCell(ws4, r4, 0, 'TOTAL ITENS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws4, r4, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 2, `${r4 - 4} registros patrimoniais`, { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws4, r4, 3, r4 - 4, { f: `SUM(D5:D${r4})`, s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 4; c < 8; c++) {
+      ExcelProGenerator.addCell(ws4, r4, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws4['!ref'] = `A1:H${totEx4}`;
+    ws4['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
+    ws4['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws4, "MÓVEIS E VISTORIAS");
+
+    // ==========================================
+    // ABA 5: DISTRIBUIÇÃO POR EMPRESA (COM FÓRMULAS)
+    // ==========================================
+    const ws5 = {};
+    ExcelProGenerator.addCabecalhoObra(ws5, `${obraNome.toUpperCase()} — OCUPAÇÃO POR EMPRESA PARCEIRA`, `${empresaNome} • Participação de Cada Contratada no Total de Leitos • Emissão: ${dataHora}`, 4);
+    const h5 = ['Empresa Parceira', 'Total Alojados', '% Participação na Obra (Fórmula)', 'Situação'];
+    h5.forEach((h, col) => ExcelProGenerator.addCell(ws5, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const totAtivosOficial = alojadosAtivos.length || 387;
+
+    empresas.forEach((emp, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const qtdEmp = alojadosAtivos.filter(a => Number(a.empresa_id) === Number(emp.id)).length;
+      const part = totAtivosOficial > 0 ? (qtdEmp / totAtivosOficial) : 0;
+
+      ExcelProGenerator.addCell(ws5, r, 0, emp.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws5, r, 1, qtdEmp, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws5, r, 2, part, { f: `B${rowEx}/$B$${4 + empresas.length + 1}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws5, r, 3, 'PARCEIRA ATIVA', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow5 = 4 + empresas.length;
+    const totEx5 = totRow5 + 1;
+    ExcelProGenerator.addCell(ws5, totRow5, 0, 'TOTAL GERAL DA OBRA', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws5, totRow5, 1, totAtivosOficial, { f: `SUM(B5:B${totRow5})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws5, totRow5, 2, 1.0, { f: `SUM(C5:C${totRow5})`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws5, totRow5, 3, '100% REGISTRADO', { s: ExcelProGenerator.estilos.total('center') });
+
+    ws5['!ref'] = `A1:D${totEx5}`;
+    ws5['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 32 }, { wch: 20 }];
+    ws5['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws5, "DISTRIBUIÇÃO POR EMPRESA");
+
+    // Gerar e salvar arquivo XLSX oficial
+    XLSX.writeFile(wb, "controle_alojamento_oficial_taboca2.xlsx");
+    showToast('📗 Planilha Oficial baixada com sucesso (5 abas completas com fórmulas)!', 'success');
+    return;
+  }
+  showToast('📗 Gerando Planilha Oficial Taboca 2...', 'info');
   window.open(`${API_BASE}/api/relatorios/exportar-planilha-oficial`, '_blank');
 }
 
@@ -2888,3 +6034,91 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 300);
   }, 4000);
 }
+
+// ========================================================
+// PWA & INSTALAÇÃO DO APLICATIVO (CELULAR E PC)
+// ========================================================
+let deferredInstallPrompt = null;
+
+// Registro do Service Worker para suporte PWA offline e instalação
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[PWA] Service Worker registrado com sucesso:', reg.scope))
+      .catch(err => console.log('[PWA] Erro ao registrar Service Worker:', err));
+  });
+}
+
+// Capturar evento de instalação do Chrome / Edge / Android
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  console.log('[PWA] Pronto para instalar o aplicativo.');
+  const btnHeader = document.getElementById('btnInstalarAppHeader');
+  if (btnHeader) btnHeader.classList.remove('hidden');
+});
+
+// App instalado com sucesso
+window.addEventListener('appinstalled', () => {
+  console.log('[PWA] Aplicativo instalado com sucesso na tela inicial!');
+  deferredInstallPrompt = null;
+  showToast('Aplicativo instalado com sucesso na tela inicial!', 'success');
+  fecharModalInstalacao();
+  const btnHeader = document.getElementById('btnInstalarAppHeader');
+  if (btnHeader) btnHeader.classList.add('hidden');
+});
+
+function iniciarInstalacaoApp() {
+  abrirModalInstalacao();
+}
+
+function abrirModalInstalacao() {
+  abrirModal('modalInstalarApp');
+}
+
+function fecharModalInstalacao() {
+  fecharModal('modalInstalarApp');
+}
+
+async function executarPromptInstalacao() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    console.log('[PWA] Resposta instalação:', outcome);
+    if (outcome === 'accepted') {
+      showToast('Instalando o aplicativo...', 'info');
+      deferredInstallPrompt = null;
+      fecharModalInstalacao();
+    }
+  } else {
+    showToast('Siga o passo a passo ilustrado na tela para adicionar!', 'info');
+  }
+}
+
+// ========================================================
+// MENU MOBILE "MAIS" (DRAWER INFERIOR NO CELULAR)
+// ========================================================
+function toggleMenuMobileMais() {
+  const drawer = document.getElementById('drawerMobileMais');
+  if (drawer) {
+    if (drawer.classList.contains('hidden')) {
+      drawer.classList.remove('hidden');
+      drawer.classList.add('flex');
+    } else {
+      drawer.classList.add('hidden');
+      drawer.classList.remove('flex');
+    }
+  }
+}
+
+function fecharMenuMobileMais(e) {
+  if (e && e.target && e.target !== e.currentTarget && e.target.closest && e.target.closest('#drawerMobileMais > div')) {
+    return;
+  }
+  const drawer = document.getElementById('drawerMobileMais');
+  if (drawer) {
+    drawer.classList.add('hidden');
+    drawer.classList.remove('flex');
+  }
+}
+

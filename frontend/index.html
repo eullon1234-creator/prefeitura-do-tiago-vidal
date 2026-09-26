@@ -2,14 +2,40 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Prefeitura de Canteiro | Controle de Alojamentos</title>
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico">
+  <!-- PWA Manifest & Suporte a Instalação no Celular e PC -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Prefeitura">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <!-- Silenciar aviso informativo do Tailwind CDN no console -->
+  <script>
+    const _origWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      _origWarn.apply(console, args);
+    };
+  </script>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS com Estilos, Cores e Fórmulas Profissionais (xlsx-js-style) -->
+  <script src="xlsx.bundle.js"></script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"><\/script>');
+    }
+  </script>
   <!-- Cropper.js (Edição e Recorte de Fotos 1:1) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -42,11 +68,20 @@
   </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
+    html, body {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      max-width: 100vw;
+      -webkit-tap-highlight-color: transparent;
+    }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .overscroll-contain {
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
@@ -54,34 +89,34 @@
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased overflow-x-hidden w-full">
 
   <!-- Top Navbar -->
-  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md no-print">
-    <div class="px-4 py-2.5 flex items-center justify-between gap-4">
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md no-print w-full">
+    <div class="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2 max-w-full">
       <!-- Left: Brand & Mobile Toggle -->
-      <div class="flex items-center gap-3">
-        <button id="mobileMenuBtn" class="md:hidden text-slate-300 hover:text-white p-1 rounded hover:bg-slate-800">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <button id="mobileMenuBtn" onclick="toggleSidebarMobile()" class="md:hidden text-slate-300 hover:text-white p-1.5 -ml-1 rounded-lg hover:bg-slate-800 flex-shrink-0" aria-label="Abrir Menu">
           <i class="fa-solid fa-bars text-lg"></i>
         </button>
-        <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchTab('dashboard')">
-          <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-bold shadow-sm">
-            <i class="fa-solid fa-hotel text-lg"></i>
+        <div class="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" onclick="switchTab('dashboard')">
+          <div class="h-9 sm:h-10 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-7 sm:h-8 w-auto object-contain">
           </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="font-bold tracking-tight text-base text-white">PREFEITURA DE CANTEIRO</span>
-              <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5 flex-nowrap">
+              <span class="font-extrabold tracking-tight text-xs sm:text-base text-white truncate">PREFEITURA</span>
+              <span class="app-obra-tag text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex-shrink-0">Taboca 2</span>
             </div>
-            <p class="text-xs text-slate-400">Controle Integrado de Alojamentos & Vistorias</p>
+            <p class="app-empresa-nome hidden sm:block text-[11px] sm:text-xs text-slate-400 truncate leading-none mt-0.5">GEL • Goetze Lobato Engenharia S.A.</p>
           </div>
         </div>
       </div>
 
       <!-- Right: User info, mode switch & fast actions -->
-      <div class="flex items-center gap-2.5">
-        <!-- Firebase Status Badge -->
-        <button onclick="switchTab('configuracoes')" title="Firebase Firestore: Conectado ao projeto prefeitura-cc71b. Clique para gerenciar sincronização." class="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-xs transition">
+      <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <!-- Firebase Status Badge (Telas Grandes) -->
+        <button onclick="switchTab('configuracoes')" title="Firebase Firestore Conectado" class="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-xs transition">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="firebaseDot"></span>
           <span class="text-slate-300 font-medium flex items-center gap-1">
             <i class="fa-solid fa-fire text-amber-500 text-xs"></i> 
@@ -89,39 +124,54 @@
           </span>
         </button>
 
-        <!-- Controle de Tamanho da Letra (Configurações de Tipografia) -->
-        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="Ajustar tamanho da letra do sistema">
-          <span class="text-[10px] text-slate-400 px-1 font-semibold hidden sm:inline"><i class="fa-solid fa-font mr-0.5"></i></span>
+        <!-- Controle de Tipografia (Telas Médias e Grandes) -->
+        <div class="hidden lg:flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="Ajustar tamanho da letra do sistema">
+          <span class="text-[10px] text-slate-400 px-1 font-semibold"><i class="fa-solid fa-font mr-0.5"></i></span>
           <button onclick="alterarTamanhoFonte('sm')" id="btnFontNav_sm" class="px-1.5 py-0.5 text-[11px] font-bold rounded text-slate-400 hover:text-white transition" title="Letra Pequena (13.5px)">A-</button>
           <button onclick="alterarTamanhoFonte('md')" id="btnFontNav_md" class="px-1.5 py-0.5 text-xs font-bold rounded bg-amber-500 text-slate-950 transition" title="Letra Normal / Padrão (15px)">A</button>
           <button onclick="alterarTamanhoFonte('lg')" id="btnFontNav_lg" class="px-1.5 py-0.5 text-sm font-bold rounded text-slate-400 hover:text-white transition" title="Letra Grande (17px)">A+</button>
           <button onclick="alterarTamanhoFonte('xl')" id="btnFontNav_xl" class="px-1.5 py-0.5 text-base font-bold rounded text-slate-400 hover:text-white transition" title="Letra Extra Grande (19px)">A++</button>
         </div>
 
-        <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original -->
-        <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition" title="Exportar Planilha Oficial no formato original exato">
+        <!-- Botão Instalar App (PWA) no Celular e PC -->
+        <button id="btnInstalarAppHeader" onclick="iniciarInstalacaoApp()" class="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Instalar aplicativo no celular ou computador">
+          <i class="fa-solid fa-download text-xs"></i>
+          <span class="hidden sm:inline">Baixar App</span>
+          <span class="sm:hidden text-[11px]">App</span>
+        </button>
+
+        <!-- Botão Sincronizar Nuvem (PC e Celular) -->
+        <button id="btnSyncNuvemHeader" onclick="sincronizarComNuvemHeader()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Sincronizar com a Nuvem (Atualizar Celular e PC)">
+          <i class="fa-solid fa-cloud-arrow-down text-xs" id="iconSyncNuvemHeader"></i>
+          <span class="hidden sm:inline">Sincronizar Nuvem</span>
+          <span class="sm:hidden text-[11px]">Nuvem</span>
+        </button>
+
+        <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original (Desktop) -->
+        <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition flex-shrink-0" title="Exportar Planilha Oficial no formato original exato">
           <i class="fa-solid fa-file-excel"></i> Planilha Oficial
         </button>
 
         <!-- Maintenance Alert Indicator -->
-        <button onclick="goToAlertas()" title="Ver itens em manutenção" class="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
-          <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+        <button onclick="goToAlertas()" title="Ver itens em manutenção" class="relative p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex-shrink-0">
+          <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm"></i>
           <span id="badgeAlertasNav" class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full hidden">0</span>
         </button>
 
-        <!-- Profile / Role badge -->
-        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-1">
-          <div class="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5" id="userBadge">
+        <!-- Profile / Role badge (Responsivo: Compacto no celular, Completo no desktop) -->
+        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5 sm:p-1 flex-shrink-0">
+          <div class="px-1.5 sm:px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5" id="userBadge">
             <i class="fa-solid fa-shield-halved text-amber-400" id="userRoleIcon"></i>
-            <span id="userRoleText" class="text-amber-300 font-medium">PREFEITO</span>
+            <span id="userRoleText" class="text-amber-300 font-medium hidden sm:inline">PREFEITO</span>
           </div>
-          <button onclick="toggleUserMode()" class="px-2 py-1 text-[11px] rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition" title="Alternar entre modo Prefeito (Admin) e Consulta">
-            <i class="fa-solid fa-repeat text-slate-400 mr-1"></i>Alternar
+          <button onclick="toggleUserMode()" class="px-1.5 sm:px-2 py-1 text-[11px] rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition flex items-center gap-1" title="Alternar entre modo Prefeito (Admin) e Consulta">
+            <i class="fa-solid fa-repeat text-slate-400 text-[10px]"></i>
+            <span class="hidden md:inline">Alternar</span>
           </button>
         </div>
 
         <!-- Refresh Button -->
-        <button onclick="refreshAllData()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Atualizar Dados">
+        <button onclick="refreshAllData()" class="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex-shrink-0" title="Atualizar Dados">
           <i class="fa-solid fa-arrows-rotate text-sm" id="refreshIcon"></i>
         </button>
       </div>
@@ -129,11 +179,32 @@
   </header>
 
   <!-- Main Container -->
-  <div class="flex-1 flex overflow-hidden">
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Backdrop Overlay para Fechar Sidebar no Celular ao Clicar Fora -->
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 hidden md:hidden transition-opacity duration-300 no-print" onclick="toggleSidebarMobile(false)"></div>
 
     <!-- Sidebar Navigation -->
-    <aside id="sidebar" class="w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between transition-all duration-300 z-20 md:static fixed inset-y-0 left-0 -translate-x-full md:translate-x-0 no-print">
-      <div class="p-3 space-y-1">
+    <aside id="sidebar" class="w-72 sm:w-80 md:w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between transition-transform duration-300 ease-in-out z-50 md:z-20 fixed md:static inset-y-0 left-0 -translate-x-full md:translate-x-0 shadow-2xl md:shadow-none h-full no-print">
+      
+      <!-- Topo da Sidebar no Mobile (com Logo Oficial & Botão Fechar X) -->
+      <div class="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/90 flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="h-9 px-2 py-0.5 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-7 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-extrabold text-white text-sm leading-tight">Prefeitura de Canteiro</h4>
+            <p class="app-empresa-nome text-[10px] text-slate-400">GEL • Goetze Lobato Eng. S.A.</p>
+          </div>
+        </div>
+        <button onclick="toggleSidebarMobile(false)" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" aria-label="Fechar menu lateral">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Links de Navegação com Scroll Livre e Suave -->
+      <div class="p-3 space-y-1 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
         <div class="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
           Módulos Principais
         </div>
@@ -189,34 +260,58 @@
           <i class="fa-solid fa-sliders w-5 text-indigo-400"></i>
           <span>Configurações & Firebase</span>
         </button>
+
+        <!-- Atalho Rápido de Instalar App também dentro da Sidebar -->
+        <div class="pt-3 pb-4">
+          <button onclick="toggleSidebarMobile(false); iniciarInstalacaoApp();" class="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-xs shadow-md transition transform active:scale-98">
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-mobile-screen-button text-sm"></i>
+              <span>Instalar Aplicativo Oficial</span>
+            </span>
+            <i class="fa-solid fa-download text-xs"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Sidebar Footer -->
-      <div class="p-3 border-t border-slate-800 bg-slate-950/50">
+      <div class="p-3 border-t border-slate-800 bg-slate-950/60 flex-shrink-0">
+        <div class="flex items-center gap-2 mb-2 p-1.5 rounded-lg bg-slate-900 border border-slate-800">
+          <div class="h-6 px-1.5 py-0.5 rounded bg-white flex items-center justify-center flex-shrink-0 shadow-xs">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-4 w-auto object-contain">
+          </div>
+          <div class="app-empresa-curto text-[10px] text-slate-300 font-semibold truncate leading-tight">
+            Goetze Lobato Eng. S.A.
+          </div>
+        </div>
         <div class="flex items-center gap-2 text-xs text-slate-400">
           <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span>Banco Conectado (SQLite)</span>
+          <span>Sistema Integrado Ativo</span>
         </div>
-        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro v1.0 • Taboca 2</p>
+        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro • <span class="app-obra-tag">Taboca 2</span></p>
       </div>
     </aside>
 
     <!-- Content Area -->
-    <main class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 bg-slate-100">
+    <main class="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 md:p-6 pb-28 md:pb-6 bg-slate-100">
 
       <!-- ================= TAB 1: DASHBOARD ================= -->
       <div id="tab-dashboard" class="tab-content space-y-6">
         
         <!-- Header / Salutation & Action Buttons -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div>
-            <div class="flex items-center gap-2">
-              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Painel Geral de Ocupação</h1>
-              <span id="roleBadgeInPage" class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-                Acesso: Prefeito
-              </span>
+          <div class="flex items-center gap-4">
+            <div class="hidden sm:flex h-14 w-auto px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 items-center justify-center flex-shrink-0 shadow-xs">
+              <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-10 w-auto object-contain">
             </div>
-            <p class="text-sm text-slate-500 mt-0.5">Visão consolidada dos blocos, quartos, vagas e estado de conservação das instalações.</p>
+            <div>
+              <div class="flex items-center gap-2">
+                <h1 class="text-xl md:text-2xl font-bold text-slate-900">Painel Geral de Ocupação</h1>
+                <span id="roleBadgeInPage" class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                  Acesso: Prefeito
+                </span>
+              </div>
+              <p class="text-sm text-slate-500 mt-0.5">Gestão de Alojamentos • Obra <span class="app-obra-tag font-semibold text-slate-700">Taboca 2</span> • <span class="app-empresa-nome font-semibold text-slate-700">GEL • Goetze Lobato Engenharia S.A.</span></p>
+            </div>
           </div>
           
           <div class="flex flex-wrap items-center gap-2.5">
@@ -502,9 +597,15 @@
           </div>
         </div>
 
-        <!-- Tabela de Alojados -->
+        <!-- Tabela e Cards de Alojados -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="overflow-x-auto">
+          <!-- Cards Otimizados para Celular (Mobile) -->
+          <div id="listaAlojadosMobile" class="md:hidden divide-y divide-slate-100">
+            <!-- Populado via Javascript no celular -->
+          </div>
+
+          <!-- Tabela Completa para Computador / Tablet -->
+          <div class="hidden md:block overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-700">
               <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                 <tr>
@@ -967,6 +1068,92 @@
           </div>
         </div>
 
+        <!-- SEÇÃO: IDENTIDADE VISUAL & EMPRESA -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-lg font-bold flex-shrink-0">
+                <i class="fa-solid fa-building-user"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Identidade Visual & Empresa</h3>
+                <p class="text-xs text-slate-500">Personalize a logomarca da construtora, o nome da empresa e o nome do canteiro/obra. Atualizado em tempo real no app e em todos os aparelhos.</p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-amber-50 text-amber-800 border border-amber-200 inline-flex items-center gap-1.5 self-start sm:self-center">
+              <i class="fa-solid fa-shield-halved text-amber-500"></i> Exclusivo Prefeito
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            <!-- Coluna da Logo (Preview e Upload) -->
+            <div class="md:col-span-4 flex flex-col items-center sm:items-start space-y-3">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Logomarca Oficial
+              </label>
+              
+              <div class="w-full h-32 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-amber-400 p-3 flex flex-col items-center justify-center relative group transition bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:12px_12px]">
+                <img id="configLogoPreview" src="logo_gel_cropped.png" alt="Prévia da Logomarca" class="max-h-20 max-w-full object-contain filter drop-shadow-sm transition-transform group-hover:scale-105">
+                <div class="absolute inset-0 bg-slate-900/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer" onclick="document.getElementById('configLogoFileInput').click()">
+                  <span class="text-white text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur-xs flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-camera"></i> Trocar Logo
+                  </span>
+                </div>
+              </div>
+
+              <!-- Input File Oculto -->
+              <input type="file" id="configLogoFileInput" accept="image/*" class="hidden" onchange="previewLogoConfig(this)">
+
+              <!-- Botões de Ação da Logo -->
+              <div class="flex items-center gap-2 w-full">
+                <button type="button" onclick="document.getElementById('configLogoFileInput').click()" class="btn-prefeito flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs">
+                  <i class="fa-solid fa-upload"></i> Escolher Imagem
+                </button>
+                <button type="button" onclick="restaurarLogoPadrao()" title="Restaurar logotipo original GEL" class="btn-prefeito py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition border border-slate-200">
+                  <i class="fa-solid fa-rotate-left"></i> Padrão
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400 leading-tight">Formatos PNG, JPG ou WebP. Recomendamos imagem horizontal com fundo transparente.</p>
+            </div>
+
+            <!-- Coluna dos Textos (Nome da Empresa & Nome da Obra) -->
+            <div class="md:col-span-8 space-y-4">
+              <div>
+                <label for="configEmpresaNome" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nome Completo da Empresa / Construtora
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-building"></i>
+                  </div>
+                  <input type="text" id="configEmpresaNome" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm font-semibold text-slate-800 placeholder-slate-400 transition" placeholder="Ex: GEL • Goetze Lobato Engenharia S.A.">
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Exibido na barra superior, menus e cabeçalhos de relatórios.</p>
+              </div>
+
+              <div>
+                <label for="configObraNome" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Identificação do Canteiro / Obra (Tag)
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-location-dot"></i>
+                  </div>
+                  <input type="text" id="configObraNome" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm font-semibold text-slate-800 placeholder-slate-400 transition" placeholder="Ex: Taboca 2">
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Tag amarela destacada no topo da tela e nas fichas dos quartos.</p>
+              </div>
+
+              <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span id="identidadeVisualStatusMsg" class="text-xs text-slate-500 italic">Pronto para salvar alterações</span>
+                <button type="button" id="btnSalvarIdentidadeVisual" onclick="salvarConfigIdentidadeVisual(event)" class="btn-prefeito w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition transform active:scale-98">
+                  <i class="fa-solid fa-floppy-disk"></i> Salvar Identidade Visual
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- SEÇÃO 1: TAMANHO DAS LETRAS / TIPOGRAFIA -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div class="flex items-center justify-between">
@@ -1105,6 +1292,41 @@
               <div><span class="text-slate-500">storageBucket:</span> <span class="text-amber-300">"prefeitura-cc71b.firebasestorage.app"</span></div>
               <div><span class="text-slate-500">appId:</span> <span class="text-slate-300">"1:395936672533:web:d7d17537d2c38c47bc971c"</span></div>
             </div>
+          </div>
+
+          <!-- Alerta e Instruções das Regras do Firestore (Permissões) -->
+          <div id="firebaseRulesAlert" class="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs space-y-2.5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200 pb-2">
+              <div class="flex items-center gap-2 font-bold text-amber-950 text-xs">
+                <span class="w-6 h-6 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </span>
+                <span>Regras de Segurança do Firebase Firestore (Acesso Livre)</span>
+              </div>
+              <a href="https://console.firebase.google.com/project/prefeitura-cc71b/firestore/rules" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-xs">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir Regras no Console Firebase
+              </a>
+            </div>
+            <p class="text-amber-900 leading-relaxed text-[11.5px]">
+              Se aparecer o erro <b>"Missing or insufficient permissions"</b>, é porque o Google bloqueia gravações por padrão no Console do Firebase. Para liberar em 20 segundos:
+            </p>
+            <div class="space-y-1.5 text-amber-950 text-[11.5px]">
+              <div>1. Clique no botão acima <b>"Abrir Regras no Console Firebase"</b>.</div>
+              <div>2. Na aba <b>Regras (Rules)</b>, substitua o texto pelo código abaixo:</div>
+            </div>
+            <pre class="bg-slate-900 text-emerald-400 p-3 rounded-lg font-mono text-[11px] overflow-x-auto select-all leading-relaxed">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+            <p class="text-amber-800 text-[11px]">
+              3. Clique no botão azul <b>Publicar (Publish)</b> no topo do Console. As permissões ficam ativas na mesma hora!
+            </p>
+          </div>
+
           <!-- ESTRATÉGIA DE ECONOMIA MÁXIMA DE DADOS FIREBASE (PARTE 1) -->
           <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 space-y-3">
             <div class="flex items-center justify-between">
@@ -1387,25 +1609,38 @@
   </div>
 
   <!-- Modal Novo / Editar Alojado -->
-  <div id="modalAlojadoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalAlojadoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalAlojadoTitulo" class="text-base font-bold">Cadastrar Novo Alojado</h3>
-        <button onclick="fecharModal('modalAlojadoForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalAlojadoForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formAlojado" onsubmit="salvarAlojado(event)" class="p-6 space-y-4">
+      <form id="formAlojado" onsubmit="salvarAlojado(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
         <input type="hidden" id="alojadoFormId">
 
-        <!-- Seleção de Vaga (Somente se for novo ou reatribuindo) -->
+        <!-- Seleção de Vaga (Somente se for novo cadastro) -->
         <div id="secaoSelecaoVaga" class="space-y-1">
           <label class="block text-xs font-semibold text-slate-700">Selecione o Quarto e Vaga Livre *</label>
           <select id="alojadoFormVagaId" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50">
             <option value="">Carregando vagas livres...</option>
           </select>
           <p class="text-[11px] text-slate-400">Mostra apenas vagas desocupadas disponíveis.</p>
+        </div>
+
+        <!-- Quarto Atual com Atalho de Mudar (Apenas em Edição) -->
+        <div id="secaoLocalAtualEdicao" class="hidden p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-xs text-blue-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
+          <div>
+            <div class="font-bold text-slate-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-bed text-sky-600"></i> Quarto / Cama Atual:
+            </div>
+            <div id="alojadoFormLocalAtualTexto" class="text-xs text-slate-700 font-semibold mt-0.5">--</div>
+          </div>
+          <button type="button" onclick="atalhoMudarQuartoDoForm()" class="btn-prefeito px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs flex-shrink-0">
+            <i class="fa-solid fa-arrows-turn-to-dots"></i> Mudar de Quarto
+          </button>
         </div>
 
         <!-- Nome Completo -->
@@ -1442,6 +1677,23 @@
             <label class="block text-xs font-semibold text-slate-700">Data de Entrada</label>
             <input type="date" id="alojadoFormDataEntrada" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
           </div>
+        </div>
+
+        <!-- WhatsApp / Celular (Opcional) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 flex items-center justify-between">
+            <span class="flex items-center gap-1.5 text-slate-800">
+              <i class="fa-brands fa-whatsapp text-emerald-600 font-bold text-sm"></i> WhatsApp / Celular
+            </span>
+            <span class="text-[11px] text-slate-400 font-normal">Opcional</span>
+          </label>
+          <div class="relative mt-1">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-emerald-600 font-semibold text-sm pointer-events-none">
+              <i class="fa-brands fa-whatsapp"></i>
+            </span>
+            <input type="tel" id="alojadoFormWhatsapp" placeholder="(XX) 9XXXX-XXXX" maxlength="16" oninput="formatarTelefoneInput(this)" class="w-full py-2 pl-9 pr-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Ao tocar no nome do colaborador, abrirá o botão direto para o WhatsApp dele.</p>
         </div>
 
         <!-- Foto do Trabalhador -->
@@ -1486,16 +1738,16 @@
   </div>
 
   <!-- Modal Realocar Alojado -->
-  <div id="modalRealocar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalRealocar" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 class="text-base font-bold">Realocar Alojado de Vaga</h3>
-        <button onclick="fecharModal('modalRealocar')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalRealocar')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formRealocar" onsubmit="confirmarRealocacao(event)" class="p-6 space-y-4">
+      <form id="formRealocar" onsubmit="confirmarRealocacao(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="realocarAlojadoId">
         
         <div class="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
@@ -1569,16 +1821,16 @@
   </div>
 
   <!-- Modal Novo / Editar Móvel -->
-  <div id="modalMovelForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalMovelForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalMovelTitulo" class="text-base font-bold">Cadastrar Item / Móvel</h3>
-        <button onclick="fecharModal('modalMovelForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalMovelForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formMovel" onsubmit="salvarMovel(event)" class="p-6 space-y-4">
+      <form id="formMovel" onsubmit="salvarMovel(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="movelFormId">
         
         <!-- Seleção de Quarto (se não foi aberto dentro do modal do quarto) -->
@@ -1597,6 +1849,7 @@
             <option value="Guarda-roupa / Armário">Guarda-roupa / Armário</option>
             <option value="Ventilador de Parede">Ventilador de Parede</option>
             <option value="Ar-Condicionado">Ar-Condicionado</option>
+            <option value="Fechadura">Fechadura</option>
             <option value="Lâmpada LED">Lâmpada LED</option>
             <option value="Tomadas">Tomadas</option>
             <option value="Espelho">Espelho</option>
@@ -1654,16 +1907,16 @@
   </div>
 
   <!-- Modal Novo / Editar Bloco -->
-  <div id="modalBlocoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalBlocoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalBlocoTitulo" class="text-base font-bold">Cadastrar Novo Bloco</h3>
-        <button onclick="fecharModal('modalBlocoForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalBlocoForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formBloco" onsubmit="salvarBloco(event)" class="p-6 space-y-4">
+      <form id="formBloco" onsubmit="salvarBloco(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="blocoFormId">
         
         <div>
@@ -1693,16 +1946,16 @@
   </div>
 
   <!-- Modal Novo Quarto -->
-  <div id="modalQuartoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalQuartoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 class="text-base font-bold">Adicionar Novo Quarto</h3>
-        <button onclick="fecharModal('modalQuartoForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalQuartoForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formQuarto" onsubmit="salvarQuarto(event)" class="p-6 space-y-4">
+      <form id="formQuarto" onsubmit="salvarQuarto(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <div>
           <label class="block text-xs font-semibold text-slate-700">Bloco de Destino *</label>
           <select id="quartoFormBlocoId" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -1740,16 +1993,16 @@
   </div>
 
   <!-- Modal Nova Empresa -->
-  <div id="modalEmpresaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+  <div id="modalEmpresaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
         <h3 id="modalEmpresaTitulo" class="text-base font-bold">Cadastrar Empresa / Contratada</h3>
-        <button onclick="fecharModal('modalEmpresaForm')" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
+        <button onclick="fecharModal('modalEmpresaForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
-      <form id="formEmpresa" onsubmit="salvarEmpresa(event)" class="p-6 space-y-4">
+      <form id="formEmpresa" onsubmit="salvarEmpresa(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <input type="hidden" id="empresaFormId">
         
         <div>
@@ -1809,8 +2062,18 @@
           <div id="modalFotoInfoLocal" class="text-[11px] text-slate-400">Bloco • Quarto • Cama</div>
         </div>
 
-        <!-- Ações: Upload e Remoção de Foto -->
-        <div class="w-full pt-2 flex flex-col gap-2">
+        <!-- Botão WhatsApp Direto -->
+        <a id="modalFotoBtnWhatsapp" href="#" target="_blank" rel="noopener noreferrer" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition cursor-pointer hidden">
+          <i class="fa-brands fa-whatsapp text-xl"></i>
+          <span id="modalFotoWhatsappTexto">Conversar no WhatsApp</span>
+        </a>
+
+        <!-- Ações: Upload, Edição e Remoção de Foto -->
+        <div class="w-full pt-1 flex flex-col gap-2">
+          <button type="button" onclick="editarAlojadoDoModalFoto()" class="btn-prefeito w-full py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-pen-to-square text-sky-600"></i>
+            <span>Editar Cadastro / WhatsApp</span>
+          </button>
           <label class="btn-prefeito w-full py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition">
             <i class="fa-solid fa-camera"></i>
             <span>Tirar Foto / Trocar Foto</span>
@@ -1905,10 +2168,191 @@
     </div>
   </div>
 
+  <!-- ================= BARRA DE NAVEGAÇÃO INFERIOR FIXA (MOBILE APP) ================= -->
+  <nav id="bottomNavBar" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around items-center py-2 px-1 shadow-2xl no-print" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
+    <button onclick="switchTab('dashboard')" data-mob-tab="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-amber-400 transition font-bold scale-105">
+      <i class="fa-solid fa-chart-pie text-lg mb-0.5"></i>
+      <span class="text-[10px]">Painel</span>
+    </button>
+    <button onclick="switchTab('blocos')" data-mob-tab="blocos" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-border-all text-lg mb-0.5"></i>
+      <span class="text-[10px]">Quartos</span>
+    </button>
+    <button onclick="switchTab('alojados')" data-mob-tab="alojados" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-users-line text-lg mb-0.5"></i>
+      <span class="text-[10px]">Alojados</span>
+    </button>
+    <button onclick="switchTab('moveis')" data-mob-tab="moveis" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-bed text-lg mb-0.5"></i>
+      <span class="text-[10px]">Móveis</span>
+    </button>
+    <button onclick="toggleMenuMobileMais()" id="btnMobMais" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-white transition font-medium">
+      <i class="fa-solid fa-bars-staggered text-lg mb-0.5"></i>
+      <span class="text-[10px]">Mais</span>
+    </button>
+  </nav>
+
+  <!-- ================= DRAWER / MENU "MAIS" PARA CELULAR ================= -->
+  <div id="drawerMobileMais" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden flex flex-col justify-end transition-opacity duration-300 no-print" onclick="fecharMenuMobileMais(event)">
+    <div class="bg-slate-900 border-t border-slate-800 rounded-t-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="w-12 h-1.5 bg-slate-700 rounded-full mx-auto -mt-1 mb-2"></div>
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="h-9 px-2 py-0.5 rounded-lg bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img h-6 w-auto object-contain">
+          </div>
+          <div>
+            <h4 class="font-bold text-white text-sm">Mais Funcionalidades</h4>
+            <p class="app-empresa-nome text-[11px] text-slate-400">GEL • Goetze Lobato Engenharia S.A.</p>
+          </div>
+        </div>
+        <button onclick="fecharMenuMobileMais()" class="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Ação Rápida de Instalar App no Celular -->
+      <button onclick="fecharMenuMobileMais(); iniciarInstalacaoApp();" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-sm shadow-md transition transform active:scale-98">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-slate-950/20 flex items-center justify-center text-slate-950">
+            <i class="fa-solid fa-mobile-screen-button text-base"></i>
+          </div>
+          <div class="text-left">
+            <div class="font-extrabold text-sm">Baixar / Instalar App</div>
+            <div class="text-[11px] text-slate-900/80 font-medium">Instalar no Celular ou Computador</div>
+          </div>
+        </div>
+        <i class="fa-solid fa-download text-slate-950"></i>
+      </button>
+
+      <!-- Grade de Atalhos -->
+      <div class="grid grid-cols-2 gap-2.5 pt-1">
+        <button onclick="fecharMenuMobileMais(); switchTab('gestao_cadastros')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-building-circle-gear text-indigo-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Estrutura & Empresas</span>
+          <span class="text-[10px] text-slate-400">Cadastros e cores</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('relatorios')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-file-excel text-emerald-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Relatórios & Excel</span>
+          <span class="text-[10px] text-slate-400">Exportar planilhas</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('importacao')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-file-import text-orange-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Importar Planilha</span>
+          <span class="text-[10px] text-slate-400">Atualizar dados</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('auditoria')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-clock-rotate-left text-cyan-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Auditoria & Logs</span>
+          <span class="text-[10px] text-slate-400">Histórico de ações</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('configuracoes')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-sliders text-amber-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Configurações</span>
+          <span class="text-[10px] text-slate-400">Firebase & fontes</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); toggleUserMode()" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-shield-halved text-amber-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Modo de Acesso</span>
+          <span class="text-[10px] text-slate-400">Prefeito / Consulta</span>
+        </button>
+      </div>
+
+      <!-- Botão Rápido Baixar Planilha Original no Mobile -->
+      <button onclick="fecharMenuMobileMais(); exportarPlanilhaOficial()" class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800 text-emerald-400 border border-emerald-900/50 hover:bg-slate-750 font-bold text-xs transition">
+        <i class="fa-solid fa-file-excel"></i> Baixar Planilha Oficial (.xlsx)
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= MODAL INSTALAR APLICATIVO (PWA) ================= -->
+  <div id="modalInstalarApp" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4 no-print">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+      
+      <!-- Topo com Ícone do App -->
+      <div class="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 p-6 text-white text-center relative">
+        <button onclick="fecharModalInstalacao()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+        <div class="w-24 h-16 rounded-2xl bg-white p-2 flex items-center justify-center mx-auto shadow-lg mb-3 border-2 border-amber-400/50">
+          <img src="logo_gel_cropped.png" alt="Logo" class="app-logo-img max-h-12 w-auto object-contain">
+        </div>
+        <h3 class="font-extrabold text-lg text-white">Instalar Aplicativo Oficial</h3>
+        <p class="text-xs text-slate-300 mt-1 max-w-xs mx-auto"><span class="app-empresa-nome">GEL • Goetze Lobato Engenharia S.A.</span> • <span class="app-obra-tag">Taboca 2</span></p>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30 mt-2.5">
+          <i class="fa-solid fa-bolt"></i> Abre em 0s • Sem barras de navegador • Offline
+        </div>
+      </div>
+
+      <!-- Abas de Instrução por Dispositivo -->
+      <div class="p-5 space-y-4">
+        
+        <!-- Botão Direto de Instalação (Disponível quando navegador suporta prompt) -->
+        <div id="blocoBotaoInstalarNativo">
+          <button onclick="executarPromptInstalacao()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition transform active:scale-98">
+            <i class="fa-solid fa-download text-base"></i> Instalar Aplicativo Agora
+          </button>
+          <div class="text-center text-[11px] text-slate-400 mt-1.5">Compatível com Android, Google Chrome, Microsoft Edge e iOS</div>
+        </div>
+
+        <!-- Guia Passo a Passo por Aparelho -->
+        <div class="border-t border-slate-100 pt-3 space-y-3">
+          <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-circle-info text-amber-500"></i> Como Adicionar no seu Aparelho:
+          </div>
+
+          <!-- Opção iPhone / iPad (Safari) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <i class="fa-brands fa-apple text-base text-slate-900"></i> No iPhone ou iPad (Safari):
+            </div>
+            <ol class="text-xs text-slate-600 space-y-1.5 list-decimal pl-4 leading-relaxed">
+              <li>Toque no botão <b>Compartilhar</b> <i class="fa-solid fa-arrow-up-from-bracket text-sky-600 font-bold"></i> (ícone com quadrado e seta) no rodapé do Safari.</li>
+              <li>Role para cima e toque em <b class="text-slate-900">"Adicionar à Tela de Início"</b> <i class="fa-regular fa-square-plus text-slate-800"></i>.</li>
+              <li>Toque em <b class="text-emerald-700">"Adicionar"</b> no canto superior. Pronto!</li>
+            </ol>
+          </div>
+
+          <!-- Opção Android (Chrome) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <i class="fa-brands fa-android text-base text-emerald-600"></i> No Celular Android (Chrome):
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Clique no botão verde acima ou toque no menu <b>três pontinhos (⋮)</b> no topo do Chrome e selecione <b class="text-slate-900">"Instalar aplicativo"</b> ou <b class="text-slate-900">"Adicionar à tela inicial"</b>.
+            </p>
+          </div>
+
+          <!-- Opção Computador (Windows / Mac) -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <i class="fa-solid fa-desktop text-base text-sky-600"></i> No Computador (PC / Notebook):
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              No Google Chrome ou Edge, clique no ícone de <b>instalar aplicativo</b> (ícone de computador com seta para baixo) na barra de endereços ao lado do link, ou clique no botão acima.
+            </p>
+          </div>
+        </div>
+
+        <button onclick="fecharModalInstalacao()" class="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+          Fechar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 </html>

@@ -6,7 +6,8 @@
     "taxa_ocupacao": 44.0,
     "total_blocos": 10,
     "total_quartos": 220,
-    "total_alojados": 387
+    "total_alojados": 387,
+    "total_alertas_manutencao": 0
   },
   "blocos": [
     {
@@ -14,70 +15,80 @@
       "nome": "Bloco 1",
       "tipo": "alojamento",
       "ordem": 1,
-      "created_at": "2026-09-24 23:03:49"
+      "created_at": "2026-09-24 23:03:49",
+      "itens_alerta": 0
     },
     {
       "id": 22,
       "nome": "Bloco 2",
       "tipo": "alojamento",
       "ordem": 3,
-      "created_at": "2026-09-24 23:03:49"
+      "created_at": "2026-09-24 23:03:49",
+      "itens_alerta": 0
     },
     {
       "id": 23,
       "nome": "Bloco 3",
       "tipo": "alojamento",
       "ordem": 5,
-      "created_at": "2026-09-24 23:03:49"
+      "created_at": "2026-09-24 23:03:49",
+      "itens_alerta": 0
     },
     {
       "id": 24,
       "nome": "Bloco 4",
       "tipo": "alojamento",
       "ordem": 7,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 25,
       "nome": "Bloco 5",
       "tipo": "alojamento",
       "ordem": 9,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 26,
       "nome": "Bloco 1 ADM",
       "tipo": "adm",
       "ordem": 11,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 27,
       "nome": "Bloco 2 ADM",
       "tipo": "adm",
       "ordem": 13,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 28,
       "nome": "Bloco 3 ADM",
       "tipo": "adm",
       "ordem": 15,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 29,
       "nome": "Contêiner 1",
       "tipo": "conteiner",
       "ordem": 17,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 30,
       "nome": "Contêiner 2",
       "tipo": "conteiner",
       "ordem": 18,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     }
   ],
   "empresas": [
@@ -7722,9 +7733,9 @@
           "quarto_id": 442,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -8184,9 +8195,9 @@
           "quarto_id": 445,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -9298,9 +9309,9 @@
           "quarto_id": 452,
           "tipo_item": "Guarda-roupa / Armário",
           "quantidade": 4,
-          "estado_conservacao": "Ruim",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Porta solta com dobradiça quebrada",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -9724,9 +9735,9 @@
           "quarto_id": 455,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -13266,9 +13277,9 @@
           "quarto_id": 478,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -14344,9 +14355,9 @@
           "quarto_id": 485,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -18230,9 +18241,9 @@
           "quarto_id": 510,
           "tipo_item": "Guarda-roupa / Armário",
           "quantidade": 4,
-          "estado_conservacao": "Ruim",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Porta solta com dobradiça quebrada",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -22044,9 +22055,9 @@
           "quarto_id": 535,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -31782,9 +31793,9 @@
           "quarto_id": 598,
           "tipo_item": "Guarda-roupa / Armário",
           "quantidade": 4,
-          "estado_conservacao": "Ruim",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Porta solta com dobradiça quebrada",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -32054,9 +32065,9 @@
           "quarto_id": 600,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -32978,9 +32989,9 @@
           "quarto_id": 606,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -34518,9 +34529,9 @@
           "quarto_id": 616,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"

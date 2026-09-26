@@ -6,7 +6,8 @@
     "taxa_ocupacao": 44.0,
     "total_blocos": 10,
     "total_quartos": 220,
-    "total_alojados": 387
+    "total_alojados": 387,
+    "total_alertas_manutencao": 0
   },
   "blocos": [
     {
@@ -14,70 +15,80 @@
       "nome": "Bloco 1",
       "tipo": "alojamento",
       "ordem": 1,
-      "created_at": "2026-09-24 23:03:49"
+      "created_at": "2026-09-24 23:03:49",
+      "itens_alerta": 0
     },
     {
       "id": 22,
       "nome": "Bloco 2",
       "tipo": "alojamento",
       "ordem": 3,
-      "created_at": "2026-09-24 23:03:49"
+      "created_at": "2026-09-24 23:03:49",
+      "itens_alerta": 0
     },
     {
       "id": 23,
       "nome": "Bloco 3",
       "tipo": "alojamento",
       "ordem": 5,
-      "created_at": "2026-09-24 23:03:49"
+      "created_at": "2026-09-24 23:03:49",
+      "itens_alerta": 0
     },
     {
       "id": 24,
       "nome": "Bloco 4",
       "tipo": "alojamento",
       "ordem": 7,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 25,
       "nome": "Bloco 5",
       "tipo": "alojamento",
       "ordem": 9,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 26,
       "nome": "Bloco 1 ADM",
       "tipo": "adm",
       "ordem": 11,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 27,
       "nome": "Bloco 2 ADM",
       "tipo": "adm",
       "ordem": 13,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 28,
       "nome": "Bloco 3 ADM",
       "tipo": "adm",
       "ordem": 15,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 29,
       "nome": "Contêiner 1",
       "tipo": "conteiner",
       "ordem": 17,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     },
     {
       "id": 30,
       "nome": "Contêiner 2",
       "tipo": "conteiner",
       "ordem": 18,
-      "created_at": "2026-09-24 23:03:50"
+      "created_at": "2026-09-24 23:03:50",
+      "itens_alerta": 0
     }
   ],
   "empresas": [
@@ -149,7 +160,7 @@
       "status": "ativo",
       "observacoes": "Importado da planilha oficial Taboca 2",
       "created_at": "2026-09-24 23:03:50",
-      "foto_url": "/uploads/fotos_alojados/alojado_1043_4d23f848.jpg",
+      "foto_url": "https://i.ibb.co/sppGW7kB/alojado-1043-4d23f848.jpg",
       "empresa_nome": "GEL",
       "empresa_cor": "#2563eb",
       "bloco_nome": "Bloco 5",
@@ -7634,6 +7645,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90441,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -7713,9 +7733,9 @@
           "quarto_id": 442,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -7779,6 +7799,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90442,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -7924,6 +7953,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90443,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -8069,6 +8107,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90444,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -8148,9 +8195,9 @@
           "quarto_id": 445,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -8214,6 +8261,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90445,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -8359,6 +8415,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90446,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -8504,6 +8569,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90447,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -8649,6 +8723,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90448,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -8794,6 +8877,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90449,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -8939,6 +9031,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90450,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -9084,6 +9185,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90451,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -9199,9 +9309,9 @@
           "quarto_id": 452,
           "tipo_item": "Guarda-roupa / Armário",
           "quantidade": 4,
-          "estado_conservacao": "Ruim",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Porta solta com dobradiça quebrada",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -9229,6 +9339,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90452,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -9374,6 +9493,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90453,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -9519,6 +9647,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90454,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -9598,9 +9735,9 @@
           "quarto_id": 455,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -9664,6 +9801,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90455,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -9809,6 +9955,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90456,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -9954,6 +10109,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90457,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -10099,6 +10263,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90458,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -10244,6 +10417,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90459,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -10389,6 +10571,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90460,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -10534,6 +10725,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90461,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -10679,6 +10879,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90462,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -10824,6 +11033,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90463,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -10969,6 +11187,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90464,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -11114,6 +11341,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90465,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -11259,6 +11495,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90466,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -11404,6 +11649,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90467,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -11549,6 +11803,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90468,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -11694,6 +11957,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90469,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -11839,6 +12111,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90470,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -11984,6 +12265,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90471,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -12129,6 +12419,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90472,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -12274,6 +12573,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90473,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -12419,6 +12727,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90474,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -12564,6 +12881,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90475,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -12709,6 +13035,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90476,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -12854,6 +13189,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90477,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -12933,9 +13277,9 @@
           "quarto_id": 478,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -12999,6 +13343,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90478,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -13144,6 +13497,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90479,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -13289,6 +13651,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90480,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -13434,6 +13805,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90481,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -13579,6 +13959,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90482,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -13724,6 +14113,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90483,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -13869,6 +14267,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90484,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -13948,9 +14355,9 @@
           "quarto_id": 485,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -14014,6 +14421,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90485,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -14159,6 +14575,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90486,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -14304,6 +14729,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90487,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -14449,6 +14883,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90488,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -14594,6 +15037,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90489,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -14739,6 +15191,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90490,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -14884,6 +15345,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90491,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -15029,6 +15499,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90492,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -15174,6 +15653,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90493,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -15319,6 +15807,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90494,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -15464,6 +15961,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90495,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -15609,6 +16115,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90496,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -15754,6 +16269,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90497,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -15899,6 +16423,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90498,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -16044,6 +16577,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90499,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -16189,6 +16731,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90500,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -16334,6 +16885,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90501,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -16479,6 +17039,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90502,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -16624,6 +17193,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90503,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -16769,6 +17347,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90504,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -16914,6 +17501,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90505,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -17059,6 +17655,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90506,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -17204,6 +17809,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90507,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -17349,6 +17963,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90508,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -17494,6 +18117,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90509,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -17609,9 +18241,9 @@
           "quarto_id": 510,
           "tipo_item": "Guarda-roupa / Armário",
           "quantidade": 4,
-          "estado_conservacao": "Ruim",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Porta solta com dobradiça quebrada",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -17639,6 +18271,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90510,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -17784,6 +18425,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90511,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -17929,6 +18579,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90512,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -18074,6 +18733,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90513,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -18219,6 +18887,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90514,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -18364,6 +19041,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90515,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -18509,6 +19195,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90516,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -18654,6 +19349,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90517,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -18799,6 +19503,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90518,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -18944,6 +19657,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90519,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -19089,6 +19811,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90520,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -19234,6 +19965,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90521,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -19379,6 +20119,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90522,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -19524,6 +20273,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90523,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -19669,6 +20427,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90524,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -19814,6 +20581,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90525,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -19959,6 +20735,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90526,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -20104,6 +20889,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90527,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -20249,6 +21043,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90528,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -20394,6 +21197,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90529,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -20539,6 +21351,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90530,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -20684,6 +21505,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90531,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -20829,6 +21659,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90532,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -20974,6 +21813,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90533,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -21119,6 +21967,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90534,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -21198,9 +22055,9 @@
           "quarto_id": 535,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -21264,6 +22121,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90535,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -21409,6 +22275,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90536,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -21554,6 +22429,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90537,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -21699,6 +22583,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90538,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -21844,6 +22737,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90539,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -21989,6 +22891,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90540,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -22134,6 +23045,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90541,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -22279,6 +23199,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90542,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -22424,6 +23353,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90543,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -22569,6 +23507,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90544,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -22714,6 +23661,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90545,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -22859,6 +23815,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90546,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -23004,6 +23969,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90547,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -23149,6 +24123,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90548,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -23294,6 +24277,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90549,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -23439,6 +24431,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90550,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -23584,6 +24585,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90551,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -23729,6 +24739,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90552,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -23874,6 +24893,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90553,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -24019,6 +25047,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90554,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -24164,6 +25201,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90555,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -24309,6 +25355,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90556,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -24454,6 +25509,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90557,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -24599,6 +25663,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90558,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -24744,6 +25817,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90559,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -24889,6 +25971,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90560,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -25034,6 +26125,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90561,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -25179,6 +26279,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90562,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -25324,6 +26433,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90563,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -25469,6 +26587,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90564,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -25614,6 +26741,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90565,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -25759,6 +26895,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90566,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -25904,6 +27049,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90567,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -26049,6 +27203,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90568,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -26194,6 +27357,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90569,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -26339,6 +27511,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90570,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -26484,6 +27665,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90571,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -26629,6 +27819,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90572,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -26774,6 +27973,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90573,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -26919,6 +28127,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90574,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -27064,6 +28281,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90575,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -27209,6 +28435,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90576,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -27354,6 +28589,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90577,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -27499,6 +28743,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90578,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -27644,6 +28897,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90579,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -27789,6 +29051,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90580,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -27934,6 +29205,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90581,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -28079,6 +29359,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90582,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -28224,6 +29513,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90583,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -28369,6 +29667,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90584,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -28514,6 +29821,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90585,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -28659,6 +29975,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90586,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -28804,6 +30129,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90587,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -28872,7 +30206,7 @@
           "nome_completo": "ADAILTON DA SILVA LIMA",
           "matricula": "18586",
           "funcao": "LÍDER DE EQUIPE",
-          "foto_url": "/uploads/fotos_alojados/alojado_1043_4d23f848.jpg",
+          "foto_url": "https://i.ibb.co/sppGW7kB/alojado-1043-4d23f848.jpg",
           "empresa_nome": "GEL",
           "empresa_cor": "#2563eb"
         }
@@ -28949,6 +30283,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90588,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -29094,6 +30437,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90589,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -29239,6 +30591,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90590,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -29384,6 +30745,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90591,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -29529,6 +30899,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90592,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -29674,6 +31053,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90593,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -29819,6 +31207,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90594,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -29964,6 +31361,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90595,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -30109,6 +31515,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90596,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -30254,6 +31669,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90597,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -30369,9 +31793,9 @@
           "quarto_id": 598,
           "tipo_item": "Guarda-roupa / Armário",
           "quantidade": 4,
-          "estado_conservacao": "Ruim",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Porta solta com dobradiça quebrada",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -30399,6 +31823,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90598,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -30544,6 +31977,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90599,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -30623,9 +32065,9 @@
           "quarto_id": 600,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -30689,6 +32131,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90600,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -30834,6 +32285,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90601,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -30979,6 +32439,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90602,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -31124,6 +32593,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90603,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -31269,6 +32747,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90604,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -31414,6 +32901,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90605,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -31493,9 +32989,9 @@
           "quarto_id": 606,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Regular",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Filtro sujo necessita limpeza preventiva",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -31559,6 +33055,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90606,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -31704,6 +33209,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90607,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -31849,6 +33363,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90608,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -31994,6 +33517,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90609,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -32139,6 +33671,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90610,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -32284,6 +33825,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90611,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -32429,6 +33979,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90612,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -32574,6 +34133,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90613,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -32719,6 +34287,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90614,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -32864,6 +34441,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90615,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -32943,9 +34529,9 @@
           "quarto_id": 616,
           "tipo_item": "Ar-Condicionado",
           "quantidade": 1,
-          "estado_conservacao": "Danificado",
-          "precisa_manutencao": 1,
-          "data_vistoria": "2026-09-15",
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-26",
           "observacoes": "Motor travado / barulho excessivo",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
@@ -33009,6 +34595,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90616,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -33154,6 +34749,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90617,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -33299,6 +34903,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90618,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -33444,6 +35057,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90619,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -33589,6 +35211,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90620,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -33734,6 +35365,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90621,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -33879,6 +35519,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90622,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -34024,6 +35673,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90623,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -34169,6 +35827,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90624,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -34314,6 +35981,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90625,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -34459,6 +36135,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90626,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -34604,6 +36289,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90627,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -34749,6 +36443,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90628,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -34894,6 +36597,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90629,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -35039,6 +36751,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90630,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -35184,6 +36905,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90631,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -35329,6 +37059,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90632,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -35474,6 +37213,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90633,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -35619,6 +37367,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90634,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -35764,6 +37521,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90635,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -35909,6 +37675,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90636,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -36054,6 +37829,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90637,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -36199,6 +37983,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90638,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -36344,6 +38137,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90639,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -36489,6 +38291,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90640,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -36634,6 +38445,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90641,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -36779,6 +38599,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90642,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -36924,6 +38753,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90643,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -37069,6 +38907,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90644,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -37214,6 +39061,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90645,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -37359,6 +39215,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90646,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -37504,6 +39369,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90647,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -37649,6 +39523,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90648,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -37794,6 +39677,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90649,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -37939,6 +39831,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90650,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -38084,6 +39985,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90651,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -38229,6 +40139,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90652,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -38374,6 +40293,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90653,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -38519,6 +40447,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90654,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -38664,6 +40601,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90655,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -38809,6 +40755,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90656,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -38954,6 +40909,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90657,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -39099,6 +41063,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90658,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -39244,6 +41217,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90659,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     },
@@ -39389,6 +41371,15 @@
           "observacoes": "Testadas e aterradas",
           "foto_url": null,
           "created_at": "2026-09-24 23:03:50"
+        },
+        {
+          "id": 90660,
+          "tipo_item": "Fechadura",
+          "quantidade": 1,
+          "estado_conservacao": "Bom",
+          "precisa_manutencao": 0,
+          "data_vistoria": "2026-09-25",
+          "observacoes": "Fechadura da porta funcionando"
         }
       ]
     }
