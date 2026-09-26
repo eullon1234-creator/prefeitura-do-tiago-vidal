@@ -181,9 +181,62 @@ const StaticApiEngine = {
     const blocos = this.dbState.blocos || [];
     const empresas = this.dbState.empresas || [];
 
+    // Reconciliar vagas com alojados para garantir consistência de ID e metadados
+    const activeAlojados = alojados.filter(a => a.status === 'ativo');
+    const alojadoMapByVaga = new Map();
+    const alojadoMapByQuartoCama = new Map();
+    activeAlojados.forEach(a => {
+      if (a.vaga_id) alojadoMapByVaga.set(Number(a.vaga_id), a);
+      if (a.quarto_numero && a.numero_cama) {
+        const key = `${(a.bloco_nome || '').trim().toLowerCase()}_${String(a.quarto_numero).trim()}_${Number(a.numero_cama)}`;
+        alojadoMapByQuartoCama.set(key, a);
+      }
+    });
+
     // Recalcular status por quarto
     quartos.forEach(q => {
       const vagas = q.vagas || [];
+      vagas.forEach(v => {
+        if (!v.vaga_id && v.id) v.vaga_id = v.id;
+        if (!v.id && v.vaga_id) v.id = v.vaga_id;
+
+        let a = null;
+        if (v.alojado_id) {
+          a = activeAlojados.find(x => x.id === v.alojado_id);
+        }
+        if (!a && v.alojado && v.alojado.id) {
+          a = activeAlojados.find(x => x.id === v.alojado.id) || v.alojado;
+        }
+        if (!a && v.id) {
+          a = alojadoMapByVaga.get(Number(v.id));
+        }
+        if (!a && q.numero && v.numero_cama) {
+          const key = `${(q.bloco_nome || '').trim().toLowerCase()}_${String(q.numero).trim()}_${Number(v.numero_cama)}`;
+          a = alojadoMapByQuartoCama.get(key);
+        }
+
+        if (a && a.status === 'ativo') {
+          v.status = 'ocupada';
+          v.alojado_id = a.id;
+          v.nome_completo = a.nome_completo;
+          v.matricula = a.matricula || '';
+          v.funcao = a.funcao || '';
+          v.empresa_nome = a.empresa_nome || '';
+          v.empresa_cor = a.empresa_cor || '#2563eb';
+          v.foto_url = a.foto_url || null;
+          v.whatsapp = a.whatsapp || '';
+          v.alojado = { ...a };
+          a.vaga_id = v.id;
+          a.quarto_numero = q.numero;
+          a.bloco_nome = q.bloco_nome;
+          a.numero_cama = v.numero_cama;
+        } else if (v.status === 'ocupada' && !a && !v.alojado && !v.nome_completo) {
+          v.status = 'livre';
+          v.alojado = null;
+          v.alojado_id = null;
+        }
+      });
+
       const cap = q.capacidade || vagas.length || 4;
       const oc = vagas.filter(v => v.status === 'ocupada').length;
       const liv = cap - oc;
@@ -765,7 +818,15 @@ const StaticApiEngine = {
 
       if (foundBed) {
         foundBed.status = 'ocupada';
-        foundBed.alojado = novoAlojado;
+        foundBed.alojado_id = novoId;
+        foundBed.nome_completo = novoAlojado.nome_completo;
+        foundBed.matricula = novoAlojado.matricula || '';
+        foundBed.funcao = novoAlojado.funcao || '';
+        foundBed.empresa_nome = novoAlojado.empresa_nome || '';
+        foundBed.empresa_cor = novoAlojado.empresa_cor || '#2563eb';
+        foundBed.foto_url = novoAlojado.foto_url || null;
+        foundBed.whatsapp = novoAlojado.whatsapp || '';
+        foundBed.alojado = { ...novoAlojado };
       }
 
       this.dbState.alojados.unshift(novoAlojado);
@@ -2991,15 +3052,24 @@ function renderQuartosCards(quartos) {
 
     // Camas dentro do quarto
     const camasHtml = q.vagas.map(v => {
-      if (v.status === 'ocupada' && v.alojado_id) {
-        const safeNome = (v.nome_completo || '').replace(/'/g, "\\'");
-        const safeEmpresa = (v.empresa_nome || '').replace(/'/g, "\\'");
-        const safeFuncao = (v.funcao || '').replace(/'/g, "\\'");
-        const clickFoto = `abrirModalFotoAlojado(${v.alojado_id}, '${safeNome}', '${v.foto_url || ''}', '${safeEmpresa}', '${v.empresa_cor || ''}', '${safeFuncao}', '${v.matricula || ''}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
+      const alId = v.alojado_id || (v.alojado && v.alojado.id);
+      const isOcupada = (v.status === 'ocupada') && (alId || v.nome_completo || v.alojado);
+      if (isOcupada) {
+        const finalId = alId || (v.alojado && v.alojado.id) || 0;
+        const nomeAl = v.nome_completo || (v.alojado && v.alojado.nome_completo) || 'Colaborador';
+        const safeNome = nomeAl.replace(/'/g, "\\'");
+        const empNome = v.empresa_nome || (v.alojado && v.alojado.empresa_nome) || 'GEL';
+        const safeEmpresa = empNome.replace(/'/g, "\\'");
+        const funcaoAl = v.funcao || (v.alojado && v.alojado.funcao) || '';
+        const safeFuncao = funcaoAl.replace(/'/g, "\\'");
+        const fotoAl = v.foto_url || (v.alojado && v.alojado.foto_url) || '';
+        const matAl = v.matricula || (v.alojado && v.alojado.matricula) || '';
+        const corEmp = v.empresa_cor || (v.alojado && v.alojado.empresa_cor) || '#2563eb';
+        const clickFoto = `abrirModalFotoAlojado(${finalId}, '${safeNome}', '${fotoAl}', '${safeEmpresa}', '${corEmp}', '${safeFuncao}', '${matAl}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
 
         // Buscar telefone atualizado
         const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
-          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === v.alojado_id)
+          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === finalId)
           : null;
         const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
         const waUrl = getWhatsappUrl(zapNum);
@@ -3010,23 +3080,23 @@ function renderQuartosCards(quartos) {
               <span class="font-bold text-slate-800 flex items-center gap-1">
                 <i class="fa-solid fa-bed text-blue-600"></i> Cama ${v.numero_cama}
               </span>
-              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white truncate max-w-[100px]" style="background-color: ${v.empresa_cor || '#475569'}">
-                ${v.empresa_nome || 'CONTRATADA'}
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white truncate max-w-[100px]" style="background-color: ${corEmp}">
+                ${empNome}
               </span>
             </div>
             
             <div class="flex items-center gap-2 mb-1">
-              ${renderAvatarHtml(v.nome_completo, v.foto_url, 'w-8 h-8', 'text-[11px]', clickFoto)}
+              ${renderAvatarHtml(nomeAl, fotoAl, 'w-8 h-8', 'text-[11px]', clickFoto)}
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 min-w-0">
-                  <span class="font-bold text-slate-900 truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${v.nome_completo}</span>
+                  <span class="font-bold text-slate-900 truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${nomeAl}</span>
                   ${waUrl ? `
                     <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-[11px] flex-shrink-0 transition" title="Conversar no WhatsApp (${zapNum})">
                       <i class="fa-brands fa-whatsapp"></i>
                     </a>
                   ` : ''}
                 </div>
-                <div class="text-[11px] text-slate-500 truncate">${v.funcao || 'Alojado'} • Reg: ${v.matricula || '-'}</div>
+                <div class="text-[11px] text-slate-500 truncate">${funcaoAl || 'Alojado'} • Reg: ${matAl || '-'}</div>
               </div>
             </div>
 
@@ -3043,10 +3113,10 @@ function renderQuartosCards(quartos) {
                 ` : ''}
               </div>
               <div class="flex items-center gap-2">
-                <button onclick="abrirModalRealocar(${v.alojado_id}, '${safeNome}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})" class="btn-prefeito text-[10px] font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1">
+                <button onclick="abrirModalRealocar(${finalId}, '${safeNome}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})" class="btn-prefeito text-[10px] font-semibold text-sky-600 hover:text-sky-800 flex items-center gap-1">
                   <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
                 </button>
-                <button onclick="abrirModalDesligar(${v.alojado_id}, '${safeNome}')" class="btn-prefeito text-[10px] font-semibold text-red-600 hover:text-red-800 flex items-center gap-1">
+                <button onclick="abrirModalDesligar(${finalId}, '${safeNome}')" class="btn-prefeito text-[10px] font-semibold text-red-600 hover:text-red-800 flex items-center gap-1">
                   <i class="fa-solid fa-person-walking-arrow-right"></i> Liberar
                 </button>
               </div>
@@ -3054,6 +3124,7 @@ function renderQuartosCards(quartos) {
           </div>
         `;
       } else {
+        const idVaga = v.id || v.vaga_id || '';
         return `
           <div class="p-2.5 rounded-lg bg-emerald-50/60 border border-dashed border-emerald-300 flex flex-col justify-between text-xs">
             <div class="flex items-center justify-between">
@@ -3067,7 +3138,7 @@ function renderQuartosCards(quartos) {
               Disponível para alojar
             </div>
 
-            <button onclick="openModalNovoAlojadoComVaga(${v.vaga_id})" class="btn-prefeito w-full py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold flex items-center justify-center gap-1 transition">
+            <button onclick="openModalNovoAlojadoComVaga(${idVaga})" class="btn-prefeito w-full py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-semibold flex items-center justify-center gap-1 transition">
               <i class="fa-solid fa-plus"></i> Alojar
             </button>
           </div>
@@ -3143,15 +3214,24 @@ async function abrirModalQuartoDetalhes(quartoId) {
     // Renderiza camas no modal
     const camasGrid = document.getElementById('modalQuartoGridCamas');
     camasGrid.innerHTML = q.vagas.map(v => {
-      if (v.status === 'ocupada' && v.alojado_id) {
-        const safeNome = (v.nome_completo || '').replace(/'/g, "\\'");
-        const safeEmpresa = (v.empresa_nome || '').replace(/'/g, "\\'");
-        const safeFuncao = (v.funcao || '').replace(/'/g, "\\'");
-        const clickFoto = `abrirModalFotoAlojado(${v.alojado_id}, '${safeNome}', '${v.foto_url || ''}', '${safeEmpresa}', '${v.empresa_cor || ''}', '${safeFuncao}', '${v.matricula || ''}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
+      const alId = v.alojado_id || (v.alojado && v.alojado.id);
+      const isOcupada = (v.status === 'ocupada') && (alId || v.nome_completo || v.alojado);
+      if (isOcupada) {
+        const finalId = alId || (v.alojado && v.alojado.id) || 0;
+        const nomeAl = v.nome_completo || (v.alojado && v.alojado.nome_completo) || 'Colaborador';
+        const safeNome = nomeAl.replace(/'/g, "\\'");
+        const empNome = v.empresa_nome || (v.alojado && v.alojado.empresa_nome) || 'GEL';
+        const safeEmpresa = empNome.replace(/'/g, "\\'");
+        const funcaoAl = v.funcao || (v.alojado && v.alojado.funcao) || '';
+        const safeFuncao = funcaoAl.replace(/'/g, "\\'");
+        const fotoAl = v.foto_url || (v.alojado && v.alojado.foto_url) || '';
+        const matAl = v.matricula || (v.alojado && v.alojado.matricula) || '';
+        const corEmp = v.empresa_cor || (v.alojado && v.alojado.empresa_cor) || '#2563eb';
+        const clickFoto = `abrirModalFotoAlojado(${finalId}, '${safeNome}', '${fotoAl}', '${safeEmpresa}', '${corEmp}', '${safeFuncao}', '${matAl}', '${q.bloco_nome}', '${q.numero}', ${v.numero_cama})`;
 
         // Buscar telefone atualizado
         const alObj = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados)
-          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === v.alojado_id)
+          ? window.StaticApiEngine.dbState.alojados.find(x => x.id === finalId)
           : null;
         const zapNum = (alObj && alObj.whatsapp) ? alObj.whatsapp : (v.whatsapp || '');
         const waUrl = getWhatsappUrl(zapNum);
@@ -3160,22 +3240,22 @@ async function abrirModalQuartoDetalhes(quartoId) {
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
             <div class="flex items-center justify-between">
               <span class="font-bold text-slate-900"><i class="fa-solid fa-bed text-blue-600 mr-1"></i> Cama ${v.numero_cama}</span>
-              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white" style="background-color: ${v.empresa_cor || '#475569'}">${v.empresa_nome || 'GEL'}</span>
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded text-white" style="background-color: ${corEmp}">${empNome}</span>
             </div>
             
             <div class="flex items-center gap-3">
-              ${renderAvatarHtml(v.nome_completo, v.foto_url, 'w-11 h-11', 'text-xs', clickFoto)}
+              ${renderAvatarHtml(nomeAl, fotoAl, 'w-11 h-11', 'text-xs', clickFoto)}
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 min-w-0">
-                  <span class="font-bold text-slate-900 text-sm truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${v.nome_completo}</span>
+                  <span class="font-bold text-slate-900 text-sm truncate cursor-pointer hover:text-sky-600" onclick="${clickFoto}" title="Ver perfil e WhatsApp">${nomeAl}</span>
                   ${waUrl ? `
                     <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-600 text-xs flex-shrink-0 transition" title="Conversar no WhatsApp (${zapNum})">
                       <i class="fa-brands fa-whatsapp"></i>
                     </a>
                   ` : ''}
                 </div>
-                <div class="text-slate-500">Matrícula: <b>${v.matricula || '-'}</b> • Função: <b>${v.funcao || '-'}</b></div>
-                <div class="text-slate-400 text-[10px]">Entrada: ${v.data_entrada || '-'} ${zapNum ? `• <span class="text-emerald-700 font-mono font-medium">${formatarTelefoneTexto(zapNum)}</span>` : ''}</div>
+                <div class="text-slate-500">Matrícula: <b>${matAl || '-'}</b> • Função: <b>${funcaoAl || '-'}</b></div>
+                <div class="text-slate-400 text-[10px]">Entrada: ${v.data_entrada || (alObj && alObj.data_entrada) || '-'} ${zapNum ? `• <span class="text-emerald-700 font-mono font-medium">${formatarTelefoneTexto(zapNum)}</span>` : ''}</div>
               </div>
             </div>
 
@@ -3194,13 +3274,14 @@ async function abrirModalQuartoDetalhes(quartoId) {
           </div>
         `;
       } else {
+        const idVaga = v.id || v.vaga_id || '';
         return `
           <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex items-center justify-between">
             <div>
               <span class="font-bold text-emerald-900"><i class="fa-solid fa-bed text-emerald-600 mr-1"></i> Cama ${v.numero_cama}</span>
               <div class="text-emerald-700 text-[11px]">Vaga Livre</div>
             </div>
-            <button onclick="fecharModal('modalQuartoDetalhes'); openModalNovoAlojadoComVaga(${v.vaga_id})" class="btn-prefeito px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+            <button onclick="fecharModal('modalQuartoDetalhes'); openModalNovoAlojadoComVaga(${idVaga})" class="btn-prefeito px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
               Alojar
             </button>
           </div>
@@ -3714,7 +3795,10 @@ async function salvarAlojado(e) {
 
       showToast('Alojado cadastrado com sucesso!', 'success');
       fecharModal('modalAlojadoForm');
-      refreshAllData();
+      fecharModal('modalQuartoDetalhes');
+      await refreshAllData();
+      carregarQuartos();
+      carregarAlojados();
     } catch (err) {
       showToast(err.message, 'error');
     }
