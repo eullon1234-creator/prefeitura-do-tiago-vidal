@@ -1963,7 +1963,7 @@ function iniciarListenerTempoRealFirebase() {
           if (typeof carregarMoveis === 'function') carregarMoveis();
           if (typeof carregarQuartos === 'function' && activeTab === 'blocos') carregarQuartos();
           if (quartoSelecionadoId && typeof abrirModalQuartoDetalhes === 'function') {
-            const modalEl = document.getElementById('modalQuarto');
+            const modalEl = document.getElementById('modalQuartoDetalhes');
             if (modalEl && !modalEl.classList.contains('hidden')) {
               abrirModalQuartoDetalhes(quartoSelecionadoId);
             }
