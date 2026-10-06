@@ -1979,6 +1979,14 @@ function iniciarListenerTempoRealFirebase() {
   } catch (errMov) {
     console.warn("Aviso ao iniciar snapshot de móveis:", errMov);
   }
+
+  // Ouvir chamados de manutenção enviados via QR Code pelos alojados
+  try {
+    iniciarListenerChamados();
+    carregarConfigWhatsappPrefeito();
+  } catch (errCham) {
+    console.warn("Aviso ao iniciar listener de chamados QR Code:", errCham);
+  }
 }
 
 // Botão Sincronizar Nuvem no Header (Força verificação e atualização mútua)
@@ -3006,6 +3014,8 @@ function switchTab(tabId) {
     carregarAlojados();
   } else if (tabId === 'moveis') {
     carregarMoveis();
+  } else if (tabId === 'chamados') {
+    carregarChamados();
   } else if (tabId === 'gestao_cadastros') {
     carregarGestaoCadastros();
   } else if (tabId === 'relatorios') {
@@ -3014,6 +3024,7 @@ function switchTab(tabId) {
     carregarAuditoria();
   } else if (tabId === 'configuracoes') {
     carregarConfigIdentidadeVisual();
+    carregarConfigWhatsappPrefeito();
     const salvo = localStorage.getItem('canteiro_font_size') || 'md';
     alterarTamanhoFonte(salvo);
     atualizarContadorCacheUI();
@@ -6121,4 +6132,501 @@ function fecharMenuMobileMais(e) {
     drawer.classList.remove('flex');
   }
 }
+
+// ========================================================
+// MÓDULO DE CHAMADOS QR CODE & MANUTENÇÃO DE ALOJAMENTOS
+// ========================================================
+let listaChamados = [];
+let chamadosListenerAtivo = false;
+let chamadosPrimeiraCarga = true;
+
+// Som sutil de notificação para novo chamado (Web Audio API nativa sem arquivo externo)
+function playNotificacaoChamado() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    
+    // Tom 1
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+    // Tom 2
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.38);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.38);
+  } catch (e) {
+    console.log("Notificação sonora não suportada ou não permitida pelo navegador:", e);
+  }
+}
+
+// Ouvinte em tempo real para os chamados vindos do celular dos trabalhadores
+function iniciarListenerChamados() {
+  if (!firestoreDb || chamadosListenerAtivo) return;
+  chamadosListenerAtivo = true;
+
+  console.log("🔥 [FIREBASE] Iniciando listener de chamados_suporte QR Code...");
+
+  try {
+    firestoreDb.collection('chamados_suporte').onSnapshot((snapshot) => {
+      const novosChamados = [];
+      let novosPendentes = 0;
+
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        novosChamados.push({
+          id: doc.id,
+          protocolo: d.protocolo || doc.id,
+          quarto: d.quarto || 'N/A',
+          bloco: d.bloco || 'Não informado',
+          nome_solicitante: d.nome_solicitante || 'Colaborador',
+          whatsapp_solicitante: d.whatsapp_solicitante || '',
+          categoria: d.categoria || 'Manutenção Geral',
+          descricao: d.descricao || '',
+          foto_url: d.foto_url || null,
+          status: d.status || 'pendente', // pendente | em_atendimento | concluido
+          origem: d.origem || 'QR Code',
+          criado_em: d.criado_em || new Date().toISOString(),
+          data_formatada: d.data_formatada || ''
+        });
+      });
+
+      // Ordenar por data de criação mais recente primeiro
+      novosChamados.sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0));
+
+      // Se não for a primeira carga, alertar o Prefeito
+      if (!chamadosPrimeiraCarga) {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            novosPendentes++;
+            playNotificacaoChamado();
+            showToast(`🚨 Novo Chamado no Quarto ${data.quarto || ''}: ${data.categoria || 'Manutenção'} (${data.nome_solicitante || 'Alojado'})`, 'warning');
+          }
+        });
+      }
+      chamadosPrimeiraCarga = false;
+
+      listaChamados = novosChamados;
+      atualizarContadoresChamadosUI();
+
+      if (activeTab === 'chamados') {
+        filtrarChamadosUI();
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar chamados_suporte no Firestore:", err);
+    });
+  } catch (err) {
+    console.warn("Erro ao iniciar listener de chamados_suporte:", err);
+  }
+}
+
+// Atualizar contadores e badges de chamados na UI
+function atualizarContadoresChamadosUI() {
+  const tot = listaChamados.length;
+  const pend = listaChamados.filter(c => !c.status || c.status === 'pendente').length;
+  const emAtend = listaChamados.filter(c => c.status === 'em_atendimento').length;
+  const concl = listaChamados.filter(c => c.status === 'concluido').length;
+
+  const elTot = document.getElementById('statTotalChamados');
+  const elPend = document.getElementById('statPendentesChamados');
+  const elEmAtend = document.getElementById('statEmAtendimentoChamados');
+  const elConcl = document.getElementById('statConcluidosChamados');
+
+  if (elTot) elTot.textContent = tot;
+  if (elPend) elPend.textContent = pend;
+  if (elEmAtend) elEmAtend.textContent = emAtend;
+  if (elConcl) elConcl.textContent = concl;
+
+  // Badge na sidebar
+  const sideBadge = document.getElementById('sideCountChamados');
+  if (sideBadge) {
+    if (pend > 0) {
+      sideBadge.textContent = pend;
+      sideBadge.classList.remove('hidden');
+    } else {
+      sideBadge.classList.add('hidden');
+    }
+  }
+
+  // Badge no drawer mobile
+  const drawerBadge = document.getElementById('drawerBadgeChamados');
+  if (drawerBadge) {
+    drawerBadge.textContent = `${pend} pendente${pend === 1 ? '' : 's'}`;
+  }
+}
+
+// Carregar e filtrar chamados
+function carregarChamados() {
+  atualizarContadoresChamadosUI();
+  filtrarChamadosUI();
+}
+
+function filtrarChamadosUI() {
+  const busca = (document.getElementById('buscaChamadosInput')?.value || '').toLowerCase().trim();
+  const st = document.getElementById('filtroStatusChamados')?.value || 'todos';
+  const cat = document.getElementById('filtroCategoriaChamados')?.value || 'todas';
+
+  let filtrados = [...listaChamados];
+
+  if (st !== 'todos') {
+    if (st === 'pendente') {
+      filtrados = filtrados.filter(c => !c.status || c.status === 'pendente');
+    } else {
+      filtrados = filtrados.filter(c => c.status === st);
+    }
+  }
+
+  if (cat !== 'todas') {
+    filtrados = filtrados.filter(c => c.categoria && c.categoria.toLowerCase().includes(cat.toLowerCase()));
+  }
+
+  if (busca) {
+    filtrados = filtrados.filter(c => 
+      (c.quarto && String(c.quarto).toLowerCase().includes(busca)) ||
+      (c.bloco && String(c.bloco).toLowerCase().includes(busca)) ||
+      (c.nome_solicitante && c.nome_solicitante.toLowerCase().includes(busca)) ||
+      (c.descricao && c.descricao.toLowerCase().includes(busca)) ||
+      (c.protocolo && c.protocolo.toLowerCase().includes(busca)) ||
+      (c.categoria && c.categoria.toLowerCase().includes(busca))
+    );
+  }
+
+  renderizarGridChamados(filtrados);
+}
+
+// Renderização dos cards de chamados na tela
+function renderizarGridChamados(chamados) {
+  const grid = document.getElementById('chamadosGrid');
+  const vazio = document.getElementById('chamadosVazio');
+  if (!grid) return;
+
+  if (chamados.length === 0) {
+    grid.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+
+  if (vazio) vazio.classList.add('hidden');
+
+  const iconePorCategoria = (cat) => {
+    const c = (cat || '').toLowerCase();
+    if (c.includes('lâmpada') || c.includes('lampada') || c.includes('ilumina')) return 'fa-solid fa-lightbulb text-amber-500';
+    if (c.includes('ar') || c.includes('ar-condicionado') || c.includes('clima')) return 'fa-solid fa-snowflake text-sky-500';
+    if (c.includes('chuveiro') || c.includes('torneira') || c.includes('hidr') || c.includes('banheiro')) return 'fa-solid fa-faucet-drip text-cyan-500';
+    if (c.includes('tomada') || c.includes('elétr') || c.includes('eletr')) return 'fa-solid fa-plug text-yellow-500';
+    if (c.includes('porta') || c.includes('fechadura') || c.includes('chave')) return 'fa-solid fa-key text-rose-500';
+    if (c.includes('cama') || c.includes('beliche') || c.includes('colch')) return 'fa-solid fa-bed text-indigo-500';
+    if (c.includes('armário') || c.includes('guarda') || c.includes('móvel')) return 'fa-solid fa-warehouse text-emerald-500';
+    return 'fa-solid fa-triangle-exclamation text-slate-500';
+  };
+
+  const badgeStatus = (status) => {
+    if (status === 'concluido') {
+      return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300"><i class="fa-solid fa-circle-check"></i> Concluído</span>';
+    }
+    if (status === 'em_atendimento') {
+      return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-300"><i class="fa-solid fa-person-digging"></i> Em Atendimento</span>';
+    }
+    return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300"><i class="fa-solid fa-clock"></i> Pendente</span>';
+  };
+
+  grid.innerHTML = chamados.map(c => {
+    const dataDisplay = c.data_formatada || (c.criado_em ? new Date(c.criado_em).toLocaleString('pt-BR') : '');
+    const blocoTexto = c.bloco && c.bloco !== 'Não especificado' ? ` • ${c.bloco}` : '';
+
+    return `
+      <div class="bg-white rounded-2xl border ${c.status === 'pendente' ? 'border-amber-300 shadow-md ring-1 ring-amber-100' : 'border-slate-200 shadow-sm'} p-4 flex flex-col justify-between transition hover:shadow-md">
+        
+        <!-- Topo do Card -->
+        <div>
+          <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-10 h-10 rounded-xl ${c.status === 'pendente' ? 'bg-amber-500/10 text-amber-600 border border-amber-300' : 'bg-slate-100 text-slate-700'} flex items-center justify-center text-base font-extrabold flex-shrink-0">
+                <i class="fa-solid fa-door-open"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-extrabold text-slate-900 leading-tight">
+                  Quarto ${c.quarto}<span class="text-xs font-semibold text-slate-500">${blocoTexto}</span>
+                </h4>
+                <p class="text-[10px] font-mono text-slate-400 mt-0.5">#${c.protocolo}</p>
+              </div>
+            </div>
+            <div>
+              ${badgeStatus(c.status)}
+            </div>
+          </div>
+
+          <!-- Problema e Solicitante -->
+          <div class="pt-3 space-y-2">
+            
+            <div class="flex items-center gap-2">
+              <i class="${iconePorCategoria(c.categoria)} text-sm"></i>
+              <span class="text-xs font-bold text-slate-800">${c.categoria}</span>
+            </div>
+
+            <div class="bg-slate-50 rounded-xl p-2.5 text-xs text-slate-700 leading-relaxed border border-slate-100">
+              ${c.descricao || '<span class="text-slate-400 italic">Sem descrição informada</span>'}
+            </div>
+
+            <!-- Dados do Solicitante -->
+            <div class="pt-1 flex flex-col gap-1 text-[11px] text-slate-500">
+              <div class="flex items-center justify-between">
+                <span class="flex items-center gap-1 font-medium text-slate-700">
+                  <i class="fa-solid fa-user text-slate-400"></i> ${c.nome_solicitante}
+                </span>
+                <span class="text-[10px] text-slate-400">${dataDisplay}</span>
+              </div>
+
+              ${c.whatsapp_solicitante ? `
+                <div class="flex items-center justify-between pt-0.5">
+                  <span class="text-slate-500">Contato: ${c.whatsapp_solicitante}</span>
+                  <a href="https://wa.me/55${c.whatsapp_solicitante.replace(/\D/g, '')}?text=${encodeURIComponent('Olá ' + c.nome_solicitante + ', sobre seu chamado de manutenção do Quarto ' + c.quarto + ':')}" target="_blank" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    <i class="fa-brands fa-whatsapp"></i> Responder
+                  </a>
+                </div>
+              ` : ''}
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Botões de Ação do Prefeito -->
+        <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-1.5 mt-3">
+          <button onclick="excluirChamado('${c.protocolo}')" class="btn-prefeito p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Chamado">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+
+          <div class="flex items-center gap-1.5">
+            ${c.status === 'pendente' ? `
+              <button onclick="alterarStatusChamado('${c.protocolo}', 'em_atendimento')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-semibold text-xs transition">
+                <i class="fa-solid fa-play text-[10px] mr-1"></i> Atender
+              </button>
+              <button onclick="alterarStatusChamado('${c.protocolo}', 'concluido')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition">
+                <i class="fa-solid fa-check text-[10px] mr-1"></i> Concluir
+              </button>
+            ` : c.status === 'em_atendimento' ? `
+              <button onclick="alterarStatusChamado('${c.protocolo}', 'concluido')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition">
+                <i class="fa-solid fa-check text-[10px] mr-1"></i> Marcar Concluído
+              </button>
+            ` : `
+              <button onclick="alterarStatusChamado('${c.protocolo}', 'pendente')" class="btn-prefeito px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Reabrir Chamado">
+                <i class="fa-solid fa-rotate-left mr-1"></i> Reabrir
+              </button>
+            `}
+          </div>
+        </div>
+
+      </div>
+    `;
+  }).join('');
+}
+
+// Alterar Status do Chamado
+async function alterarStatusChamado(protocolo, novoStatus) {
+  const ch = listaChamados.find(c => c.protocolo === protocolo || c.id === protocolo);
+  if (!ch) return;
+
+  const statusAnterior = ch.status;
+  ch.status = novoStatus;
+  atualizarContadoresChamadosUI();
+  filtrarChamadosUI();
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('chamados_suporte').doc(protocolo).update({
+        status: novoStatus,
+        atualizado_em: firebase.firestore.FieldValue.serverTimestamp(),
+        atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+      });
+      showToast(`Chamado #${protocolo} atualizado para "${novoStatus === 'concluido' ? 'Concluído' : novoStatus === 'em_atendimento' ? 'Em Atendimento' : 'Pendente'}"!`, 'success');
+    } catch (err) {
+      console.warn("Erro ao atualizar status no Firestore:", err);
+      // reverter se falhou
+      ch.status = statusAnterior;
+      atualizarContadoresChamadosUI();
+      filtrarChamadosUI();
+      showToast('Erro ao atualizar chamado no Firebase: ' + err.message, 'error');
+    }
+  } else {
+    showToast(`Chamado #${protocolo} atualizado localmente!`, 'info');
+  }
+}
+
+// Excluir Chamado
+async function excluirChamado(protocolo) {
+  if (!confirm(`Tem certeza que deseja remover o chamado #${protocolo}?`)) return;
+
+  listaChamados = listaChamados.filter(c => c.protocolo !== protocolo && c.id !== protocolo);
+  atualizarContadoresChamadosUI();
+  filtrarChamadosUI();
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('chamados_suporte').doc(protocolo).delete();
+      showToast(`Chamado #${protocolo} removido com sucesso.`, 'info');
+    } catch (err) {
+      console.warn("Erro ao excluir chamado no Firestore:", err);
+    }
+  }
+}
+
+// Obter link público do chamado para o QR Code
+function getQRCodeUrl() {
+  const href = window.location.href;
+  // Se estiver rodando localmente ou em domínio com barra
+  if (href.includes('index.html')) {
+    return href.replace('index.html', 'chamado.html');
+  }
+  const cleanUrl = href.split('?')[0].split('#')[0];
+  return cleanUrl.endsWith('/') ? `${cleanUrl}chamado.html` : `${cleanUrl}/chamado.html`;
+}
+
+// Plaquinha QR Code
+function abrirModalPlaquinhaQR() {
+  const qrUrl = getQRCodeUrl();
+  const imgEl = document.getElementById('imgPlaquinhaQRCode');
+  const txtEl = document.getElementById('textoPlaquinhaUrl');
+  const configDisplay = document.getElementById('configQrLinkDisplay');
+
+  // Gerador de QR Code em alta resolução com API confiável
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrUrl)}&format=png`;
+  if (imgEl) imgEl.src = qrApiUrl;
+  if (txtEl) txtEl.textContent = qrUrl;
+  if (configDisplay) configDisplay.value = qrUrl;
+
+  abrirModal('modalPlaquinhaQR');
+}
+
+function imprimirPlaquinhaQR() {
+  document.body.classList.add('imprimindo-plaquinha');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('imprimindo-plaquinha');
+  }, 1000);
+}
+
+function copiarLinkQRCode() {
+  const qrUrl = getQRCodeUrl();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(qrUrl).then(() => {
+      showToast('Link do QR Code copiado com sucesso!', 'success');
+    }).catch(() => {
+      prompt('Copie o link abaixo:', qrUrl);
+    });
+  } else {
+    prompt('Copie o link abaixo:', qrUrl);
+  }
+}
+
+function recarregarChamadosManual() {
+  const icone = document.getElementById('iconeReloadChamados');
+  if (icone) icone.classList.add('fa-spin');
+  showToast('Recarregando chamados da nuvem...', 'info');
+
+  if (firestoreDb) {
+    firestoreDb.collection('chamados_suporte').get().then(snap => {
+      const novos = [];
+      snap.forEach(doc => {
+        const d = doc.data();
+        novos.push({
+          id: doc.id,
+          protocolo: d.protocolo || doc.id,
+          quarto: d.quarto || 'N/A',
+          bloco: d.bloco || 'Não informado',
+          nome_solicitante: d.nome_solicitante || 'Colaborador',
+          whatsapp_solicitante: d.whatsapp_solicitante || '',
+          categoria: d.categoria || 'Manutenção Geral',
+          descricao: d.descricao || '',
+          foto_url: d.foto_url || null,
+          status: d.status || 'pendente',
+          origem: d.origem || 'QR Code',
+          criado_em: d.criado_em || new Date().toISOString(),
+          data_formatada: d.data_formatada || ''
+        });
+      });
+      novos.sort((a, b) => new Date(b.criado_em || 0) - new Date(a.criado_em || 0));
+      listaChamados = novos;
+      atualizarContadoresChamadosUI();
+      filtrarChamadosUI();
+      if (icone) icone.classList.remove('fa-spin');
+      showToast('Lista de chamados atualizada com sucesso!', 'success');
+    }).catch(err => {
+      if (icone) icone.classList.remove('fa-spin');
+      showToast('Erro ao recarregar: ' + err.message, 'error');
+    });
+  } else {
+    if (icone) icone.classList.remove('fa-spin');
+    filtrarChamadosUI();
+  }
+}
+
+// Configurações do WhatsApp do Prefeito
+function carregarConfigWhatsappPrefeito() {
+  const qrUrl = getQRCodeUrl();
+  const configDisplay = document.getElementById('configQrLinkDisplay');
+  if (configDisplay) configDisplay.value = qrUrl;
+
+  const salvoLocal = localStorage.getItem('prefeitura_whatsapp_prefeito') || '67 8187-7277';
+  const inpZap = document.getElementById('configWhatsappPrefeito');
+  if (inpZap) inpZap.value = salvoLocal;
+
+  if (firestoreDb) {
+    firestoreDb.collection('configuracoes').doc('prefeitura_contato').get().then(doc => {
+      if (doc.exists && doc.data().whatsapp_prefeito) {
+        if (inpZap) inpZap.value = doc.data().whatsapp_prefeito;
+        localStorage.setItem('prefeitura_whatsapp_prefeito', doc.data().whatsapp_prefeito);
+      }
+    }).catch(e => console.log('Config contato load:', e));
+  }
+}
+
+async function salvarConfigWhatsappPrefeito(event) {
+  if (event) event.preventDefault();
+  const inpZap = document.getElementById('configWhatsappPrefeito');
+  const statusMsg = document.getElementById('configWhatsappStatusMsg');
+  const btn = document.getElementById('btnSalvarWhatsappPrefeito');
+  if (!inpZap) return;
+
+  const valor = inpZap.value.trim();
+  if (!valor) {
+    showToast('Informe o número de WhatsApp do Prefeito.', 'warning');
+    return;
+  }
+
+  localStorage.setItem('prefeitura_whatsapp_prefeito', valor);
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+  }
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('configuracoes').doc('prefeitura_contato').set({
+        whatsapp_prefeito: valor,
+        atualizado_em: firebase.firestore.FieldValue.serverTimestamp(),
+        atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+      }, { merge: true });
+    } catch (e) {
+      console.warn("Aviso ao salvar contato no Firestore:", e);
+    }
+  }
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar Número do Prefeito';
+  }
+  if (statusMsg) {
+    statusMsg.innerHTML = '<span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Número do Prefeito atualizado e sincronizado!</span>';
+  }
+  showToast('WhatsApp do Prefeito atualizado com sucesso!', 'success');
+}
+
 

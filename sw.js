@@ -1,10 +1,11 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v3.0';
+const CACHE_NAME = 'prefeitura-pwa-v3.1';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
+  'chamado.html',
   'app.js',
   'xlsx.bundle.js',
   'manifest.json',
@@ -14,7 +15,9 @@ const ASSETS_TO_CACHE = [
   'icon-512.png',
   'apple-touch-icon.png',
   'logo_gel.png',
-  'logo_gel_cropped.png'
+  'logo_gel_cropped.png',
+  'logo_gel_oficial.png',
+  'banner.html'
 ];
 
 // Instalação do Service Worker

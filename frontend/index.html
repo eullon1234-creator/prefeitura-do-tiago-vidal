@@ -85,7 +85,25 @@
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
-      body { background: white; color: black; }
+      body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
+      body.imprimindo-plaquinha > *:not(#modalPlaquinhaQR) { display: none !important; }
+      body.imprimindo-plaquinha #modalPlaquinhaQR {
+        position: static !important;
+        display: block !important;
+        background: transparent !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+      }
+      body.imprimindo-plaquinha #modalPlaquinhaQR > div {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      body.imprimindo-plaquinha #areaImpressaoPlaquinha {
+        background: white !important;
+        padding: 0 !important;
+      }
     }
   </style>
 </head>
@@ -230,6 +248,12 @@
           <i class="fa-solid fa-bed w-5 text-violet-400"></i>
           <span>Móveis & Vistoria</span>
           <span id="sideCountAlertas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-red-950 text-red-300 border border-red-800">0</span>
+        </button>
+
+        <button onclick="switchTab('chamados')" data-tab="chamados" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-qrcode w-5 text-amber-400"></i>
+          <span>Chamados QR Code</span>
+          <span id="sideCountChamados" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold hidden">0</span>
         </button>
 
         <div class="px-3 pt-4 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -729,6 +753,135 @@
 
       </div>
 
+      <!-- ================= TAB: CHAMADOS QR CODE & MANUTENÇÃO ================= -->
+      <div id="tab-chamados" class="tab-content hidden space-y-6">
+        
+        <!-- Header da Aba -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200">
+                <i class="fa-solid fa-bolt text-amber-600 mr-1"></i> Tempo Real
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Chamados via QR Code</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Solicitações de reparo enviadas pelos colaboradores direto da porta do alojamento (Lâmpadas, Ar, Chuveiro, etc.).
+            </p>
+          </div>
+
+          <!-- Ações Rápidas -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="abrirModalPlaquinhaQR()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-qrcode"></i> Plaquinha QR Code Padrão
+            </button>
+            <a href="chamado.html" target="_blank" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1.5 border border-slate-200 transition">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Testar Tela do Celular
+            </a>
+            <button onclick="recarregarChamadosManual()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition" title="Recarregar Lista">
+              <i class="fa-solid fa-rotate" id="iconeReloadChamados"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Cards de Métricas de Chamados -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total de Chamados</p>
+              <h3 id="statTotalChamados" class="text-2xl font-extrabold text-slate-900 mt-1">0</h3>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-clipboard-list"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/40 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold text-amber-700 uppercase tracking-wider">Pendentes</p>
+              <h3 id="statPendentesChamados" class="text-2xl font-extrabold text-amber-600 mt-1">0</h3>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-clock"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-sky-200 bg-sky-50/40 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold text-sky-700 uppercase tracking-wider">Em Atendimento</p>
+              <h3 id="statEmAtendimentoChamados" class="text-2xl font-extrabold text-sky-600 mt-1">0</h3>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-person-digging"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold text-emerald-700 uppercase tracking-wider">Concluídos</p>
+              <h3 id="statConcluidosChamados" class="text-2xl font-extrabold text-emerald-600 mt-1">0</h3>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filtros e Busca -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input 
+              type="text" 
+              id="buscaChamadosInput" 
+              oninput="filtrarChamadosUI()" 
+              placeholder="Buscar por quarto, nome do funcionário, problema ou protocolo..." 
+              class="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+            >
+          </div>
+
+          <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+            <!-- Filtro de Status -->
+            <select id="filtroStatusChamados" onchange="filtrarChamadosUI()" class="px-3 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white outline-none">
+              <option value="todos">Todos os Status</option>
+              <option value="pendente" selected>Apenas Pendentes (Atenção)</option>
+              <option value="em_atendimento">Em Atendimento</option>
+              <option value="concluido">Concluídos / Resolvidos</option>
+            </select>
+
+            <!-- Filtro de Categoria -->
+            <select id="filtroCategoriaChamados" onchange="filtrarChamadosUI()" class="px-3 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white outline-none">
+              <option value="todas">Todas as Categorias</option>
+              <option value="Lâmpada / Iluminação">Lâmpada / Iluminação</option>
+              <option value="Ar-Condicionado">Ar-Condicionado</option>
+              <option value="Banheiro / Hidráulica">Banheiro / Chuveiro</option>
+              <option value="Tomada / Elétrica">Tomada / Elétrica</option>
+              <option value="Porta / Fechadura">Porta / Fechadura</option>
+              <option value="Cama / Beliche">Cama / Beliche</option>
+              <option value="Armário / Guarda-roupa">Guarda-Roupa</option>
+              <option value="Outro">Outro Problema</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Grade de Chamados -->
+        <div id="chamadosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populado via Javascript -->
+        </div>
+
+        <!-- Estado Vazio -->
+        <div id="chamadosVazio" class="hidden bg-white p-12 rounded-xl border border-slate-200 text-center space-y-3">
+          <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl">
+            <i class="fa-solid fa-clipboard-check"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Nenhum chamado encontrado</h3>
+          <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Não há chamados com os filtros selecionados. Novos chamados escaneados nos quartos aparecerão aqui automaticamente.
+          </p>
+        </div>
+
+      </div>
+
       <!-- ================= TAB 5: GESTÃO DE CADASTROS (ESTRUTURA & EMPRESAS) ================= -->
       <div id="tab-gestao_cadastros" class="tab-content hidden space-y-6">
         
@@ -1150,6 +1303,75 @@
                   <i class="fa-solid fa-floppy-disk"></i> Salvar Identidade Visual
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO: WHATSAPP DO PREFEITO & QR CODE DOS ALOJAMENTOS -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-lg font-bold">
+                <i class="fa-brands fa-whatsapp"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Contato do Prefeito & QR Code de Manutenção</h3>
+                <p class="text-xs text-slate-500">Defina o número de WhatsApp que receberá as mensagens dos funcionários ao escanearem o QR Code no quarto.</p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <i class="fa-solid fa-cloud text-[10px]"></i> Sincronizado na Nuvem
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div>
+              <label for="configWhatsappPrefeito" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                WhatsApp do Prefeito (com DDD)
+              </label>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-emerald-500">
+                  <i class="fa-brands fa-whatsapp text-base"></i>
+                </div>
+                <input 
+                  type="text" 
+                  id="configWhatsappPrefeito" 
+                  value="67 8187-7277" 
+                  placeholder="Ex: 67 98187-7277" 
+                  class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 text-sm font-semibold text-slate-800 placeholder-slate-400 transition"
+                >
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1">Ao clicar no botão no celular, o chamado abre diretamente a conversa com este número.</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Página de Chamado do QR Code
+              </label>
+              <div class="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  id="configQrLinkDisplay" 
+                  readonly 
+                  class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono text-slate-600 outline-none"
+                >
+                <button type="button" onclick="copiarLinkQRCode()" class="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1 flex-shrink-0" title="Copiar Link">
+                  <i class="fa-solid fa-copy"></i>
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1">Endereço público gerado no QR Code colado nas portas dos quartos.</p>
+            </div>
+          </div>
+
+          <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
+            <span id="configWhatsappStatusMsg" class="text-xs text-slate-500 italic">Número salvo e pronto para uso</span>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <button type="button" onclick="abrirModalPlaquinhaQR()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-qrcode"></i> Ver Plaquinha QR Code
+              </button>
+              <button type="button" id="btnSalvarWhatsappPrefeito" onclick="salvarConfigWhatsappPrefeito(event)" class="btn-prefeito w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition">
+                <i class="fa-solid fa-floppy-disk"></i> Salvar Número do Prefeito
+              </button>
             </div>
           </div>
         </div>
@@ -2168,6 +2390,106 @@ service cloud.firestore {
     </div>
   </div>
 
+  <!-- ================= MODAL PLAQUINHA QR CODE PADRÃO (IMPRESSÃO A4) ================= -->
+  <div id="modalPlaquinhaQR" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      
+      <!-- Topo Modal (Não sai na impressão) -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between no-print flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i class="fa-solid fa-qrcode text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Plaquinha de QR Code Padrão</h3>
+            <p class="text-[11px] text-slate-400">Pronta para imprimir e fixar nas portas de todos os quartos</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="imprimirPlaquinhaQR()" class="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-print"></i> Imprimir Plaquinha
+          </button>
+          <button onclick="fecharModal('modalPlaquinhaQR')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo Visual da Plaquinha (Imprimível) -->
+      <div class="p-6 overflow-y-auto flex-1 bg-slate-100 flex items-center justify-center" id="areaImpressaoPlaquinha">
+        
+        <!-- Placa Estilizada Oficial -->
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 sm:p-8 border-4 border-slate-900 shadow-xl text-center space-y-4 text-slate-900">
+          
+          <!-- Cabeçalho da Placa -->
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3">
+            <div class="h-11 px-2.5 py-1 rounded-lg bg-white flex items-center justify-center border border-slate-300">
+              <img src="logo_gel_oficial.png" alt="Logo GEL Oficial" class="h-8 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] font-black uppercase tracking-widest text-slate-500 block">Canteiro de Obras</span>
+              <span class="text-xs font-black text-amber-600 uppercase">Taboca 2</span>
+            </div>
+          </div>
+
+          <!-- Título em Destaque -->
+          <div class="bg-slate-900 text-white py-2 px-3 rounded-xl shadow-xs">
+            <h2 class="text-base sm:text-lg font-black tracking-wide uppercase">SOLICITAÇÃO DE MANUTENÇÃO</h2>
+            <p class="text-[11px] font-bold text-amber-400">PREFEITURA DE ALOJAMENTOS</p>
+          </div>
+
+          <!-- Chamada para Ação -->
+          <p class="text-xs sm:text-sm font-semibold text-slate-700 leading-snug">
+            Problemas com <span class="text-amber-600 font-bold underline">lâmpada queimada</span>, <span class="text-sky-600 font-bold underline">ar-condicionado</span>, <span class="text-rose-600 font-bold underline">chuveiro</span> ou conserto no quarto?
+          </p>
+
+          <!-- Imagem do QR Code Gerada Dinamicamente -->
+          <div class="bg-white p-3 rounded-2xl border-2 border-dashed border-slate-400 inline-block mx-auto shadow-inner">
+            <img id="imgPlaquinhaQRCode" src="" alt="QR Code Manutenção" class="w-48 h-48 sm:w-56 sm:h-56 mx-auto object-contain">
+            <p class="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-wider">Aponte a câmera do celular</p>
+          </div>
+
+          <!-- Passos Simples -->
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-left space-y-2 text-xs">
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+              <p class="text-slate-800 font-medium">Escaneie o QR Code acima com seu celular.</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <p class="text-slate-800 font-medium">Informe seu nome, número do quarto e o defeito.</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+              <p class="text-slate-800 font-medium">Envie pelo WhatsApp do Prefeito ou pelo Aplicativo!</p>
+            </div>
+          </div>
+
+          <!-- Rodapé com Link Alternativo -->
+          <div class="pt-2 border-t border-slate-200 text-slate-500 text-[10px] leading-tight space-y-0.5">
+            <p class="font-bold text-slate-700">Prefeito Tiago Vidal • Plantão de Alojamento</p>
+            <p class="font-mono text-[9px] text-slate-500 break-all" id="textoPlaquinhaUrl"></p>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Rodapé Modal -->
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between no-print flex-shrink-0">
+        <span class="text-xs text-slate-500">Dica: Imprima várias cópias e cole nas portas dos quartos.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="fecharModal('modalPlaquinhaQR')" class="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+            Fechar
+          </button>
+          <button type="button" onclick="imprimirPlaquinhaQR()" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-print"></i> Imprimir Placa
+          </button>
+        </div>
+      </div>
+
+  </div>
+
   <!-- ================= BARRA DE NAVEGAÇÃO INFERIOR FIXA (MOBILE APP) ================= -->
   <nav id="bottomNavBar" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around items-center py-2 px-1 shadow-2xl no-print" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
     <button onclick="switchTab('dashboard')" data-mob-tab="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-amber-400 transition font-bold scale-105">
@@ -2228,6 +2550,15 @@ service cloud.firestore {
 
       <!-- Grade de Atalhos -->
       <div class="grid grid-cols-2 gap-2.5 pt-1">
+        <button onclick="fecharMenuMobileMais(); switchTab('chamados')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-amber-500/40 hover:bg-slate-800 text-left transition col-span-2">
+          <div class="flex items-center justify-between w-full">
+            <i class="fa-solid fa-qrcode text-amber-400 text-lg mb-1.5"></i>
+            <span id="drawerBadgeChamados" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">0 pendentes</span>
+          </div>
+          <span class="text-xs font-bold text-white">Chamados QR Code dos Alojamentos</span>
+          <span class="text-[10px] text-slate-300">Solicitações de lâmpada, ar e manutenção</span>
+        </button>
+
         <button onclick="fecharMenuMobileMais(); switchTab('gestao_cadastros')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
           <i class="fa-solid fa-building-circle-gear text-indigo-400 text-lg mb-1.5"></i>
           <span class="text-xs font-bold text-white">Estrutura & Empresas</span>
