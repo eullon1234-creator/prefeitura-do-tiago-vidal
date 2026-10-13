@@ -3655,7 +3655,7 @@ service cloud.firestore {
           </label>
           <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-slate-50">
             <div class="w-14 h-14 rounded-xl border border-slate-300 bg-white flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm relative">
-              <img id="itemEstoqueFotoPreview" src="" alt="Preview" class="w-full h-full object-cover hidden" onerror="tratarErroFotoPreviewItemEstoque()">
+              <img id="itemEstoqueFotoPreview" alt="Preview" class="w-full h-full object-cover hidden" onerror="if (typeof tratarErroFotoPreviewItemEstoque === 'function') tratarErroFotoPreviewItemEstoque(); else this.classList.add('hidden');">
               <div id="itemEstoqueFotoPlaceholder" class="text-slate-400 text-lg flex flex-col items-center justify-center">
                 <i class="fa-solid fa-camera"></i>
               </div>
