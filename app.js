@@ -9160,6 +9160,11 @@ function atualizarContadoresEstoqueUI() {
   if (drawerBadge) {
     drawerBadge.textContent = `${totItens} itens`;
   }
+
+  // Atualiza indicadores de bens alocados em campo
+  if (typeof atualizarBensAlocadosCampoUI === 'function') {
+    atualizarBensAlocadosCampoUI();
+  }
 }
 
 // Filtragem e renderização da grade de itens
@@ -9199,6 +9204,37 @@ function filtrarEstoqueUI() {
   });
 
   renderizarEstoqueGrid(filtrados);
+}
+
+// Funções auxiliares para foto via URL na internet
+function aoDigitarUrlFotoItemEstoque(url) {
+  const preview = document.getElementById('itemEstoqueFotoPreview');
+  const placeholder = document.getElementById('itemEstoqueFotoPlaceholder');
+  if (!preview || !placeholder) return;
+
+  const urlLimpa = (url || '').trim();
+  if (urlLimpa.length > 5) {
+    preview.src = urlLimpa;
+    preview.classList.remove('hidden');
+    placeholder.classList.add('hidden');
+  } else {
+    preview.src = '';
+    preview.classList.add('hidden');
+    placeholder.classList.remove('hidden');
+  }
+}
+
+function tratarErroFotoPreviewItemEstoque() {
+  const preview = document.getElementById('itemEstoqueFotoPreview');
+  const placeholder = document.getElementById('itemEstoqueFotoPlaceholder');
+  if (preview) preview.classList.add('hidden');
+  if (placeholder) placeholder.classList.remove('hidden');
+}
+
+function limparFotoItemEstoqueForm() {
+  const input = document.getElementById('itemEstoqueFormFotoUrl');
+  if (input) input.value = '';
+  aoDigitarUrlFotoItemEstoque('');
 }
 
 // Renderização dos cards de estoque
@@ -9260,13 +9296,24 @@ function renderizarEstoqueGrid(itens) {
             </div>
           </div>
 
-          <h3 class="text-sm font-bold text-slate-900 leading-snug hover:text-teal-700 transition cursor-pointer" onclick="abrirDetalhesItemEstoque('${item.id}')">
-            ${item.nome}
-          </h3>
+          <!-- Informações do Item com Foto opcional -->
+          <div class="flex items-start gap-3 my-1">
+            ${item.foto_url ? `
+              <div class="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex-shrink-0 cursor-pointer shadow-sm group relative" onclick="abrirDetalhesItemEstoque('${item.id}')" title="Clique para ampliar">
+                <img src="${item.foto_url}" alt="${item.nome}" class="w-full h-full object-cover group-hover:scale-105 transition" onerror="this.parentElement.style.display='none'">
+              </div>
+            ` : ''}
 
-          <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-            <i class="fa-solid fa-warehouse text-amber-500 text-[11px]"></i>
-            <span>${item.local || 'Almoxarifado'}</span>
+            <div class="flex-1 min-w-0">
+              <h3 class="text-sm font-bold text-slate-900 leading-snug hover:text-teal-700 transition cursor-pointer" onclick="abrirDetalhesItemEstoque('${item.id}')">
+                ${item.nome}
+              </h3>
+
+              <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <i class="fa-solid fa-warehouse text-amber-500 text-[11px]"></i>
+                <span class="truncate">${item.local || 'Almoxarifado'}</span>
+              </div>
+            </div>
           </div>
 
           <!-- Informações de Patrimônio & Valor (se existirem) -->
@@ -9332,6 +9379,7 @@ function openModalNovoItemEstoque() {
   document.getElementById('modalItemEstoqueFormTitulo').textContent = 'Cadastrar Item no Estoque';
   document.getElementById('itemEstoqueFormQtd').value = 0;
   document.getElementById('itemEstoqueFormQtdMinima').value = 2;
+  limparFotoItemEstoqueForm();
   const btnExcluir = document.getElementById('btnExcluirItemEstoqueModal');
   if (btnExcluir) btnExcluir.classList.add('hidden');
   popularSelectsLocaisEstoque();
@@ -9359,6 +9407,9 @@ function editarItemEstoque(id) {
   setVal('itemEstoqueFormEmpresa', item.empresa || '');
   setVal('itemEstoqueFormMarca', item.marca || '');
   setVal('itemEstoqueFormObs', item.observacoes || '');
+  setVal('itemEstoqueFormFotoUrl', item.foto_url || '');
+
+  aoDigitarUrlFotoItemEstoque(item.foto_url || '');
 
   const btnExcluir = document.getElementById('btnExcluirItemEstoqueModal');
   if (btnExcluir) btnExcluir.classList.remove('hidden');
@@ -9382,6 +9433,7 @@ async function salvarItemEstoque(event) {
   const empresa = document.getElementById('itemEstoqueFormEmpresa').value.trim();
   const marca = document.getElementById('itemEstoqueFormMarca').value.trim();
   const observacoes = document.getElementById('itemEstoqueFormObs').value.trim();
+  const foto_url = (document.getElementById('itemEstoqueFormFotoUrl')?.value || '').trim();
 
   const itemObj = {
     id,
@@ -9396,6 +9448,7 @@ async function salvarItemEstoque(event) {
     empresa,
     marca,
     observacoes,
+    foto_url,
     atualizado_em: new Date().toISOString()
   };
 
@@ -9574,6 +9627,19 @@ function abrirDetalhesItemEstoque(id) {
   document.getElementById('modalItemDetalhesSaldo').textContent = `${item.quantidade || 0} ${item.unidade || 'UN'}`;
   document.getElementById('modalItemDetalhesPatrimonio').textContent = item.patrimonio ? `#${item.patrimonio.replace('#', '')}` : 'Sem plaqueta';
   document.getElementById('modalItemDetalhesValor').textContent = item.valor ? Number(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Não informado';
+
+  // Foto do item em destaque
+  const containerFoto = document.getElementById('modalItemDetalhesFotoContainer');
+  const imgFoto = document.getElementById('modalItemDetalhesFotoImg');
+  if (containerFoto && imgFoto) {
+    if (item.foto_url && item.foto_url.trim() !== '') {
+      imgFoto.src = item.foto_url;
+      containerFoto.classList.remove('hidden');
+    } else {
+      imgFoto.src = '';
+      containerFoto.classList.add('hidden');
+    }
+  }
 
   // Histórico
   const container = document.getElementById('modalItemMovimentacoesLista');
@@ -9915,3 +9981,376 @@ window.confirmarTransferenciaMovelCasa = confirmarTransferenciaMovelCasa;
 
 window.openModalDevolverMovelEstoque = openModalDevolverMovelEstoque;
 window.confirmarDevolucaoMovelEstoque = confirmarDevolucaoMovelEstoque;
+
+// ========================================================
+// RASTREABILIDADE PATRIMONIAL & SUB-ABAS DO ESTOQUE
+// ========================================================
+
+let subAbaEstoqueAtiva = 'galpoes';
+
+function trocarSubAbaEstoque(aba) {
+  subAbaEstoqueAtiva = aba;
+  const btnGalpoes = document.getElementById('btnSubAbaEstoque_galpoes');
+  const btnAlocados = document.getElementById('btnSubAbaEstoque_alocados');
+  const painelGalpoes = document.getElementById('painelEstoqueGalpoes');
+  const painelAlocados = document.getElementById('painelEstoqueAlocados');
+
+  if (aba === 'galpoes') {
+    if (btnGalpoes) btnGalpoes.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-teal-600 text-white shadow-sm';
+    if (btnAlocados) btnAlocados.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700';
+    if (painelGalpoes) painelGalpoes.classList.remove('hidden');
+    if (painelAlocados) painelAlocados.classList.add('hidden');
+    filtrarEstoqueUI();
+  } else {
+    if (btnGalpoes) btnGalpoes.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700';
+    if (btnAlocados) btnAlocados.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-indigo-600 text-white shadow-sm';
+    if (painelGalpoes) painelGalpoes.classList.add('hidden');
+    if (painelAlocados) painelAlocados.classList.remove('hidden');
+    atualizarBensAlocadosCampoUI();
+  }
+}
+
+function obterTodosBensAlocados() {
+  const lista = [];
+
+  // 1. Bens nas Casas Urbanas
+  if (Array.isArray(listaCasasCidade)) {
+    listaCasasCidade.forEach(casa => {
+      if (Array.isArray(casa.comodos)) {
+        casa.comodos.forEach(comodo => {
+          if (Array.isArray(comodo.moveis)) {
+            comodo.moveis.forEach(mov => {
+              lista.push({
+                id: mov.id,
+                tipo_origem: 'casa',
+                casa_id: casa.id,
+                casa_nome: casa.nome || casa.identificador || 'Casa Urbana',
+                comodo_id: comodo.id,
+                comodo_nome: comodo.nome || comodo.tipo || 'Cômodo',
+                local_formatado: `${casa.nome || casa.identificador || 'Casa'} • ${comodo.nome || comodo.tipo || 'Cômodo'}`,
+                endereco: casa.endereco || 'Área Urbana',
+                nome: mov.tipo || 'Móvel / Equipamento',
+                marca: mov.marca || '',
+                patrimonio: mov.patrimonio || '',
+                valor: Number(mov.valor || 0),
+                quantidade: Number(mov.quantidade || 1),
+                estado: mov.estado || 'Bom',
+                empresa: mov.empresa || '',
+                foto_url: mov.foto_url || ''
+              });
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // 2. Bens nos Quartos de Alojamento
+  if (typeof StaticApiEngine !== 'undefined' && StaticApiEngine.dbState && Array.isArray(StaticApiEngine.dbState.quartos)) {
+    StaticApiEngine.dbState.quartos.forEach(quarto => {
+      if (Array.isArray(quarto.moveis)) {
+        quarto.moveis.forEach(mov => {
+          lista.push({
+            id: mov.id,
+            tipo_origem: 'alojamento',
+            quarto_id: quarto.id,
+            bloco_id: quarto.bloco_id,
+            quarto_numero: quarto.numero,
+            bloco_nome: quarto.bloco_nome || '',
+            local_formatado: `Alojamento Bloco ${quarto.bloco_nome || ''} • Quarto ${quarto.numero}`,
+            endereco: 'Canteiro de Obras / Alojamento',
+            nome: mov.tipo_item || mov.tipo || 'Móvel de Alojamento',
+            marca: mov.marca || '',
+            patrimonio: mov.patrimonio || '',
+            valor: Number(mov.valor || 0),
+            quantidade: Number(mov.quantidade || 1),
+            estado: mov.estado_conservacao || mov.estado || 'Bom',
+            empresa: mov.empresa || '',
+            foto_url: mov.foto_url || ''
+          });
+        });
+      }
+    });
+  }
+
+  return lista;
+}
+
+function atualizarBensAlocadosCampoUI() {
+  const todosBens = obterTodosBensAlocados();
+
+  // Atualizar badge da sub-aba
+  const badgeQtd = document.getElementById('badgeQtdBensAlocados');
+  if (badgeQtd) badgeQtd.textContent = todosBens.length;
+
+  // Atualizar KPIs de bens em campo
+  const kpiTot = document.getElementById('kpiBensAlocadosTotal');
+  const kpiCasas = document.getElementById('kpiBensAlocadosCasas');
+  const kpiAloj = document.getElementById('kpiBensAlocadosAlojamentos');
+  const kpiVal = document.getElementById('kpiBensAlocadosValorTotal');
+
+  const totCasas = todosBens.filter(b => b.tipo_origem === 'casa').length;
+  const totAloj = todosBens.filter(b => b.tipo_origem === 'alojamento').length;
+  const valTot = todosBens.reduce((acc, b) => acc + (b.valor * b.quantidade), 0);
+
+  if (kpiTot) kpiTot.textContent = todosBens.length;
+  if (kpiCasas) kpiCasas.textContent = totCasas;
+  if (kpiAloj) kpiAloj.textContent = totAloj;
+  if (kpiVal) kpiVal.textContent = valTot.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  filtrarBensAlocadosUI();
+}
+
+function filtrarBensAlocadosUI() {
+  const termo = (document.getElementById('buscaBensAlocadosInput')?.value || '').toLowerCase().trim();
+  const filtroTipo = document.getElementById('filtroBensAlocadosTipoLocal')?.value || 'todos';
+  const filtroEstado = document.getElementById('filtroBensAlocadosEstado')?.value || 'todos';
+
+  const todos = obterTodosBensAlocados();
+
+  let filtrados = todos.filter(bem => {
+    if (termo) {
+      const matchNome = (bem.nome || '').toLowerCase().includes(termo);
+      const matchMarca = (bem.marca || '').toLowerCase().includes(termo);
+      const matchPat = (bem.patrimonio || '').toLowerCase().includes(termo);
+      const matchLocal = (bem.local_formatado || '').toLowerCase().includes(termo);
+      const matchEmp = (bem.empresa || '').toLowerCase().includes(termo);
+      if (!matchNome && !matchMarca && !matchPat && !matchLocal && !matchEmp) return false;
+    }
+
+    if (filtroTipo !== 'todos' && bem.tipo_origem !== filtroTipo) return false;
+
+    if (filtroEstado !== 'todos') {
+      const est = (bem.estado || '').toLowerCase();
+      if (filtroEstado === 'Bom' && !est.includes('bom') && !est.includes('ótimo') && !est.includes('excelente')) return false;
+      if (filtroEstado === 'Regular' && !est.includes('regular')) return false;
+      if (filtroEstado === 'Danificado' && !est.includes('ruim') && !est.includes('danificado') && !est.includes('manuten')) return false;
+    }
+
+    return true;
+  });
+
+  renderizarGridBensAlocados(filtrados);
+}
+
+function renderizarGridBensAlocados(bens) {
+  const container = document.getElementById('gridBensAlocadosContainer');
+  const vazio = document.getElementById('bensAlocadosVazio');
+  if (!container) return;
+
+  if (bens.length === 0) {
+    container.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+
+  if (vazio) vazio.classList.add('hidden');
+
+  container.innerHTML = bens.map(bem => {
+    const isCasa = bem.tipo_origem === 'casa';
+    const tagLocalClass = isCasa ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-sky-50 text-sky-800 border-sky-200';
+    const iconeLocal = isCasa ? 'fa-house' : 'fa-building';
+
+    let estadoBadge = 'bg-emerald-100 text-emerald-800';
+    if ((bem.estado || '').toLowerCase().includes('regular')) estadoBadge = 'bg-amber-100 text-amber-800';
+    if ((bem.estado || '').toLowerCase().includes('ruim') || (bem.estado || '').toLowerCase().includes('danificado')) estadoBadge = 'bg-rose-100 text-rose-800';
+
+    return `
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition p-4 sm:p-5 flex flex-col justify-between">
+        <div>
+          <!-- Header do Card com Localização -->
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${tagLocalClass}">
+              <i class="fa-solid ${iconeLocal}"></i>
+              <span class="truncate max-w-[200px]">${bem.local_formatado}</span>
+            </span>
+
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${estadoBadge}">
+              ${bem.estado || 'Bom'}
+            </span>
+          </div>
+
+          <!-- Nome do Móvel / Bem com Foto se existir -->
+          <div class="mt-2 flex items-start gap-3">
+            ${bem.foto_url ? `
+              <div class="w-14 h-14 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex-shrink-0 shadow-sm">
+                <img src="${bem.foto_url}" alt="${bem.nome}" class="w-full h-full object-cover" onerror="this.parentElement.style.display='none'">
+              </div>
+            ` : `
+              <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center text-lg flex-shrink-0">
+                <i class="fa-solid fa-couch"></i>
+              </div>
+            `}
+            <div class="flex-1 min-w-0">
+              <h3 class="text-sm font-bold text-slate-900 leading-snug">
+                ${bem.nome}
+              </h3>
+              ${bem.marca ? `<p class="text-[11px] text-slate-500 font-medium">Marca: ${bem.marca}</p>` : ''}
+              ${bem.empresa ? `<p class="text-[10px] text-indigo-600 font-semibold">Empresa: ${bem.empresa}</p>` : ''}
+            </div>
+          </div>
+
+          <!-- Plaqueta de Patrimônio & Valor -->
+          <div class="mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+            <div>
+              <span class="text-[9px] font-bold text-slate-400 uppercase block">Patrimônio / Plaqueta</span>
+              ${bem.patrimonio ? `
+                <span class="font-mono text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded border border-indigo-200 inline-block mt-0.5">
+                  <i class="fa-solid fa-tag text-[9px] mr-1"></i>${bem.patrimonio}
+                </span>
+              ` : '<span class="text-xs text-slate-400 italic">Sem plaqueta</span>'}
+            </div>
+
+            <div class="text-right">
+              <span class="text-[9px] font-bold text-slate-400 uppercase block">Valor Unitário</span>
+              <span class="text-xs font-black text-slate-800">
+                ${bem.valor ? Number(bem.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rodapé do Card com Ações Rápidas -->
+        <div class="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+          <span class="text-xs font-bold text-slate-600">
+            Qtd: <span class="font-black text-slate-900">${bem.quantidade}</span>
+          </span>
+
+          <div class="flex items-center gap-1.5">
+            ${isCasa ? `
+              <button onclick="openModalTransferirMovelCasa('${bem.casa_id}', '${bem.comodo_id}', '${bem.id}')" class="px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition flex items-center gap-1" title="Transferir de Casa ou Cômodo">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i> Transferir
+              </button>
+              <button onclick="openModalDevolverMovelEstoque('${bem.casa_id}', '${bem.comodo_id}', '${bem.id}')" class="px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold transition flex items-center gap-1" title="Devolver ao Almoxarifado/Estoque">
+                <i class="fa-solid fa-box-archive"></i> Devolver
+              </button>
+            ` : `
+              <span class="text-[11px] text-slate-500 font-medium italic">
+                <i class="fa-solid fa-bed mr-1"></i> Em uso no Alojamento
+              </span>
+            `}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ========================================================
+// EXPORTAÇÃO DE RELATÓRIO DO ESTOQUE EM EXCEL (.XLSX)
+// ========================================================
+
+function exportarRelatorioEstoqueExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('Biblioteca SheetJS ainda não foi carregada. Tente novamente em instantes.', 'error');
+    return;
+  }
+
+  try {
+    const wb = XLSX.utils.book_new();
+
+    // 1. Aba: Saldo em Galpões
+    const dadosGalpoes = listaEstoqueItens.map(item => {
+      const qtd = Number(item.quantidade || 0);
+      const min = Number(item.qtd_minima || 0);
+      const val = Number(item.valor || 0);
+      const isCritico = qtd <= min;
+
+      return {
+        'ID Item': item.id || '',
+        'Nome do Material / Bem': item.nome || '',
+        'Categoria': item.categoria || '',
+        'Galpão / Local': item.local || '',
+        'Saldo Atual': qtd,
+        'Unidade': item.unidade || 'UN',
+        'Estoque Mínimo': min,
+        'Status do Saldo': isCritico ? 'CRÍTICO / BAIXO' : 'NORMAL',
+        'Plaqueta Patrimônio': item.patrimonio || '',
+        'Marca / Modelo': item.marca || '',
+        'Empresa Proprietária': item.empresa || '',
+        'Valor Unitário (R$)': val,
+        'Valor Total em Saldo (R$)': val * qtd,
+        'Link da Foto': item.foto_url || '',
+        'Observações': item.observacoes || ''
+      };
+    });
+    const wsGalpoes = XLSX.utils.json_to_sheet(dadosGalpoes);
+    XLSX.utils.book_append_sheet(wb, wsGalpoes, 'Saldo em Galpões');
+
+    // 2. Aba: Bens Alocados em Campo
+    const todosBens = obterTodosBensAlocados();
+    const dadosCampo = todosBens.map(b => ({
+      'ID Bem': b.id || '',
+      'Item / Móvel': b.nome || '',
+      'Plaqueta Patrimônio': b.patrimonio || '',
+      'Tipo de Instalação': b.tipo_origem === 'casa' ? 'Casa Urbana' : 'Alojamento dos Blocos',
+      'Localização / Imóvel': b.tipo_origem === 'casa' ? b.casa_nome : b.local_formatado,
+      'Cômodo / Quarto': b.tipo_origem === 'casa' ? b.comodo_nome : `Quarto ${b.quarto_numero || ''}`,
+      'Endereço / Referência': b.endereco || '',
+      'Quantidade': b.quantidade || 1,
+      'Estado de Conservação': b.estado || 'Bom',
+      'Marca': b.marca || '',
+      'Empresa': b.empresa || '',
+      'Valor Estimado Unitário (R$)': b.valor || 0,
+      'Valor Estimado Total (R$)': (b.valor || 0) * (b.quantidade || 1),
+      'Link da Foto': b.foto_url || ''
+    }));
+    const wsCampo = XLSX.utils.json_to_sheet(dadosCampo);
+    XLSX.utils.book_append_sheet(wb, wsCampo, 'Bens em Campo');
+
+    // 3. Aba: Movimentações Recentes
+    const dadosMovs = listaEstoqueMovimentacoes.map(m => ({
+      'ID Movimentação': m.id || '',
+      'Data': m.data || '',
+      'Tipo': (m.tipo || '').toUpperCase(),
+      'Item': m.item_nome || '',
+      'Quantidade': m.quantidade || 0,
+      'Saldo Anterior': m.saldo_anterior || 0,
+      'Novo Saldo': m.novo_saldo || 0,
+      'Galpão / Local': m.local || '',
+      'Motivo / Destino': m.motivo || '',
+      'Responsável': m.responsavel || ''
+    }));
+    const wsMovs = XLSX.utils.json_to_sheet(dadosMovs);
+    XLSX.utils.book_append_sheet(wb, wsMovs, 'Histórico de Movimentações');
+
+    // 4. Aba: Resumo Executivo
+    const totItensEstoque = listaEstoqueItens.length;
+    const totCriticos = listaEstoqueItens.filter(i => Number(i.quantidade || 0) <= Number(i.qtd_minima || 0)).length;
+    const valTotalEstoque = listaEstoqueItens.reduce((acc, i) => acc + (Number(i.valor || 0) * Number(i.quantidade || 0)), 0);
+    const valTotalCampo = todosBens.reduce((acc, b) => acc + (b.valor * b.quantidade), 0);
+
+    const dadosResumo = [
+      { 'Indicador': 'Data de Geração do Relatório', 'Valor': new Date().toLocaleString('pt-BR') },
+      { 'Indicador': 'Total de Tipos de Itens em Galpões', 'Valor': totItensEstoque },
+      { 'Indicador': 'Itens com Estoque Baixo / Crítico', 'Valor': totCriticos },
+      { 'Indicador': 'Valor Total dos Materiais em Galpões (R$)', 'Valor': valTotalEstoque.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) },
+      { 'Indicador': 'Total de Bens Alocados em Campo (Casas & Alojamentos)', 'Valor': todosBens.length },
+      { 'Indicador': 'Bens Alocados em Casas Urbanas', 'Valor': todosBens.filter(b => b.tipo_origem === 'casa').length },
+      { 'Indicador': 'Bens Alocados em Quartos de Alojamento', 'Valor': todosBens.filter(b => b.tipo_origem === 'alojamento').length },
+      { 'Indicador': 'Valor Total Estimado de Bens em Campo (R$)', 'Valor': valTotalCampo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) },
+      { 'Indicador': 'Patrimônio Consolidado Geral (Galpões + Campo)', 'Valor': (valTotalEstoque + valTotalCampo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
+    ];
+    const wsResumo = XLSX.utils.json_to_sheet(dadosResumo);
+    XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo Executivo');
+
+    const dataHoje = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `RELATORIO_ALMOXARIFADO_PATRIMONIO_${dataHoje}.xlsx`);
+    showToast('Relatório geral de estoque exportado com sucesso em Excel (.xlsx)!', 'success');
+  } catch (err) {
+    console.error('Erro ao exportar Excel:', err);
+    showToast('Erro ao exportar relatório em Excel: ' + err.message, 'error');
+  }
+}
+
+// Exposição das novas funções no window
+window.aoDigitarUrlFotoItemEstoque = aoDigitarUrlFotoItemEstoque;
+window.tratarErroFotoPreviewItemEstoque = tratarErroFotoPreviewItemEstoque;
+window.limparFotoItemEstoqueForm = limparFotoItemEstoqueForm;
+window.trocarSubAbaEstoque = trocarSubAbaEstoque;
+window.obterTodosBensAlocados = obterTodosBensAlocados;
+window.atualizarBensAlocadosCampoUI = atualizarBensAlocadosCampoUI;
+window.filtrarBensAlocadosUI = filtrarBensAlocadosUI;
+window.renderizarGridBensAlocados = renderizarGridBensAlocados;
+window.exportarRelatorioEstoqueExcel = exportarRelatorioEstoqueExcel;
+
