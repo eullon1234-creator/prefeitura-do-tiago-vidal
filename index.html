@@ -31,11 +31,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- SheetJS com Estilos, Cores e Fórmulas Profissionais (xlsx-js-style) -->
   <script src="xlsx.bundle.js"></script>
-  <script>
-    if (typeof XLSX === 'undefined') {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"><\/script>');
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <!-- Cropper.js (Edição e Recorte de Fotos 1:1) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -254,6 +250,18 @@
           <i class="fa-solid fa-qrcode w-5 text-amber-400"></i>
           <span>Chamados QR Code</span>
           <span id="sideCountChamados" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold hidden">0</span>
+        </button>
+
+        <button onclick="switchTab('casas_cidade')" data-tab="casas_cidade" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-house-chimney-user w-5 text-indigo-400"></i>
+          <span>Casas na Cidade</span>
+          <span id="sideCountCasas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
+        </button>
+
+        <button onclick="switchTab('estoque')" data-tab="estoque" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-boxes-stacked w-5 text-teal-400"></i>
+          <span>Estoque & Almoxarifado</span>
+          <span id="sideCountEstoque" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
         </button>
 
         <div class="px-3 pt-4 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -878,6 +886,126 @@
           <p class="text-xs text-slate-500 max-w-sm mx-auto">
             Não há chamados com os filtros selecionados. Novos chamados escaneados nos quartos aparecerão aqui automaticamente.
           </p>
+        </div>
+
+      </div>
+
+      <!-- ================= TAB: CASAS NA CIDADE (LIDERANÇA & ENGENHARIA) ================= -->
+      <div id="tab-casas_cidade" class="tab-content hidden space-y-6">
+        
+        <!-- Header da Aba -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200">
+                <i class="fa-solid fa-city text-indigo-600 mr-1"></i> Gestão Urbana
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Casas na Cidade • Equipe de Liderança</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Controle de imóveis alugados para engenheiros, mestres e encarregados: cômodos, inventário de móveis, moradores e despesas (Luz, Água, Aluguel).
+            </p>
+          </div>
+
+          <!-- Ações Rápidas -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="openModalNovaCasa()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Nova Casa na Cidade
+            </button>
+            <button onclick="openModalNovaDespesaCasaGlobal()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-receipt"></i> Lançar Conta (Luz/Água)
+            </button>
+            <button onclick="recarregarCasasCidadeManual()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition" title="Recarregar Dados">
+              <i class="fa-solid fa-rotate" id="iconeReloadCasas"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Cards de Métricas -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Casas na Cidade</p>
+              <h3 id="statTotalCasas" class="text-2xl font-extrabold text-slate-900 mt-1">0</h3>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-house-chimney"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Moradores Alojados</p>
+              <h3 id="statMoradoresCasas" class="text-2xl font-extrabold text-emerald-600 mt-1">0</h3>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-user-tie"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Vagas Livres</p>
+              <h3 id="statVagasLivresCasas" class="text-2xl font-extrabold text-sky-600 mt-1">0</h3>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-bed"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/30 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold text-amber-700 uppercase tracking-wider">Despesas do Mês Atual</p>
+              <h3 id="statDespesasMesCasas" class="text-2xl font-extrabold text-amber-600 mt-1">R$ 0,00</h3>
+              <p id="statDespesasPendentesSub" class="text-[10px] text-slate-500 mt-0.5">0 contas pendentes</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-file-invoice-dollar"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filtros e Busca -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input 
+              type="text" 
+              id="buscaCasasInput" 
+              oninput="filtrarCasasCidadeUI()" 
+              placeholder="Buscar por nome da casa, endereço, bairro, morador ou móvel..." 
+              class="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+            >
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select id="filtroOcupacaoCasas" onchange="filtrarCasasCidadeUI()" class="px-3 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white outline-none">
+              <option value="todas">Todas as Casas</option>
+              <option value="vagas_livres">Com Vagas Disponíveis</option>
+              <option value="lotadas">Totalmente Ocupadas</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Grade de Casas -->
+        <div id="casasCidadeGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Populado via Javascript -->
+        </div>
+
+        <!-- Estado Vazio -->
+        <div id="casasCidadeVazio" class="hidden bg-white p-12 rounded-xl border border-slate-200 text-center space-y-3">
+          <div class="w-16 h-16 rounded-full bg-indigo-50 text-indigo-400 flex items-center justify-center mx-auto text-2xl">
+            <i class="fa-solid fa-house-chimney-crack"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Nenhuma casa encontrada</h3>
+          <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Cadastre as casas alugadas na cidade para gerenciar os cômodos, engenheiros alojados e despesas de consumo.
+          </p>
+          <div class="pt-2">
+            <button onclick="openModalNovaCasa()" class="btn-prefeito px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Cadastrar Primeira Casa
+            </button>
+          </div>
         </div>
 
       </div>
@@ -1749,6 +1877,152 @@ service cloud.firestore {
 
       </div>
 
+      <!-- ================= TAB: ESTOQUE & ALMOXARIFADO ================= -->
+      <div id="tab-estoque" class="tab-content hidden space-y-5">
+        <!-- Topo da Aba de Estoque -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                <i class="fa-solid fa-boxes-stacked text-teal-600 mr-1"></i> Almoxarifado Central
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Estoque & Patrimônio</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Controle de materiais de alojamento, manutenção, limpeza e bens patrimoniais (Camas, TVs, Geladeiras com valor e plaqueta de patrimônio).
+            </p>
+          </div>
+
+          <!-- Ações Rápidas -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="openModalNovoItemEstoque()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Novo Item
+            </button>
+            <button onclick="openModalMovimentacaoEstoque('entrada')" class="btn-prefeito px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-arrow-down"></i> Registrar Entrada
+            </button>
+            <button onclick="openModalMovimentacaoEstoque('saida')" class="btn-prefeito px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-arrow-up"></i> Registrar Saída
+            </button>
+            <button onclick="openModalLocaisEstoque()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition" title="Gerenciar Galpões e Locais de Estoque">
+              <i class="fa-solid fa-warehouse"></i>
+            </button>
+            <button onclick="recarregarEstoqueManual()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition" title="Recarregar Estoque">
+              <i class="fa-solid fa-rotate" id="iconeReloadEstoque"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Indicadores / Cards de Resumo de Estoque -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl flex-shrink-0">
+              <i class="fa-solid fa-box-open"></i>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total de Itens</span>
+              <span id="metricEstoqueTotalItens" class="text-xl sm:text-2xl font-black text-slate-900">0</span>
+              <span class="text-[10px] text-slate-500 block">cadastrados no sistema</span>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl flex-shrink-0">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estoque Crítico</span>
+              <span id="metricEstoqueCritico" class="text-xl sm:text-2xl font-black text-rose-600">0</span>
+              <span class="text-[10px] text-rose-500 font-semibold block">precisam de reposição</span>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl flex-shrink-0">
+              <i class="fa-solid fa-tags"></i>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Patrimônio Registrado</span>
+              <span id="metricEstoqueValorPatrimonio" class="text-lg sm:text-xl font-black text-indigo-600">R$ 0,00</span>
+              <span id="metricEstoqueQtdPatrimonio" class="text-[10px] text-slate-500 block">0 bens com plaqueta</span>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0">
+              <i class="fa-solid fa-warehouse"></i>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Galpões / Locais</span>
+              <span id="metricEstoqueLocais" class="text-xl sm:text-2xl font-black text-slate-900">2</span>
+              <span class="text-[10px] text-slate-500 block">Galpão Cidade e Alojamento</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filtros e Barra de Busca -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="flex-1 relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <i class="fa-solid fa-magnifying-glass text-xs"></i>
+            </div>
+            <input 
+              type="text" 
+              id="buscaEstoqueInput" 
+              placeholder="Buscar por nome, marca, código ou patrimônio (#GEL-001)..." 
+              class="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 font-medium"
+              oninput="filtrarEstoqueUI()"
+            >
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <!-- Filtro de Galpão / Local -->
+            <select id="filtroEstoqueLocal" onchange="filtrarEstoqueUI()" class="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="todos">🏬 Todos os Galpões</option>
+              <!-- Populado dinamicamente -->
+            </select>
+
+            <!-- Filtro de Categoria -->
+            <select id="filtroEstoqueCategoria" onchange="filtrarEstoqueUI()" class="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="todas">📦 Todas as Categorias</option>
+              <option value="Alojamento">🛏️ Alojamento & Quartos</option>
+              <option value="Manutenção">🔧 Manutenção & Reparos</option>
+              <option value="Limpeza">🧹 Limpeza & Higiene</option>
+              <option value="Móveis/Eletros">🏠 Móveis & Eletrodomésticos</option>
+              <option value="Outros">Outros</option>
+            </select>
+
+            <!-- Filtro de Status / Patrimônio -->
+            <select id="filtroEstoqueStatus" onchange="filtrarEstoqueUI()" class="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="todos">Todos os Níveis</option>
+              <option value="critico">⚠️ Apenas Estoque Baixo / Crítico</option>
+              <option value="patrimonio">🏷️ Apenas Itens com Patrimônio</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Grade / Lista de Itens do Estoque -->
+        <div id="estoqueItensGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populado via Javascript -->
+        </div>
+
+        <!-- Estado Vazio -->
+        <div id="estoqueVazio" class="hidden bg-white p-10 rounded-2xl border border-dashed border-slate-300 text-center space-y-3">
+          <div class="w-16 h-16 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-2xl mx-auto">
+            <i class="fa-solid fa-boxes-stacked"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Nenhum item encontrado no estoque</h3>
+          <p class="text-xs text-slate-500 max-w-md mx-auto">
+            Cadastre os itens armazenados nos galpões (colchões, lâmpadas, camas, tvs, geladeiras) para ter controle de saldo e movimentações.
+          </p>
+          <div class="pt-2">
+            <button onclick="openModalNovoItemEstoque()" class="btn-prefeito px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Cadastrar Primeiro Item
+            </button>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -2487,7 +2761,900 @@ service cloud.firestore {
           </button>
         </div>
       </div>
+    </div>
+  </div>
 
+  <!-- ================= MODAL FORMULÁRIO DE CASA (CRIAR / EDITAR) ================= -->
+  <div id="modalCasaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-indigo-950 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
+            <i class="fa-solid fa-house-chimney text-sm"></i>
+          </div>
+          <div>
+            <h3 id="casaFormTitulo" class="text-base font-bold">Cadastrar Casa na Cidade</h3>
+            <p class="text-[11px] text-indigo-300">Alojamento para Engenharia & Liderança</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalCasaForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formCasa" onsubmit="salvarCasa(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <input type="hidden" id="casaFormId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Nome / Identificação da Casa *</label>
+          <input type="text" id="casaFormNome" required placeholder="Ex: Casa Engenharia 01 - Centro" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Endereço (Rua e Nº) *</label>
+            <input type="text" id="casaFormEndereco" required placeholder="Ex: Rua das Flores, 450" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Bairro / Cidade</label>
+            <input type="text" id="casaFormBairro" placeholder="Ex: Centro - Três Lagoas/MS" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+            <span>Link do Google Maps / Localização GPS</span>
+            <span class="text-[10px] text-slate-400 font-normal">(opcional)</span>
+          </label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <i class="fa-solid fa-location-dot"></i>
+            </div>
+            <input type="url" id="casaFormMapsUrl" placeholder="https://maps.app.goo.gl/... ou endereço" class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-mono">
+          </div>
+          <p class="text-[10px] text-slate-400 mt-0.5">Permite abrir a rota no GPS do celular com 1 toque.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Foto da Fachada da Casa</label>
+          <div class="flex items-center gap-3">
+            <div class="w-16 h-16 rounded-xl bg-slate-100 border border-slate-300 overflow-hidden flex-shrink-0 flex items-center justify-center">
+              <img id="casaFormFotoPreview" src="" alt="Fachada" class="w-full h-full object-cover hidden">
+              <i id="casaFormFotoIcon" class="fa-solid fa-house text-2xl text-slate-300"></i>
+            </div>
+            <div class="flex-1 space-y-1.5">
+              <input type="text" id="casaFormFotoUrl" placeholder="URL da foto da casa ou use o botão ao lado" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" oninput="atualizarPreviewFotoCasaInput(this.value)">
+              <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer border border-slate-300 transition">
+                <i class="fa-solid fa-camera"></i> Carregar do Aparelho
+                <input type="file" accept="image/*" class="hidden" onchange="uploadFotoFachadaCasa(this)">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Responsável pela Casa</label>
+            <input type="text" id="casaFormResponsavel" placeholder="Ex: Eng. Tiago Vidal" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Valor do Aluguel (R$)</label>
+            <input type="number" step="0.01" id="casaFormAluguelValor" placeholder="Ex: 2500.00" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Observações da Casa</label>
+          <textarea id="casaFormObs" rows="2" placeholder="Ex: Casa com garagem para 2 carros, área gourmet e portão eletrônico..." class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalCasaForm')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition">
+            Salvar Casa
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL DETALHES COMPLETOS DA CASA ================= -->
+  <div id="modalCasaDetalhes" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[96vh] flex flex-col overflow-hidden border border-slate-300">
+      
+      <!-- Topo com Banner da Casa -->
+      <div class="relative bg-slate-900 text-white flex-shrink-0">
+        <!-- Barra de Ações Topo -->
+        <div class="px-5 py-3.5 flex items-center justify-between border-b border-slate-800/80">
+          <div class="flex items-center gap-3">
+            <span class="px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-300 font-bold text-xs border border-indigo-500/30">
+              <i class="fa-solid fa-house-chimney mr-1"></i> Casa Urbana
+            </span>
+            <h2 id="modalCasaDetalhesTitulo" class="text-base sm:text-lg font-black truncate max-w-md">Casa --</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <a id="modalCasaDetalhesMapsLink" href="#" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition" title="Abrir localização no Google Maps">
+              <i class="fa-solid fa-location-arrow text-emerald-400"></i> <span class="hidden sm:inline">GPS / Maps</span>
+            </a>
+            <button onclick="editarCasaAtual()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-pen-to-square text-amber-400"></i> <span class="hidden sm:inline">Editar</span>
+            </button>
+            <button onclick="fecharModal('modalCasaDetalhes')" class="p-1.5 rounded-lg text-slate-400 hover:text-white">
+              <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Dados Rápidos da Casa -->
+        <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-950 to-slate-900">
+          <div class="flex items-center gap-4">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-slate-800 border-2 border-slate-700 flex-shrink-0 flex items-center justify-center">
+              <img id="modalCasaDetalhesFoto" src="" alt="Fachada" class="w-full h-full object-cover hidden">
+              <i id="modalCasaDetalhesFotoIcon" class="fa-solid fa-house text-3xl text-slate-600"></i>
+            </div>
+            <div>
+              <p id="modalCasaDetalhesEndereco" class="text-xs sm:text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+                <i class="fa-solid fa-location-dot text-rose-400"></i> --
+              </p>
+              <div class="flex items-center gap-2 mt-1.5 flex-wrap text-xs text-slate-400">
+                <span id="modalCasaDetalhesOcupacaoBadge" class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">0 vagas ocupadas</span>
+                <span id="modalCasaDetalhesComodosCount" class="text-slate-300">0 cômodos</span>
+                <span id="modalCasaDetalhesResponsavel" class="text-slate-400">Resp: --</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="openModalNovoComodo(casaSelecionadaId)" class="btn-prefeito px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Novo Cômodo
+            </button>
+            <button onclick="openModalNovaDespesaCasa(casaSelecionadaId)" class="btn-prefeito px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-receipt"></i> Lançar Conta
+            </button>
+          </div>
+        </div>
+
+        <!-- Abas Internas da Casa -->
+        <div class="flex items-center px-4 bg-slate-950 border-t border-slate-800 gap-1 overflow-x-auto">
+          <button onclick="trocarAbaCasaDetalhes('comodos')" id="btnAbaCasa_comodos" class="px-4 py-2.5 text-xs font-bold border-b-2 border-indigo-500 text-white transition flex items-center gap-1.5">
+            <i class="fa-solid fa-door-open text-indigo-400"></i> Cômodos, Moradores & Móveis
+          </button>
+          <button onclick="trocarAbaCasaDetalhes('despesas')" id="btnAbaCasa_despesas" class="px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5">
+            <i class="fa-solid fa-file-invoice-dollar text-amber-400"></i> Despesas (Luz, Água, Aluguel...)
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo das Abas da Casa -->
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50 space-y-4 custom-scrollbar">
+        
+        <!-- PAINEL 1: CÔMODOS, MORADORES & MÓVEIS -->
+        <div id="painelCasa_comodos" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Divisão de Cômodos da Residência</h4>
+            <span class="text-xs text-slate-400">Quartos, Sala, Cozinha e demais áreas</span>
+          </div>
+
+          <div id="casaDetalhesComodosGrid" class="space-y-4">
+            <!-- Populado via Javascript -->
+          </div>
+
+          <div id="casaDetalhesComodosVazio" class="hidden bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center space-y-2">
+            <i class="fa-solid fa-door-closed text-3xl text-slate-300"></i>
+            <p class="text-sm font-bold text-slate-700">Nenhum cômodo cadastrado nesta casa</p>
+            <p class="text-xs text-slate-400">Adicione os quartos (Quarto 1, Quarto 2...), a sala e a cozinha para controlar camas e móveis.</p>
+            <button onclick="openModalNovoComodo(casaSelecionadaId)" class="btn-prefeito mt-2 px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold">
+              <i class="fa-solid fa-plus mr-1"></i> Adicionar Primeiro Cômodo
+            </button>
+          </div>
+        </div>
+
+        <!-- PAINEL 2: DESPESAS & CONTAS -->
+        <div id="painelCasa_despesas" class="hidden space-y-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h4 class="text-sm font-bold text-slate-900">Histórico de Contas & Consumo da Casa</h4>
+              <p class="text-xs text-slate-500">Controle de faturas de Energia, Água, Aluguel e Internet</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="month" id="filtroMesDespesaCasaInput" onchange="carregarDespesasCasaAtual()" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white">
+              <button onclick="openModalNovaDespesaCasa(casaSelecionadaId)" class="btn-prefeito px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1">
+                <i class="fa-solid fa-plus"></i> Lançar Conta
+              </button>
+            </div>
+          </div>
+
+          <!-- Cards de Resumo da Casa no Mês -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-white p-3 rounded-xl border border-slate-200">
+              <p class="text-[10px] uppercase font-bold text-slate-400">Total do Mês</p>
+              <h5 id="modalCasaDespesaTotalMes" class="text-base font-extrabold text-slate-900 mt-0.5">R$ 0,00</h5>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-amber-200 bg-amber-50/20">
+              <p class="text-[10px] uppercase font-bold text-amber-600">Pendente de Pgto</p>
+              <h5 id="modalCasaDespesaTotalPendente" class="text-base font-extrabold text-amber-600 mt-0.5">R$ 0,00</h5>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-emerald-200 bg-emerald-50/20">
+              <p class="text-[10px] uppercase font-bold text-emerald-600">Pago</p>
+              <h5 id="modalCasaDespesaTotalPago" class="text-base font-extrabold text-emerald-600 mt-0.5">R$ 0,00</h5>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-sky-200 bg-sky-50/20">
+              <p class="text-[10px] uppercase font-bold text-sky-600">Qtd. Contas</p>
+              <h5 id="modalCasaDespesaQtdContas" class="text-base font-extrabold text-sky-700 mt-0.5">0</h5>
+            </div>
+          </div>
+
+          <!-- Lista de Despesas -->
+          <div id="casaDetalhesDespesasTabela" class="space-y-2">
+            <!-- Populado via Javascript -->
+          </div>
+
+          <div id="casaDetalhesDespesasVazio" class="hidden bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center space-y-2">
+            <i class="fa-solid fa-receipt text-3xl text-slate-300"></i>
+            <p class="text-sm font-bold text-slate-700">Nenhuma despesa lançada para este mês</p>
+            <p class="text-xs text-slate-400">Cadastre a conta de luz, água ou aluguel para manter o histórico sob controle.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Rodapé Modal -->
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+        <span class="text-xs text-slate-500" id="modalCasaDetalhesFooterInfo">Prefeitura Taboca 2 • Gestão Urbana</span>
+        <button type="button" onclick="fecharModal('modalCasaDetalhes')" class="px-4 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold">
+          Fechar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= MODAL NOVO CÔMODO DA CASA ================= -->
+  <div id="modalComodoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modalComodoFormTitulo" class="text-sm font-bold">Adicionar Cômodo à Casa</h3>
+        <button onclick="fecharModal('modalComodoForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formComodo" onsubmit="salvarComodo(event)" class="p-5 space-y-4">
+        <input type="hidden" id="comodoFormCasaId">
+        <input type="hidden" id="comodoFormId">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Tipo de Cômodo *</label>
+          <select id="comodoFormTipo" required onchange="toggleComodoCapacidadeCamas(this.value)" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+            <option value="quarto">Quarto (Com camas / moradores)</option>
+            <option value="sala">Sala de Estar / Jantar</option>
+            <option value="cozinha">Cozinha</option>
+            <option value="banheiro">Banheiro</option>
+            <option value="lavanderia">Lavanderia / Área de Serviço</option>
+            <option value="externa">Área Externa / Garagem</option>
+            <option value="outro">Outro Cômodo</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nome do Cômodo *</label>
+          <input type="text" id="comodoFormNome" required placeholder="Ex: Quarto 1, Quarto Suíte, Sala Principal..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div id="comodoFormCamasContainer">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Quantidade de Camas / Vagas no Quarto</label>
+          <input type="number" id="comodoFormCamas" min="1" max="10" value="2" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <p class="text-[10px] text-slate-400 mt-0.5">Define quantas pessoas podem dormir neste quarto.</p>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalComodoForm')" class="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-800 text-xs font-semibold">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold">
+            Salvar Cômodo
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL ALOCAR MORADOR NO QUARTO DA CASA ================= -->
+  <div id="modalMoradorCasaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold">Alocar Morador na Cama</h3>
+          <p id="modalMoradorCasaSubtitulo" class="text-[11px] text-indigo-300">Quarto -- • Cama --</p>
+        </div>
+        <button onclick="fecharModal('modalMoradorCasaForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formMoradorCasa" onsubmit="salvarMoradorCasa(event)" class="p-5 space-y-3.5">
+        <input type="hidden" id="moradorCasaFormCasaId">
+        <input type="hidden" id="moradorCasaFormComodoId">
+        <input type="hidden" id="moradorCasaFormCamaNum">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Completo do Colaborador *</label>
+          <input type="text" id="moradorCasaFormNome" required placeholder="Ex: Eng. Tiago Vidal da Silva" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Cargo / Função *</label>
+            <input type="text" id="moradorCasaFormFuncao" required placeholder="Ex: Engenheiro Residente" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Empresa</label>
+            <input type="text" id="moradorCasaFormEmpresa" placeholder="Ex: GEL" value="GEL" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Telefone / WhatsApp</label>
+            <input type="tel" id="moradorCasaFormWhatsapp" placeholder="Ex: (67) 99999-9999" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Data de Entrada</label>
+            <input type="date" id="moradorCasaFormDataEntrada" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalMoradorCasaForm')" class="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-800 text-xs font-semibold">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">
+            Alocar na Cama
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL MÓVEL / ELETRO NO CÔMODO ================= -->
+  <div id="modalMovelComodoForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modalMovelComodoFormTitulo" class="text-sm font-bold">Adicionar Móvel ou Eletrodoméstico</h3>
+        <button onclick="fecharModal('modalMovelComodoForm')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formMovelComodo" onsubmit="salvarMovelComodo(event)" class="p-5 space-y-3.5">
+        <input type="hidden" id="movelComodoFormCasaId">
+        <input type="hidden" id="movelComodoFormComodoId">
+        <input type="hidden" id="movelComodoFormId">
+
+        <!-- Opção de Origem: Puxar do Estoque vs Cadastrar Direto -->
+        <div class="p-3 bg-teal-50/70 border border-teal-200 rounded-xl space-y-2">
+          <label class="block text-xs font-bold text-teal-900 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i class="fa-solid fa-boxes-stacked text-teal-600"></i> Puxar Móvel do Estoque / Galpão?
+            </span>
+            <span class="text-[10px] text-teal-700 font-semibold bg-teal-100 px-2 py-0.5 rounded-full">Opcional</span>
+          </label>
+          <select id="movelComodoOrigemEstoqueSelect" onchange="aoSelecionarMovelOrigemEstoque(this.value)" class="w-full py-2 px-3 text-xs border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-medium bg-white">
+            <option value="">➕ Não, quero cadastrar móvel avulso diretamente na casa</option>
+            <!-- Populado dinamicamente com móveis e eletros do estoque -->
+          </select>
+          <div id="movelComodoOrigemEstoqueAviso" class="hidden text-[11px] text-teal-800 font-medium flex items-center gap-1.5 pt-0.5">
+            <i class="fa-solid fa-circle-check text-teal-600"></i>
+            <span>Os dados de marca, patrimônio e valor foram preenchidos automaticamente do estoque!</span>
+          </div>
+          <div id="movelComodoBaixarEstoqueCheckContainer" class="hidden pt-1">
+            <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-teal-950">
+              <input type="checkbox" id="movelComodoBaixarEstoqueCheck" checked class="rounded text-teal-600 focus:ring-teal-500">
+              <span>Dar baixa automática de 1 unidade deste item no estoque</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Item / Equipamento *</label>
+          <input type="text" id="movelComodoFormTipo" required list="sugestoesMoveisCasa" placeholder="Ex: Geladeira Frost Free, Ar-Condicionado, Fogão 4 bocas, Sofá, Cama Box..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold">
+          <datalist id="sugestoesMoveisCasa">
+            <option value="Geladeira Frost Free"></option>
+            <option value="Ar-Condicionado Split"></option>
+            <option value="Fogão 4 Bocas"></option>
+            <option value="Botijão de Gás"></option>
+            <option value="Micro-ondas"></option>
+            <option value="Máquina de Lavar Roupa"></option>
+            <option value="Smart TV"></option>
+            <option value="Sofá 3 Lugares"></option>
+            <option value="Mesa com 4 Cadeiras"></option>
+            <option value="Cama Box Solteiro"></option>
+            <option value="Cama Box Casal"></option>
+            <option value="Guarda-roupa"></option>
+            <option value="Ventilador"></option>
+          </datalist>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Quantidade *</label>
+            <input type="number" id="movelComodoFormQtd" min="1" max="50" value="1" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Estado de Conservação</label>
+            <select id="movelComodoFormEstado" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+              <option value="Novo">Novo</option>
+              <option value="Bom" selected>Bom</option>
+              <option value="Regular">Regular</option>
+              <option value="Danificado">Danificado / Reparo</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Marca / Modelo</label>
+            <input type="text" id="movelComodoFormMarca" placeholder="Ex: Brastemp, Consul, Samsung..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              <span>Nº Plaqueta / Patrimônio</span>
+              <span class="text-[10px] text-indigo-600 font-bold ml-1">(Opcional)</span>
+            </label>
+            <input type="text" id="movelComodoFormPatrimonio" placeholder="Ex: #GEL-1042" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Estimado do Bem (R$)</label>
+            <input type="number" step="0.01" id="movelComodoFormValor" placeholder="Ex: 2200.00" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Empresa Proprietária</label>
+            <input type="text" id="movelComodoFormEmpresa" placeholder="Ex: GEL, Engevix..." value="GEL" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalMovelComodoForm')" class="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-800 text-xs font-semibold">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold">
+            Salvar Móvel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL DESPESA / CONTA DA CASA ================= -->
+  <div id="modalDespesaCasaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-5 py-3.5 bg-amber-500 text-slate-950 flex items-center justify-between">
+        <div>
+          <h3 id="modalDespesaCasaFormTitulo" class="text-sm font-black uppercase">Lançar Despesa da Casa</h3>
+          <p class="text-[11px] font-semibold text-slate-900">Energia Elétrica, Água, Aluguel e Internet</p>
+        </div>
+        <button onclick="fecharModal('modalDespesaCasaForm')" class="text-slate-900 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formDespesaCasa" onsubmit="salvarDespesaCasa(event)" class="p-5 space-y-3.5">
+        <input type="hidden" id="despesaCasaFormId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Casa de Destino *</label>
+          <select id="despesaCasaFormCasaId" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold">
+            <!-- Populado via Javascript -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Tipo de Despesa *</label>
+            <select id="despesaCasaFormCategoria" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold">
+              <option value="Energia Elétrica">⚡ Energia Elétrica</option>
+              <option value="Água e Saneamento">💧 Água e Saneamento</option>
+              <option value="Aluguel do Imóvel">🏠 Aluguel</option>
+              <option value="Internet / Wi-Fi">📶 Internet / Wi-Fi</option>
+              <option value="Gás de Cozinha">🔥 Gás de Cozinha</option>
+              <option value="Manutenção / Reparo">🔧 Manutenção</option>
+              <option value="Outro">Outra Despesa</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mês de Referência *</label>
+            <input type="month" id="despesaCasaFormMes" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Total (R$) *</label>
+            <input type="number" step="0.01" id="despesaCasaFormValor" required placeholder="Ex: 350.80" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Data de Vencimento *</label>
+            <input type="date" id="despesaCasaFormVencimento" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Status do Pagamento</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-amber-300 bg-amber-50/50 cursor-pointer">
+              <input type="radio" name="despesaStatus" value="pendente" checked id="statusPendenteRadio" class="text-amber-500 focus:ring-amber-400">
+              <span class="text-xs font-bold text-amber-800">🟡 A Vencer / Pendente</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-emerald-300 bg-emerald-50/50 cursor-pointer">
+              <input type="radio" name="despesaStatus" value="pago" id="statusPagoRadio" class="text-emerald-500 focus:ring-emerald-400">
+              <span class="text-xs font-bold text-emerald-800">🟢 Conta Paga</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Código de Barras / Obs</label>
+          <input type="text" id="despesaCasaFormObs" placeholder="Ex: Código de barras ou fatura da Sanesul/Energisa..." class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalDespesaCasaForm')" class="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-800 text-xs font-semibold">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold shadow-sm">
+            Salvar Lançamento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL ITEM DO ESTOQUE (CRIAR / EDITAR) ================= -->
+  <div id="modalItemEstoqueForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3.5 bg-teal-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center">
+            <i class="fa-solid fa-box-open text-sm"></i>
+          </div>
+          <div>
+            <h3 id="modalItemEstoqueFormTitulo" class="text-sm font-bold">Cadastrar Item no Estoque</h3>
+            <p class="text-[11px] text-teal-300">Almoxarifado & Controle de Bens</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalItemEstoqueForm')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formItemEstoque" onsubmit="salvarItemEstoque(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <input type="hidden" id="itemEstoqueFormId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Nome do Item / Material *</label>
+          <input type="text" id="itemEstoqueFormNome" required placeholder="Ex: Colchão D33 Solteiro, Lâmpada LED 12W, TV Smart 43..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-semibold">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Categoria *</label>
+            <select id="itemEstoqueFormCategoria" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-medium">
+              <option value="Alojamento">🛏️ Alojamento & Quartos (Colchão, Lençol, Travesseiro)</option>
+              <option value="Manutenção">🔧 Manutenção & Reparos (Lâmpada, Torneira, Chuveiro)</option>
+              <option value="Limpeza">🧹 Limpeza & Higiene (Saco lixo, Água sanitária, Sabão)</option>
+              <option value="Móveis/Eletros">🏠 Móveis & Eletrodomésticos (Cama, TV, Geladeira)</option>
+              <option value="Outros">Outros Materiais</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Galpão / Local de Armazenamento *</label>
+            <select id="itemEstoqueFormLocal" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-semibold">
+              <!-- Populado dinamicamente -->
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Qtd Atual *</label>
+            <input type="number" id="itemEstoqueFormQtd" required min="0" value="0" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Unidade *</label>
+            <select id="itemEstoqueFormUnidade" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="UN">UN (Unidade)</option>
+              <option value="CX">CX (Caixa)</option>
+              <option value="PCT">PCT (Pacote)</option>
+              <option value="PAR">PAR (Par)</option>
+              <option value="LT">LT (Litro)</option>
+              <option value="M">M (Metro)</option>
+              <option value="KG">KG (Quilo)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Mínimo Alerta</label>
+            <input type="number" id="itemEstoqueFormQtdMinima" min="0" value="2" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-rose-600 font-bold" title="Avisa quando o saldo for menor ou igual">
+          </div>
+        </div>
+
+        <!-- SEÇÃO PATRIMÔNIO (OPCIONAL PARA MÓVEIS / ELETROS GRANDES) -->
+        <div class="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-tags text-indigo-600"></i> Controle de Patrimônio & Plaqueta
+            </span>
+            <span class="text-[10px] uppercase font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">Opcional</span>
+          </div>
+          <p class="text-[11px] text-slate-500">
+            Preencha caso este item seja um bem patrimonial (Cama, Geladeira, TV, Ar-Condicionado, Fogão, Mesa) exigido por empresas parceiras.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Nº Plaqueta / Patrimônio</label>
+              <input type="text" id="itemEstoqueFormPatrimonio" placeholder="Ex: #GEL-2041, #PAT-880..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Unitário / Custo (R$)</label>
+              <input type="number" step="0.01" id="itemEstoqueFormValor" placeholder="Ex: 1850.00" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Empresa Proprietária do Bem</label>
+              <input type="text" id="itemEstoqueFormEmpresa" placeholder="Ex: GEL, Engevix, Consórcio..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Marca / Modelo</label>
+              <input type="text" id="itemEstoqueFormMarca" placeholder="Ex: Brastemp, Consul, Samsung..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Observações do Item</label>
+          <textarea id="itemEstoqueFormObs" rows="2" placeholder="Ex: Localizado na prateleira B2 do Galpão 1..." class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"></textarea>
+        </div>
+
+        <div class="pt-3 flex items-center justify-between gap-2 border-t border-slate-200">
+          <button type="button" id="btnExcluirItemEstoqueModal" onclick="excluirItemEstoqueAtual()" class="px-3.5 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition flex items-center gap-1.5 hidden">
+            <i class="fa-solid fa-trash-can"></i> Excluir do Estoque
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" onclick="fecharModal('modalItemEstoqueForm')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-prefeito px-5 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-sm transition">
+              Salvar Item
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL MOVIMENTAÇÃO DE ESTOQUE (ENTRADA / SAÍDA) ================= -->
+  <div id="modalMovimentacaoEstoque" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div id="movimentacaoEstoqueTopo" class="px-5 py-3.5 bg-emerald-600 text-white flex items-center justify-between">
+        <div>
+          <h3 id="movimentacaoEstoqueTitulo" class="text-sm font-black uppercase">Registrar Entrada no Estoque</h3>
+          <p class="text-[11px] font-medium opacity-90">Atualiza o saldo imediatamente</p>
+        </div>
+        <button onclick="fecharModal('modalMovimentacaoEstoque')" class="text-white hover:opacity-75">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formMovimentacaoEstoque" onsubmit="salvarMovimentacaoEstoque(event)" class="p-5 space-y-3.5">
+        <input type="hidden" id="movimentacaoTipo" value="entrada">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Item do Estoque *</label>
+          <select id="movimentacaoItemId" required onchange="aoSelecionarItemMovimentacao(this.value)" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-semibold">
+            <!-- Populado dinamicamente -->
+          </select>
+          <p id="movimentacaoSaldoAtualBadge" class="text-[11px] text-slate-500 mt-1 font-semibold">Saldo Atual: -</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Quantidade *</label>
+            <input type="number" id="movimentacaoQtd" required min="1" value="1" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Data *</label>
+            <input type="date" id="movimentacaoData" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 font-medium">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Destino / Motivo / Solicitante *</label>
+          <input type="text" id="movimentacaoMotivo" required placeholder="Ex: Substituição lâmpada Bloco B quarto 14, Compra nota #1204..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Responsável / Retirado Por</label>
+            <input type="text" id="movimentacaoResponsavel" placeholder="Ex: João Manutenção, Tiago..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Galpão / Origem</label>
+            <select id="movimentacaoLocal" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-xs">
+              <!-- Populado dinamicamente -->
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalMovimentacaoEstoque')" class="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-800 text-xs font-semibold">
+            Cancelar
+          </button>
+          <button type="submit" id="btnSalvarMovimentacaoEstoque" class="btn-prefeito px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-sm">
+            Confirmar Movimentação
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL GERENCIAR GALPÕES / LOCAIS DE ESTOQUE ================= -->
+  <div id="modalLocaisEstoque" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-warehouse text-amber-400"></i>
+          <h3 class="text-sm font-bold">Galpões & Locais de Estoque</h3>
+        </div>
+        <button onclick="fecharModal('modalLocaisEstoque')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <p class="text-xs text-slate-500">
+          Cadastre os locais onde seus itens ficam guardados (ex: Galpão 1 na Cidade, Galpão 2 no Alojamento, Almoxarifado Central).
+        </p>
+
+        <!-- Formulário Adicionar Local -->
+        <form onsubmit="adicionarLocalEstoque(event)" class="flex gap-2">
+          <input type="text" id="novoLocalEstoqueNome" required placeholder="Ex: Galpão 1 (Cidade), Galpão 2 (Obra)..." class="flex-1 py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold">
+          <button type="submit" class="btn-prefeito px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex-shrink-0">
+            <i class="fa-solid fa-plus"></i> Adicionar
+          </button>
+        </form>
+
+        <!-- Lista de Locais -->
+        <div class="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-56 overflow-y-auto" id="listaLocaisEstoqueContainer">
+          <!-- Populado via Javascript -->
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button type="button" onclick="fecharModal('modalLocaisEstoque')" class="px-4 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL HISTÓRICO / DETALHES DO ITEM ================= -->
+  <div id="modalItemEstoqueDetalhes" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div>
+          <h3 id="modalItemDetalhesTitulo" class="text-sm font-bold text-white">Detalhes do Item</h3>
+          <p id="modalItemDetalhesSubtitulo" class="text-[11px] text-teal-300">Histórico de movimentações</p>
+        </div>
+        <button onclick="fecharModal('modalItemEstoqueDetalhes')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+        <!-- Cards de Info -->
+        <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
+          <div>
+            <span class="text-[10px] text-slate-400 font-bold uppercase block">Saldo Atual</span>
+            <span id="modalItemDetalhesSaldo" class="text-lg font-black text-slate-900">-</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 font-bold uppercase block">Patrimônio</span>
+            <span id="modalItemDetalhesPatrimonio" class="text-xs font-mono font-bold text-indigo-700 block mt-1">-</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 font-bold uppercase block">Valor Unitário</span>
+            <span id="modalItemDetalhesValor" class="text-xs font-bold text-emerald-700 block mt-1">-</span>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Histórico de Entradas e Saídas</h4>
+          <div id="modalItemMovimentacoesLista" class="space-y-2 max-h-64 overflow-y-auto">
+            <!-- Populado via Javascript -->
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnEditarItemPeloDetalhe" class="px-3.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold border border-teal-200">
+            <i class="fa-solid fa-pen-to-square mr-1"></i> Editar Item
+          </button>
+          <button type="button" id="btnExcluirItemPeloDetalhe" class="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition">
+            <i class="fa-solid fa-trash-can mr-1"></i> Excluir
+          </button>
+        </div>
+        <button type="button" onclick="fecharModal('modalItemEstoqueDetalhes')" class="px-4 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL RESOLUÇÃO DE CHAMADO COM BAIXA NO ESTOQUE ================= -->
+  <div id="modalConcluirChamadoComEstoque" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="px-5 py-3.5 bg-emerald-600 text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-black uppercase">Concluir Chamado de Manutenção</h3>
+          <p class="text-[11px] font-medium opacity-90">Dar baixa automática de materiais usados</p>
+        </div>
+        <button onclick="fecharModal('modalConcluirChamadoComEstoque')" class="text-white hover:opacity-75">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formConcluirChamadoEstoque" onsubmit="confirmarConclusaoChamadoComEstoque(event)" class="p-5 space-y-3.5">
+        <input type="hidden" id="chamadoConcluirProtocolo">
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+          <p class="font-bold text-slate-800" id="chamadoConcluirInfoQuarto">Quarto: -</p>
+          <p class="text-slate-600" id="chamadoConcluirInfoDescricao">Problema: -</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Material Utilizado no Reparo (Opcional)</label>
+          <select id="chamadoEstoqueItemSelect" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold">
+            <option value="">Nenhum material do estoque (apenas conserto/ajuste)</option>
+            <!-- Populado com itens de manutenção e alojamento -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3" id="chamadoEstoqueQtdContainer">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Quantidade Usada</label>
+            <input type="number" id="chamadoEstoqueQtd" min="1" value="1" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Retirado de qual Galpão?</label>
+            <select id="chamadoEstoqueLocal" class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-xs">
+              <!-- Populado dinamicamente -->
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Observações do Reparo Feito</label>
+          <input type="text" id="chamadoConcluirObs" placeholder="Ex: Trocada lâmpada queimada por nova, teste OK..." class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalConcluirChamadoComEstoque')" class="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-800 text-xs font-semibold">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm">
+            <i class="fa-solid fa-check mr-1"></i> Concluir & Baixar Estoque
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- ================= BARRA DE NAVEGAÇÃO INFERIOR FIXA (MOBILE APP) ================= -->
@@ -2557,6 +3724,24 @@ service cloud.firestore {
           </div>
           <span class="text-xs font-bold text-white">Chamados QR Code dos Alojamentos</span>
           <span class="text-[10px] text-slate-300">Solicitações de lâmpada, ar e manutenção</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('casas_cidade')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-indigo-500/40 hover:bg-slate-800 text-left transition col-span-2">
+          <div class="flex items-center justify-between w-full">
+            <i class="fa-solid fa-house-chimney-user text-indigo-400 text-lg mb-1.5"></i>
+            <span id="drawerBadgeCasas" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">0 casas</span>
+          </div>
+          <span class="text-xs font-bold text-white">Casas na Cidade (Liderança & Engenharia)</span>
+          <span class="text-[10px] text-slate-300">Imóveis alugados, cômodos, móveis e contas</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); switchTab('estoque')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
+          <div class="flex items-center justify-between w-full">
+            <i class="fa-solid fa-boxes-stacked text-teal-400 text-lg mb-1.5"></i>
+            <span id="drawerBadgeEstoque" class="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">0 itens</span>
+          </div>
+          <span class="text-xs font-bold text-white">Estoque & Almoxarifado (Galgões)</span>
+          <span class="text-[10px] text-slate-300">Móveis, patrimônio, lâmpadas, colchões e baixas</span>
         </button>
 
         <button onclick="fecharMenuMobileMais(); switchTab('gestao_cadastros')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
@@ -2684,6 +3869,6 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=3.0"></script>
+  <script src="app.js?v=3.8"></script>
 </body>
 </html>

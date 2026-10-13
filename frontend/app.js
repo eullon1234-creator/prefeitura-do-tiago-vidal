@@ -1984,8 +1984,10 @@ function iniciarListenerTempoRealFirebase() {
   try {
     iniciarListenerChamados();
     carregarConfigWhatsappPrefeito();
+    iniciarListenerCasasCidade();
+    iniciarListenerEstoque();
   } catch (errCham) {
-    console.warn("Aviso ao iniciar listener de chamados QR Code:", errCham);
+    console.warn("Aviso ao iniciar listener de chamados QR Code / Casas / Estoque:", errCham);
   }
 }
 
@@ -3016,6 +3018,10 @@ function switchTab(tabId) {
     carregarMoveis();
   } else if (tabId === 'chamados') {
     carregarChamados();
+  } else if (tabId === 'casas_cidade') {
+    carregarCasasCidade();
+  } else if (tabId === 'estoque') {
+    carregarEstoque();
   } else if (tabId === 'gestao_cadastros') {
     carregarGestaoCadastros();
   } else if (tabId === 'relatorios') {
@@ -5998,12 +6004,18 @@ function preencherSelectQuartosParaMovel(selectId, selectedQuartoId = null) {
 
 function abrirModal(modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) modal.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 }
 
 function fecharModal(modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 // Toast Notificações
@@ -6408,11 +6420,11 @@ function renderizarGridChamados(chamados) {
               <button onclick="alterarStatusChamado('${c.protocolo}', 'em_atendimento')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-semibold text-xs transition">
                 <i class="fa-solid fa-play text-[10px] mr-1"></i> Atender
               </button>
-              <button onclick="alterarStatusChamado('${c.protocolo}', 'concluido')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition">
+              <button onclick="abrirModalConcluirChamadoEstoque('${c.protocolo}')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition">
                 <i class="fa-solid fa-check text-[10px] mr-1"></i> Concluir
               </button>
             ` : c.status === 'em_atendimento' ? `
-              <button onclick="alterarStatusChamado('${c.protocolo}', 'concluido')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition">
+              <button onclick="abrirModalConcluirChamadoEstoque('${c.protocolo}')" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition">
                 <i class="fa-solid fa-check text-[10px] mr-1"></i> Marcar Concluído
               </button>
             ` : `
@@ -6629,4 +6641,2457 @@ async function salvarConfigWhatsappPrefeito(event) {
   showToast('WhatsApp do Prefeito atualizado com sucesso!', 'success');
 }
 
+// ========================================================
+// MÓDULO DE CASAS NA CIDADE (LIDERANÇA & ENGENHARIA)
+// ========================================================
+let listaCasasCidade = [];
+let listaDespesasCasas = [];
+let casaSelecionadaId = null;
+let abaAtivaCasaDetalhes = 'comodos';
+let listenerCasasAtivo = false;
 
+// Variaveis Globais de Estoque
+var listaEstoqueItens = [];
+var listaEstoqueMovimentacoes = [];
+var listaEstoqueLocais = ['Galpão 1 (Cidade)', 'Galpão 2 (Alojamento Obra)', 'Almoxarifado Central'];
+var listenerEstoqueAtivo = false;
+var itemEstoqueSelecionadoId = null;
+function abrirDetalhesCasa(id) { if (typeof abrirModalCasaDetalhes === 'function') abrirModalCasaDetalhes(id); }
+
+
+// Obter mês atual formatado YYYY-MM para filtros de despesas
+function getMesAtualStr() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${d.getFullYear()}-${m}`;
+}
+
+// Inicializar ouvinte em tempo real do Firestore para Casas e Despesas
+function iniciarListenerCasasCidade() {
+  if (!firestoreDb || listenerCasasAtivo) return;
+  listenerCasasAtivo = true;
+
+  console.log("🏙️ [CASAS CIDADE] Inicializando sincronização em tempo real das Casas Urbanas...");
+
+  // 1. Carregar cache local imediato
+  try {
+    const cachedCasas = localStorage.getItem('casas_cidade_cache');
+    if (cachedCasas) {
+      listaCasasCidade = JSON.parse(cachedCasas);
+    }
+    const cachedDespesas = localStorage.getItem('casas_despesas_cache');
+    if (cachedDespesas) {
+      listaDespesasCasas = JSON.parse(cachedDespesas);
+    }
+    atualizarContadoresCasasUI();
+  } catch (e) {}
+
+  // 2. Ouvir coleção de casas_cidade
+  try {
+    firestoreDb.collection('casas_cidade').onSnapshot((snapshot) => {
+      const novasCasas = [];
+      snapshot.forEach(doc => {
+        novasCasas.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Ordenar alfabeticamente pelo nome da casa
+      novasCasas.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+      listaCasasCidade = novasCasas;
+      try {
+        localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+      } catch (e) {}
+
+      atualizarContadoresCasasUI();
+
+      if (activeTab === 'casas_cidade') {
+        filtrarCasasCidadeUI();
+      }
+
+      // Se o modal de detalhes estiver aberto para a casa atual, atualizar
+      if (casaSelecionadaId) {
+        const casaAtualizada = listaCasasCidade.find(c => c.id === casaSelecionadaId);
+        if (casaAtualizada) {
+          atualizarDadosModalCasaDetalhes(casaAtualizada);
+        }
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar casas_cidade no Firestore:", err);
+    });
+  } catch (err) {
+    console.warn("Erro ao registrar snapshot de casas_cidade:", err);
+  }
+
+  // 3. Ouvir coleção de casas_despesas
+  try {
+    firestoreDb.collection('casas_despesas').onSnapshot((snapshot) => {
+      const novasDespesas = [];
+      snapshot.forEach(doc => {
+        novasDespesas.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Ordenar por data de vencimento mais próxima
+      novasDespesas.sort((a, b) => new Date(b.vencimento || 0) - new Date(a.vencimento || 0));
+
+      listaDespesasCasas = novasDespesas;
+      try {
+        localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+      } catch (e) {}
+
+      atualizarContadoresCasasUI();
+
+      if (casaSelecionadaId && abaAtivaCasaDetalhes === 'despesas') {
+        carregarDespesasCasaAtual();
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar casas_despesas no Firestore:", err);
+    });
+  } catch (err) {
+    console.warn("Erro ao registrar snapshot de casas_despesas:", err);
+  }
+}
+
+// Atualizar métricas, contadores e badges de Casas na Cidade
+function atualizarContadoresCasasUI() {
+  const totCasas = listaCasasCidade.length;
+  let totMoradores = 0;
+  let totCamas = 0;
+
+  listaCasasCidade.forEach(c => {
+    (c.comodos || []).forEach(com => {
+      if (com.tipo === 'quarto') {
+        totCamas += Number(com.capacidade_camas || 0);
+        totMoradores += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+      }
+    });
+  });
+
+  const vagasLivres = Math.max(0, totCamas - totMoradores);
+
+  // Despesas do mês corrente
+  const mesAtual = getMesAtualStr();
+  const despesasMes = listaDespesasCasas.filter(d => (d.mes_referencia || '').startsWith(mesAtual));
+  const totGastoMes = despesasMes.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+  const pendentesMes = despesasMes.filter(d => d.status === 'pendente').length;
+
+  const elTotCasas = document.getElementById('statTotalCasas');
+  const elMoradores = document.getElementById('statMoradoresCasas');
+  const elVagasLivres = document.getElementById('statVagasLivresCasas');
+  const elDespesasMes = document.getElementById('statDespesasMesCasas');
+  const elPendentesSub = document.getElementById('statDespesasPendentesSub');
+
+  if (elTotCasas) elTotCasas.textContent = totCasas;
+  if (elMoradores) elMoradores.textContent = totMoradores;
+  if (elVagasLivres) elVagasLivres.textContent = vagasLivres;
+  if (elDespesasMes) elDespesasMes.textContent = totGastoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  if (elPendentesSub) elPendentesSub.textContent = `${pendentesMes} conta${pendentesMes === 1 ? '' : 's'} pendente${pendentesMes === 1 ? '' : 's'}`;
+
+  // Badge na sidebar
+  const sideBadge = document.getElementById('sideCountCasas');
+  if (sideBadge) {
+    if (totCasas > 0) {
+      sideBadge.textContent = `${totCasas} casa${totCasas === 1 ? '' : 's'}`;
+      sideBadge.classList.remove('hidden');
+    } else {
+      sideBadge.classList.add('hidden');
+    }
+  }
+
+  // Badge no drawer mobile
+  const drawerBadge = document.getElementById('drawerBadgeCasas');
+  if (drawerBadge) {
+    drawerBadge.textContent = `${totCasas} casa${totCasas === 1 ? '' : 's'} (${totMoradores} hab)`;
+  }
+}
+
+// Carregar e filtrar casas
+function carregarCasasCidade() {
+  atualizarContadoresCasasUI();
+  filtrarCasasCidadeUI();
+}
+
+function filtrarCasasCidadeUI() {
+  const busca = (document.getElementById('buscaCasasInput')?.value || '').toLowerCase().trim();
+  const filtroOcup = document.getElementById('filtroOcupacaoCasas')?.value || 'todas';
+
+  let filtradas = [...listaCasasCidade];
+
+  if (filtroOcup !== 'todas') {
+    filtradas = filtradas.filter(c => {
+      let camas = 0;
+      let ocupadas = 0;
+      (c.comodos || []).forEach(com => {
+        if (com.tipo === 'quarto') {
+          camas += Number(com.capacidade_camas || 0);
+          ocupadas += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+        }
+      });
+      if (filtroOcup === 'vagas_livres') return camas > ocupadas;
+      if (filtroOcup === 'lotadas') return camas > 0 && camas === ocupadas;
+      return true;
+    });
+  }
+
+  if (busca) {
+    filtradas = filtradas.filter(c => {
+      const matchNome = (c.nome || '').toLowerCase().includes(busca);
+      const matchEnd = (c.endereco || '').toLowerCase().includes(busca);
+      const matchBairro = (c.bairro || '').toLowerCase().includes(busca);
+      const matchResp = (c.responsavel || '').toLowerCase().includes(busca);
+      
+      // Moradores dentro dos cômodos
+      const matchMorador = (c.comodos || []).some(com => 
+        (com.camas || []).some(cm => cm.morador && (cm.morador.nome || '').toLowerCase().includes(busca))
+      );
+
+      // Móveis dentro dos cômodos
+      const matchMovel = (c.comodos || []).some(com => 
+        (com.moveis || []).some(m => (m.tipo || '').toLowerCase().includes(busca) || (m.marca || '').toLowerCase().includes(busca))
+      );
+
+      return matchNome || matchEnd || matchBairro || matchResp || matchMorador || matchMovel;
+    });
+  }
+
+  renderizarCasasCidadeGrid(filtradas);
+}
+
+// Renderização dos cards de casas
+function renderizarCasasCidadeGrid(casas) {
+  const grid = document.getElementById('casasCidadeGrid');
+  const vazio = document.getElementById('casasCidadeVazio');
+  if (!grid) return;
+
+  if (casas.length === 0) {
+    grid.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+
+  if (vazio) vazio.classList.add('hidden');
+
+  const mesAtual = getMesAtualStr();
+
+  grid.innerHTML = casas.map(c => {
+    let totCamas = 0;
+    let totMoradores = 0;
+    let totQuartos = 0;
+    const nomesMoradores = [];
+
+    (c.comodos || []).forEach(com => {
+      if (com.tipo === 'quarto') {
+        totQuartos++;
+        totCamas += Number(com.capacidade_camas || 0);
+        (com.camas || []).forEach(cm => {
+          if (cm.morador && cm.morador.nome) {
+            totMoradores++;
+            nomesMoradores.push(cm.morador.nome);
+          }
+        });
+      }
+    });
+
+    const vagasLivres = Math.max(0, totCamas - totMoradores);
+    const taxaOcupacao = totCamas > 0 ? Math.round((totMoradores / totCamas) * 100) : 0;
+
+    // Despesas da casa no mês
+    const despCasaMes = listaDespesasCasas.filter(d => d.casa_id === c.id && (d.mes_referencia || '').startsWith(mesAtual));
+    const totalGastoCasa = despCasaMes.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+    const pendentesCount = despCasaMes.filter(d => d.status === 'pendente').length;
+
+    // Foto da casa com fallback
+    const fotoHtml = c.foto_url 
+      ? `<img src="${c.foto_url}" alt="${c.nome}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">`
+      : `<div class="w-full h-full bg-gradient-to-br from-indigo-900 via-slate-800 to-slate-900 flex items-center justify-center text-indigo-400/40">
+           <i class="fa-solid fa-house-chimney text-5xl"></i>
+         </div>`;
+
+    const mapsBtn = c.maps_url 
+      ? `<a href="${c.maps_url}" target="_blank" onclick="event.stopPropagation()" class="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1 transition" title="Abrir localização no Google Maps">
+           <i class="fa-solid fa-location-arrow text-emerald-600"></i> Maps
+         </a>`
+      : '';
+
+    return `
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition flex flex-col justify-between overflow-hidden group">
+        
+        <!-- Topo com Imagem da Fachada -->
+        <div class="relative h-44 w-full overflow-hidden cursor-pointer" onclick="abrirModalCasaDetalhes('${c.id}')">
+          ${fotoHtml}
+          
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30"></div>
+
+          <!-- Badges no Topo da Foto -->
+          <div class="absolute top-3 left-3 right-3 flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-slate-950/80 backdrop-blur text-white text-[11px] font-bold border border-white/20">
+              <i class="fa-solid fa-bed text-sky-400 mr-1"></i> ${totMoradores}/${totCamas} Ocupados
+            </span>
+
+            ${vagasLivres > 0 ? `
+              <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-extrabold uppercase shadow-sm">
+                ${vagasLivres} Vaga${vagasLivres === 1 ? '' : 's'} Livre${vagasLivres === 1 ? '' : 's'}
+              </span>
+            ` : `
+              <span class="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold uppercase shadow-sm">
+                Lotada
+              </span>
+            `}
+          </div>
+
+          <!-- Nome da Casa sobreposto na foto -->
+          <div class="absolute bottom-3 left-3 right-3 text-white">
+            <h3 class="text-base font-black truncate leading-tight drop-shadow-sm">${c.nome}</h3>
+            <p class="text-xs text-slate-300 truncate mt-0.5 flex items-center gap-1">
+              <i class="fa-solid fa-location-dot text-rose-400 text-[10px]"></i> ${c.endereco || 'Endereço não informado'}
+            </p>
+          </div>
+        </div>
+
+        <!-- Conteúdo do Card -->
+        <div class="p-4 space-y-3 flex-1 flex flex-col justify-between">
+          
+          <div class="space-y-2.5">
+            <!-- Barra de Progresso de Ocupação -->
+            <div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                <span>Ocupação dos Quartos</span>
+                <span class="font-bold text-slate-700">${taxaOcupacao}%</span>
+              </div>
+              <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div class="h-full ${taxaOcupacao >= 100 ? 'bg-rose-500' : 'bg-indigo-600'}" style="width: ${taxaOcupacao}%"></div>
+              </div>
+            </div>
+
+            <!-- Resumo de Cômodos e Moradores -->
+            <div class="flex items-center gap-2 text-xs text-slate-600 flex-wrap">
+              <span class="px-2 py-1 rounded bg-slate-100 font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-door-open text-indigo-500"></i> ${totQuartos} Quartos
+              </span>
+              <span class="px-2 py-1 rounded bg-slate-100 font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-couch text-amber-500"></i> ${(c.comodos || []).length} Cômodos
+              </span>
+              ${c.responsavel ? `
+                <span class="px-2 py-1 rounded bg-slate-100 font-semibold text-slate-600 truncate max-w-[140px]" title="Responsável: ${c.responsavel}">
+                  <i class="fa-solid fa-user-tie text-emerald-500"></i> ${c.responsavel}
+                </span>
+              ` : ''}
+            </div>
+
+            <!-- Moradores Listados -->
+            <div class="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-xs text-slate-700">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Moradores Alojados:</span>
+              ${nomesMoradores.length > 0 ? `
+                <div class="flex items-center gap-1 flex-wrap">
+                  ${nomesMoradores.slice(0, 3).map(n => `
+                    <span class="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 text-[11px] font-medium truncate max-w-[130px]">
+                      ${n.split(' ')[0]} ${n.split(' ')[1] || ''}
+                    </span>
+                  `).join('')}
+                  ${nomesMoradores.length > 3 ? `
+                    <span class="text-[10px] text-slate-500 font-bold">+${nomesMoradores.length - 3}</span>
+                  ` : ''}
+                </div>
+              ` : `
+                <span class="text-slate-400 italic text-[11px]">Nenhum morador alocado ainda</span>
+              `}
+            </div>
+
+            <!-- Resumo Financeiro do Mês -->
+            <div class="flex items-center justify-between p-2 rounded-xl bg-amber-50/40 border border-amber-200/60 text-xs">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-amber-700 block">Despesas (${mesAtual.split('-')[1]}/${mesAtual.split('-')[0]}):</span>
+                <span class="font-extrabold text-slate-900">${totalGastoCasa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+              </div>
+              <div class="text-right">
+                ${pendentesCount > 0 ? `
+                  <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
+                    ${pendentesCount} conta${pendentesCount === 1 ? '' : 's'} a pagar
+                  </span>
+                ` : `
+                  <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    Tudo em dia
+                  </span>
+                `}
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Rodapé com Botões de Ação -->
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+            <div>
+              ${mapsBtn}
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button onclick="editarCasa('${c.id}')" class="btn-prefeito p-2 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-slate-100 text-xs transition" title="Editar Casa">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="excluirCasa('${c.id}')" class="btn-prefeito p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Casa">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+              <button onclick="abrirModalCasaDetalhes('${c.id}')" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition">
+                <span>Abrir Casa</span> <i class="fa-solid fa-chevron-right text-[10px]"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    `;
+  }).join('');
+}
+
+// Criar / Editar Casa
+function openModalNovaCasa() {
+  const form = document.getElementById('formCasa');
+  if (form) form.reset();
+  const idEl = document.getElementById('casaFormId');
+  if (idEl) idEl.value = '';
+  const titEl = document.getElementById('casaFormTitulo') || document.getElementById('modalCasaFormTitulo');
+  if (titEl) titEl.textContent = 'Cadastrar Casa na Cidade';
+  const imgEl = document.getElementById('casaFormFotoPreview');
+  if (imgEl) { imgEl.src = ''; imgEl.classList.add('hidden'); }
+  const iconEl = document.getElementById('casaFormFotoIcon');
+  if (iconEl) iconEl.classList.remove('hidden');
+  abrirModal('modalCasaForm');
+}
+
+function editarCasa(id) {
+  const c = listaCasasCidade.find(x => x.id === id);
+  if (!c) return;
+
+  const form = document.getElementById('formCasa');
+  if (form) form.reset();
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  setVal('casaFormId', c.id);
+  setVal('casaFormNome', c.nome || '');
+  setVal('casaFormEndereco', c.endereco || '');
+  setVal('casaFormBairro', c.bairro || '');
+  setVal('casaFormMapsUrl', c.maps_url || '');
+  setVal('casaFormResponsavel', c.responsavel || '');
+  setVal('casaFormAluguelValor', c.aluguel_valor || '');
+  setVal('casaFormObs', c.observacoes || '');
+  setVal('casaFormFotoUrl', c.foto_url || '');
+  
+  atualizarPreviewFotoCasaInput(c.foto_url);
+  const titEl = document.getElementById('casaFormTitulo') || document.getElementById('modalCasaFormTitulo');
+  if (titEl) titEl.textContent = 'Editar Casa na Cidade';
+  abrirModal('modalCasaForm');
+}
+
+function editarCasaAtual() {
+  if (casaSelecionadaId) {
+    editarCasa(casaSelecionadaId);
+  }
+}
+
+function atualizarPreviewFotoCasaInput(url) {
+  const imgEl = document.getElementById('casaFormFotoPreview');
+  const iconEl = document.getElementById('casaFormFotoIcon');
+  if (url && url.trim() !== '') {
+    imgEl.src = url;
+    imgEl.classList.remove('hidden');
+    iconEl.classList.add('hidden');
+  } else {
+    imgEl.src = '';
+    imgEl.classList.add('hidden');
+    iconEl.classList.remove('hidden');
+  }
+}
+
+// Upload de foto da fachada (Canvas para compactar)
+function uploadFotoFachadaCasa(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let w = img.width;
+      let h = img.height;
+      const maxDim = 1200;
+
+      if (w > h && w > maxDim) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else if (h > maxDim) {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.80);
+      document.getElementById('casaFormFotoUrl').value = compressedDataUrl;
+      atualizarPreviewFotoCasaInput(compressedDataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Salvar Casa
+async function salvarCasa(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('casaFormId').value || ('CASA-' + Date.now());
+  const nome = document.getElementById('casaFormNome').value.trim();
+  const endereco = document.getElementById('casaFormEndereco').value.trim();
+  const bairro = document.getElementById('casaFormBairro').value.trim();
+  const mapsUrl = document.getElementById('casaFormMapsUrl').value.trim();
+  const responsavel = document.getElementById('casaFormResponsavel').value.trim();
+  const aluguelValor = parseFloat(document.getElementById('casaFormAluguelValor').value) || 0;
+  const observacoes = document.getElementById('casaFormObs').value.trim();
+  const fotoUrl = document.getElementById('casaFormFotoUrl').value.trim();
+
+  // Buscar se já existia cômodos para não perder
+  const casaExistente = listaCasasCidade.find(x => x.id === id);
+  const comodosExistentes = casaExistente ? (casaExistente.comodos || []) : [];
+
+  const casaData = {
+    nome: nome,
+    endereco: endereco,
+    bairro: bairro,
+    maps_url: mapsUrl,
+    responsavel: responsavel,
+    aluguel_valor: aluguelValor,
+    observacoes: observacoes,
+    foto_url: fotoUrl || null,
+    comodos: comodosExistentes,
+    atualizado_em: new Date().toISOString(),
+    atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+  };
+
+  // 1. Atualizar localmente
+  const index = listaCasasCidade.findIndex(x => x.id === id);
+  if (index >= 0) {
+    listaCasasCidade[index] = { id: id, ...casaData };
+  } else {
+    listaCasasCidade.push({ id: id, ...casaData });
+  }
+
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarContadoresCasasUI();
+  filtrarCasasCidadeUI();
+  fecharModal('modalCasaForm');
+  showToast(`Casa "${nome}" salva com sucesso!`, 'success');
+
+  // 2. Sincronizar com Firestore
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(id).set(casaData, { merge: true });
+    } catch (err) {
+      console.warn("Aviso ao salvar casa no Firestore:", err);
+    }
+  }
+}
+
+// Excluir Casa
+async function excluirCasa(id) {
+  const c = listaCasasCidade.find(x => x.id === id);
+  if (!c) return;
+
+  if (!confirm(`Tem certeza que deseja excluir a casa "${c.nome}" e todo o seu histórico de cômodos e moradores?`)) return;
+
+  listaCasasCidade = listaCasasCidade.filter(x => x.id !== id);
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarContadoresCasasUI();
+  filtrarCasasCidadeUI();
+
+  if (casaSelecionadaId === id) {
+    fecharModal('modalCasaDetalhes');
+  }
+
+  showToast(`Casa "${c.nome}" excluída com sucesso.`, 'info');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(id).delete();
+    } catch (err) {
+      console.warn("Erro ao excluir casa no Firestore:", err);
+    }
+  }
+}
+
+// Abrir Modal de Detalhes da Casa
+function abrirModalCasaDetalhes(id) {
+  casaSelecionadaId = id;
+  const c = listaCasasCidade.find(x => x.id === id);
+  if (!c) return;
+
+  atualizarDadosModalCasaDetalhes(c);
+  trocarAbaCasaDetalhes('comodos');
+  abrirModal('modalCasaDetalhes');
+}
+
+function atualizarDadosModalCasaDetalhes(c) {
+  document.getElementById('modalCasaDetalhesTitulo').textContent = c.nome;
+  document.getElementById('modalCasaDetalhesEndereco').innerHTML = `<i class="fa-solid fa-location-dot text-rose-400"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+  document.getElementById('modalCasaDetalhesResponsavel').textContent = c.responsavel ? `Resp: ${c.responsavel}` : 'Sem resp. definido';
+
+  const mapsLinkEl = document.getElementById('modalCasaDetalhesMapsLink');
+  if (c.maps_url && c.maps_url.trim() !== '') {
+    mapsLinkEl.href = c.maps_url;
+    mapsLinkEl.classList.remove('hidden');
+  } else {
+    // Gerar link de busca no Google Maps pelo endereço
+    const endEncoded = encodeURIComponent((c.endereco || '') + ' ' + (c.bairro || ''));
+    mapsLinkEl.href = `https://www.google.com/maps/search/?api=1&query=${endEncoded}`;
+    mapsLinkEl.classList.remove('hidden');
+  }
+
+  // Foto
+  const imgEl = document.getElementById('modalCasaDetalhesFoto');
+  const iconEl = document.getElementById('modalCasaDetalhesFotoIcon');
+  if (c.foto_url) {
+    imgEl.src = c.foto_url;
+    imgEl.classList.remove('hidden');
+    iconEl.classList.add('hidden');
+  } else {
+    imgEl.src = '';
+    imgEl.classList.add('hidden');
+    iconEl.classList.remove('hidden');
+  }
+
+  // Estatísticas rápidas da casa
+  let totCamas = 0;
+  let totMoradores = 0;
+  (c.comodos || []).forEach(com => {
+    if (com.tipo === 'quarto') {
+      totCamas += Number(com.capacidade_camas || 0);
+      totMoradores += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+    }
+  });
+
+  document.getElementById('modalCasaDetalhesOcupacaoBadge').textContent = `${totMoradores} de ${totCamas} vagas ocupadas`;
+  document.getElementById('modalCasaDetalhesComodosCount').textContent = `${(c.comodos || []).length} cômodos cadastrados`;
+
+  // Renderizar cômodos
+  renderizarComodosCasaDetalhes(c);
+}
+
+// Trocar aba interna no modal da casa
+function trocarAbaCasaDetalhes(aba) {
+  abaAtivaCasaDetalhes = aba;
+
+  const btnComodos = document.getElementById('btnAbaCasa_comodos');
+  const btnDespesas = document.getElementById('btnAbaCasa_despesas');
+  const painelComodos = document.getElementById('painelCasa_comodos');
+  const painelDespesas = document.getElementById('painelCasa_despesas');
+
+  if (aba === 'comodos') {
+    btnComodos.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-indigo-500 text-white transition flex items-center gap-1.5';
+    btnDespesas.className = 'px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5';
+    painelComodos.classList.remove('hidden');
+    painelDespesas.classList.add('hidden');
+  } else {
+    btnComodos.className = 'px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5';
+    btnDespesas.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-amber-500 text-white transition flex items-center gap-1.5';
+    painelComodos.classList.add('hidden');
+    painelDespesas.classList.remove('hidden');
+
+    const inputMes = document.getElementById('filtroMesDespesaCasaInput');
+    if (inputMes && !inputMes.value) {
+      inputMes.value = getMesAtualStr();
+    }
+    carregarDespesasCasaAtual();
+  }
+}
+
+// Renderizar cômodos da casa no modal
+function renderizarComodosCasaDetalhes(c) {
+  const container = document.getElementById('casaDetalhesComodosGrid');
+  const vazio = document.getElementById('casaDetalhesComodosVazio');
+  if (!container) return;
+
+  const comodos = c.comodos || [];
+
+  if (comodos.length === 0) {
+    container.innerHTML = '';
+    vazio.classList.remove('hidden');
+    return;
+  }
+  vazio.classList.add('hidden');
+
+  const iconeComodo = (tipo) => {
+    if (tipo === 'quarto') return 'fa-solid fa-bed text-sky-500';
+    if (tipo === 'sala') return 'fa-solid fa-couch text-amber-500';
+    if (tipo === 'cozinha') return 'fa-solid fa-kitchen-set text-emerald-500';
+    if (tipo === 'banheiro') return 'fa-solid fa-shower text-cyan-500';
+    if (tipo === 'lavanderia') return 'fa-solid fa-soap text-indigo-500';
+    if (tipo === 'externa') return 'fa-solid fa-warehouse text-slate-500';
+    return 'fa-solid fa-door-open text-slate-500';
+  };
+
+  container.innerHTML = comodos.map(com => {
+    const ehQuarto = com.tipo === 'quarto';
+    const camas = com.camas || [];
+    const moveis = com.moveis || [];
+
+    return `
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+        
+        <!-- Topo do Cômodo -->
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-sm">
+              <i class="${iconeComodo(com.tipo)}"></i>
+            </div>
+            <div>
+              <h5 class="text-sm font-bold text-slate-900 leading-tight">${com.nome}</h5>
+              <span class="text-[10px] uppercase font-bold text-slate-400">
+                ${ehQuarto ? `${com.capacidade_camas || 2} Vagas de Alojamento` : 'Área de Convivência'}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1">
+            <button onclick="openModalNovoMovelComodo('${c.id}', '${com.id}')" class="btn-prefeito px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1 transition" title="Adicionar móvel/eletro neste cômodo">
+              <i class="fa-solid fa-plus text-[10px]"></i> Móvel/Eletro
+            </button>
+            <button onclick="excluirComodo('${c.id}', '${com.id}')" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir este cômodo">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Se for Quarto: Camas e Moradores -->
+        ${ehQuarto ? `
+          <div class="space-y-2">
+            <span class="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+              <i class="fa-solid fa-users text-sky-500"></i> Camas & Moradores Alocados:
+            </span>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              ${Array.from({ length: Number(com.capacidade_camas || 2) }).map((_, idx) => {
+                const camaNum = idx + 1;
+                const camaObj = camas.find(cm => Number(cm.numero) === camaNum);
+                const morador = camaObj ? camaObj.morador : null;
+
+                if (morador && morador.nome) {
+                  return `
+                    <div class="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                          ${morador.nome.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="min-w-0">
+                          <p class="text-xs font-bold text-slate-900 truncate leading-tight">${morador.nome}</p>
+                          <p class="text-[10px] text-emerald-800 font-medium truncate">${morador.funcao || 'Liderança'}</p>
+                          ${morador.whatsapp ? `
+                            <a href="https://wa.me/55${morador.whatsapp.replace(/\D/g, '')}" target="_blank" class="text-[10px] text-emerald-600 font-bold hover:underline flex items-center gap-1">
+                              <i class="fa-brands fa-whatsapp"></i> ${morador.whatsapp}
+                            </a>
+                          ` : ''}
+                        </div>
+                      </div>
+                      <button onclick="desocuparCamaCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-100 text-xs transition" title="Liberar Cama / Desalojar">
+                        <i class="fa-solid fa-user-xmark"></i>
+                      </button>
+                    </div>
+                  `;
+                } else {
+                  return `
+                    <div class="p-2.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-400 text-xs flex items-center justify-center flex-shrink-0">
+                          ${camaNum}
+                        </div>
+                        <div>
+                          <p class="text-xs font-semibold text-slate-500">Cama ${camaNum} (Livre)</p>
+                          <span class="text-[10px] text-slate-400">Vaga disponível</span>
+                        </div>
+                      </div>
+                      <button onclick="openModalNovoMoradorCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 transition">
+                        <i class="fa-solid fa-user-plus mr-1"></i> Alocar
+                      </button>
+                    </div>
+                  `;
+                }
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Móveis e Eletrodomésticos deste cômodo -->
+        <div class="pt-1">
+          <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
+            Inventário de Móveis & Equipamentos:
+          </span>
+
+          ${moveis.length > 0 ? `
+            <div class="flex items-center gap-1.5 flex-wrap">
+              ${moveis.map(m => `
+                <div class="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs flex items-center gap-1.5 text-slate-800">
+                  <span class="font-bold text-indigo-600">${m.quantidade || 1}x</span>
+                  <span>${m.tipo}</span>
+                  <span class="text-[10px] px-1 py-0.5 rounded bg-slate-200 text-slate-600">${m.estado || 'Bom'}</span>
+                  ${m.marca ? `<span class="text-[10px] text-slate-500 font-medium">(${m.marca})</span>` : ''}
+                  ${m.patrimonio ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold border border-indigo-200" title="Plaqueta de Patrimônio"><i class="fa-solid fa-tag text-[9px] mr-0.5"></i>${m.patrimonio}</span>` : ''}
+                  ${m.valor ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold" title="Valor do Bem">${Number(m.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>` : ''}
+                  <button onclick="excluirMovelComodo('${c.id}', '${com.id}', '${m.id}')" class="btn-prefeito text-slate-400 hover:text-rose-600 ml-1" title="Remover item">
+                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <p class="text-[11px] text-slate-400 italic">Nenhum móvel ou equipamento registrado neste cômodo.</p>
+          `}
+        </div>
+
+      </div>
+    `;
+  }).join('');
+}
+
+// Ações de Cômodo
+function openModalNovoComodo(casaId) {
+  document.getElementById('formComodo').reset();
+  document.getElementById('comodoFormCasaId').value = casaId;
+  document.getElementById('comodoFormId').value = '';
+  document.getElementById('comodoFormTipo').value = 'quarto';
+  toggleComodoCapacidadeCamas('quarto');
+  abrirModal('modalComodoForm');
+}
+
+function toggleComodoCapacidadeCamas(tipo) {
+  const container = document.getElementById('comodoFormCamasContainer');
+  if (tipo === 'quarto') {
+    container.classList.remove('hidden');
+  } else {
+    container.classList.add('hidden');
+  }
+}
+
+async function salvarComodo(event) {
+  event.preventDefault();
+
+  const casaId = document.getElementById('comodoFormCasaId').value;
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  if (!casa) return;
+
+  const tipo = document.getElementById('comodoFormTipo').value;
+  const nome = document.getElementById('comodoFormNome').value.trim();
+  const camas = tipo === 'quarto' ? (parseInt(document.getElementById('comodoFormCamas').value) || 2) : 0;
+
+  const comodoId = 'COM-' + Date.now();
+  const novoComodo = {
+    id: comodoId,
+    tipo: tipo,
+    nome: nome,
+    capacidade_camas: camas,
+    camas: [],
+    moveis: []
+  };
+
+  casa.comodos = casa.comodos || [];
+  casa.comodos.push(novoComodo);
+
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarContadoresCasasUI();
+  atualizarDadosModalCasaDetalhes(casa);
+  fecharModal('modalComodoForm');
+  showToast(`Cômodo "${nome}" adicionado com sucesso!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).update({
+        comodos: casa.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn("Erro ao atualizar cômodos no Firestore:", err);
+    }
+  }
+}
+
+async function excluirComodo(casaId, comodoId) {
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  if (!casa) return;
+
+  if (!confirm('Tem certeza que deseja excluir este cômodo e seu inventário?')) return;
+
+  casa.comodos = (casa.comodos || []).filter(cm => cm.id !== comodoId);
+
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarContadoresCasasUI();
+  atualizarDadosModalCasaDetalhes(casa);
+  showToast('Cômodo removido com sucesso.', 'info');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).update({
+        comodos: casa.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn("Erro ao excluir cômodo no Firestore:", err);
+    }
+  }
+}
+
+// Alocar Morador na Cama
+function openModalNovoMoradorCasa(casaId, comodoId, camaNum) {
+  document.getElementById('formMoradorCasa').reset();
+  document.getElementById('moradorCasaFormCasaId').value = casaId;
+  document.getElementById('moradorCasaFormComodoId').value = comodoId;
+  document.getElementById('moradorCasaFormCamaNum').value = camaNum;
+
+  const c = listaCasasCidade.find(x => x.id === casaId);
+  const com = c ? (c.comodos || []).find(cm => cm.id === comodoId) : null;
+  const comNome = com ? com.nome : 'Quarto';
+
+  document.getElementById('modalMoradorCasaSubtitulo').textContent = `${comNome} • Cama Nº ${camaNum}`;
+  document.getElementById('moradorCasaFormDataEntrada').value = new Date().toISOString().split('T')[0];
+  abrirModal('modalMoradorCasaForm');
+}
+
+async function salvarMoradorCasa(event) {
+  event.preventDefault();
+
+  const casaId = document.getElementById('moradorCasaFormCasaId').value;
+  const comodoId = document.getElementById('moradorCasaFormComodoId').value;
+  const camaNum = parseInt(document.getElementById('moradorCasaFormCamaNum').value);
+
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  if (!casa) return;
+  const comodo = (casa.comodos || []).find(cm => cm.id === comodoId);
+  if (!comodo) return;
+
+  const nome = document.getElementById('moradorCasaFormNome').value.trim();
+  const funcao = document.getElementById('moradorCasaFormFuncao').value.trim();
+  const empresa = document.getElementById('moradorCasaFormEmpresa').value.trim();
+  const whatsapp = document.getElementById('moradorCasaFormWhatsapp').value.trim();
+  const dataEntrada = document.getElementById('moradorCasaFormDataEntrada').value;
+
+  comodo.camas = comodo.camas || [];
+  let camaObj = comodo.camas.find(cm => Number(cm.numero) === camaNum);
+  if (!camaObj) {
+    camaObj = { numero: camaNum };
+    comodo.camas.push(camaObj);
+  }
+
+  camaObj.morador = {
+    nome: nome,
+    funcao: funcao,
+    empresa: empresa,
+    whatsapp: whatsapp,
+    data_entrada: dataEntrada
+  };
+
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarContadoresCasasUI();
+  atualizarDadosModalCasaDetalhes(casa);
+  fecharModal('modalMoradorCasaForm');
+  showToast(`Colaborador "${nome}" alocado na cama ${camaNum}!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).update({
+        comodos: casa.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn("Erro ao alocar morador no Firestore:", err);
+    }
+  }
+}
+
+async function desocuparCamaCasa(casaId, comodoId, camaNum) {
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  if (!casa) return;
+  const comodo = (casa.comodos || []).find(cm => cm.id === comodoId);
+  if (!comodo) return;
+
+  if (!confirm(`Deseja realmente desalojar o morador da Cama ${camaNum}?`)) return;
+
+  const camaObj = (comodo.camas || []).find(cm => Number(cm.numero) === Number(camaNum));
+  if (camaObj) {
+    camaObj.morador = null;
+  }
+
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarContadoresCasasUI();
+  atualizarDadosModalCasaDetalhes(casa);
+  showToast(`Cama ${camaNum} liberada com sucesso!`, 'info');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).update({
+        comodos: casa.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn("Erro ao desocupar cama no Firestore:", err);
+    }
+  }
+}
+
+// Ações de Móvel / Eletro
+function popularSelectMovelEstoque() {
+  const select = document.getElementById('movelComodoOrigemEstoqueSelect');
+  if (!select) return;
+
+  const aviso = document.getElementById('movelComodoOrigemEstoqueAviso');
+  const checkBaixar = document.getElementById('movelComodoBaixarEstoqueCheckContainer');
+  if (aviso) aviso.classList.add('hidden');
+  if (checkBaixar) checkBaixar.classList.add('hidden');
+
+  const itensDisponiveis = (listaEstoqueItens || []).filter(item => Number(item.quantidade || 0) > 0);
+
+  if (itensDisponiveis.length === 0) {
+    select.innerHTML = `
+      <option value="">➕ Não, quero cadastrar móvel avulso diretamente na casa</option>
+      <option value="" disabled>⚠️ Nenhum móvel com saldo disponível no estoque</option>
+    `;
+    return;
+  }
+
+  let optionsHtml = '<option value="">➕ Não, quero cadastrar móvel avulso diretamente na casa</option>';
+  optionsHtml += '<optgroup label="📦 Itens disponíveis no Estoque / Galpões:">';
+  
+  itensDisponiveis.forEach(item => {
+    const temPatrimonio = item.patrimonio ? ` [Patrimônio: ${item.patrimonio}]` : '';
+    const local = item.local ? ` (${item.local})` : '';
+    const qtd = `${item.quantidade} ${item.unidade || 'UN'} disponíveis`;
+    optionsHtml += `<option value="${item.id}">📦 ${item.nome} - Saldo: ${qtd}${temPatrimonio}${local}</option>`;
+  });
+
+  optionsHtml += '</optgroup>';
+  select.innerHTML = optionsHtml;
+}
+
+function aoSelecionarMovelOrigemEstoque(itemId) {
+  const aviso = document.getElementById('movelComodoOrigemEstoqueAviso');
+  const checkBaixar = document.getElementById('movelComodoBaixarEstoqueCheckContainer');
+
+  if (!itemId) {
+    if (aviso) aviso.classList.add('hidden');
+    if (checkBaixar) checkBaixar.classList.add('hidden');
+    return;
+  }
+
+  const item = (listaEstoqueItens || []).find(x => x.id === itemId);
+  if (!item) return;
+
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  setVal('movelComodoFormTipo', item.nome || '');
+  setVal('movelComodoFormMarca', item.marca || '');
+  setVal('movelComodoFormPatrimonio', item.patrimonio || '');
+  setVal('movelComodoFormValor', item.valor || '');
+  setVal('movelComodoFormEmpresa', item.empresa || 'GEL');
+  setVal('movelComodoFormQtd', 1);
+
+  if (aviso) aviso.classList.remove('hidden');
+  if (checkBaixar) checkBaixar.classList.remove('hidden');
+}
+
+function openModalNovoMovelComodo(casaId, comodoId) {
+  const form = document.getElementById('formMovelComodo');
+  if (form) form.reset();
+  document.getElementById('movelComodoFormCasaId').value = casaId;
+  document.getElementById('movelComodoFormComodoId').value = comodoId;
+  document.getElementById('movelComodoFormId').value = '';
+  document.getElementById('movelComodoFormEstado').value = 'Bom';
+  document.getElementById('movelComodoFormQtd').value = 1;
+  popularSelectMovelEstoque();
+  abrirModal('modalMovelComodoForm');
+}
+
+async function salvarMovelComodo(event) {
+  event.preventDefault();
+
+  const casaId = document.getElementById('movelComodoFormCasaId').value;
+  const comodoId = document.getElementById('movelComodoFormComodoId').value;
+
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  if (!casa) return;
+  const comodo = (casa.comodos || []).find(cm => cm.id === comodoId);
+  if (!comodo) return;
+
+  const tipo = document.getElementById('movelComodoFormTipo').value.trim();
+  const qtd = parseInt(document.getElementById('movelComodoFormQtd').value) || 1;
+  const estado = document.getElementById('movelComodoFormEstado').value;
+  const marca = document.getElementById('movelComodoFormMarca') ? document.getElementById('movelComodoFormMarca').value.trim() : '';
+  const patrimonio = document.getElementById('movelComodoFormPatrimonio') ? document.getElementById('movelComodoFormPatrimonio').value.trim() : '';
+  const valor = document.getElementById('movelComodoFormValor') ? (parseFloat(document.getElementById('movelComodoFormValor').value) || 0) : 0;
+  const empresa = document.getElementById('movelComodoFormEmpresa') ? document.getElementById('movelComodoFormEmpresa').value.trim() : '';
+
+  // Verificar se veio do estoque e se deve dar baixa
+  const estoqueItemId = document.getElementById('movelComodoOrigemEstoqueSelect') ? document.getElementById('movelComodoOrigemEstoqueSelect').value : '';
+  const deveBaixarEstoque = document.getElementById('movelComodoBaixarEstoqueCheck') && document.getElementById('movelComodoBaixarEstoqueCheck').checked;
+
+  const movelId = 'MOV-' + Date.now();
+  const novoMovel = {
+    id: movelId,
+    tipo: tipo,
+    quantidade: qtd,
+    estado: estado,
+    marca: marca,
+    patrimonio: patrimonio,
+    valor: valor,
+    empresa: empresa,
+    estoque_origem_id: estoqueItemId || null
+  };
+
+  comodo.moveis = comodo.moveis || [];
+  comodo.moveis.push(novoMovel);
+
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarDadosModalCasaDetalhes(casa);
+  fecharModal('modalMovelComodoForm');
+
+  // Baixa automática no estoque se solicitado
+  if (estoqueItemId && deveBaixarEstoque) {
+    const itemEstoque = (listaEstoqueItens || []).find(x => x.id === estoqueItemId);
+    if (itemEstoque) {
+      const saldoAnterior = Number(itemEstoque.quantidade || 0);
+      const novoSaldo = Math.max(0, saldoAnterior - qtd);
+      itemEstoque.quantidade = novoSaldo;
+
+      const movId = 'MOV-' + Date.now();
+      const movObj = {
+        id: movId,
+        item_id: estoqueItemId,
+        item_nome: itemEstoque.nome,
+        tipo: 'saida',
+        quantidade: qtd,
+        saldo_anterior: saldoAnterior,
+        novo_saldo: novoSaldo,
+        data: new Date().toISOString().split('T')[0],
+        motivo: `Alocado na Casa: ${casa.nome} (${comodo.nome})`,
+        responsavel: 'Almoxarifado / Casas',
+        local: itemEstoque.local || 'Almoxarifado',
+        criado_em: new Date().toISOString()
+      };
+
+      listaEstoqueMovimentacoes.unshift(movObj);
+      try {
+        localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+        localStorage.setItem('estoque_movimentacoes_cache', JSON.stringify(listaEstoqueMovimentacoes));
+      } catch (e) {}
+
+      atualizarContadoresEstoqueUI();
+      filtrarEstoqueUI();
+
+      if (firestoreDb) {
+        try {
+          firestoreDb.collection('estoque_itens').doc(estoqueItemId).update({
+            quantidade: novoSaldo,
+            atualizado_em: new Date().toISOString()
+          });
+          firestoreDb.collection('estoque_movimentacoes').doc(movId).set(movObj);
+        } catch (e) {}
+      }
+    }
+  }
+
+  showToast(`Móvel "${tipo}" cadastrado com sucesso!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).update({
+        comodos: casa.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn("Erro ao adicionar móvel no Firestore:", err);
+    }
+  }
+}
+
+async function excluirMovelComodo(casaId, comodoId, movelId) {
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  if (!casa) return;
+  const comodo = (casa.comodos || []).find(cm => cm.id === comodoId);
+  if (!comodo) return;
+
+  if (!confirm('Deseja remover este item do cômodo?')) return;
+
+  comodo.moveis = (comodo.moveis || []).filter(m => m.id !== movelId);
+
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarDadosModalCasaDetalhes(casa);
+  showToast('Item removido do cômodo.', 'info');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).update({
+        comodos: casa.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn("Erro ao excluir móvel no Firestore:", err);
+    }
+  }
+}
+
+// Ações de Despesas / Contas de Consumo
+function openModalNovaDespesaCasa(casaId) {
+  popularSelectCasasDespesa(casaId);
+  document.getElementById('formDespesaCasa').reset();
+  document.getElementById('despesaCasaFormId').value = '';
+  document.getElementById('despesaCasaFormCasaId').value = casaId;
+  document.getElementById('despesaCasaFormMes').value = getMesAtualStr();
+  document.getElementById('statusPendenteRadio').checked = true;
+  abrirModal('modalDespesaCasaForm');
+}
+
+function openModalNovaDespesaCasaGlobal() {
+  if (listaCasasCidade.length === 0) {
+    showToast('Cadastre ao menos uma casa antes de lançar despesas.', 'warning');
+    return;
+  }
+  const casaPadrao = casaSelecionadaId || listaCasasCidade[0].id;
+  openModalNovaDespesaCasa(casaPadrao);
+}
+
+function popularSelectCasasDespesa(selectedId) {
+  const select = document.getElementById('despesaCasaFormCasaId');
+  if (!select) return;
+
+  select.innerHTML = listaCasasCidade.map(c => `
+    <option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.nome} (${c.bairro || c.endereco || ''})</option>
+  `).join('');
+}
+
+async function salvarDespesaCasa(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('despesaCasaFormId').value || ('DESP-' + Date.now());
+  const casaId = document.getElementById('despesaCasaFormCasaId').value;
+  const categoria = document.getElementById('despesaCasaFormCategoria').value;
+  const mes = document.getElementById('despesaCasaFormMes').value;
+  const valor = parseFloat(document.getElementById('despesaCasaFormValor').value) || 0;
+  const vencimento = document.getElementById('despesaCasaFormVencimento').value;
+  const status = document.getElementById('statusPagoRadio').checked ? 'pago' : 'pendente';
+  const obs = document.getElementById('despesaCasaFormObs').value.trim();
+
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  const casaNome = casa ? casa.nome : 'Casa';
+
+  const despesaData = {
+    casa_id: casaId,
+    casa_nome: casaNome,
+    categoria: categoria,
+    mes_referencia: mes,
+    valor: valor,
+    vencimento: vencimento,
+    status: status,
+    observacoes: obs,
+    criado_em: new Date().toISOString(),
+    atualizado_em: new Date().toISOString()
+  };
+
+  const idx = listaDespesasCasas.findIndex(x => x.id === id);
+  if (idx >= 0) {
+    listaDespesasCasas[idx] = { id: id, ...despesaData };
+  } else {
+    listaDespesasCasas.push({ id: id, ...despesaData });
+  }
+
+  localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+  atualizarContadoresCasasUI();
+  fecharModal('modalDespesaCasaForm');
+  showToast(`Conta de ${categoria} salva com sucesso!`, 'success');
+
+  if (casaSelecionadaId === casaId && abaAtivaCasaDetalhes === 'despesas') {
+    carregarDespesasCasaAtual();
+  }
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_despesas').doc(id).set(despesaData, { merge: true });
+    } catch (err) {
+      console.warn("Erro ao salvar despesa no Firestore:", err);
+    }
+  }
+}
+
+// Carregar e renderizar despesas da casa atual
+function carregarDespesasCasaAtual() {
+  if (!casaSelecionadaId) return;
+
+  const mesFiltro = document.getElementById('filtroMesDespesaCasaInput')?.value || getMesAtualStr();
+  const container = document.getElementById('casaDetalhesDespesasTabela');
+  const vazio = document.getElementById('casaDetalhesDespesasVazio');
+  if (!container) return;
+
+  const despesasCasa = listaDespesasCasas.filter(d => d.casa_id === casaSelecionadaId && (d.mes_referencia || '').startsWith(mesFiltro));
+
+  const total = despesasCasa.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+  const totalPago = despesasCasa.filter(d => d.status === 'pago').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+  const totalPendente = despesasCasa.filter(d => d.status === 'pendente').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+
+  document.getElementById('modalCasaDespesaTotalMes').textContent = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  document.getElementById('modalCasaDespesaTotalPendente').textContent = totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  document.getElementById('modalCasaDespesaTotalPago').textContent = totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  document.getElementById('modalCasaDespesaQtdContas').textContent = despesasCasa.length;
+
+  if (despesasCasa.length === 0) {
+    container.innerHTML = '';
+    vazio.classList.remove('hidden');
+    return;
+  }
+  vazio.classList.add('hidden');
+
+  const iconeDespesa = (cat) => {
+    if (cat.includes('Energia')) return 'fa-solid fa-bolt text-yellow-500';
+    if (cat.includes('Água')) return 'fa-solid fa-droplet text-cyan-500';
+    if (cat.includes('Aluguel')) return 'fa-solid fa-house text-emerald-500';
+    if (cat.includes('Internet')) return 'fa-solid fa-wifi text-indigo-500';
+    if (cat.includes('Gás')) return 'fa-solid fa-fire text-amber-500';
+    return 'fa-solid fa-file-invoice-dollar text-slate-500';
+  };
+
+  container.innerHTML = despesasCasa.map(d => {
+    const ehPago = d.status === 'pago';
+    const vencFormatado = d.vencimento ? new Date(d.vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '--';
+
+    return `
+      <div class="bg-white p-3.5 rounded-xl border ${ehPago ? 'border-slate-200' : 'border-amber-300 bg-amber-50/20'} flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg flex-shrink-0">
+            <i class="${iconeDespesa(d.categoria)}"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h5 class="text-xs font-bold text-slate-900">${d.categoria}</h5>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ehPago ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
+                ${ehPago ? '🟢 Pago' : '🟡 A Vencer / Pendente'}
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5">
+              Vencimento: <strong class="text-slate-700">${vencFormatado}</strong> ${d.observacoes ? '• ' + d.observacoes : ''}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-black text-slate-900">
+            ${(Number(d.valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </span>
+
+          <button onclick="alternarStatusDespesaCasa('${d.id}')" class="btn-prefeito px-2.5 py-1.5 rounded-lg ${ehPago ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} text-xs font-bold transition flex items-center gap-1">
+            <i class="fa-solid ${ehPago ? 'fa-rotate-left' : 'fa-check'} text-[10px]"></i>
+            <span>${ehPago ? 'Reabrir' : 'Dar Baixa'}</span>
+          </button>
+
+          <button onclick="excluirDespesaCasa('${d.id}')" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Lançamento">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function alternarStatusDespesaCasa(despesaId) {
+  const d = listaDespesasCasas.find(x => x.id === despesaId);
+  if (!d) return;
+
+  const novoStatus = d.status === 'pago' ? 'pendente' : 'pago';
+  d.status = novoStatus;
+
+  localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+  atualizarContadoresCasasUI();
+  carregarDespesasCasaAtual();
+  showToast(`Conta de ${d.categoria} marcada como "${novoStatus === 'pago' ? 'Paga' : 'Pendente'}"!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_despesas').doc(despesaId).update({
+        status: novoStatus,
+        atualizado_em: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn("Erro ao atualizar status da conta no Firestore:", err);
+    }
+  }
+}
+
+async function excluirDespesaCasa(despesaId) {
+  if (!confirm('Deseja realmente excluir este lançamento de conta?')) return;
+
+  listaDespesasCasas = listaDespesasCasas.filter(x => x.id !== despesaId);
+  localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+  atualizarContadoresCasasUI();
+  carregarDespesasCasaAtual();
+  showToast('Lançamento excluído com sucesso.', 'info');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_despesas').doc(despesaId).delete();
+    } catch (err) {
+      console.warn("Erro ao excluir conta no Firestore:", err);
+    }
+  }
+}
+
+function recarregarCasasCidadeManual() {
+  const icone = document.getElementById('iconeReloadCasas');
+  if (icone) icone.classList.add('fa-spin');
+  showToast('Recarregando dados das casas...', 'info');
+
+  if (firestoreDb) {
+    Promise.all([
+      firestoreDb.collection('casas_cidade').get(),
+      firestoreDb.collection('casas_despesas').get()
+    ]).then(([snapCasas, snapDesp]) => {
+      const novasCasas = [];
+      snapCasas.forEach(doc => novasCasas.push({ id: doc.id, ...doc.data() }));
+      novasCasas.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+      listaCasasCidade = novasCasas;
+
+      const novasDesp = [];
+      snapDesp.forEach(doc => novasDesp.push({ id: doc.id, ...doc.data() }));
+      novasDesp.sort((a, b) => new Date(b.vencimento || 0) - new Date(a.vencimento || 0));
+      listaDespesasCasas = novasDesp;
+
+      localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+      localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+
+      atualizarContadoresCasasUI();
+      filtrarCasasCidadeUI();
+      if (icone) icone.classList.remove('fa-spin');
+      showToast('Dados das Casas sincronizados com sucesso!', 'success');
+    }).catch(err => {
+      if (icone) icone.classList.remove('fa-spin');
+      showToast('Erro ao recarregar: ' + err.message, 'error');
+    });
+  } else {
+    if (icone) icone.classList.remove('fa-spin');
+    filtrarCasasCidadeUI();
+  }
+}
+
+// Exposição explícita no window para garantir funcionamento de botões onclick
+window.openModalNovaCasa = openModalNovaCasa;
+window.editarCasa = editarCasa;
+window.salvarCasa = salvarCasa;
+window.excluirCasa = excluirCasa;
+window.abrirDetalhesCasa = typeof abrirModalCasaDetalhes !== 'undefined' ? abrirModalCasaDetalhes : function(id) { if (typeof abrirModalCasaDetalhes === 'function') abrirModalCasaDetalhes(id); };
+window.trocarAbaCasaDetalhes = trocarAbaCasaDetalhes;
+window.openModalNovoComodo = openModalNovoComodo;
+window.salvarComodoCasa = salvarComodoCasa;
+window.excluirComodoCasa = excluirComodoCasa;
+window.openModalNovoMoradorCasa = openModalNovoMoradorCasa;
+window.salvarMoradorCasa = salvarMoradorCasa;
+window.removerMoradorCasa = removerMoradorCasa;
+window.openModalNovoMovelComodo = openModalNovoMovelComodo;
+window.salvarMovelComodo = salvarMovelComodo;
+window.excluirMovelComodo = excluirMovelComodo;
+window.openModalNovaDespesaCasa = openModalNovaDespesaCasa;
+window.openModalNovaDespesaCasaGlobal = openModalNovaDespesaCasaGlobal;
+window.salvarDespesaCasa = salvarDespesaCasa;
+window.alternarStatusDespesaCasa = alternarStatusDespesaCasa;
+window.excluirDespesaCasa = excluirDespesaCasa;
+window.recarregarCasasCidadeManual = recarregarCasasCidadeManual;
+window.filtrarCasasCidadeUI = filtrarCasasCidadeUI;
+
+
+
+
+
+// ========================================================
+// MÓDULO DE ESTOQUE & ALMOXARIFADO (GALPÕES & PATRIMÔNIO)
+// ========================================================
+// listaEstoqueItens declarada no topo
+// listaEstoqueMovimentacoes declarada no topo
+// listaEstoqueLocais declarada no topo
+// listenerEstoqueAtivo declarado no topo
+// itemEstoqueSelecionadoId declarado no topo
+
+// Inicialização do ouvinte em tempo real do Firestore para Estoque
+function iniciarListenerEstoque() {
+  if (!firestoreDb || listenerEstoqueAtivo) return;
+  listenerEstoqueAtivo = true;
+
+  console.log("📦 [ESTOQUE] Inicializando sincronização em tempo real de Estoque & Almoxarifado...");
+
+  // 1. Carregar do cache local
+  try {
+    const cachedItens = localStorage.getItem('estoque_itens_cache');
+    if (cachedItens) listaEstoqueItens = JSON.parse(cachedItens);
+    const cachedMovs = localStorage.getItem('estoque_movimentacoes_cache');
+    if (cachedMovs) listaEstoqueMovimentacoes = JSON.parse(cachedMovs);
+    const cachedLocais = localStorage.getItem('estoque_locais_cache');
+    if (cachedLocais) listaEstoqueLocais = JSON.parse(cachedLocais);
+    
+    // Seed inicial padrão se estiver totalmente vazio
+    if (!cachedItens || listaEstoqueItens.length === 0) {
+      inicializarItensPadraoEstoque();
+    }
+
+    atualizarContadoresEstoqueUI();
+    popularSelectsLocaisEstoque();
+  } catch (e) {
+    console.warn("Aviso ao carregar cache do estoque:", e);
+  }
+
+  // 2. Ouvir coleção de estoque_itens
+  try {
+    firestoreDb.collection('estoque_itens').onSnapshot((snapshot) => {
+      if (!snapshot.empty) {
+        const itensNuvem = [];
+        snapshot.forEach(doc => itensNuvem.push({ id: doc.id, ...doc.data() }));
+        itensNuvem.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+        listaEstoqueItens = itensNuvem;
+        try { localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens)); } catch (e) {}
+        atualizarContadoresEstoqueUI();
+        if (activeTab === 'estoque') filtrarEstoqueUI();
+      }
+    }, (err) => console.warn("Aviso listener estoque_itens:", err));
+  } catch (err) {
+    console.warn("Erro ao iniciar snapshot de estoque_itens:", err);
+  }
+
+  // 3. Ouvir coleção de estoque_movimentacoes
+  try {
+    firestoreDb.collection('estoque_movimentacoes').onSnapshot((snapshot) => {
+      if (!snapshot.empty) {
+        const movsNuvem = [];
+        snapshot.forEach(doc => movsNuvem.push({ id: doc.id, ...doc.data() }));
+        movsNuvem.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+        listaEstoqueMovimentacoes = movsNuvem;
+        try { localStorage.setItem('estoque_movimentacoes_cache', JSON.stringify(listaEstoqueMovimentacoes)); } catch (e) {}
+        atualizarContadoresEstoqueUI();
+      }
+    }, (err) => console.warn("Aviso listener estoque_movimentacoes:", err));
+  } catch (err) {
+    console.warn("Erro snapshot estoque_movimentacoes:", err);
+  }
+
+  // 4. Ouvir locais/galpões
+  try {
+    firestoreDb.collection('configuracoes').doc('estoque_locais').onSnapshot((doc) => {
+      if (doc.exists && doc.data().locais) {
+        listaEstoqueLocais = doc.data().locais;
+        try { localStorage.setItem('estoque_locais_cache', JSON.stringify(listaEstoqueLocais)); } catch (e) {}
+        popularSelectsLocaisEstoque();
+        if (activeTab === 'estoque') filtrarEstoqueUI();
+      }
+    }, (err) => console.warn("Aviso listener estoque_locais:", err));
+  } catch (err) {}
+}
+
+// Criar itens padrão de canteiro caso não haja nenhum cadastrado
+function inicializarItensPadraoEstoque() {
+  const itensIniciais = [
+    {
+      id: 'EST-COLCHAO-D33',
+      nome: 'Colchão D33 Solteiro (Alojamento)',
+      categoria: 'Alojamento',
+      local: 'Galpão 2 (Alojamento Obra)',
+      quantidade: 24,
+      unidade: 'UN',
+      qtd_minima: 5,
+      patrimonio: '',
+      valor: 280.00,
+      empresa: 'GEL',
+      marca: 'Ortobom D33',
+      observacoes: 'Padrão dos quartos de alojados'
+    },
+    {
+      id: 'EST-LAMPADA-LED',
+      nome: 'Lâmpada LED 12W Bivolt E27',
+      categoria: 'Manutenção',
+      local: 'Galpão 2 (Alojamento Obra)',
+      quantidade: 45,
+      unidade: 'UN',
+      qtd_minima: 10,
+      patrimonio: '',
+      valor: 12.50,
+      empresa: 'GEL',
+      marca: 'Avant / Elgin',
+      observacoes: 'Usada nos chamados de lâmpada queimada'
+    },
+    {
+      id: 'EST-CHUVEIRO-MAXI',
+      nome: 'Chuveiro Elétrico 220V + Resistência',
+      categoria: 'Manutenção',
+      local: 'Galpão 2 (Alojamento Obra)',
+      quantidade: 8,
+      unidade: 'UN',
+      qtd_minima: 3,
+      patrimonio: '',
+      valor: 65.00,
+      empresa: 'GEL',
+      marca: 'Lorenzetti Maxi Ducha',
+      observacoes: 'Substituição em banheiros de pavilhão'
+    },
+    {
+      id: 'EST-SACO-LIXO-100L',
+      nome: 'Saco de Lixo Reforçado 100L (Fardo 100un)',
+      categoria: 'Limpeza',
+      local: 'Galpão 1 (Cidade)',
+      quantidade: 15,
+      unidade: 'PCT',
+      qtd_minima: 3,
+      patrimonio: '',
+      valor: 48.00,
+      empresa: 'GEL',
+      marca: 'Plastfort',
+      observacoes: 'Para equipe de limpeza dos alojamentos e casas'
+    },
+    {
+      id: 'EST-TV-SAMSUNG-43',
+      nome: 'Smart TV 43" Full HD (Sala da Casa)',
+      categoria: 'Móveis/Eletros',
+      local: 'Galpão 1 (Cidade)',
+      quantidade: 2,
+      unidade: 'UN',
+      qtd_minima: 1,
+      patrimonio: '#GEL-TV-001',
+      valor: 1650.00,
+      empresa: 'GEL',
+      marca: 'Samsung Smart',
+      observacoes: 'Destinada às casas de engenharia na cidade'
+    },
+    {
+      id: 'EST-GELADEIRA-375L',
+      nome: 'Geladeira Frost Free 375L Duplex',
+      categoria: 'Móveis/Eletros',
+      local: 'Galpão 1 (Cidade)',
+      quantidade: 1,
+      unidade: 'UN',
+      qtd_minima: 1,
+      patrimonio: '#GEL-REF-004',
+      valor: 2850.00,
+      empresa: 'GEL',
+      marca: 'Brastemp BRM44',
+      observacoes: 'Equipamento patrimonial da liderança'
+    }
+  ];
+
+  listaEstoqueItens = itensIniciais;
+  try {
+    localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+    localStorage.setItem('estoque_locais_cache', JSON.stringify(listaEstoqueLocais));
+  } catch (e) {}
+}
+
+// Carregamento da aba Estoque
+function carregarEstoque() {
+  iniciarListenerEstoque();
+  popularSelectsLocaisEstoque();
+  atualizarContadoresEstoqueUI();
+  filtrarEstoqueUI();
+}
+
+// Popular selects de locais/galpões
+function popularSelectsLocaisEstoque() {
+  const fLocal = document.getElementById('filtroEstoqueLocal');
+  const formLocal = document.getElementById('itemEstoqueFormLocal');
+  const movLocal = document.getElementById('movimentacaoLocal');
+  const chamLocal = document.getElementById('chamadoEstoqueLocal');
+
+  const optionsHtml = listaEstoqueLocais.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+
+  if (fLocal) {
+    const currentVal = fLocal.value;
+    fLocal.innerHTML = '<option value="todos">🏬 Todos os Galpões</option>' + optionsHtml;
+    if (currentVal) fLocal.value = currentVal;
+  }
+  if (formLocal) formLocal.innerHTML = optionsHtml;
+  if (movLocal) movLocal.innerHTML = optionsHtml;
+  if (chamLocal) chamLocal.innerHTML = optionsHtml;
+
+  // Renderizar modal de lista de locais
+  renderizarListaLocaisModal();
+}
+
+// Atualizar métricas do topo do estoque
+function atualizarContadoresEstoqueUI() {
+  const totItens = listaEstoqueItens.length;
+  let totCritico = 0;
+  let totValorPatrimonio = 0;
+  let qtdPatrimonio = 0;
+
+  listaEstoqueItens.forEach(item => {
+    const qtd = Number(item.quantidade || 0);
+    const min = Number(item.qtd_minima || 0);
+    if (qtd <= min) totCritico++;
+
+    if (item.patrimonio && item.patrimonio.trim() !== '') {
+      qtdPatrimonio += qtd;
+      if (item.valor) {
+        totValorPatrimonio += (Number(item.valor) * qtd);
+      }
+    }
+  });
+
+  const mTot = document.getElementById('metricEstoqueTotalItens');
+  if (mTot) mTot.textContent = totItens;
+
+  const mCrit = document.getElementById('metricEstoqueCritico');
+  if (mCrit) mCrit.textContent = totCritico;
+
+  const mVal = document.getElementById('metricEstoqueValorPatrimonio');
+  if (mVal) mVal.textContent = totValorPatrimonio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const mQtdPat = document.getElementById('metricEstoqueQtdPatrimonio');
+  if (mQtdPat) mQtdPat.textContent = `${qtdPatrimonio} itens patrimoniados`;
+
+  const mLoc = document.getElementById('metricEstoqueLocais');
+  if (mLoc) mLoc.textContent = listaEstoqueLocais.length;
+
+  // Badges no Menu e Drawer
+  const sideBadge = document.getElementById('sideCountEstoque');
+  if (sideBadge) {
+    sideBadge.textContent = `${totItens} itens`;
+    sideBadge.classList.remove('hidden');
+  }
+  const drawerBadge = document.getElementById('drawerBadgeEstoque');
+  if (drawerBadge) {
+    drawerBadge.textContent = `${totItens} itens`;
+  }
+}
+
+// Filtragem e renderização da grade de itens
+function filtrarEstoqueUI() {
+  const termo = (document.getElementById('buscaEstoqueInput')?.value || '').toLowerCase().trim();
+  const filtroLocal = document.getElementById('filtroEstoqueLocal')?.value || 'todos';
+  const filtroCat = document.getElementById('filtroEstoqueCategoria')?.value || 'todas';
+  const filtroStatus = document.getElementById('filtroEstoqueStatus')?.value || 'todos';
+
+  let filtrados = listaEstoqueItens.filter(item => {
+    // Busca textual
+    if (termo) {
+      const matchNome = (item.nome || '').toLowerCase().includes(termo);
+      const matchMarca = (item.marca || '').toLowerCase().includes(termo);
+      const matchPat = (item.patrimonio || '').toLowerCase().includes(termo);
+      const matchCat = (item.categoria || '').toLowerCase().includes(termo);
+      const matchEmp = (item.empresa || '').toLowerCase().includes(termo);
+      if (!matchNome && !matchMarca && !matchPat && !matchCat && !matchEmp) return false;
+    }
+
+    // Filtro Galpão
+    if (filtroLocal !== 'todos' && item.local !== filtroLocal) return false;
+
+    // Filtro Categoria
+    if (filtroCat !== 'todas' && item.categoria !== filtroCat) return false;
+
+    // Filtro Status / Patrimônio
+    if (filtroStatus === 'critico') {
+      const qtd = Number(item.quantidade || 0);
+      const min = Number(item.qtd_minima || 0);
+      if (qtd > min) return false;
+    } else if (filtroStatus === 'patrimonio') {
+      if (!item.patrimonio || item.patrimonio.trim() === '') return false;
+    }
+
+    return true;
+  });
+
+  renderizarEstoqueGrid(filtrados);
+}
+
+// Renderização dos cards de estoque
+function renderizarEstoqueGrid(itens) {
+  const grid = document.getElementById('estoqueItensGrid');
+  const vazio = document.getElementById('estoqueVazio');
+  if (!grid) return;
+
+  if (itens.length === 0) {
+    grid.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+
+  if (vazio) vazio.classList.add('hidden');
+
+  grid.innerHTML = itens.map(item => {
+    const qtd = Number(item.quantidade || 0);
+    const min = Number(item.qtd_minima || 0);
+    const isCritico = qtd <= min;
+    const temPatrimonio = item.patrimonio && item.patrimonio.trim() !== '';
+
+    let catBadgeColor = 'bg-slate-100 text-slate-700';
+    let catIcon = 'fa-box';
+    if (item.categoria === 'Alojamento') {
+      catBadgeColor = 'bg-sky-50 text-sky-700 border border-sky-200';
+      catIcon = 'fa-bed';
+    } else if (item.categoria === 'Manutenção') {
+      catBadgeColor = 'bg-amber-50 text-amber-700 border border-amber-200';
+      catIcon = 'fa-wrench';
+    } else if (item.categoria === 'Limpeza') {
+      catBadgeColor = 'bg-teal-50 text-teal-700 border border-teal-200';
+      catIcon = 'fa-broom';
+    } else if (item.categoria === 'Móveis/Eletros') {
+      catBadgeColor = 'bg-purple-50 text-purple-700 border border-purple-200';
+      catIcon = 'fa-couch';
+    }
+
+    return `
+      <div class="bg-white rounded-2xl border ${isCritico ? 'border-rose-300 shadow-rose-50/50' : 'border-slate-200'} shadow-sm hover:shadow-md transition p-4 sm:p-5 flex flex-col justify-between">
+        
+        <!-- Topo do Card -->
+        <div>
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${catBadgeColor}">
+              <i class="fa-solid ${catIcon} text-[10px]"></i> ${item.categoria}
+            </span>
+
+            <div class="flex items-center gap-1">
+              ${isCritico ? `
+                <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px] flex items-center gap-1">
+                  <i class="fa-solid fa-triangle-exclamation"></i> Baixo
+                </span>
+              ` : `
+                <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]">
+                  Normal
+                </span>
+              `}
+            </div>
+          </div>
+
+          <h3 class="text-sm font-bold text-slate-900 leading-snug hover:text-teal-700 transition cursor-pointer" onclick="abrirDetalhesItemEstoque('${item.id}')">
+            ${item.nome}
+          </h3>
+
+          <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <i class="fa-solid fa-warehouse text-amber-500 text-[11px]"></i>
+            <span>${item.local || 'Almoxarifado'}</span>
+          </div>
+
+          <!-- Informações de Patrimônio & Valor (se existirem) -->
+          ${temPatrimonio || item.valor ? `
+            <div class="mt-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+              ${temPatrimonio ? `
+                <span class="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded border border-indigo-200" title="Plaqueta de Patrimônio">
+                  <i class="fa-solid fa-tag text-[9px] mr-1"></i>${item.patrimonio}
+                </span>
+              ` : '<span class="text-[10px] text-slate-400">Sem plaqueta</span>'}
+
+              ${item.valor ? `
+                <span class="font-bold text-slate-800 text-xs">
+                  ${Number(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  <span class="text-[10px] text-slate-400 font-normal">/un</span>
+                </span>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Rodapé do Card com Saldo e Botões -->
+        <div class="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Saldo em Estoque</span>
+            <div class="flex items-baseline gap-1">
+              <span class="text-xl font-black ${isCritico ? 'text-rose-600' : 'text-slate-900'}">${qtd}</span>
+              <span class="text-xs font-bold text-slate-500">${item.unidade || 'UN'}</span>
+            </div>
+          </div>
+
+          <!-- Ações Rápidas -->
+          <div class="flex items-center gap-1">
+            <button onclick="abrirMovimentacaoRapidaItem('${item.id}', 'entrada')" class="btn-prefeito p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition" title="Dar Entrada (+)">
+              <i class="fa-solid fa-plus"></i>
+            </button>
+            <button onclick="abrirMovimentacaoRapidaItem('${item.id}', 'saida')" class="btn-prefeito p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition" title="Dar Baixa / Saída (-)">
+              <i class="fa-solid fa-minus"></i>
+            </button>
+            <button onclick="abrirDetalhesItemEstoque('${item.id}')" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs transition" title="Ver Histórico e Detalhes">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </button>
+            <button onclick="editarItemEstoque('${item.id}')" class="btn-prefeito p-2 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 text-xs transition" title="Editar Item">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button onclick="excluirItemEstoque('${item.id}')" class="btn-prefeito p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Item do Estoque">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    `;
+  }).join('');
+}
+
+// Criar / Editar Item do Estoque
+function openModalNovoItemEstoque() {
+  const form = document.getElementById('formItemEstoque');
+  if (form) form.reset();
+  document.getElementById('itemEstoqueFormId').value = '';
+  document.getElementById('modalItemEstoqueFormTitulo').textContent = 'Cadastrar Item no Estoque';
+  document.getElementById('itemEstoqueFormQtd').value = 0;
+  document.getElementById('itemEstoqueFormQtdMinima').value = 2;
+  const btnExcluir = document.getElementById('btnExcluirItemEstoqueModal');
+  if (btnExcluir) btnExcluir.classList.add('hidden');
+  popularSelectsLocaisEstoque();
+  abrirModal('modalItemEstoqueForm');
+}
+
+function editarItemEstoque(id) {
+  const item = listaEstoqueItens.find(x => x.id === id);
+  if (!item) return;
+
+  const form = document.getElementById('formItemEstoque');
+  if (form) form.reset();
+  popularSelectsLocaisEstoque();
+
+  const setVal = (fieldId, val) => { const el = document.getElementById(fieldId); if (el) el.value = val; };
+  setVal('itemEstoqueFormId', item.id);
+  setVal('itemEstoqueFormNome', item.nome || '');
+  setVal('itemEstoqueFormCategoria', item.categoria || 'Alojamento');
+  setVal('itemEstoqueFormLocal', item.local || listaEstoqueLocais[0]);
+  setVal('itemEstoqueFormQtd', item.quantidade || 0);
+  setVal('itemEstoqueFormUnidade', item.unidade || 'UN');
+  setVal('itemEstoqueFormQtdMinima', item.qtd_minima || 2);
+  setVal('itemEstoqueFormPatrimonio', item.patrimonio || '');
+  setVal('itemEstoqueFormValor', item.valor || '');
+  setVal('itemEstoqueFormEmpresa', item.empresa || '');
+  setVal('itemEstoqueFormMarca', item.marca || '');
+  setVal('itemEstoqueFormObs', item.observacoes || '');
+
+  const btnExcluir = document.getElementById('btnExcluirItemEstoqueModal');
+  if (btnExcluir) btnExcluir.classList.remove('hidden');
+
+  document.getElementById('modalItemEstoqueFormTitulo').textContent = 'Editar Item do Estoque';
+  abrirModal('modalItemEstoqueForm');
+}
+
+async function salvarItemEstoque(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('itemEstoqueFormId').value || ('EST-' + Date.now());
+  const nome = document.getElementById('itemEstoqueFormNome').value.trim();
+  const categoria = document.getElementById('itemEstoqueFormCategoria').value;
+  const local = document.getElementById('itemEstoqueFormLocal').value;
+  const quantidade = parseInt(document.getElementById('itemEstoqueFormQtd').value) || 0;
+  const unidade = document.getElementById('itemEstoqueFormUnidade').value;
+  const qtdMinima = parseInt(document.getElementById('itemEstoqueFormQtdMinima').value) || 0;
+  const patrimonio = document.getElementById('itemEstoqueFormPatrimonio').value.trim();
+  const valor = parseFloat(document.getElementById('itemEstoqueFormValor').value) || 0;
+  const empresa = document.getElementById('itemEstoqueFormEmpresa').value.trim();
+  const marca = document.getElementById('itemEstoqueFormMarca').value.trim();
+  const observacoes = document.getElementById('itemEstoqueFormObs').value.trim();
+
+  const itemObj = {
+    id,
+    nome,
+    categoria,
+    local,
+    quantidade,
+    unidade,
+    qtd_minima: qtdMinima,
+    patrimonio,
+    valor,
+    empresa,
+    marca,
+    observacoes,
+    atualizado_em: new Date().toISOString()
+  };
+
+  const idx = listaEstoqueItens.findIndex(x => x.id === id);
+  if (idx >= 0) {
+    listaEstoqueItens[idx] = itemObj;
+  } else {
+    listaEstoqueItens.push(itemObj);
+  }
+
+  try { localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens)); } catch (e) {}
+
+  atualizarContadoresEstoqueUI();
+  filtrarEstoqueUI();
+  fecharModal('modalItemEstoqueForm');
+  showToast(`Item "${nome}" salvo no estoque com sucesso!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('estoque_itens').doc(id).set(itemObj, { merge: true });
+    } catch (err) {
+      console.warn("Erro ao salvar item no Firestore:", err);
+    }
+  }
+}
+
+// Movimentações de Estoque (Entradas e Saídas)
+function openModalMovimentacaoEstoque(tipo = 'entrada') {
+  const form = document.getElementById('formMovimentacaoEstoque');
+  if (form) form.reset();
+
+  popularSelectsLocaisEstoque();
+  popularSelectItensMovimentacao();
+
+  document.getElementById('movimentacaoTipo').value = tipo;
+  document.getElementById('movimentacaoData').value = new Date().toISOString().split('T')[0];
+  document.getElementById('movimentacaoQtd').value = 1;
+
+  const topo = document.getElementById('movimentacaoEstoqueTopo');
+  const tit = document.getElementById('movimentacaoEstoqueTitulo');
+  const btn = document.getElementById('btnSalvarMovimentacaoEstoque');
+
+  if (tipo === 'entrada') {
+    topo.className = 'px-5 py-3.5 bg-emerald-600 text-white flex items-center justify-between';
+    tit.textContent = 'Registrar Entrada no Estoque';
+    btn.className = 'btn-prefeito px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm';
+    btn.innerHTML = '<i class="fa-solid fa-arrow-down mr-1"></i> Confirmar Entrada';
+  } else {
+    topo.className = 'px-5 py-3.5 bg-rose-600 text-white flex items-center justify-between';
+    tit.textContent = 'Registrar Saída / Baixa do Estoque';
+    btn.className = 'btn-prefeito px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm';
+    btn.innerHTML = '<i class="fa-solid fa-arrow-up mr-1"></i> Confirmar Saída';
+  }
+
+  // Atualizar badge do primeiro item
+  const firstItem = document.getElementById('movimentacaoItemId')?.value;
+  if (firstItem) aoSelecionarItemMovimentacao(firstItem);
+
+  abrirModal('modalMovimentacaoEstoque');
+}
+
+function abrirMovimentacaoRapidaItem(itemId, tipo) {
+  openModalMovimentacaoEstoque(tipo);
+  const select = document.getElementById('movimentacaoItemId');
+  if (select) {
+    select.value = itemId;
+    aoSelecionarItemMovimentacao(itemId);
+  }
+}
+
+function popularSelectItensMovimentacao() {
+  const select = document.getElementById('movimentacaoItemId');
+  if (!select) return;
+
+  if (listaEstoqueItens.length === 0) {
+    select.innerHTML = '<option value="">Nenhum item cadastrado</option>';
+    return;
+  }
+
+  select.innerHTML = listaEstoqueItens.map(item => `
+    <option value="${item.id}">${item.nome} (${item.quantidade || 0} ${item.unidade || 'UN'}) - ${item.local || ''}</option>
+  `).join('');
+}
+
+function aoSelecionarItemMovimentacao(itemId) {
+  const item = listaEstoqueItens.find(x => x.id === itemId);
+  const badge = document.getElementById('movimentacaoSaldoAtualBadge');
+  const locSelect = document.getElementById('movimentacaoLocal');
+  if (item && badge) {
+    badge.innerHTML = `Saldo Atual: <b class="text-teal-700">${item.quantidade || 0} ${item.unidade || 'UN'}</b> no <i>${item.local}</i>`;
+    if (locSelect) locSelect.value = item.local;
+  }
+}
+
+async function salvarMovimentacaoEstoque(event) {
+  event.preventDefault();
+
+  const itemId = document.getElementById('movimentacaoItemId').value;
+  const item = listaEstoqueItens.find(x => x.id === itemId);
+  if (!item) {
+    showToast('Selecione um item válido!', 'warning');
+    return;
+  }
+
+  const tipo = document.getElementById('movimentacaoTipo').value; // 'entrada' ou 'saida'
+  const qtd = parseInt(document.getElementById('movimentacaoQtd').value) || 1;
+  const data = document.getElementById('movimentacaoData').value;
+  const motivo = document.getElementById('movimentacaoMotivo').value.trim();
+  const responsavel = document.getElementById('movimentacaoResponsavel').value.trim() || 'Almoxarifado';
+  const local = document.getElementById('movimentacaoLocal').value || item.local;
+
+  if (tipo === 'saida' && qtd > Number(item.quantidade || 0)) {
+    if (!confirm(`Atenção: A quantidade de saída (${qtd}) é maior que o saldo em estoque (${item.quantidade || 0}). Deseja continuar mesmo assim?`)) {
+      return;
+    }
+  }
+
+  // Atualizar saldo
+  const saldoAnterior = Number(item.quantidade || 0);
+  const novoSaldo = tipo === 'entrada' ? (saldoAnterior + qtd) : Math.max(0, saldoAnterior - qtd);
+  item.quantidade = novoSaldo;
+  item.local = local;
+
+  const movId = 'MOV-' + Date.now();
+  const movObj = {
+    id: movId,
+    item_id: itemId,
+    item_nome: item.nome,
+    tipo: tipo,
+    quantidade: qtd,
+    saldo_anterior: saldoAnterior,
+    novo_saldo: novoSaldo,
+    data: data,
+    motivo: motivo,
+    responsavel: responsavel,
+    local: local,
+    criado_em: new Date().toISOString()
+  };
+
+  listaEstoqueMovimentacoes.unshift(movObj);
+
+  try {
+    localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+    localStorage.setItem('estoque_movimentacoes_cache', JSON.stringify(listaEstoqueMovimentacoes));
+  } catch (e) {}
+
+  atualizarContadoresEstoqueUI();
+  filtrarEstoqueUI();
+  fecharModal('modalMovimentacaoEstoque');
+
+  showToast(`${tipo === 'entrada' ? 'Entrada' : 'Saída'} de ${qtd}x "${item.nome}" registrada! Novo saldo: ${novoSaldo}`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('estoque_itens').doc(itemId).update({
+        quantidade: novoSaldo,
+        local: local,
+        atualizado_em: new Date().toISOString()
+      });
+      await firestoreDb.collection('estoque_movimentacoes').doc(movId).set(movObj);
+    } catch (err) {
+      console.warn("Erro ao registrar movimentação no Firestore:", err);
+    }
+  }
+}
+
+// Detalhes e Histórico de Item
+function abrirDetalhesItemEstoque(id) {
+  const item = listaEstoqueItens.find(x => x.id === id);
+  if (!item) return;
+
+  itemEstoqueSelecionadoId = id;
+
+  document.getElementById('modalItemDetalhesTitulo').textContent = item.nome;
+  document.getElementById('modalItemDetalhesSubtitulo').textContent = `${item.categoria} • ${item.local}`;
+  document.getElementById('modalItemDetalhesSaldo').textContent = `${item.quantidade || 0} ${item.unidade || 'UN'}`;
+  document.getElementById('modalItemDetalhesPatrimonio').textContent = item.patrimonio ? `#${item.patrimonio.replace('#', '')}` : 'Sem plaqueta';
+  document.getElementById('modalItemDetalhesValor').textContent = item.valor ? Number(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Não informado';
+
+  // Histórico
+  const container = document.getElementById('modalItemMovimentacoesLista');
+  const movs = listaEstoqueMovimentacoes.filter(m => m.item_id === id);
+
+  if (movs.length === 0) {
+    container.innerHTML = '<p class="text-xs text-slate-400 italic py-3 text-center">Nenhuma movimentação registrada para este item ainda.</p>';
+  } else {
+    container.innerHTML = movs.map(m => `
+      <div class="p-2.5 rounded-xl border border-slate-200 text-xs flex items-center justify-between bg-white">
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-lg ${m.tipo === 'entrada' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} flex items-center justify-center font-bold text-[10px]">
+            ${m.tipo === 'entrada' ? '+' : '-'}
+          </span>
+          <div>
+            <p class="font-bold text-slate-800 leading-tight">${m.motivo || 'Sem motivo'}</p>
+            <p class="text-[10px] text-slate-400 font-medium">${m.data || ''} • Resp: ${m.responsavel || 'Almoxarifado'}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="font-bold text-sm ${m.tipo === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}">
+            ${m.tipo === 'entrada' ? '+' : '-'}${m.quantidade}
+          </span>
+          <span class="text-[10px] text-slate-400 block">Saldo: ${m.novo_saldo}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const btnEdit = document.getElementById('btnEditarItemPeloDetalhe');
+  if (btnEdit) {
+    btnEdit.onclick = () => {
+      fecharModal('modalItemEstoqueDetalhes');
+      editarItemEstoque(id);
+    };
+  }
+
+  const btnExcluir = document.getElementById('btnExcluirItemPeloDetalhe');
+  if (btnExcluir) {
+    btnExcluir.onclick = () => {
+      excluirItemEstoque(id);
+    };
+  }
+
+  abrirModal('modalItemEstoqueDetalhes');
+}
+
+// Excluir Item do Estoque
+async function excluirItemEstoque(id) {
+  const item = listaEstoqueItens.find(x => x.id === id);
+  const nome = item ? item.nome : 'Item';
+
+  if (!confirm(`Tem certeza que deseja excluir o item "${nome}" do estoque? Esta ação não pode ser desfeita.`)) {
+    return;
+  }
+
+  listaEstoqueItens = listaEstoqueItens.filter(x => x.id !== id);
+
+  try {
+    localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+  } catch (e) {}
+
+  fecharModal('modalItemEstoqueDetalhes');
+  fecharModal('modalItemEstoqueForm');
+
+  atualizarContadoresEstoqueUI();
+  filtrarEstoqueUI();
+
+  showToast(`Item "${nome}" excluído do estoque com sucesso!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('estoque_itens').doc(id).delete();
+    } catch (err) {
+      console.warn("Erro ao excluir item do Firestore:", err);
+    }
+  }
+}
+
+function excluirItemEstoqueAtual() {
+  const id = document.getElementById('itemEstoqueFormId') ? document.getElementById('itemEstoqueFormId').value : null;
+  if (id) {
+    excluirItemEstoque(id);
+  }
+}
+
+// Gerenciamento de Galpões e Locais
+function openModalLocaisEstoque() {
+  renderizarListaLocaisModal();
+  abrirModal('modalLocaisEstoque');
+}
+
+function renderizarListaLocaisModal() {
+  const container = document.getElementById('listaLocaisEstoqueContainer');
+  if (!container) return;
+
+  container.innerHTML = listaEstoqueLocais.map((loc, idx) => `
+    <div class="p-2.5 px-3 flex items-center justify-between text-xs font-semibold text-slate-800 bg-white hover:bg-slate-50">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-warehouse text-amber-500 text-xs"></i>
+        <span>${loc}</span>
+      </div>
+      ${listaEstoqueLocais.length > 1 ? `
+        <button onclick="removerLocalEstoque(${idx})" class="btn-prefeito text-slate-400 hover:text-rose-600 p-1" title="Excluir Galpão">
+          <i class="fa-solid fa-trash-can text-[11px]"></i>
+        </button>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+async function adicionarLocalEstoque(event) {
+  event.preventDefault();
+  const input = document.getElementById('novoLocalEstoqueNome');
+  const nome = input.value.trim();
+  if (!nome) return;
+
+  if (listaEstoqueLocais.includes(nome)) {
+    showToast('Este galpão já existe!', 'warning');
+    return;
+  }
+
+  listaEstoqueLocais.push(nome);
+  input.value = '';
+  try { localStorage.setItem('estoque_locais_cache', JSON.stringify(listaEstoqueLocais)); } catch (e) {}
+
+  popularSelectsLocaisEstoque();
+  showToast(`Galpão "${nome}" adicionado com sucesso!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('configuracoes').doc('estoque_locais').set({
+        locais: listaEstoqueLocais,
+        atualizado_em: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {}
+  }
+}
+
+async function removerLocalEstoque(idx) {
+  const nome = listaEstoqueLocais[idx];
+  if (!confirm(`Deseja realmente remover o local "${nome}"?`)) return;
+
+  listaEstoqueLocais.splice(idx, 1);
+  try { localStorage.setItem('estoque_locais_cache', JSON.stringify(listaEstoqueLocais)); } catch (e) {}
+
+  popularSelectsLocaisEstoque();
+  showToast(`Galpão "${nome}" removido.`, 'info');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('configuracoes').doc('estoque_locais').set({
+        locais: listaEstoqueLocais,
+        atualizado_em: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {}
+  }
+}
+
+// Integração com Chamados do QR Code: Dar Baixa Automática de Material
+function abrirModalConcluirChamadoEstoque(protocolo) {
+  const ch = listaChamados.find(c => c.protocolo === protocolo || c.id === protocolo);
+  if (!ch) return;
+
+  document.getElementById('chamadoConcluirProtocolo').value = protocolo;
+  document.getElementById('chamadoConcluirInfoQuarto').textContent = `Quarto: ${ch.quarto || 'Não informado'} (${ch.bloco || 'Geral'}) - Solicitante: ${ch.nome_alojado || 'Anônimo'}`;
+  document.getElementById('chamadoConcluirInfoDescricao').textContent = `Defeito Relatado: "${ch.descricao || ch.tipo_problema || 'Manutenção'}"`;
+  document.getElementById('chamadoConcluirObs').value = '';
+
+  // Popular select com materiais de manutenção/alojamento
+  const sel = document.getElementById('chamadoEstoqueItemSelect');
+  if (sel) {
+    const itensReparo = listaEstoqueItens.filter(i => i.categoria === 'Manutenção' || i.categoria === 'Alojamento');
+    sel.innerHTML = '<option value="">Nenhum material do estoque (apenas conserto/ajuste)</option>' + 
+      itensReparo.map(i => `<option value="${i.id}">${i.nome} (Saldo: ${i.quantidade} ${i.unidade}) - ${i.local}</option>`).join('');
+
+    // Sugerir item automaticamente baseado no texto do chamado
+    const desc = (ch.descricao || '').toLowerCase();
+    if (desc.includes('lâmpada') || desc.includes('lampada') || desc.includes('luz')) {
+      const lamp = itensReparo.find(i => i.nome.toLowerCase().includes('lâmpada') || i.nome.toLowerCase().includes('lampada'));
+      if (lamp) sel.value = lamp.id;
+    } else if (desc.includes('chuveiro') || desc.includes('banho') || desc.includes('resistência')) {
+      const chuv = itensReparo.find(i => i.nome.toLowerCase().includes('chuveiro'));
+      if (chuv) sel.value = chuv.id;
+    } else if (desc.includes('colchão') || desc.includes('colchao') || desc.includes('cama')) {
+      const col = itensReparo.find(i => i.nome.toLowerCase().includes('colchão') || i.nome.toLowerCase().includes('colchao'));
+      if (col) sel.value = col.id;
+    }
+  }
+
+  popularSelectsLocaisEstoque();
+  abrirModal('modalConcluirChamadoComEstoque');
+}
+
+async function confirmarConclusaoChamadoComEstoque(event) {
+  event.preventDefault();
+
+  const protocolo = document.getElementById('chamadoConcluirProtocolo').value;
+  const itemId = document.getElementById('chamadoEstoqueItemSelect').value;
+  const qtd = parseInt(document.getElementById('chamadoEstoqueQtd').value) || 1;
+  const local = document.getElementById('chamadoEstoqueLocal').value;
+  const obs = document.getElementById('chamadoConcluirObs').value.trim();
+
+  const ch = listaChamados.find(c => c.protocolo === protocolo || c.id === protocolo);
+  if (!ch) return;
+
+  // Se selecionou material, dar baixa automática no estoque
+  if (itemId) {
+    const item = listaEstoqueItens.find(x => x.id === itemId);
+    if (item) {
+      const saldoAnterior = Number(item.quantidade || 0);
+      const novoSaldo = Math.max(0, saldoAnterior - qtd);
+      item.quantidade = novoSaldo;
+
+      const movId = 'MOV-' + Date.now();
+      const movObj = {
+        id: movId,
+        item_id: itemId,
+        item_nome: item.nome,
+        tipo: 'saida',
+        quantidade: qtd,
+        saldo_anterior: saldoAnterior,
+        novo_saldo: novoSaldo,
+        data: new Date().toISOString().split('T')[0],
+        motivo: `Reparo Chamado #${protocolo} (${ch.quarto || ''}): ${ch.descricao || 'Manutenção'}`,
+        responsavel: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito'),
+        local: local || item.local,
+        criado_em: new Date().toISOString()
+      };
+
+      listaEstoqueMovimentacoes.unshift(movObj);
+
+      try {
+        localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+        localStorage.setItem('estoque_movimentacoes_cache', JSON.stringify(listaEstoqueMovimentacoes));
+      } catch (e) {}
+
+      if (firestoreDb) {
+        try {
+          await firestoreDb.collection('estoque_itens').doc(itemId).update({
+            quantidade: novoSaldo,
+            atualizado_em: new Date().toISOString()
+          });
+          await firestoreDb.collection('estoque_movimentacoes').doc(movId).set(movObj);
+        } catch (e) {}
+      }
+    }
+  }
+
+  // Concluir chamado
+  ch.status = 'concluido';
+  if (obs) ch.observacoes_prefeito = obs;
+  atualizarContadoresChamadosUI();
+  filtrarChamadosUI();
+  fecharModal('modalConcluirChamadoComEstoque');
+  showToast(`Chamado #${protocolo} concluído e baixa realizada com sucesso!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('chamados_suporte').doc(protocolo).update({
+        status: 'concluido',
+        observacoes_prefeito: obs || '',
+        atualizado_em: firebase.firestore.FieldValue.serverTimestamp(),
+        atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
+      });
+    } catch (e) {}
+  }
+}
+
+// Recarregar manual do Estoque
+function recarregarEstoqueManual() {
+  const icone = document.getElementById('iconeReloadEstoque');
+  if (icone) icone.classList.add('fa-spin');
+
+  if (firestoreDb) {
+    Promise.all([
+      firestoreDb.collection('estoque_itens').get(),
+      firestoreDb.collection('estoque_movimentacoes').get()
+    ]).then(([snapItens, snapMovs]) => {
+      if (!snapItens.empty) {
+        const itens = [];
+        snapItens.forEach(doc => itens.push({ id: doc.id, ...doc.data() }));
+        itens.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+        listaEstoqueItens = itens;
+        localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+      }
+      if (!snapMovs.empty) {
+        const movs = [];
+        snapMovs.forEach(doc => movs.push({ id: doc.id, ...doc.data() }));
+        movs.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+        listaEstoqueMovimentacoes = movs;
+        localStorage.setItem('estoque_movimentacoes_cache', JSON.stringify(listaEstoqueMovimentacoes));
+      }
+      atualizarContadoresEstoqueUI();
+      filtrarEstoqueUI();
+      if (icone) icone.classList.remove('fa-spin');
+      showToast('Estoque sincronizado com a nuvem!', 'success');
+    }).catch(err => {
+      if (icone) icone.classList.remove('fa-spin');
+      showToast('Erro ao recarregar estoque: ' + err.message, 'error');
+    });
+  } else {
+    if (icone) icone.classList.remove('fa-spin');
+    filtrarEstoqueUI();
+  }
+}
+
+// Exposição explícita no window para garantir botões onclick
+window.openModalNovoItemEstoque = openModalNovoItemEstoque;
+window.editarItemEstoque = editarItemEstoque;
+window.salvarItemEstoque = salvarItemEstoque;
+window.openModalMovimentacaoEstoque = openModalMovimentacaoEstoque;
+window.abrirMovimentacaoRapidaItem = abrirMovimentacaoRapidaItem;
+window.aoSelecionarItemMovimentacao = aoSelecionarItemMovimentacao;
+window.salvarMovimentacaoEstoque = salvarMovimentacaoEstoque;
+window.abrirDetalhesItemEstoque = abrirDetalhesItemEstoque;
+window.openModalLocaisEstoque = openModalLocaisEstoque;
+window.adicionarLocalEstoque = adicionarLocalEstoque;
+window.removerLocalEstoque = removerLocalEstoque;
+window.abrirModalConcluirChamadoEstoque = abrirModalConcluirChamadoEstoque;
+window.confirmarConclusaoChamadoComEstoque = confirmarConclusaoChamadoComEstoque;
+window.recarregarEstoqueManual = recarregarEstoqueManual;
+window.filtrarEstoqueUI = filtrarEstoqueUI;
+window.excluirItemEstoque = excluirItemEstoque;
+window.excluirItemEstoqueAtual = excluirItemEstoqueAtual;
+
+window.aoSelecionarMovelOrigemEstoque = aoSelecionarMovelOrigemEstoque;
