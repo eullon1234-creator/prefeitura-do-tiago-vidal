@@ -2725,6 +2725,7 @@ async function restaurarLogoPadrao() {
 // ========================================================
 let currentCropper = null;
 let currentCropAlojadoId = null;
+let currentCropMoradorCasa = null; // { casaId, comodoId, camaNum }
 
 function iniciarCropFoto(file, alojadoId) {
   if (!file) return;
@@ -2864,8 +2865,38 @@ async function confirmarCropFoto() {
         StaticApiEngine.saveToStorage();
       }
 
+      // 3.1 Se for morador de Casa Urbana
+      if (currentCropMoradorCasa) {
+        const { casaId, comodoId, camaNum } = currentCropMoradorCasa;
+        const casa = (listaCasasCidade || []).find(c => c.id === casaId);
+        if (casa) {
+          const com = (casa.comodos || []).find(x => x.id === comodoId);
+          const cm = com ? (com.camas || []).find(x => Number(x.numero) === Number(camaNum)) : null;
+          if (cm && cm.morador) {
+            cm.morador.foto_url = finalFotoUrl;
+          }
+          try {
+            localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+          } catch (e) {}
+          if (firestoreDb) {
+            try {
+              firestoreDb.collection('casas_cidade').doc(casaId).update({
+                comodos: casa.comodos,
+                atualizado_em: new Date().toISOString()
+              });
+            } catch (e) {}
+          }
+          if (typeof atualizarDadosModalCasaDetalhes === 'function') {
+            atualizarDadosModalCasaDetalhes(casa);
+          }
+          if (activeTab === 'casas_cidade' && typeof filtrarCasasCidadeUI === 'function') {
+            filtrarCasasCidadeUI();
+          }
+        }
+      }
+
       // 4. Salvar no Firestore se conectado
-      if (firebaseInitialized && firestoreDb) {
+      if (firebaseInitialized && firestoreDb && !currentCropMoradorCasa) {
         firestoreDb.collection('alojados').doc(String(alojadoId)).set({
           foto_url: finalFotoUrl,
           atualizado_em: new Date().toISOString()
@@ -3169,17 +3200,70 @@ async function carregarDashboard() {
     const data = await res.json();
     globalStats = data;
 
-    // Atualiza KPIs do Topo
-    document.getElementById('kpiTotalVagas').textContent = data.geral.total_vagas;
-    document.getElementById('kpiTotalQuartos').textContent = data.geral.total_quartos;
-    document.getElementById('kpiTotalBlocos').textContent = data.geral.total_blocos;
-    document.getElementById('kpiOcupadas').textContent = data.geral.ocupadas;
-    document.getElementById('kpiTaxaOcupacao').textContent = `${data.geral.taxa_ocupacao}%`;
-    document.getElementById('kpiLivres').textContent = data.geral.disponiveis;
-    document.getElementById('kpiAlertasManut').textContent = data.geral.total_alertas_manutencao;
+    // Calcular estatísticas completas das Casas Urbanas
+    const totCasas = (listaCasasCidade || []).length;
+    let totQuartosCasas = 0;
+    let totCamasCasas = 0;
+    let totMoradoresCasas = 0;
+
+    (listaCasasCidade || []).forEach(c => {
+      (c.comodos || []).forEach(com => {
+        if (com.tipo === 'quarto') {
+          totQuartosCasas++;
+          totCamasCasas += Number(com.capacidade_camas || 0);
+          totMoradoresCasas += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+        }
+      });
+    });
+    const livresCasas = Math.max(0, totCamasCasas - totMoradoresCasas);
+
+    // Totais Consolidados (Alojamento Taboca 2 + Casas Urbanas)
+    const alojVagas = Number(data.geral.total_vagas || 0);
+    const alojOcupadas = Number(data.geral.ocupadas || 0);
+    const alojLivres = Number(data.geral.disponiveis || 0);
+
+    const totalVagasGeral = alojVagas + totCamasCasas;
+    const totalOcupadasGeral = alojOcupadas + totMoradoresCasas;
+    const totalLivresGeral = alojLivres + livresCasas;
+    const taxaOcupacaoGeral = totalVagasGeral > 0 ? Math.round((totalOcupadasGeral / totalVagasGeral) * 100) : 0;
+
+    // Atualiza KPIs do Topo com Valores Consolidados e Detalhamento
+    const elKpiTotalVagas = document.getElementById('kpiTotalVagas');
+    if (elKpiTotalVagas) elKpiTotalVagas.textContent = totalVagasGeral;
+    const elKpiAlojVagas = document.getElementById('kpiAlojVagas');
+    if (elKpiAlojVagas) elKpiAlojVagas.textContent = `${alojVagas} vagas`;
+    const elKpiCasasVagas = document.getElementById('kpiCasasVagas');
+    if (elKpiCasasVagas) elKpiCasasVagas.textContent = `${totCamasCasas} vagas`;
+
+    const elKpiOcupadas = document.getElementById('kpiOcupadas');
+    if (elKpiOcupadas) elKpiOcupadas.textContent = totalOcupadasGeral;
+    const elKpiAlojOcupadas = document.getElementById('kpiAlojOcupadas');
+    if (elKpiAlojOcupadas) elKpiAlojOcupadas.textContent = `${alojOcupadas} pessoas`;
+    const elKpiCasasOcupadas = document.getElementById('kpiCasasOcupadas');
+    if (elKpiCasasOcupadas) elKpiCasasOcupadas.textContent = `${totMoradoresCasas} pessoas`;
+
+    const elKpiLivres = document.getElementById('kpiLivres');
+    if (elKpiLivres) elKpiLivres.textContent = totalLivresGeral;
+    const elKpiAlojLivres = document.getElementById('kpiAlojLivres');
+    if (elKpiAlojLivres) elKpiAlojLivres.textContent = `${alojLivres} livres`;
+    const elKpiCasasLivres = document.getElementById('kpiCasasLivres');
+    if (elKpiCasasLivres) elKpiCasasLivres.textContent = `${livresCasas} livres`;
+
+    const elKpiTaxa = document.getElementById('kpiTaxaOcupacao');
+    if (elKpiTaxa) elKpiTaxa.textContent = `${taxaOcupacaoGeral}%`;
+
+    const elKpiAlertas = document.getElementById('kpiAlertasManut');
+    if (elKpiAlertas) elKpiAlertas.textContent = data.geral.total_alertas_manutencao;
+
+    const elKpiQuartos = document.getElementById('kpiTotalQuartos');
+    if (elKpiQuartos) elKpiQuartos.textContent = data.geral.total_quartos;
+    const elKpiBlocos = document.getElementById('kpiTotalBlocos');
+    if (elKpiBlocos) elKpiBlocos.textContent = data.geral.total_blocos;
 
     // Sidebar counts
-    document.getElementById('sideCountVagas').textContent = data.geral.total_vagas;
+    const elSideCountVagas = document.getElementById('sideCountVagas');
+    if (elSideCountVagas) elSideCountVagas.textContent = totalVagasGeral;
+
     const sideBadge = document.getElementById('sideCountAlertas');
     if (sideBadge) {
       sideBadge.textContent = data.geral.total_alertas_manutencao;
@@ -3192,24 +3276,28 @@ async function carregarDashboard() {
 
     // Badge Alertas Top Navbar
     const badgeAlertas = document.getElementById('badgeAlertasNav');
-    if (data.geral.total_alertas_manutencao > 0) {
-      badgeAlertas.textContent = data.geral.total_alertas_manutencao;
-      badgeAlertas.classList.remove('hidden');
-    } else {
-      badgeAlertas.classList.add('hidden');
+    if (badgeAlertas) {
+      if (data.geral.total_alertas_manutencao > 0) {
+        badgeAlertas.textContent = data.geral.total_alertas_manutencao;
+        badgeAlertas.classList.remove('hidden');
+      } else {
+        badgeAlertas.classList.add('hidden');
+      }
     }
 
     // Banner de Alerta de Manutenção
     const banner = document.getElementById('bannerAlertaManutencao');
-    if (data.geral.total_alertas_manutencao > 0) {
-      banner.classList.remove('hidden');
-      document.getElementById('bannerAlertaTexto').textContent = 
-        `Foram identificados ${data.geral.total_alertas_manutencao} itens ou móveis necessitando de manutenção ou em estado ruim/danificado nas vistorias.`;
-    } else {
-      banner.classList.add('hidden');
+    if (banner) {
+      if (data.geral.total_alertas_manutencao > 0) {
+        banner.classList.remove('hidden');
+        document.getElementById('bannerAlertaTexto').textContent = 
+          `Foram identificados ${data.geral.total_alertas_manutencao} itens ou móveis necessitando de manutenção ou em estado ruim/danificado nas vistorias.`;
+      } else {
+        banner.classList.add('hidden');
+      }
     }
 
-    // Renderiza Cards dos Blocos no Dashboard
+    // Renderiza Cards dos Blocos no Dashboard (incluindo card de Casas Urbanas)
     renderBlocosCards(data.blocos);
 
     // Renderiza Gráficos
@@ -3225,7 +3313,7 @@ function renderBlocosCards(blocos) {
   const container = document.getElementById('gridBlocosCards');
   if (!container) return;
 
-  container.innerHTML = blocos.map(b => {
+  let htmlCards = (blocos || []).map(b => {
     let badgeTipo = 'bg-slate-100 text-slate-700';
     if (b.tipo === 'adm') badgeTipo = 'bg-indigo-100 text-indigo-700';
     if (b.tipo === 'conteiner') badgeTipo = 'bg-orange-100 text-orange-700';
@@ -3262,6 +3350,60 @@ function renderBlocosCards(blocos) {
       </div>
     `;
   }).join('');
+
+  // Adicionar Card Especial de Casas Urbanas ao Grid
+  const totCasas = (listaCasasCidade || []).length;
+  let totQuartosCasas = 0;
+  let totCamasCasas = 0;
+  let totMoradoresCasas = 0;
+
+  (listaCasasCidade || []).forEach(c => {
+    (c.comodos || []).forEach(com => {
+      if (com.tipo === 'quarto') {
+        totQuartosCasas++;
+        totCamasCasas += Number(com.capacidade_camas || 0);
+        totMoradoresCasas += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+      }
+    });
+  });
+  const livresCasas = Math.max(0, totCamasCasas - totMoradoresCasas);
+  const taxaCasas = totCamasCasas > 0 ? Math.round((totMoradoresCasas / totCamasCasas) * 100) : 0;
+
+  let barColorCasas = 'bg-indigo-600';
+  if (taxaCasas >= 95) barColorCasas = 'bg-red-600';
+  else if (taxaCasas >= 70) barColorCasas = 'bg-amber-500';
+
+  htmlCards += `
+    <div onclick="switchTab('casas_cidade')" class="bg-gradient-to-br from-white to-indigo-50/50 p-4 rounded-xl border-2 border-indigo-200 hover:border-indigo-500 hover:shadow-lg transition cursor-pointer flex flex-col justify-between" title="Clique para gerenciar as Casas na Cidade">
+      <div>
+        <div class="flex items-center justify-between gap-1 mb-1.5">
+          <h4 class="font-bold text-slate-900 text-sm truncate flex items-center gap-1.5">
+            <i class="fa-solid fa-house-chimney text-indigo-600"></i> Casas na Cidade
+          </h4>
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">URBANO</span>
+        </div>
+        <div class="text-xs text-slate-500">
+          ${totCasas} casas • ${totQuartosCasas} quartos • ${totCamasCasas} camas
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <div class="flex items-center justify-between text-xs mb-1">
+          <span class="font-semibold text-slate-700">${totMoradoresCasas} ocupadas</span>
+          <span class="text-emerald-600 font-bold">${livresCasas} livres</span>
+        </div>
+        <div class="w-full h-2 rounded-full bg-indigo-100 overflow-hidden">
+          <div class="${barColorCasas} h-full rounded-full transition-all" style="width: ${taxaCasas}%"></div>
+        </div>
+        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+          <span class="text-indigo-600 font-bold">${taxaCasas}% ocupação</span>
+          <span class="text-indigo-600 font-bold flex items-center gap-0.5">Gerenciar <i class="fa-solid fa-arrow-right text-[10px]"></i></span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = htmlCards;
 }
 
 function renderChartBlocos(blocos) {
@@ -4415,6 +4557,12 @@ function abrirModalFotoAlojado(alojadoId, nome, fotoUrl, empresaNome, empresaCor
 }
 
 function editarAlojadoDoModalFoto() {
+  if (currentCropMoradorCasa) {
+    const { casaId, comodoId, camaNum } = currentCropMoradorCasa;
+    fecharModal('modalFotoAlojado');
+    openModalEditarMoradorCasa(casaId, comodoId, camaNum);
+    return;
+  }
   const alojadoId = document.getElementById('modalFotoAlojadoId').value;
   if (!alojadoId) return;
   fecharModal('modalFotoAlojado');
@@ -4424,15 +4572,58 @@ function editarAlojadoDoModalFoto() {
 function uploadFotoModalAlojado(input) {
   if (!checkPrefeitoAccess()) return;
   if (!input.files || !input.files[0]) return;
+  if (currentCropMoradorCasa) {
+    iniciarCropFoto(input.files[0], 'morador_casa');
+    return;
+  }
   const alojadoId = document.getElementById('modalFotoAlojadoId').value;
   iniciarCropFoto(input.files[0], alojadoId);
 }
 
 async function removerFotoModalAlojado() {
   if (!checkPrefeitoAccess()) return;
-  const alojadoId = document.getElementById('modalFotoAlojadoId').value;
   if (!confirm('Deseja realmente remover a foto deste colaborador?')) return;
 
+  // Se for morador de casa
+  if (currentCropMoradorCasa) {
+    const { casaId, comodoId, camaNum } = currentCropMoradorCasa;
+    const casa = (listaCasasCidade || []).find(c => c.id === casaId);
+    if (casa) {
+      const com = (casa.comodos || []).find(x => x.id === comodoId);
+      const cm = com ? (com.camas || []).find(x => Number(x.numero) === Number(camaNum)) : null;
+      if (cm && cm.morador) {
+        cm.morador.foto_url = null;
+      }
+      try {
+        localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+      } catch (e) {}
+      if (firestoreDb) {
+        try {
+          firestoreDb.collection('casas_cidade').doc(casaId).update({
+            comodos: casa.comodos,
+            atualizado_em: new Date().toISOString()
+          });
+        } catch (e) {}
+      }
+      atualizarDadosModalCasaDetalhes(casa);
+      if (activeTab === 'casas_cidade' && typeof filtrarCasasCidadeUI === 'function') {
+        filtrarCasasCidadeUI();
+      }
+    }
+    showToast('Foto do morador removida!', 'success');
+    const imgEl = document.getElementById('modalFotoImg');
+    if (imgEl) {
+      imgEl.src = '';
+      imgEl.classList.add('hidden');
+    }
+    const vazioEl = document.getElementById('modalFotoVazio');
+    if (vazioEl) vazioEl.classList.remove('hidden');
+    const btnRem = document.getElementById('modalFotoBtnRemover');
+    if (btnRem) btnRem.classList.add('hidden');
+    return;
+  }
+
+  const alojadoId = document.getElementById('modalFotoAlojadoId').value;
   try {
     await StaticApiEngine.init();
     const alojado = (StaticApiEngine.dbState.alojados || []).find(x => x.id == alojadoId);
@@ -6802,6 +6993,32 @@ function atualizarContadoresCasasUI() {
   if (drawerBadge) {
     drawerBadge.textContent = `${totCasas} casa${totCasas === 1 ? '' : 's'} (${totMoradores} hab)`;
   }
+
+  // Sincronizar KPIs do Dashboard Inicial se estiverem visíveis
+  const elKpiCasasVagas = document.getElementById('kpiCasasVagas');
+  if (elKpiCasasVagas) elKpiCasasVagas.textContent = `${totCamas} vagas`;
+  const elKpiCasasOcupadas = document.getElementById('kpiCasasOcupadas');
+  if (elKpiCasasOcupadas) elKpiCasasOcupadas.textContent = `${totMoradores} pessoas`;
+  const elKpiCasasLivres = document.getElementById('kpiCasasLivres');
+  if (elKpiCasasLivres) elKpiCasasLivres.textContent = `${vagasLivres} livres`;
+
+  if (typeof globalStats !== 'undefined' && globalStats && globalStats.geral) {
+    const alojV = Number(globalStats.geral.total_vagas || 0);
+    const alojO = Number(globalStats.geral.ocupadas || 0);
+    const alojL = Number(globalStats.geral.disponiveis || 0);
+
+    const elKpiTotV = document.getElementById('kpiTotalVagas');
+    if (elKpiTotV) elKpiTotV.textContent = alojV + totCamas;
+    const elKpiTotO = document.getElementById('kpiOcupadas');
+    if (elKpiTotO) elKpiTotO.textContent = alojO + totMoradores;
+    const elKpiTotL = document.getElementById('kpiLivres');
+    if (elKpiTotL) elKpiTotL.textContent = alojL + vagasLivres;
+    const elKpiTaxa = document.getElementById('kpiTaxaOcupacao');
+    const totGeral = alojV + totCamas;
+    if (elKpiTaxa && totGeral > 0) {
+      elKpiTaxa.textContent = `${Math.round(((alojO + totMoradores) / totGeral) * 100)}%`;
+    }
+  }
 }
 
 // Carregar e filtrar casas
@@ -7376,15 +7593,15 @@ function renderizarComodosCasaDetalhes(c) {
                 const morador = camaObj ? camaObj.morador : null;
 
                 if (morador && morador.nome) {
+                  const clickFoto = `abrirModalFotoMoradorCasa('${c.id}', '${com.id}', ${camaNum})`;
+                  const safeNome = (morador.nome || '').replace(/'/g, "\\'");
                   return `
-                    <div class="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 flex items-center justify-between gap-2">
-                      <div class="flex items-center gap-2 min-w-0">
-                        <div class="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                          ${morador.nome.charAt(0).toUpperCase()}
-                        </div>
+                    <div class="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 flex items-center justify-between gap-2 shadow-2xs hover:border-emerald-300 transition">
+                      <div class="flex items-center gap-2.5 min-w-0">
+                        ${renderAvatarHtml(morador.nome, morador.foto_url, 'w-10 h-10', 'text-xs', clickFoto)}
                         <div class="min-w-0">
                           <p class="text-xs font-bold text-slate-900 truncate leading-tight">${morador.nome}</p>
-                          <p class="text-[10px] text-emerald-800 font-medium truncate">${morador.funcao || 'Liderança'}</p>
+                          <p class="text-[10px] text-emerald-800 font-medium truncate">${morador.funcao || 'Liderança'}${morador.empresa ? ` • ${morador.empresa}` : ''}</p>
                           ${morador.whatsapp ? `
                             <a href="https://wa.me/55${morador.whatsapp.replace(/\D/g, '')}" target="_blank" class="text-[10px] text-emerald-600 font-bold hover:underline flex items-center gap-1">
                               <i class="fa-brands fa-whatsapp"></i> ${morador.whatsapp}
@@ -7392,9 +7609,17 @@ function renderizarComodosCasaDetalhes(c) {
                           ` : ''}
                         </div>
                       </div>
-                      <button onclick="desocuparCamaCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-100 text-xs transition" title="Liberar Cama / Desalojar">
-                        <i class="fa-solid fa-user-xmark"></i>
-                      </button>
+                      <div class="flex items-center gap-1">
+                        <button onclick="${clickFoto}" class="btn-prefeito p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 text-xs transition" title="Ver / alterar foto de ${safeNome}">
+                          <i class="fa-solid fa-camera"></i>
+                        </button>
+                        <button onclick="openModalEditarMoradorCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 text-xs transition" title="Editar dados do morador">
+                          <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="desocuparCamaCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-100 text-xs transition" title="Liberar Cama / Desalojar">
+                          <i class="fa-solid fa-user-xmark"></i>
+                        </button>
+                      </div>
                     </div>
                   `;
                 } else {
@@ -7427,18 +7652,34 @@ function renderizarComodosCasaDetalhes(c) {
           </span>
 
           ${moveis.length > 0 ? `
-            <div class="flex items-center gap-1.5 flex-wrap">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               ${moveis.map(m => `
-                <div class="px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs flex items-center gap-1.5 text-slate-800">
-                  <span class="font-bold text-indigo-600">${m.quantidade || 1}x</span>
-                  <span>${m.tipo}</span>
-                  <span class="text-[10px] px-1 py-0.5 rounded bg-slate-200 text-slate-600">${m.estado || 'Bom'}</span>
-                  ${m.marca ? `<span class="text-[10px] text-slate-500 font-medium">(${m.marca})</span>` : ''}
-                  ${m.patrimonio ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold border border-indigo-200" title="Plaqueta de Patrimônio"><i class="fa-solid fa-tag text-[9px] mr-0.5"></i>${m.patrimonio}</span>` : ''}
-                  ${m.valor ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold" title="Valor do Bem">${Number(m.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>` : ''}
-                  <button onclick="excluirMovelComodo('${c.id}', '${com.id}', '${m.id}')" class="btn-prefeito text-slate-400 hover:text-rose-600 ml-1" title="Remover item">
-                    <i class="fa-solid fa-xmark text-[10px]"></i>
-                  </button>
+                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex flex-col justify-between gap-1.5 text-slate-800 shadow-2xs hover:border-slate-300 transition">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-extrabold text-indigo-600">${m.quantidade || 1}x</span>
+                        <span class="font-bold text-slate-900 truncate">${m.tipo}</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-semibold">${m.estado || 'Bom'}</span>
+                        ${m.marca ? `<span class="text-[10px] text-slate-500 font-medium">${m.marca}</span>` : ''}
+                        ${m.patrimonio ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold border border-indigo-200" title="Plaqueta de Patrimônio"><i class="fa-solid fa-tag text-[9px] mr-0.5"></i>${m.patrimonio}</span>` : ''}
+                        ${m.valor ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold" title="Valor do Bem">${Number(m.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-end gap-1 pt-1 border-t border-slate-100 btn-prefeito">
+                    <button onclick="openModalTransferirMovelCasa('${c.id}', '${com.id}', '${m.id}')" class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[11px] font-bold flex items-center gap-1 transition" title="Transferir este móvel para outro cômodo ou casa">
+                      <i class="fa-solid fa-right-left text-[10px]"></i> Transferir
+                    </button>
+                    <button onclick="openModalDevolverMovelEstoque('${c.id}', '${com.id}', '${m.id}')" class="px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-[11px] font-bold flex items-center gap-1 transition" title="Devolver móvel para o estoque / galpão">
+                      <i class="fa-solid fa-boxes-stacked text-[10px]"></i> Devolver ao Estoque
+                    </button>
+                    <button onclick="excluirMovelComodo('${c.id}', '${com.id}', '${m.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-[11px] transition" title="Excluir item">
+                      <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
                 </div>
               `).join('')}
             </div>
@@ -7538,20 +7779,206 @@ async function excluirComodo(casaId, comodoId) {
   }
 }
 
+// Funções de Foto do Morador da Casa
+function previewFotoMoradorCasa(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let w = img.width;
+      let h = img.height;
+      const maxDim = 800;
+
+      if (w > h && w > maxDim) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else if (h > maxDim) {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const urlInput = document.getElementById('moradorCasaFormFotoUrl');
+      const preview = document.getElementById('moradorCasaFormFotoPreview');
+      const placeholder = document.getElementById('moradorCasaFormFotoPlaceholder');
+      const btnRem = document.getElementById('btnRemoverFotoMoradorCasaForm');
+
+      if (urlInput) urlInput.value = compressedDataUrl;
+      if (preview) {
+        preview.src = compressedDataUrl;
+        preview.classList.remove('hidden');
+      }
+      if (placeholder) placeholder.classList.add('hidden');
+      if (btnRem) btnRem.classList.remove('hidden');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function limparFotoMoradorCasaForm() {
+  const inp = document.getElementById('moradorCasaFormFotoInput');
+  const urlInput = document.getElementById('moradorCasaFormFotoUrl');
+  const preview = document.getElementById('moradorCasaFormFotoPreview');
+  const placeholder = document.getElementById('moradorCasaFormFotoPlaceholder');
+  const btnRem = document.getElementById('btnRemoverFotoMoradorCasaForm');
+
+  if (inp) inp.value = '';
+  if (urlInput) urlInput.value = '';
+  if (preview) {
+    preview.src = '';
+    preview.classList.add('hidden');
+  }
+  if (placeholder) placeholder.classList.remove('hidden');
+  if (btnRem) btnRem.classList.add('hidden');
+}
+
 // Alocar Morador na Cama
 function openModalNovoMoradorCasa(casaId, comodoId, camaNum) {
   document.getElementById('formMoradorCasa').reset();
+  limparFotoMoradorCasaForm();
   document.getElementById('moradorCasaFormCasaId').value = casaId;
   document.getElementById('moradorCasaFormComodoId').value = comodoId;
   document.getElementById('moradorCasaFormCamaNum').value = camaNum;
 
-  const c = listaCasasCidade.find(x => x.id === casaId);
+  const titulo = document.getElementById('modalMoradorCasaTitulo');
+  if (titulo) titulo.textContent = 'Alocar Morador na Cama';
+  const btnSubmit = document.getElementById('btnSalvarMoradorCasaSubmit');
+  if (btnSubmit) btnSubmit.textContent = 'Alocar na Cama';
+
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
   const com = c ? (c.comodos || []).find(cm => cm.id === comodoId) : null;
   const comNome = com ? com.nome : 'Quarto';
 
   document.getElementById('modalMoradorCasaSubtitulo').textContent = `${comNome} • Cama Nº ${camaNum}`;
   document.getElementById('moradorCasaFormDataEntrada').value = new Date().toISOString().split('T')[0];
   abrirModal('modalMoradorCasaForm');
+}
+
+// Editar Morador existente da Casa
+function openModalEditarMoradorCasa(casaId, comodoId, camaNum) {
+  document.getElementById('formMoradorCasa').reset();
+  limparFotoMoradorCasaForm();
+  document.getElementById('moradorCasaFormCasaId').value = casaId;
+  document.getElementById('moradorCasaFormComodoId').value = comodoId;
+  document.getElementById('moradorCasaFormCamaNum').value = camaNum;
+
+  const titulo = document.getElementById('modalMoradorCasaTitulo');
+  if (titulo) titulo.textContent = 'Editar Cadastro do Morador';
+  const btnSubmit = document.getElementById('btnSalvarMoradorCasaSubmit');
+  if (btnSubmit) btnSubmit.textContent = 'Salvar Alterações';
+
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
+  const com = c ? (c.comodos || []).find(cm => cm.id === comodoId) : null;
+  const camaObj = com ? (com.camas || []).find(cm => Number(cm.numero) === Number(camaNum)) : null;
+  const morador = camaObj ? camaObj.morador : null;
+
+  if (morador) {
+    document.getElementById('moradorCasaFormNome').value = morador.nome || '';
+    document.getElementById('moradorCasaFormFuncao').value = morador.funcao || '';
+    document.getElementById('moradorCasaFormEmpresa').value = morador.empresa || 'GEL';
+    document.getElementById('moradorCasaFormWhatsapp').value = morador.whatsapp || '';
+    document.getElementById('moradorCasaFormDataEntrada').value = morador.data_entrada || new Date().toISOString().split('T')[0];
+
+    if (morador.foto_url) {
+      document.getElementById('moradorCasaFormFotoUrl').value = morador.foto_url;
+      const preview = document.getElementById('moradorCasaFormFotoPreview');
+      const placeholder = document.getElementById('moradorCasaFormFotoPlaceholder');
+      const btnRem = document.getElementById('btnRemoverFotoMoradorCasaForm');
+      if (preview) {
+        preview.src = morador.foto_url;
+        preview.classList.remove('hidden');
+      }
+      if (placeholder) placeholder.classList.add('hidden');
+      if (btnRem) btnRem.classList.remove('hidden');
+    }
+  }
+
+  const comNome = com ? com.nome : 'Quarto';
+  document.getElementById('modalMoradorCasaSubtitulo').textContent = `${comNome} • Cama Nº ${camaNum}`;
+  abrirModal('modalMoradorCasaForm');
+}
+
+// Abrir Modal de Foto dedicado para Morador da Casa (mesmo comportamento do alojamento)
+function abrirModalFotoMoradorCasa(casaId, comodoId, camaNum) {
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
+  const com = c ? (c.comodos || []).find(cm => cm.id === comodoId) : null;
+  const camaObj = com ? (com.camas || []).find(cm => Number(cm.numero) === Number(camaNum)) : null;
+  const morador = camaObj ? camaObj.morador : null;
+
+  if (!morador) return;
+
+  currentCropMoradorCasa = { casaId, comodoId, camaNum };
+  currentCropAlojadoId = null;
+
+  document.getElementById('modalFotoAlojadoId').value = `casa_${casaId}_${comodoId}_${camaNum}`;
+  document.getElementById('modalFotoNome').textContent = morador.nome;
+  document.getElementById('modalFotoSub').textContent = `Casa: ${c ? c.nome : 'Cidade'} • ${com ? com.nome : 'Quarto'} (Cama ${camaNum})`;
+
+  const empBadge = document.getElementById('modalFotoInfoEmpresa');
+  if (empBadge) {
+    empBadge.textContent = morador.empresa || 'GEL';
+    empBadge.style.backgroundColor = '#4f46e5';
+  }
+
+  document.getElementById('modalFotoInfoCargo').textContent = `${morador.funcao || 'Morador'}`;
+  document.getElementById('modalFotoInfoLocal').textContent = `${c ? c.nome : 'Casa'} • ${com ? com.nome : 'Quarto'} • Cama Nº ${camaNum}`;
+
+  const imgEl = document.getElementById('modalFotoImg');
+  const vazioEl = document.getElementById('modalFotoVazio');
+  const btnRemover = document.getElementById('modalFotoBtnRemover');
+
+  const fotoAtual = morador.foto_url;
+  if (fotoAtual && fotoAtual.trim() !== '') {
+    if (typeof photoCacheManager !== 'undefined' && photoCacheManager.getPhoto) {
+      photoCacheManager.getPhoto(fotoAtual).then(cached => {
+        if (cached && imgEl) imgEl.src = cached;
+      });
+    }
+    if (imgEl) {
+      imgEl.src = fotoAtual;
+      imgEl.classList.remove('hidden');
+    }
+    if (vazioEl) vazioEl.classList.add('hidden');
+    if (btnRemover) btnRemover.classList.remove('hidden');
+  } else {
+    if (imgEl) {
+      imgEl.src = '';
+      imgEl.classList.add('hidden');
+    }
+    if (vazioEl) vazioEl.classList.remove('hidden');
+    if (btnRemover) btnRemover.classList.add('hidden');
+  }
+
+  // Botão direto WhatsApp
+  const btnZap = document.getElementById('modalFotoBtnWhatsapp');
+  const txtZap = document.getElementById('modalFotoWhatsappTexto');
+  const zapNum = morador.whatsapp || '';
+  const waUrl = getWhatsappUrl(zapNum);
+
+  if (btnZap) {
+    if (waUrl) {
+      btnZap.href = waUrl;
+      const zapFormatado = formatarTelefoneTexto(zapNum);
+      if (txtZap) txtZap.textContent = `Conversar no WhatsApp (${zapFormatado})`;
+      btnZap.classList.remove('hidden');
+    } else {
+      btnZap.href = '#';
+      btnZap.classList.add('hidden');
+    }
+  }
+
+  abrirModal('modalFotoAlojado');
+  updateUserRoleUI();
 }
 
 async function salvarMoradorCasa(event) {
@@ -7561,7 +7988,7 @@ async function salvarMoradorCasa(event) {
   const comodoId = document.getElementById('moradorCasaFormComodoId').value;
   const camaNum = parseInt(document.getElementById('moradorCasaFormCamaNum').value);
 
-  const casa = listaCasasCidade.find(c => c.id === casaId);
+  const casa = (listaCasasCidade || []).find(c => c.id === casaId);
   if (!casa) return;
   const comodo = (casa.comodos || []).find(cm => cm.id === comodoId);
   if (!comodo) return;
@@ -7571,6 +7998,27 @@ async function salvarMoradorCasa(event) {
   const empresa = document.getElementById('moradorCasaFormEmpresa').value.trim();
   const whatsapp = document.getElementById('moradorCasaFormWhatsapp').value.trim();
   const dataEntrada = document.getElementById('moradorCasaFormDataEntrada').value;
+  let fotoUrl = document.getElementById('moradorCasaFormFotoUrl').value.trim();
+
+  // Se tiver arquivo de imagem novo não convertido, usar DataURL ou tentar ImgBB
+  const fotoInput = document.getElementById('moradorCasaFormFotoInput');
+  if (fotoInput && fotoInput.files && fotoInput.files[0] && !fotoUrl.startsWith('http') && !fotoUrl.startsWith('data:image')) {
+    try {
+      const file = fotoInput.files[0];
+      const formData = new FormData();
+      formData.append('image', file);
+      const resImgbb = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData
+      });
+      const imgbbData = await resImgbb.json();
+      if (imgbbData && imgbbData.success && imgbbData.data && imgbbData.data.display_url) {
+        fotoUrl = imgbbData.data.display_url;
+      }
+    } catch (e) {
+      console.warn("Upload ImgBB falhou para morador da casa:", e);
+    }
+  }
 
   comodo.camas = comodo.camas || [];
   let camaObj = comodo.camas.find(cm => Number(cm.numero) === camaNum);
@@ -7584,14 +8032,15 @@ async function salvarMoradorCasa(event) {
     funcao: funcao,
     empresa: empresa,
     whatsapp: whatsapp,
-    data_entrada: dataEntrada
+    data_entrada: dataEntrada,
+    foto_url: fotoUrl || null
   };
 
   localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
   atualizarContadoresCasasUI();
   atualizarDadosModalCasaDetalhes(casa);
   fecharModal('modalMoradorCasaForm');
-  showToast(`Colaborador "${nome}" alocado na cama ${camaNum}!`, 'success');
+  showToast(`Colaborador "${nome}" salvo com sucesso!`, 'success');
 
   if (firestoreDb) {
     try {
@@ -7600,13 +8049,13 @@ async function salvarMoradorCasa(event) {
         atualizado_em: new Date().toISOString()
       });
     } catch (err) {
-      console.warn("Erro ao alocar morador no Firestore:", err);
+      console.warn("Erro ao salvar morador no Firestore:", err);
     }
   }
 }
 
 async function desocuparCamaCasa(casaId, comodoId, camaNum) {
-  const casa = listaCasasCidade.find(c => c.id === casaId);
+  const casa = (listaCasasCidade || []).find(c => c.id === casaId);
   if (!casa) return;
   const comodo = (casa.comodos || []).find(cm => cm.id === comodoId);
   if (!comodo) return;
@@ -7633,6 +8082,363 @@ async function desocuparCamaCasa(casaId, comodoId, camaNum) {
       console.warn("Erro ao desocupar cama no Firestore:", err);
     }
   }
+}
+
+// ========================================================
+// TRANSFERÊNCIA E DEVOLUÇÃO DE MÓVEIS DE CASAS
+// ========================================================
+
+function openModalTransferirMovelCasa(casaId, comodoId, movelId) {
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
+  if (!c) return;
+  const com = (c.comodos || []).find(x => x.id === comodoId);
+  if (!com) return;
+  const m = (com.moveis || []).find(x => x.id === movelId);
+  if (!m) return;
+
+  document.getElementById('formTransferirMovelCasa').reset();
+  document.getElementById('transfMovelCasaOrigemId').value = casaId;
+  document.getElementById('transfMovelComodoOrigemId').value = comodoId;
+  document.getElementById('transfMovelId').value = movelId;
+
+  document.getElementById('modalTransferirMovelSubtitulo').textContent = `Origem: ${c.nome} • ${com.nome}`;
+  document.getElementById('transfMovelInfoTipo').textContent = m.tipo;
+  document.getElementById('transfMovelInfoQtdBadge').textContent = `Qtd atual: ${m.quantidade || 1}`;
+
+  const infoText = [
+    m.marca ? `Marca: ${m.marca}` : null,
+    m.patrimonio ? `Patrimônio: ${m.patrimonio}` : null,
+    `Estado: ${m.estado || 'Bom'}`,
+    m.valor ? `Valor: ${Number(m.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : null
+  ].filter(Boolean).join(' • ');
+  document.getElementById('transfMovelInfoDetalhes').textContent = infoText;
+
+  const inpQtd = document.getElementById('transfMovelQtd');
+  inpQtd.max = m.quantidade || 1;
+  inpQtd.value = m.quantidade || 1;
+
+  // Popula Casas de Destino
+  const selCasa = document.getElementById('transfMovelCasaDestinoSelect');
+  selCasa.innerHTML = (listaCasasCidade || []).map(casa => `
+    <option value="${casa.id}" ${casa.id === casaId ? 'selected' : ''}>
+      🏡 ${casa.nome} (${(casa.comodos || []).length} cômodos)
+    </option>
+  `).join('');
+
+  aoMudarCasaDestinoTransferencia(selCasa.value);
+  abrirModal('modalTransferirMovelCasa');
+}
+
+function aoMudarCasaDestinoTransferencia(casaDestinoId) {
+  const casaOrigemId = document.getElementById('transfMovelCasaOrigemId').value;
+  const comodoOrigemId = document.getElementById('transfMovelComodoOrigemId').value;
+
+  const cDest = (listaCasasCidade || []).find(x => x.id === casaDestinoId);
+  const selComodo = document.getElementById('transfMovelComodoDestinoSelect');
+  if (!selComodo) return;
+
+  if (!cDest || !cDest.comodos || cDest.comodos.length === 0) {
+    selComodo.innerHTML = '<option value="" disabled>⚠️ Esta casa não possui cômodos cadastrados</option>';
+    return;
+  }
+
+  // Filtrar cômodos válidos (se for na mesma casa, não transferir pro mesmo cômodo)
+  const comodosValidos = cDest.comodos.filter(com => !(casaDestinoId === casaOrigemId && com.id === comodoOrigemId));
+
+  if (comodosValidos.length === 0) {
+    selComodo.innerHTML = '<option value="" disabled>⚠️ Selecione outra casa ou crie um novo cômodo</option>';
+    return;
+  }
+
+  selComodo.innerHTML = comodosValidos.map(com => `
+    <option value="${com.id}">
+      🚪 ${com.nome} (${com.tipo === 'quarto' ? 'Quarto' : 'Área'})
+    </option>
+  `).join('');
+}
+
+async function confirmarTransferenciaMovelCasa(event) {
+  event.preventDefault();
+
+  const casaOrigemId = document.getElementById('transfMovelCasaOrigemId').value;
+  const comodoOrigemId = document.getElementById('transfMovelComodoOrigemId').value;
+  const movelId = document.getElementById('transfMovelId').value;
+
+  const casaDestinoId = document.getElementById('transfMovelCasaDestinoSelect').value;
+  const comodoDestinoId = document.getElementById('transfMovelComodoDestinoSelect').value;
+  const qtdTransf = parseInt(document.getElementById('transfMovelQtd').value) || 1;
+  const motivo = document.getElementById('transfMovelMotivo').value.trim();
+
+  if (!casaDestinoId || !comodoDestinoId) {
+    showToast('Selecione uma casa e cômodo de destino válidos.', 'warning');
+    return;
+  }
+
+  const cOrigem = (listaCasasCidade || []).find(x => x.id === casaOrigemId);
+  if (!cOrigem) return;
+  const comOrigem = (cOrigem.comodos || []).find(x => x.id === comodoOrigemId);
+  if (!comOrigem) return;
+  const movOrigem = (comOrigem.moveis || []).find(x => x.id === movelId);
+  if (!movOrigem) return;
+
+  const cDestino = (listaCasasCidade || []).find(x => x.id === casaDestinoId);
+  if (!cDestino) return;
+  const comDestino = (cDestino.comodos || []).find(x => x.id === comodoDestinoId);
+  if (!comDestino) {
+    showToast('Cômodo de destino não encontrado.', 'error');
+    return;
+  }
+
+  const qtdDisponivel = movOrigem.quantidade || 1;
+  if (qtdTransf > qtdDisponivel) {
+    showToast(`Quantidade excede o disponível no cômodo (${qtdDisponivel}).`, 'warning');
+    return;
+  }
+
+  // 1. Debita da origem
+  if (qtdTransf === qtdDisponivel) {
+    comOrigem.moveis = (comOrigem.moveis || []).filter(x => x.id !== movelId);
+  } else {
+    movOrigem.quantidade = qtdDisponivel - qtdTransf;
+  }
+
+  // 2. Credita no destino
+  comDestino.moveis = comDestino.moveis || [];
+  const movCopia = {
+    ...movOrigem,
+    id: 'MOV-' + Date.now(),
+    quantidade: qtdTransf,
+    observacoes_transf: motivo ? `Transferido de ${cOrigem.nome} (${comOrigem.nome}): ${motivo}` : `Transferido de ${cOrigem.nome} (${comOrigem.nome})`
+  };
+  comDestino.moveis.push(movCopia);
+
+  // 3. Salva no localStorage e Firestore
+  localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  atualizarDadosModalCasaDetalhes(cOrigem);
+  fecharModal('modalTransferirMovelCasa');
+  showToast(`Móvel "${movOrigem.tipo}" (${qtdTransf}x) transferido para ${cDestino.nome} - ${comDestino.nome}!`, 'success');
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaOrigemId).update({
+        comodos: cOrigem.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+      if (casaDestinoId !== casaOrigemId) {
+        await firestoreDb.collection('casas_cidade').doc(casaDestinoId).update({
+          comodos: cDestino.comodos,
+          atualizado_em: new Date().toISOString()
+        });
+      }
+    } catch (e) {
+      console.warn("Erro ao salvar transferência no Firestore:", e);
+    }
+  }
+}
+
+// Devolver Móvel ao Estoque
+function openModalDevolverMovelEstoque(casaId, comodoId, movelId) {
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
+  if (!c) return;
+  const com = (c.comodos || []).find(x => x.id === comodoId);
+  if (!com) return;
+  const m = (com.moveis || []).find(x => x.id === movelId);
+  if (!m) return;
+
+  document.getElementById('formDevolverMovelEstoque').reset();
+  document.getElementById('devolverMovelCasaOrigemId').value = casaId;
+  document.getElementById('devolverMovelComodoOrigemId').value = comodoId;
+  document.getElementById('devolverMovelId').value = movelId;
+
+  document.getElementById('modalDevolverMovelSubtitulo').textContent = `Origem: ${c.nome} • ${com.nome}`;
+  document.getElementById('devolverMovelInfoTipo').textContent = m.tipo;
+  document.getElementById('devolverMovelInfoQtdBadge').textContent = `Disponível: ${m.quantidade || 1}x`;
+
+  const infoText = [
+    m.marca ? `Marca: ${m.marca}` : null,
+    m.patrimonio ? `Patrimônio: ${m.patrimonio}` : null,
+    m.valor ? `Valor: ${Number(m.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : null,
+    m.empresa ? `Empresa: ${m.empresa}` : null
+  ].filter(Boolean).join(' • ');
+  document.getElementById('devolverMovelInfoDetalhes').textContent = infoText;
+
+  const inpQtd = document.getElementById('devolverMovelQtd');
+  inpQtd.max = m.quantidade || 1;
+  inpQtd.value = m.quantidade || 1;
+
+  if (document.getElementById('devolverMovelEstadoConservacao')) {
+    document.getElementById('devolverMovelEstadoConservacao').value = m.estado || 'Bom';
+  }
+  if (document.getElementById('devolverMovelResponsavel')) {
+    document.getElementById('devolverMovelResponsavel').value = currentUserName || 'Prefeito';
+  }
+
+  // Popula locais de destino no estoque
+  const selLocal = document.getElementById('devolverMovelLocalEstoqueSelect');
+  if (selLocal) {
+    selLocal.innerHTML = (listaEstoqueLocais || ['Almoxarifado Central']).map(loc => `
+      <option value="${loc}">${loc}</option>
+    `).join('');
+  }
+
+  // Popula itens compatíveis do estoque
+  const selItemEstoque = document.getElementById('devolverMovelItemEstoqueSelect');
+  if (selItemEstoque) {
+    let optionsHtml = '';
+    const itemVinculado = m.estoque_origem_id ? (listaEstoqueItens || []).find(x => x.id === m.estoque_origem_id) : null;
+
+    if (itemVinculado) {
+      optionsHtml += `<option value="${itemVinculado.id}" selected>⭐ [Origem Vinculada] ${itemVinculado.nome} (Saldo atual: ${itemVinculado.quantidade || 0})</option>`;
+    }
+
+    // Procura itens com mesmo nome/tipo no estoque
+    const itensCompativeis = (listaEstoqueItens || []).filter(x => !itemVinculado || x.id !== itemVinculado.id);
+    if (itensCompativeis.length > 0) {
+      optionsHtml += '<optgroup label="📦 Itens Existentes no Estoque:">';
+      itensCompativeis.forEach(item => {
+        const isMatch = (item.nome || '').toLowerCase().includes((m.tipo || '').toLowerCase());
+        const mark = isMatch ? '✓ ' : '';
+        optionsHtml += `<option value="${item.id}" ${!itemVinculado && isMatch ? 'selected' : ''}>${mark}${item.nome} - Saldo: ${item.quantidade || 0} (${item.local || 'Almoxarifado'})</option>`;
+      });
+      optionsHtml += '</optgroup>';
+    }
+
+    optionsHtml += `<option value="__novo__" ${!itemVinculado && itensCompativeis.length === 0 ? 'selected' : ''}>➕ Criar novo item no Estoque para este móvel</option>`;
+    selItemEstoque.innerHTML = optionsHtml;
+  }
+
+  abrirModal('modalDevolverMovelEstoque');
+}
+
+async function confirmarDevolucaoMovelEstoque(event) {
+  event.preventDefault();
+
+  const casaId = document.getElementById('devolverMovelCasaOrigemId').value;
+  const comodoId = document.getElementById('devolverMovelComodoOrigemId').value;
+  const movelId = document.getElementById('devolverMovelId').value;
+
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
+  if (!c) return;
+  const com = (c.comodos || []).find(x => x.id === comodoId);
+  if (!com) return;
+  const mov = (com.moveis || []).find(x => x.id === movelId);
+  if (!mov) return;
+
+  const qtdDevolver = parseInt(document.getElementById('devolverMovelQtd').value) || 1;
+  const localDestino = document.getElementById('devolverMovelLocalEstoqueSelect').value;
+  const itemEstoqueEscolhido = document.getElementById('devolverMovelItemEstoqueSelect').value;
+  const estadoConservacao = document.getElementById('devolverMovelEstadoConservacao').value;
+  const responsavel = document.getElementById('devolverMovelResponsavel').value.trim() || currentUserName || 'Prefeito';
+  const motivo = document.getElementById('devolverMovelMotivo').value.trim();
+
+  const qtdDisponivel = mov.quantidade || 1;
+  if (qtdDevolver > qtdDisponivel) {
+    showToast(`Quantidade a devolver (${qtdDevolver}) excede a quantidade atual (${qtdDisponivel}).`, 'warning');
+    return;
+  }
+
+  // 1. Atualizar / Remover do cômodo da Casa
+  if (qtdDevolver === qtdDisponivel) {
+    com.moveis = (com.moveis || []).filter(x => x.id !== movelId);
+  } else {
+    mov.quantidade = qtdDisponivel - qtdDevolver;
+  }
+
+  // 2. Atualizar ou Criar Item no Estoque
+  let itemEstoque = null;
+  let saldoAnterior = 0;
+  let novoSaldo = qtdDevolver;
+
+  if (itemEstoqueEscolhido === '__novo__' || !itemEstoqueEscolhido) {
+    const novoItemId = 'EST-' + Date.now();
+    itemEstoque = {
+      id: novoItemId,
+      nome: mov.tipo,
+      categoria: 'Móveis & Eletrodomésticos',
+      marca: mov.marca || '',
+      patrimonio: mov.patrimonio || '',
+      valor: mov.valor || 0,
+      empresa: mov.empresa || 'GEL',
+      estado: estadoConservacao,
+      local: localDestino,
+      quantidade: qtdDevolver,
+      unidade: 'UN',
+      estoque_minimo: 1,
+      criado_em: new Date().toISOString()
+    };
+    listaEstoqueItens.push(itemEstoque);
+    saldoAnterior = 0;
+    novoSaldo = qtdDevolver;
+
+    if (firestoreDb) {
+      try {
+        firestoreDb.collection('estoque_itens').doc(novoItemId).set(itemEstoque);
+      } catch (e) {}
+    }
+  } else {
+    itemEstoque = (listaEstoqueItens || []).find(x => x.id === itemEstoqueEscolhido);
+    if (itemEstoque) {
+      saldoAnterior = Number(itemEstoque.quantidade || 0);
+      novoSaldo = saldoAnterior + qtdDevolver;
+      itemEstoque.quantidade = novoSaldo;
+      if (localDestino && !itemEstoque.local) itemEstoque.local = localDestino;
+
+      if (firestoreDb) {
+        try {
+          firestoreDb.collection('estoque_itens').doc(itemEstoque.id).update({
+            quantidade: novoSaldo,
+            atualizado_em: new Date().toISOString()
+          });
+        } catch (e) {}
+      }
+    }
+  }
+
+  // 3. Registrar Movimentação de Entrada por Devolução no Estoque
+  const movEstoqueId = 'MOV-' + Date.now();
+  const movEstoqueObj = {
+    id: movEstoqueId,
+    item_id: itemEstoque ? itemEstoque.id : movelId,
+    item_nome: itemEstoque ? itemEstoque.nome : mov.tipo,
+    tipo: 'entrada',
+    quantidade: qtdDevolver,
+    saldo_anterior: saldoAnterior,
+    novo_saldo: novoSaldo,
+    data: new Date().toISOString().split('T')[0],
+    motivo: `Devolução da Casa: ${c.nome} (${com.nome})${motivo ? ` - ${motivo}` : ''}`,
+    responsavel: responsavel,
+    local: localDestino,
+    estado_item: estadoConservacao,
+    origem_casa_id: c.id,
+    criado_em: new Date().toISOString()
+  };
+
+  listaEstoqueMovimentacoes.unshift(movEstoqueObj);
+
+  // 4. Salvar nos caches locais
+  try {
+    localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+    localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+    localStorage.setItem('estoque_movimentacoes_cache', JSON.stringify(listaEstoqueMovimentacoes));
+  } catch (e) {}
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).update({
+        comodos: c.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+      firestoreDb.collection('estoque_movimentacoes').doc(movEstoqueId).set(movEstoqueObj);
+    } catch (e) {}
+  }
+
+  // 5. Atualizar Interfaces
+  atualizarDadosModalCasaDetalhes(c);
+  if (typeof atualizarContadoresEstoqueUI === 'function') atualizarContadoresEstoqueUI();
+  if (activeTab === 'estoque' && typeof filtrarEstoqueUI === 'function') filtrarEstoqueUI();
+
+  fecharModal('modalDevolverMovelEstoque');
+  showToast(`Móvel "${mov.tipo}" (${qtdDevolver}x) devolvido com sucesso ao ${localDestino}!`, 'success');
 }
 
 // Ações de Móvel / Eletro
@@ -9092,6 +9898,20 @@ window.confirmarConclusaoChamadoComEstoque = confirmarConclusaoChamadoComEstoque
 window.recarregarEstoqueManual = recarregarEstoqueManual;
 window.filtrarEstoqueUI = filtrarEstoqueUI;
 window.excluirItemEstoque = excluirItemEstoque;
-window.excluirItemEstoqueAtual = excluirItemEstoqueAtual;
-
 window.aoSelecionarMovelOrigemEstoque = aoSelecionarMovelOrigemEstoque;
+
+// Exposição das funções de Fotos de Moradores e Transferência/Devolução de Móveis
+window.previewFotoMoradorCasa = previewFotoMoradorCasa;
+window.limparFotoMoradorCasaForm = limparFotoMoradorCasaForm;
+window.openModalNovoMoradorCasa = openModalNovoMoradorCasa;
+window.openModalEditarMoradorCasa = openModalEditarMoradorCasa;
+window.abrirModalFotoMoradorCasa = abrirModalFotoMoradorCasa;
+window.salvarMoradorCasa = salvarMoradorCasa;
+window.desocuparCamaCasa = desocuparCamaCasa;
+
+window.openModalTransferirMovelCasa = openModalTransferirMovelCasa;
+window.aoMudarCasaDestinoTransferencia = aoMudarCasaDestinoTransferencia;
+window.confirmarTransferenciaMovelCasa = confirmarTransferenciaMovelCasa;
+
+window.openModalDevolverMovelEstoque = openModalDevolverMovelEstoque;
+window.confirmarDevolucaoMovelEstoque = confirmarDevolucaoMovelEstoque;
