@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v3.8';
+const CACHE_NAME = 'prefeitura-pwa-v3.9';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
@@ -16,16 +16,28 @@ const ASSETS_TO_CACHE = [
   'apple-touch-icon.png',
   'logo_gel.png',
   'logo_gel_cropped.png',
-  'logo_gel_oficial.png',
-  'banner.html'
+  'logo_gel_oficial.png'
 ];
 
-// Instalação do Service Worker
+// Instalação do Service Worker com cache resiliente
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Cache inicializado com sucesso.');
-      return cache.addAll(ASSETS_TO_CACHE);
+      console.log('[SW] Cache inicializando:', CACHE_NAME);
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map((url) =>
+          fetch(url, { cache: 'no-cache' })
+            .then((response) => {
+              if (response && response.status === 200) {
+                return cache.put(url, response);
+              }
+              console.warn('[SW] Asset ignorado no pré-cache:', url, response ? response.status : 'sem resposta');
+            })
+            .catch((err) => {
+              console.warn('[SW] Falha ao baixar asset no pré-cache:', url, err.message);
+            })
+        )
+      );
     }).then(() => self.skipWaiting())
   );
 });
