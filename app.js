@@ -7616,6 +7616,9 @@ function renderizarComodosCasaDetalhes(c) {
                         <button onclick="openModalEditarMoradorCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 text-xs transition" title="Editar dados do morador">
                           <i class="fa-solid fa-pen"></i>
                         </button>
+                        <button onclick="openModalTransferirMoradorCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 text-xs transition" title="Mover / Transferir para outra Casa ou Quarto">
+                          <i class="fa-solid fa-right-left"></i>
+                        </button>
                         <button onclick="desocuparCamaCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-100 text-xs transition" title="Liberar Cama / Desalojar">
                           <i class="fa-solid fa-user-xmark"></i>
                         </button>
@@ -8080,6 +8083,225 @@ async function desocuparCamaCasa(casaId, comodoId, camaNum) {
       });
     } catch (err) {
       console.warn("Erro ao desocupar cama no Firestore:", err);
+    }
+  }
+}
+
+// ========================================================
+// TRANSFERÊNCIA DE MORADOR ENTRE CASAS OU QUARTOS
+// ========================================================
+
+function openModalTransferirMoradorCasa(casaId, comodoId, camaNum) {
+  const cOrigem = (listaCasasCidade || []).find(x => x.id === casaId);
+  if (!cOrigem) return;
+  const comOrigem = (cOrigem.comodos || []).find(x => x.id === comodoId);
+  if (!comOrigem) return;
+  const morador = (comOrigem.camas || []).find(x => x.numero === Number(camaNum));
+  if (!morador) return;
+
+  const form = document.getElementById('formTransferirMoradorCasa');
+  if (form) form.reset();
+
+  document.getElementById('transfMoradorCasaOrigemId').value = casaId;
+  document.getElementById('transfMoradorComodoOrigemId').value = comodoId;
+  document.getElementById('transfMoradorCamaOrigemNum').value = camaNum;
+
+  // Renderizar avatar e informações do morador
+  const avatarContainer = document.getElementById('transfMoradorAvatarContainer');
+  if (avatarContainer) {
+    avatarContainer.innerHTML = renderAvatarHtml(morador.nome, morador.foto_url, 'w-11 h-11', 'text-xs');
+  }
+
+  document.getElementById('transfMoradorInfoNome').textContent = morador.nome;
+  document.getElementById('transfMoradorInfoFuncao').textContent = `${morador.funcao || 'Colaborador'}${morador.empresa ? ` • ${morador.empresa}` : ''}`;
+  document.getElementById('transfMoradorInfoOrigem').textContent = `Origem: ${cOrigem.nome || cOrigem.identificador} • ${comOrigem.nome} (Cama ${camaNum})`;
+
+  // Popula Casas de Destino
+  const selectCasa = document.getElementById('transfMoradorCasaDestinoSelect');
+  if (selectCasa) {
+    selectCasa.innerHTML = listaCasasCidade.map(casa => {
+      const isAtual = casa.id === casaId;
+      return `<option value="${casa.id}" ${isAtual ? 'selected' : ''}>${casa.nome || casa.identificador} (${casa.endereco || 'Urbana'})${isAtual ? ' [Casa Atual]' : ''}</option>`;
+    }).join('');
+  }
+
+  aoMudarCasaDestinoTransferenciaMorador(casaId);
+  abrirModal('modalTransferirMoradorCasa');
+}
+
+function aoMudarCasaDestinoTransferenciaMorador(casaDestinoId) {
+  const cDestino = (listaCasasCidade || []).find(x => x.id === casaDestinoId);
+  const selectComodo = document.getElementById('transfMoradorComodoDestinoSelect');
+  if (!selectComodo) return;
+
+  if (!cDestino) {
+    selectComodo.innerHTML = '<option value="">Nenhum quarto disponível</option>';
+    aoMudarComodoDestinoTransferenciaMorador('');
+    return;
+  }
+
+  // Filtrar cômodos do tipo quarto
+  const quartos = (cDestino.comodos || []).filter(cm => cm.tipo === 'quarto');
+  if (quartos.length === 0) {
+    selectComodo.innerHTML = '<option value="">⚠️ Nenhum quarto nesta casa</option>';
+    aoMudarComodoDestinoTransferenciaMorador('');
+    return;
+  }
+
+  selectComodo.innerHTML = quartos.map(q => {
+    const totalCamas = Number(q.capacidade_camas || 2);
+    const ocupadas = (q.camas || []).length;
+    const livres = Math.max(0, totalCamas - ocupadas);
+    return `<option value="${q.id}">🚪 ${q.nome} (${livres} vaga${livres !== 1 ? 's' : ''} livre${livres !== 1 ? 's' : ''})</option>`;
+  }).join('');
+
+  aoMudarComodoDestinoTransferenciaMorador(selectComodo.value);
+}
+
+function aoMudarComodoDestinoTransferenciaMorador(comodoDestinoId) {
+  const casaDestinoId = document.getElementById('transfMoradorCasaDestinoSelect')?.value;
+  const cDestino = (listaCasasCidade || []).find(x => x.id === casaDestinoId);
+  const comDestino = cDestino ? (cDestino.comodos || []).find(x => x.id === comodoDestinoId) : null;
+
+  const casaOrigemId = document.getElementById('transfMoradorCasaOrigemId')?.value;
+  const comodoOrigemId = document.getElementById('transfMoradorComodoOrigemId')?.value;
+  const camaOrigemNum = Number(document.getElementById('transfMoradorCamaOrigemNum')?.value);
+
+  const selectCama = document.getElementById('transfMoradorCamaDestinoSelect');
+  const avisoSemVagas = document.getElementById('transfMoradorAvisoSemVagas');
+  const btnConfirmar = document.getElementById('btnConfirmarTransfMorador');
+
+  if (!comDestino) {
+    if (selectCama) selectCama.innerHTML = '<option value="">-</option>';
+    if (avisoSemVagas) avisoSemVagas.classList.remove('hidden');
+    if (btnConfirmar) {
+      btnConfirmar.disabled = true;
+      btnConfirmar.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    return;
+  }
+
+  const cap = Number(comDestino.capacidade_camas || 2);
+  const ocupadas = (comDestino.camas || []).map(x => x.numero);
+
+  // Identifica camas livres
+  const camasLivres = [];
+  for (let i = 1; i <= cap; i++) {
+    // Se for exatamente o mesmo cômodo de origem, não permite mover para a mesma cama
+    if (casaOrigemId === casaDestinoId && comodoOrigemId === comodoDestinoId && i === camaOrigemNum) {
+      continue;
+    }
+    if (!ocupadas.includes(i)) {
+      camasLivres.push(i);
+    }
+  }
+
+  if (camasLivres.length === 0) {
+    if (selectCama) selectCama.innerHTML = '<option value="">Sem vagas neste quarto</option>';
+    if (avisoSemVagas) avisoSemVagas.classList.remove('hidden');
+    if (btnConfirmar) {
+      btnConfirmar.disabled = true;
+      btnConfirmar.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+  } else {
+    if (selectCama) {
+      selectCama.innerHTML = camasLivres.map(num => `<option value="${num}">🛏️ Cama ${num} (Livre)</option>`).join('');
+    }
+    if (avisoSemVagas) avisoSemVagas.classList.add('hidden');
+    if (btnConfirmar) {
+      btnConfirmar.disabled = false;
+      btnConfirmar.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+  }
+}
+
+async function confirmarTransferenciaMoradorCasa(event) {
+  event.preventDefault();
+
+  const casaOrigemId = document.getElementById('transfMoradorCasaOrigemId').value;
+  const comodoOrigemId = document.getElementById('transfMoradorComodoOrigemId').value;
+  const camaOrigemNum = Number(document.getElementById('transfMoradorCamaOrigemNum').value);
+
+  const casaDestinoId = document.getElementById('transfMoradorCasaDestinoSelect').value;
+  const comodoDestinoId = document.getElementById('transfMoradorComodoDestinoSelect').value;
+  const camaDestinoNum = Number(document.getElementById('transfMoradorCamaDestinoSelect').value);
+  const motivo = document.getElementById('transfMoradorMotivo').value.trim();
+
+  if (!casaDestinoId || !comodoDestinoId || !camaDestinoNum) {
+    showToast('Selecione uma casa, quarto e cama válidos para a transferência.', 'warning');
+    return;
+  }
+
+  if (casaOrigemId === casaDestinoId && comodoOrigemId === comodoDestinoId && camaOrigemNum === camaDestinoNum) {
+    showToast('O colaborador já está nesta mesma cama.', 'warning');
+    return;
+  }
+
+  const cOrigem = (listaCasasCidade || []).find(x => x.id === casaOrigemId);
+  if (!cOrigem) return;
+  const comOrigem = (cOrigem.comodos || []).find(x => x.id === comodoOrigemId);
+  if (!comOrigem) return;
+  const moradorOrigem = (comOrigem.camas || []).find(x => x.numero === camaOrigemNum);
+  if (!moradorOrigem) {
+    showToast('Morador de origem não encontrado.', 'error');
+    return;
+  }
+
+  const cDestino = (listaCasasCidade || []).find(x => x.id === casaDestinoId);
+  if (!cDestino) return;
+  const comDestino = (cDestino.comodos || []).find(x => x.id === comodoDestinoId);
+  if (!comDestino) {
+    showToast('Quarto de destino não encontrado.', 'error');
+    return;
+  }
+
+  // Verifica se a cama de destino está realmente livre
+  const jaOcupada = (comDestino.camas || []).some(x => x.numero === camaDestinoNum);
+  if (jaOcupada) {
+    showToast(`A cama ${camaDestinoNum} do quarto de destino já foi ocupada. Escolha outra.`, 'warning');
+    return;
+  }
+
+  // 1. Remove da origem
+  comOrigem.camas = (comOrigem.camas || []).filter(x => x.numero !== camaOrigemNum);
+
+  // 2. Prepara e insere no destino
+  const moradorTransferido = {
+    ...moradorOrigem,
+    numero: camaDestinoNum,
+    remanejado_em: new Date().toISOString(),
+    observacao_remanejamento: motivo ? `Remanejado de ${cOrigem.nome} (${comOrigem.nome} - Cama ${camaOrigemNum}): ${motivo}` : `Remanejado de ${cOrigem.nome} (${comOrigem.nome})`
+  };
+
+  comDestino.camas = comDestino.camas || [];
+  comDestino.camas.push(moradorTransferido);
+
+  // 3. Salva no localStorage e atualiza interface
+  try {
+    localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  } catch (e) {}
+
+  atualizarContadoresCasasUI();
+  atualizarDadosModalCasaDetalhes(cOrigem);
+  fecharModal('modalTransferirMoradorCasa');
+
+  showToast(`"${moradorOrigem.nome}" transferido com sucesso para ${cDestino.nome} - ${comDestino.nome} (Cama ${camaDestinoNum})!`, 'success');
+
+  // 4. Salva no Firestore
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaOrigemId).update({
+        comodos: cOrigem.comodos,
+        atualizado_em: new Date().toISOString()
+      });
+      if (casaDestinoId !== casaOrigemId) {
+        await firestoreDb.collection('casas_cidade').doc(casaDestinoId).update({
+          comodos: cDestino.comodos,
+          atualizado_em: new Date().toISOString()
+        });
+      }
+    } catch (e) {
+      console.warn("Erro ao atualizar transferência de morador no Firestore:", e);
     }
   }
 }
@@ -10356,4 +10578,11 @@ window.atualizarBensAlocadosCampoUI = atualizarBensAlocadosCampoUI;
 window.filtrarBensAlocadosUI = filtrarBensAlocadosUI;
 window.renderizarGridBensAlocados = renderizarGridBensAlocados;
 window.exportarRelatorioEstoqueExcel = exportarRelatorioEstoqueExcel;
+
+// Exposição das funções de Transferência de Moradores de Casas
+window.openModalTransferirMoradorCasa = openModalTransferirMoradorCasa;
+window.aoMudarCasaDestinoTransferenciaMorador = aoMudarCasaDestinoTransferenciaMorador;
+window.aoMudarComodoDestinoTransferenciaMorador = aoMudarComodoDestinoTransferenciaMorador;
+window.confirmarTransferenciaMoradorCasa = confirmarTransferenciaMoradorCasa;
+
 
