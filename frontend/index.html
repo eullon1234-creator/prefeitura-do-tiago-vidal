@@ -511,6 +511,29 @@
           </div>
         </div>
 
+        <!-- FEED DE ATIVIDADES RECENTES (AUDITORIA / LINHA DO TEMPO) -->
+        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shadow-xs">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-sm sm:text-base">Linha do Tempo de Atividades Recentes</h3>
+                <p class="text-xs text-slate-500">Histórico em tempo real de quem fez o quê no canteiro e nas casas urbanas</p>
+              </div>
+            </div>
+            <button onclick="switchTab('auditoria')" class="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition flex items-center gap-1.5 border border-indigo-200">
+              <span>Ver Auditoria Completa</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+
+          <div id="feedAuditoriaDashboard" class="divide-y divide-slate-100">
+            <!-- Populado dinamicamente via Javascript -->
+          </div>
+        </div>
+
       </div>
 
       <!-- ================= TAB 2: VISÃO DE BLOCOS E QUARTOS (MAPA DE CAMAS) ================= -->
@@ -1278,66 +1301,144 @@
 
       </div>
 
-      <!-- ================= TAB 8: AUDITORIA & LOGS ================= -->
+      <!-- ================= TAB: AUDITORIA & LOGS ================= -->
       <div id="tab-auditoria" class="tab-content hidden space-y-6">
         
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Registro de Auditoria & Histórico</h1>
-              <p class="text-sm text-slate-500">Rastreabilidade completa de todas as alterações feitas pelo prefeito e administradores.</p>
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shadow-xs">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+              </div>
+              <div>
+                <h1 class="text-xl md:text-2xl font-bold text-slate-900">Registro de Auditoria & Atividades</h1>
+                <p class="text-xs sm:text-sm text-slate-500">Rastreabilidade completa de "Quem Fez o Quê": alocações, transferências de móveis/moradores, saídas de estoque e chamados.</p>
+              </div>
             </div>
-            <button onclick="carregarAuditoria()" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
-              <i class="fa-solid fa-arrows-rotate"></i> Atualizar Logs
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="exportarAuditoriaExcel()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition" title="Exportar histórico de auditoria em planilha Excel (.xlsx)">
+                <i class="fa-solid fa-file-excel"></i> Exportar Logs em Excel
+              </button>
+              <button onclick="carregarAuditoria()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition" title="Atualizar histórico">
+                <i class="fa-solid fa-rotate" id="iconeReloadAuditoria"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Cards de Resumo da Auditoria -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-list-check"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total de Ações</span>
+                <span id="kpiAuditTotal" class="text-lg font-black text-slate-900">0</span>
+              </div>
+            </div>
+
+            <div class="bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100 flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-house"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-indigo-950 uppercase tracking-wider block">Casas Urbanas</span>
+                <span id="kpiAuditCasas" class="text-lg font-black text-indigo-900">0</span>
+              </div>
+            </div>
+
+            <div class="bg-teal-50/60 p-3.5 rounded-xl border border-teal-100 flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-boxes-stacked"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-teal-950 uppercase tracking-wider block">Almoxarifado</span>
+                <span id="kpiAuditEstoque" class="text-lg font-black text-teal-900">0</span>
+              </div>
+            </div>
+
+            <div class="bg-sky-50/60 p-3.5 rounded-xl border border-sky-100 flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-hotel"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-sky-950 uppercase tracking-wider block">Alojamentos</span>
+                <span id="kpiAuditAloj" class="text-lg font-black text-sky-900">0</span>
+              </div>
+            </div>
           </div>
 
           <!-- Filtros de Auditoria -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
-            <div>
-              <input type="text" id="filtroAuditBusca" oninput="carregarAuditoria()" placeholder="Filtrar por detalhe..." class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+              </div>
+              <input 
+                type="text" 
+                id="filtroAuditBusca" 
+                oninput="filtrarAuditoriaUI()" 
+                placeholder="Buscar por colaborador, item, quarto..." 
+                class="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 font-medium"
+              >
             </div>
+
             <div>
-              <select id="filtroAuditAcao" onchange="carregarAuditoria()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
-                <option value="">Todas as Ações</option>
-                <option value="CRIAR">Criação</option>
-                <option value="EDITAR">Edição</option>
-                <option value="REALOCAR">Realocação de Cama</option>
-                <option value="DESLIGAR">Desligamento / Saída</option>
-                <option value="REATIVAR">Reativação</option>
-                <option value="EXCLUIR">Exclusão</option>
-                <option value="RESOLVER_MANUTENCAO">Manutenção Resolvida</option>
-                <option value="IMPORTACAO">Importação</option>
+              <select id="filtroAuditModulo" onchange="filtrarAuditoriaUI()" class="w-full py-2 px-3 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                <option value="todos">🏬 Todos os Módulos</option>
+                <option value="casas">🏡 Casas Urbanas</option>
+                <option value="estoque">📦 Estoque & Almoxarifado</option>
+                <option value="alojamento">🏢 Alojamentos / Blocos</option>
+                <option value="chamados">🔧 Chamados de Manutenção</option>
               </select>
             </div>
+
             <div>
-              <select id="filtroAuditUsuario" onchange="carregarAuditoria()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
-                <option value="">Todos os Usuários</option>
-                <option value="prefeito">Prefeito</option>
-                <option value="admin">Administrador</option>
-                <option value="sistema_importacao">Sistema de Importação</option>
+              <select id="filtroAuditAcao" onchange="filtrarAuditoriaUI()" class="w-full py-2 px-3 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                <option value="todas">⚡ Todas as Ações</option>
+                <option value="ALOCAR">👤 Alocações de Pessoas</option>
+                <option value="TRANSFERIR">🔄 Transferências (Pessoas ou Móveis)</option>
+                <option value="DESALOJAR">🚪 Desocupação / Saída</option>
+                <option value="ENTRADA">📥 Entradas no Estoque (+)</option>
+                <option value="SAIDA">📤 Baixas / Saídas do Estoque (-)</option>
+                <option value="MOVEL">🛋️ Móveis e Equipamentos</option>
+                <option value="CHAMADO">🛠️ Chamados e Reparos</option>
+              </select>
+            </div>
+
+            <div>
+              <select id="filtroAuditUsuario" onchange="filtrarAuditoriaUI()" class="w-full py-2 px-3 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                <option value="todos">👥 Todos os Usuários</option>
               </select>
             </div>
           </div>
         </div>
 
-        <!-- Tabela de Logs -->
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <!-- Tabela de Logs de Auditoria -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-700">
-              <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+            <table class="w-full text-left text-xs text-slate-700">
+              <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                 <tr>
-                  <th class="py-3 px-4">Data & Hora</th>
-                  <th class="py-3 px-4">Usuário</th>
+                  <th class="py-3 px-4">Data & Horário</th>
+                  <th class="py-3 px-4">Usuário Responsável</th>
+                  <th class="py-3 px-4">Módulo</th>
                   <th class="py-3 px-4">Ação</th>
-                  <th class="py-3 px-4">Entidade</th>
-                  <th class="py-3 px-4">Detalhes da Alteração</th>
+                  <th class="py-3 px-4">Detalhes da Atividade</th>
                 </tr>
               </thead>
-              <tbody id="tabelaAuditoriaCorpo" class="divide-y divide-slate-100 font-mono text-xs">
+              <tbody id="tabelaAuditoriaCorpo" class="divide-y divide-slate-100">
                 <!-- Populado via Javascript -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Estado Vazio Auditoria -->
+          <div id="auditoriaVazio" class="hidden p-8 text-center space-y-2">
+            <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-xl mx-auto">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <p class="text-xs font-semibold text-slate-700">Nenhum registro de auditoria encontrado com os filtros selecionados.</p>
           </div>
         </div>
 

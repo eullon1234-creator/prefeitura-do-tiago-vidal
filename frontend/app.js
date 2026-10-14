@@ -2945,6 +2945,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMobileMenu();
   loadInitialData();
   updateUserRoleUI();
+  inicializarAuditoria();
 });
 
 // Alternar entre modo Prefeito (Admin) e Consulta
@@ -4425,6 +4426,13 @@ async function salvarAlojado(e) {
       }
 
       showToast('Alojado cadastrado com sucesso!', 'success');
+      registrarAuditoria(
+        'alojamento',
+        'ALOCAR',
+        nome,
+        `Cadastrou e alocou colaborador "${nome}" no alojamento`,
+        currentUserName
+      );
       fecharModal('modalAlojadoForm');
       fecharModal('modalQuartoDetalhes');
       await refreshAllData();
@@ -4485,6 +4493,13 @@ async function salvarAlojado(e) {
       }
 
       showToast('Dados e foto do alojado atualizados!', 'success');
+      registrarAuditoria(
+        'alojamento',
+        'EDITAR',
+        nome,
+        `Atualizou cadastro/dados do colaborador "${nome}"`,
+        currentUserName
+      );
       fecharModal('modalAlojadoForm');
       carregarAlojados();
       if (activeTab === 'blocos') carregarQuartos();
@@ -4713,6 +4728,13 @@ async function confirmarRealocacao(e) {
     if (!res.ok) throw new Error(data.detail || data.message || 'Erro na realocação');
 
     showToast('Colaborador mudado de quarto com sucesso!', 'success');
+    registrarAuditoria(
+      'alojamento',
+      'TRANSFERIR',
+      document.getElementById('realocarNome')?.textContent || 'Colaborador',
+      `Mudou de quarto colaborador "${document.getElementById('realocarNome')?.textContent || 'Colaborador'}" (${motivo || 'Realocação administrativa'})`,
+      currentUserName
+    );
     fecharModal('modalRealocar');
     fecharModal('modalQuartoDetalhes');
     await refreshAllData();
@@ -4768,6 +4790,13 @@ async function confirmarDesligamento(e) {
     if (!res.ok) throw new Error(data.detail || data.message || 'Erro no desligamento');
 
     showToast('Saída registrada e vaga liberada com sucesso!', 'success');
+    registrarAuditoria(
+      'alojamento',
+      'DESALOJAR',
+      document.getElementById('desligarNome')?.textContent || 'Colaborador',
+      `Registrou saída/desligamento de colaborador "${document.getElementById('desligarNome')?.textContent || 'Colaborador'}" (${motivo || 'Conclusão de atividades'})`,
+      currentUserName
+    );
     fecharModal('modalDesligar');
     fecharModal('modalQuartoDetalhes');
     await refreshAllData();
@@ -6048,58 +6077,333 @@ async function confirmarRestaurarPadrao() {
 }
 
 // ========================================================
-// 8. AUDITORIA & LOGS
+// 8. AUDITORIA & REGISTRO DE ATIVIDADES ("QUEM FEZ O QUÊ")
 // ========================================================
 
-async function carregarAuditoria() {
-  const busca = document.getElementById('filtroAuditBusca')?.value.trim() || '';
-  const acao = document.getElementById('filtroAuditAcao')?.value || '';
-  const usuario = document.getElementById('filtroAuditUsuario')?.value || '';
+let listaAuditoriaGeral = [];
 
-  let url = `${API_BASE}/api/auditoria?limit=150&`;
-  if (busca) url += `q=${encodeURIComponent(busca)}&`;
-  if (acao) url += `acao=${acao}&`;
-  if (usuario) url += `usuario=${usuario}&`;
+function registrarAuditoria(modulo, acao, entidade, detalhes, usuarioCustom = null) {
+  const agora = new Date();
+  const dataFormatada = agora.toLocaleDateString('pt-BR');
+  const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const dataHoraTexto = `${dataFormatada} ${horaFormatada}`;
+
+  const usuario = usuarioCustom || (typeof currentUserName !== 'undefined' && currentUserName ? currentUserName : 'Prefeito');
+  const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+  const logObj = {
+    id: logId,
+    data_hora: dataHoraTexto,
+    timestamp: agora.toISOString(),
+    usuario: usuario,
+    modulo: modulo, // 'alojamento' | 'casas' | 'estoque' | 'chamados'
+    acao: acao,     // 'ALOCAR' | 'TRANSFERIR' | 'DESALOJAR' | 'ENTRADA' | 'SAIDA' | 'MOVEL' | 'CHAMADO' | 'CONTA'
+    entidade: entidade,
+    detalhes: detalhes
+  };
+
+  listaAuditoriaGeral.unshift(logObj);
+  if (listaAuditoriaGeral.length > 500) {
+    listaAuditoriaGeral = listaAuditoriaGeral.slice(0, 500);
+  }
 
   try {
-    const res = await fetch(url);
-    const logs = await res.json();
-    renderTabelaAuditoria(logs);
-  } catch (err) {
-    console.error('Erro auditoria:', err);
+    localStorage.setItem('auditoria_logs_cache', JSON.stringify(listaAuditoriaGeral.slice(0, 200)));
+  } catch (e) {}
+
+  if (typeof StaticApiEngine !== 'undefined' && StaticApiEngine.dbState) {
+    if (!StaticApiEngine.dbState.auditoria) StaticApiEngine.dbState.auditoria = [];
+    StaticApiEngine.dbState.auditoria.unshift(logObj);
   }
+
+  // Atualizar Feed no Dashboard
+  renderizarFeedAuditoriaDashboard();
+
+  // Se estiver visualizando a aba de auditoria, atualiza na hora
+  if (typeof activeTab !== 'undefined' && activeTab === 'auditoria') {
+    filtrarAuditoriaUI();
+  }
+
+  // Grava no Firestore se disponível
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    firestoreDb.collection('auditoria_logs').doc(logId).set(logObj).catch(err => {
+      console.warn("Erro ao salvar log de auditoria no Firestore:", err);
+    });
+  }
+}
+
+function inicializarAuditoria() {
+  try {
+    const salvo = localStorage.getItem('auditoria_logs_cache');
+    if (salvo) {
+      listaAuditoriaGeral = JSON.parse(salvo);
+    }
+  } catch (e) {}
+
+  if (listaAuditoriaGeral.length === 0) {
+    const agora = new Date();
+    listaAuditoriaGeral = [
+      {
+        id: 'LOG-INIT',
+        data_hora: agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: agora.toISOString(),
+        usuario: 'Prefeito Tiago Vidal',
+        modulo: 'alojamento',
+        acao: 'SISTEMA',
+        entidade: 'Canteiro',
+        detalhes: 'Sistema de Linha do Tempo e Auditoria de Atividades ativado.'
+      }
+    ];
+  }
+
+  renderizarFeedAuditoriaDashboard();
+
+  // Sincroniza do Firestore se houver registros salvos
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    firestoreDb.collection('auditoria_logs').orderBy('timestamp', 'desc').limit(150).get()
+      .then(snap => {
+        if (!snap.empty) {
+          const remotos = [];
+          snap.forEach(doc => remotos.push({ id: doc.id, ...doc.data() }));
+          listaAuditoriaGeral = remotos;
+          try { localStorage.setItem('auditoria_logs_cache', JSON.stringify(listaAuditoriaGeral.slice(0, 200))); } catch (e) {}
+          renderizarFeedAuditoriaDashboard();
+          if (activeTab === 'auditoria') carregarAuditoria();
+        }
+      })
+      .catch(e => console.warn("Firestore auditoria offline fallback:", e));
+  }
+}
+
+function renderizarFeedAuditoriaDashboard() {
+  const container = document.getElementById('feedAuditoriaDashboard');
+  if (!container) return;
+
+  const ultimos = listaAuditoriaGeral.slice(0, 6);
+  if (ultimos.length === 0) {
+    container.innerHTML = '<p class="text-xs text-slate-400 italic py-4 text-center">Nenhuma atividade recente registrada.</p>';
+    return;
+  }
+
+  container.innerHTML = ultimos.map(l => {
+    let modBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+    let modIcon = 'fa-clock';
+    let modNome = 'Sistema';
+
+    if (l.modulo === 'casas') {
+      modBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      modIcon = 'fa-house';
+      modNome = 'Casas';
+    } else if (l.modulo === 'estoque') {
+      modBadgeClass = 'bg-teal-50 text-teal-700 border-teal-200';
+      modIcon = 'fa-boxes-stacked';
+      modNome = 'Almoxarifado';
+    } else if (l.modulo === 'alojamento') {
+      modBadgeClass = 'bg-sky-50 text-sky-700 border-sky-200';
+      modIcon = 'fa-hotel';
+      modNome = 'Alojamento';
+    } else if (l.modulo === 'chamados') {
+      modBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+      modIcon = 'fa-wrench';
+      modNome = 'Chamados';
+    }
+
+    return `
+      <div class="py-2.5 flex items-start gap-3 hover:bg-slate-50/80 px-2 rounded-xl transition">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs flex-shrink-0 border ${modBadgeClass} mt-0.5 shadow-2xs">
+          <i class="fa-solid ${modIcon}"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-slate-900 truncate leading-snug">${l.detalhes}</span>
+            <span class="text-[10px] text-slate-400 whitespace-nowrap font-medium">${l.data_hora}</span>
+          </div>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+              <i class="fa-solid fa-user-check text-[9px] text-slate-400"></i> ${l.usuario || 'Prefeito'}
+            </span>
+            <span class="text-slate-300">•</span>
+            <span class="text-[10px] font-bold px-1.5 py-0.2 rounded border ${modBadgeClass}">${modNome}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function carregarAuditoria() {
+  const icone = document.getElementById('iconeReloadAuditoria');
+  if (icone) icone.classList.add('fa-spin');
+
+  // Popula select de usuários únicos
+  const selectUser = document.getElementById('filtroAuditUsuario');
+  if (selectUser) {
+    const curVal = selectUser.value;
+    const users = Array.from(new Set(listaAuditoriaGeral.map(l => l.usuario).filter(Boolean)));
+    selectUser.innerHTML = '<option value="todos">👥 Todos os Usuários</option>' + users.map(u => `<option value="${u}">${u}</option>`).join('');
+    if (curVal) selectUser.value = curVal;
+  }
+
+  // Atualiza KPIs
+  const totGeral = listaAuditoriaGeral.length;
+  const totCasas = listaAuditoriaGeral.filter(l => l.modulo === 'casas').length;
+  const totEstoque = listaAuditoriaGeral.filter(l => l.modulo === 'estoque').length;
+  const totAloj = listaAuditoriaGeral.filter(l => l.modulo === 'alojamento').length;
+
+  const kTot = document.getElementById('kpiAuditTotal');
+  const kCasas = document.getElementById('kpiAuditCasas');
+  const kEstoque = document.getElementById('kpiAuditEstoque');
+  const kAloj = document.getElementById('kpiAuditAloj');
+
+  if (kTot) kTot.textContent = totGeral;
+  if (kCasas) kCasas.textContent = totCasas;
+  if (kEstoque) kEstoque.textContent = totEstoque;
+  if (kAloj) kAloj.textContent = totAloj;
+
+  filtrarAuditoriaUI();
+  if (icone) setTimeout(() => icone.classList.remove('fa-spin'), 350);
+}
+
+function filtrarAuditoriaUI() {
+  const termo = (document.getElementById('filtroAuditBusca')?.value || '').toLowerCase().trim();
+  const filtroModulo = document.getElementById('filtroAuditModulo')?.value || 'todos';
+  const filtroAcao = document.getElementById('filtroAuditAcao')?.value || 'todas';
+  const filtroUsuario = document.getElementById('filtroAuditUsuario')?.value || 'todos';
+
+  let filtrados = listaAuditoriaGeral.filter(l => {
+    if (termo) {
+      const matchDet = (l.detalhes || '').toLowerCase().includes(termo);
+      const matchUser = (l.usuario || '').toLowerCase().includes(termo);
+      const matchAcao = (l.acao || '').toLowerCase().includes(termo);
+      const matchEnt = (l.entidade || '').toLowerCase().includes(termo);
+      if (!matchDet && !matchUser && !matchAcao && !matchEnt) return false;
+    }
+
+    if (filtroModulo !== 'todos' && l.modulo !== filtroModulo) return false;
+
+    if (filtroAcao !== 'todas') {
+      const ac = (l.acao || '').toUpperCase();
+      if (filtroAcao === 'ALOCAR' && !ac.includes('ALOCAR')) return false;
+      if (filtroAcao === 'TRANSFERIR' && !ac.includes('TRANSF')) return false;
+      if (filtroAcao === 'DESALOJAR' && !ac.includes('DESAL') && !ac.includes('SAIDA')) return false;
+      if (filtroAcao === 'ENTRADA' && !ac.includes('ENTRADA')) return false;
+      if (filtroAcao === 'SAIDA' && !ac.includes('SAIDA')) return false;
+      if (filtroAcao === 'MOVEL' && !ac.includes('MOVEL')) return false;
+      if (filtroAcao === 'CHAMADO' && !ac.includes('CHAMADO') && !ac.includes('MANUT')) return false;
+    }
+
+    if (filtroUsuario !== 'todos' && l.usuario !== filtroUsuario) return false;
+
+    return true;
+  });
+
+  renderTabelaAuditoria(filtrados);
 }
 
 function renderTabelaAuditoria(logs) {
   const tbody = document.getElementById('tabelaAuditoriaCorpo');
+  const vazio = document.getElementById('auditoriaVazio');
   if (!tbody) return;
 
   if (logs.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Nenhum registro de auditoria encontrado.</td></tr>`;
+    tbody.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
     return;
   }
 
+  if (vazio) vazio.classList.add('hidden');
+
   tbody.innerHTML = logs.map(l => {
-    let acaoClass = 'bg-slate-100 text-slate-700';
-    if (l.acao === 'CRIAR') acaoClass = 'bg-emerald-100 text-emerald-800';
-    if (l.acao === 'EDITAR') acaoClass = 'bg-blue-100 text-blue-800';
-    if (l.acao === 'REALOCAR') acaoClass = 'bg-indigo-100 text-indigo-800';
-    if (l.acao === 'DESLIGAR') acaoClass = 'bg-amber-100 text-amber-800';
-    if (l.acao === 'EXCLUIR') acaoClass = 'bg-red-100 text-red-800';
-    if (l.acao === 'IMPORTACAO' || l.acao === 'RESTAURACAO') acaoClass = 'bg-purple-100 text-purple-800';
+    let modBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+    let modIcon = 'fa-clock';
+    let modNome = 'Sistema';
+
+    if (l.modulo === 'casas') {
+      modBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      modIcon = 'fa-house';
+      modNome = 'Casas na Cidade';
+    } else if (l.modulo === 'estoque') {
+      modBadgeClass = 'bg-teal-50 text-teal-700 border-teal-200';
+      modIcon = 'fa-boxes-stacked';
+      modNome = 'Almoxarifado';
+    } else if (l.modulo === 'alojamento') {
+      modBadgeClass = 'bg-sky-50 text-sky-700 border-sky-200';
+      modIcon = 'fa-hotel';
+      modNome = 'Alojamento';
+    } else if (l.modulo === 'chamados') {
+      modBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+      modIcon = 'fa-wrench';
+      modNome = 'Chamados QR';
+    }
+
+    let acaoBadgeClass = 'bg-slate-100 text-slate-700';
+    const ac = (l.acao || '').toUpperCase();
+    if (ac.includes('ALOCAR') || ac.includes('CRIAR') || ac.includes('ENTRADA')) {
+      acaoBadgeClass = 'bg-emerald-100 text-emerald-800';
+    } else if (ac.includes('TRANSF') || ac.includes('EDITAR')) {
+      acaoBadgeClass = 'bg-indigo-100 text-indigo-800';
+    } else if (ac.includes('DESAL') || ac.includes('SAIDA') || ac.includes('EXCLUIR')) {
+      acaoBadgeClass = 'bg-rose-100 text-rose-800';
+    } else if (ac.includes('CHAMADO') || ac.includes('CONTA')) {
+      acaoBadgeClass = 'bg-amber-100 text-amber-800';
+    }
 
     return `
-      <tr class="hover:bg-slate-50">
-        <td class="py-2.5 px-4 text-slate-500 whitespace-nowrap">${l.data_hora}</td>
-        <td class="py-2.5 px-4 font-bold text-slate-900">${l.usuario}</td>
-        <td class="py-2.5 px-4">
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${acaoClass}">${l.acao}</span>
+      <tr class="hover:bg-slate-50/80 transition">
+        <td class="py-3 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+          ${l.data_hora}
         </td>
-        <td class="py-2.5 px-4 uppercase text-slate-500 text-[11px]">${l.entidade}</td>
-        <td class="py-2.5 px-4 text-slate-700">${l.detalhes}</td>
+        <td class="py-3 px-4 whitespace-nowrap">
+          <span class="inline-flex items-center gap-1.5 font-bold text-slate-800">
+            <i class="fa-solid fa-user-check text-[10px] text-slate-400"></i>
+            ${l.usuario || 'Prefeito'}
+          </span>
+        </td>
+        <td class="py-3 px-4 whitespace-nowrap">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${modBadgeClass}">
+            <i class="fa-solid ${modIcon} text-[9px]"></i> ${modNome}
+          </span>
+        </td>
+        <td class="py-3 px-4 whitespace-nowrap">
+          <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${acaoBadgeClass}">
+            ${l.acao}
+          </span>
+        </td>
+        <td class="py-3 px-4 text-slate-800 font-medium leading-relaxed">
+          ${l.detalhes}
+        </td>
       </tr>
     `;
   }).join('');
+}
+
+function exportarAuditoriaExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('Biblioteca SheetJS ainda carregando...', 'error');
+    return;
+  }
+
+  try {
+    const wb = XLSX.utils.book_new();
+    const dados = listaAuditoriaGeral.map(l => ({
+      'ID Registro': l.id || '',
+      'Data & Hora': l.data_hora || '',
+      'Usuário Responsável': l.usuario || '',
+      'Módulo': l.modulo || '',
+      'Ação': l.acao || '',
+      'Entidade': l.entidade || '',
+      'Detalhes da Alteração': l.detalhes || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dados);
+    XLSX.utils.book_append_sheet(wb, ws, 'Histórico de Auditoria');
+
+    const dataHoje = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `RELATORIO_AUDITORIA_CANTEIRO_${dataHoje}.xlsx`);
+    showToast('Histórico de auditoria exportado com sucesso em Excel (.xlsx)!', 'success');
+  } catch (e) {
+    showToast('Erro ao exportar logs de auditoria: ' + e.message, 'error');
+  }
 }
 
 // ========================================================
@@ -8049,6 +8353,11 @@ async function salvarMoradorCasa(event) {
   fecharModal('modalMoradorCasaForm');
   showToast(`Colaborador "${nome}" salvo com sucesso!`, 'success');
 
+  // Registro de Auditoria
+  if (typeof registrarAuditoria === 'function') {
+    registrarAuditoria('casas', 'ALOCAR', 'Morador', `Alocou "${nome}" (${funcao || 'Colaborador'}) na Cama ${camaNum} da ${casa.nome} (${comodo.nome})`);
+  }
+
   if (firestoreDb) {
     try {
       await firestoreDb.collection('casas_cidade').doc(casaId).update({
@@ -8070,6 +8379,7 @@ async function desocuparCamaCasa(casaId, comodoId, camaNum) {
   if (!confirm(`Deseja realmente desalojar o morador da Cama ${camaNum}?`)) return;
 
   const camaObj = (comodo.camas || []).find(cm => Number(cm.numero) === Number(camaNum));
+  const nomeAntigo = camaObj?.morador?.nome || 'Morador';
   if (camaObj) {
     camaObj.morador = null;
   }
@@ -8078,6 +8388,11 @@ async function desocuparCamaCasa(casaId, comodoId, camaNum) {
   atualizarContadoresCasasUI();
   atualizarDadosModalCasaDetalhes(casa);
   showToast(`Cama ${camaNum} liberada com sucesso!`, 'info');
+
+  // Registro de Auditoria
+  if (typeof registrarAuditoria === 'function') {
+    registrarAuditoria('casas', 'DESALOJAR', 'Morador', `Desalojou "${nomeAntigo}" da Cama ${camaNum} da ${casa.nome} (${comodo.nome})`);
+  }
 
   if (firestoreDb) {
     try {
@@ -8291,6 +8606,13 @@ async function confirmarTransferenciaMoradorCasa(event) {
 
   showToast(`"${moradorOrigem.nome}" transferido com sucesso para ${cDestino.nome} - ${comDestino.nome} (Cama ${camaDestinoNum})!`, 'success');
 
+  registrarAuditoria(
+    'casas',
+    'TRANSFERIR',
+    moradorOrigem.nome,
+    `Transferiu ${moradorOrigem.nome} de "${cOrigem.nome} - ${comOrigem.nome}" para "${cDestino.nome} - ${comDestino.nome} (Cama ${camaDestinoNum})"${motivo ? ' - Motivo: ' + motivo : ''}`
+  );
+
   // 4. Salva no Firestore
   if (firestoreDb) {
     try {
@@ -8443,6 +8765,13 @@ async function confirmarTransferenciaMovelCasa(event) {
   atualizarDadosModalCasaDetalhes(cOrigem);
   fecharModal('modalTransferirMovelCasa');
   showToast(`Móvel "${movOrigem.tipo}" (${qtdTransf}x) transferido para ${cDestino.nome} - ${comDestino.nome}!`, 'success');
+
+  registrarAuditoria(
+    'casas',
+    'MOVEL',
+    movOrigem.tipo,
+    `Transferiu ${qtdTransf}x "${movOrigem.tipo}" de "${cOrigem.nome} - ${comOrigem.nome}" para "${cDestino.nome} - ${comDestino.nome}"${motivo ? ' - Motivo: ' + motivo : ''}`
+  );
 
   if (firestoreDb) {
     try {
@@ -8665,6 +8994,14 @@ async function confirmarDevolucaoMovelEstoque(event) {
 
   fecharModal('modalDevolverMovelEstoque');
   showToast(`Móvel "${mov.tipo}" (${qtdDevolver}x) devolvido com sucesso ao ${localDestino}!`, 'success');
+
+  registrarAuditoria(
+    'casas',
+    'MOVEL',
+    mov.tipo,
+    `Devolveu ${qtdDevolver}x "${mov.tipo}" de "${c.nome} - ${com.nome}" para o almoxarifado (${localDestino})`,
+    responsavel
+  );
 }
 
 // Ações de Móvel / Eletro
@@ -8828,6 +9165,13 @@ async function salvarMovelComodo(event) {
 
   showToast(`Móvel "${tipo}" cadastrado com sucesso!`, 'success');
 
+  registrarAuditoria(
+    'casas',
+    'MOVEL',
+    tipo,
+    `Adicionou móvel "${tipo}" (${qtd}x) no cômodo "${comodo.nome}" da casa "${casa.nome}"`
+  );
+
   if (firestoreDb) {
     try {
       await firestoreDb.collection('casas_cidade').doc(casaId).update({
@@ -8853,6 +9197,13 @@ async function excluirMovelComodo(casaId, comodoId, movelId) {
   localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
   atualizarDadosModalCasaDetalhes(casa);
   showToast('Item removido do cômodo.', 'info');
+
+  registrarAuditoria(
+    'casas',
+    'MOVEL',
+    comodo.nome,
+    `Removeu item móvel do cômodo "${comodo.nome}" da casa "${casa.nome}"`
+  );
 
   if (firestoreDb) {
     try {
@@ -9695,6 +10046,13 @@ async function salvarItemEstoque(event) {
   fecharModal('modalItemEstoqueForm');
   showToast(`Item "${nome}" salvo no estoque com sucesso!`, 'success');
 
+  registrarAuditoria(
+    'estoque',
+    idx >= 0 ? 'EDITAR' : 'CRIAR',
+    nome,
+    `${idx >= 0 ? 'Editou' : 'Cadastrou'} item de estoque "${nome}" (${quantidade} ${unidade}) no local "${local}"`
+  );
+
   if (firestoreDb) {
     try {
       await firestoreDb.collection('estoque_itens').doc(id).set(itemObj, { merge: true });
@@ -9830,6 +10188,14 @@ async function salvarMovimentacaoEstoque(event) {
 
   showToast(`${tipo === 'entrada' ? 'Entrada' : 'Saída'} de ${qtd}x "${item.nome}" registrada! Novo saldo: ${novoSaldo}`, 'success');
 
+  registrarAuditoria(
+    'estoque',
+    tipo === 'entrada' ? 'ENTRADA' : 'SAIDA',
+    item.nome,
+    `${tipo === 'entrada' ? 'Entrada' : 'Saída'} de ${qtd}x "${item.nome}" (${local}). Saldo: ${saldoAnterior} ➔ ${novoSaldo}${motivo ? ' - Motivo: ' + motivo : ''}`,
+    responsavel
+  );
+
   if (firestoreDb) {
     try {
       await firestoreDb.collection('estoque_itens').doc(itemId).update({
@@ -9938,6 +10304,13 @@ async function excluirItemEstoque(id) {
   filtrarEstoqueUI();
 
   showToast(`Item "${nome}" excluído do estoque com sucesso!`, 'success');
+
+  registrarAuditoria(
+    'estoque',
+    'EXCLUIR',
+    nome,
+    `Excluiu item de estoque "${nome}" (ID: ${id})`
+  );
 
   if (firestoreDb) {
     try {
@@ -10125,6 +10498,13 @@ async function confirmarConclusaoChamadoComEstoque(event) {
   filtrarChamadosUI();
   fecharModal('modalConcluirChamadoComEstoque');
   showToast(`Chamado #${protocolo} concluído e baixa realizada com sucesso!`, 'success');
+
+  registrarAuditoria(
+    'chamados',
+    'CHAMADO',
+    `#${protocolo}`,
+    `Concluiu chamado #${protocolo} (${ch.quarto || 'Quarto'})${itemId ? ` com baixa de ${qtd}x material` : ''}${obs ? ' - Obs: ' + obs : ''}`
+  );
 
   if (firestoreDb) {
     try {
@@ -10588,5 +10968,14 @@ window.openModalTransferirMoradorCasa = openModalTransferirMoradorCasa;
 window.aoMudarCasaDestinoTransferenciaMorador = aoMudarCasaDestinoTransferenciaMorador;
 window.aoMudarComodoDestinoTransferenciaMorador = aoMudarComodoDestinoTransferenciaMorador;
 window.confirmarTransferenciaMoradorCasa = confirmarTransferenciaMoradorCasa;
+
+// Exposição das funções de Linha do Tempo e Log de Auditoria
+window.registrarAuditoria = registrarAuditoria;
+window.inicializarAuditoria = inicializarAuditoria;
+window.renderizarFeedAuditoriaDashboard = renderizarFeedAuditoriaDashboard;
+window.carregarAuditoria = carregarAuditoria;
+window.filtrarAuditoriaUI = filtrarAuditoriaUI;
+window.exportarAuditoriaExcel = exportarAuditoriaExcel;
+
 
 
