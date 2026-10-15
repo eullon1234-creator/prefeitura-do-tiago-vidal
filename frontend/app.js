@@ -16,6 +16,9 @@ let globalQuartos = [];
 let globalVagasLivres = [];
 let chartBlocosInstance = null;
 let chartEmpresasInstance = null;
+let chartCasasCidadeInstance = null;
+let chartCasasTabInstance = null;
+let modoVisualizacaoChartBlocos = 'todos'; // 'todos' | 'casas' | 'blocos'
 
 // Filtros atuais do mapa de quartos
 let filtroBlocoAtivo = '';
@@ -3303,6 +3306,7 @@ async function carregarDashboard() {
 
     // Renderiza Gráficos
     renderChartBlocos(data.blocos);
+    renderChartCasasCidade();
     renderChartEmpresas(data.empresas);
 
   } catch (err) {
@@ -3407,6 +3411,39 @@ function renderBlocosCards(blocos) {
   container.innerHTML = htmlCards;
 }
 
+function alternarModoGraficoBlocos(modo) {
+  modoVisualizacaoChartBlocos = modo;
+
+  const btnTodos = document.getElementById('btnChartModoTodos');
+  const btnCasas = document.getElementById('btnChartModoCasas');
+  const btnBlocos = document.getElementById('btnChartModoBlocos');
+
+  [btnTodos, btnCasas, btnBlocos].forEach(b => {
+    if (b) {
+      b.className = 'px-2 py-1 rounded-md transition text-slate-500 hover:text-slate-800';
+    }
+  });
+
+  const titEl = document.getElementById('tituloGraficoVagas');
+  const subEl = document.getElementById('subtituloGraficoVagas');
+
+  if (modo === 'todos') {
+    if (btnTodos) btnTodos.className = 'px-2 py-1 rounded-md transition shadow-xs bg-white text-slate-800 font-bold';
+    if (titEl) titEl.innerHTML = '<i class="fa-solid fa-chart-column text-sky-500 mr-2"></i>Vagas Ocupadas vs. Disponíveis (Blocos & Casas)';
+    if (subEl) subEl.textContent = 'Canteiro Taboca 2 + Casas Urbanas';
+  } else if (modo === 'casas') {
+    if (btnCasas) btnCasas.className = 'px-2 py-1 rounded-md transition shadow-xs bg-white text-indigo-700 font-bold';
+    if (titEl) titEl.innerHTML = '<i class="fa-solid fa-house text-indigo-600 mr-2"></i>Vagas Ocupadas vs. Disponíveis por Casa na Cidade';
+    if (subEl) subEl.textContent = 'Detalhamento Casa a Casa';
+  } else if (modo === 'blocos') {
+    if (btnBlocos) btnBlocos.className = 'px-2 py-1 rounded-md transition shadow-xs bg-white text-sky-700 font-bold';
+    if (titEl) titEl.innerHTML = '<i class="fa-solid fa-hotel text-sky-600 mr-2"></i>Vagas Ocupadas vs. Disponíveis por Bloco';
+    if (subEl) subEl.textContent = 'Apenas Canteiro Taboca 2';
+  }
+
+  renderChartBlocos(globalStats?.blocos || []);
+}
+
 function renderChartBlocos(blocos) {
   const ctx = document.getElementById('chartBlocos');
   if (!ctx) return;
@@ -3415,9 +3452,92 @@ function renderChartBlocos(blocos) {
     chartBlocosInstance.destroy();
   }
 
-  const labels = blocos.map(b => b.nome);
-  const ocupadas = blocos.map(b => b.ocupadas);
-  const livres = blocos.map(b => b.livres);
+  // Estatísticas das Casas Urbanas
+  const totCasas = (listaCasasCidade || []).length;
+  let totQuartosCasas = 0;
+  let totCamasCasas = 0;
+  let totMoradoresCasas = 0;
+
+  (listaCasasCidade || []).forEach(c => {
+    (c.comodos || []).forEach(com => {
+      if (com.tipo === 'quarto') {
+        totQuartosCasas++;
+        totCamasCasas += Number(com.capacidade_camas || 0);
+        totMoradoresCasas += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+      }
+    });
+  });
+  const livresCasas = Math.max(0, totCamasCasas - totMoradoresCasas);
+  const taxaCasas = totCamasCasas > 0 ? Math.round((totMoradoresCasas / totCamasCasas) * 100) : 0;
+
+  let labels = [];
+  let ocupadas = [];
+  let livres = [];
+  let bgOcupadas = [];
+  let bgLivres = [];
+  let metaInfo = [];
+
+  if (modoVisualizacaoChartBlocos === 'casas') {
+    // Modo Casa a Casa
+    if (!listaCasasCidade || listaCasasCidade.length === 0) {
+      labels = ['Nenhuma casa'];
+      ocupadas = [0];
+      livres = [0];
+      bgOcupadas = ['#6366f1'];
+      bgLivres = ['#10b981'];
+      metaInfo = [{ total: 0, taxa: 0, quartos: 0 }];
+    } else {
+      listaCasasCidade.forEach(c => {
+        let camasCasa = 0;
+        let ocupadasCasa = 0;
+        let quartosCasa = 0;
+        (c.comodos || []).forEach(com => {
+          if (com.tipo === 'quarto') {
+            quartosCasa++;
+            camasCasa += Number(com.capacidade_camas || 0);
+            ocupadasCasa += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+          }
+        });
+        const livresCasa = Math.max(0, camasCasa - ocupadasCasa);
+        const taxaCasa = camasCasa > 0 ? Math.round((ocupadasCasa / camasCasa) * 100) : 0;
+
+        labels.push(c.nome || 'Casa');
+        ocupadas.push(ocupadasCasa);
+        livres.push(livresCasa);
+        bgOcupadas.push('#6366f1');
+        bgLivres.push('#10b981');
+        metaInfo.push({ total: camasCasa, taxa: taxaCasa, quartos: quartosCasa });
+      });
+    }
+  } else if (modoVisualizacaoChartBlocos === 'blocos') {
+    // Apenas blocos do canteiro
+    labels = (blocos || []).map(b => b.nome);
+    ocupadas = (blocos || []).map(b => b.ocupadas);
+    livres = (blocos || []).map(b => b.livres);
+    bgOcupadas = (blocos || []).map(() => '#2563eb');
+    bgLivres = (blocos || []).map(() => '#10b981');
+    metaInfo = (blocos || []).map(b => ({ total: b.total_vagas, taxa: b.taxa_ocupacao }));
+  } else {
+    // 'todos' (Padrão): Blocos do Canteiro + Barra Especial de Casas na Cidade
+    labels = (blocos || []).map(b => b.nome);
+    ocupadas = (blocos || []).map(b => b.ocupadas);
+    livres = (blocos || []).map(b => b.livres);
+    bgOcupadas = (blocos || []).map(() => '#2563eb');
+    bgLivres = (blocos || []).map(() => '#10b981');
+    metaInfo = (blocos || []).map(b => ({ total: b.total_vagas, taxa: b.taxa_ocupacao }));
+
+    // Coluna Especial de Casas na Cidade
+    labels.push('🏠 Casas na Cidade');
+    ocupadas.push(totMoradoresCasas);
+    livres.push(livresCasas);
+    bgOcupadas.push('#6366f1'); // Destaque Indigo para Casas
+    bgLivres.push('#34d399');   // Verde menta suave
+    metaInfo.push({
+      total: totCamasCasas,
+      taxa: taxaCasas,
+      detalhesExtra: `${totCasas} casas • ${totQuartosCasas} quartos`
+    });
+  }
 
   chartBlocosInstance = new Chart(ctx, {
     type: 'bar',
@@ -3427,13 +3547,13 @@ function renderChartBlocos(blocos) {
         {
           label: 'Vagas Ocupadas',
           data: ocupadas,
-          backgroundColor: '#2563eb',
+          backgroundColor: bgOcupadas,
           borderRadius: 4,
         },
         {
           label: 'Vagas Disponíveis',
           data: livres,
-          backgroundColor: '#10b981',
+          backgroundColor: bgLivres,
           borderRadius: 4,
         }
       ]
@@ -3461,8 +3581,88 @@ function renderChartBlocos(blocos) {
         tooltip: {
           callbacks: {
             footer: (items) => {
-              const b = blocos[items[0].dataIndex];
-              return `Capacidade Total: ${b.total_vagas} | Ocupação: ${b.taxa_ocupacao}%`;
+              const idx = items[0].dataIndex;
+              const meta = metaInfo[idx];
+              if (!meta) return '';
+              let txt = `Capacidade: ${meta.total} vagas | Ocupação: ${meta.taxa}%`;
+              if (meta.detalhesExtra) txt += ` (${meta.detalhesExtra})`;
+              if (meta.quartos) txt += ` | ${meta.quartos} quartos`;
+              return txt;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderChartCasasCidade() {
+  const ctx = document.getElementById('chartCasasCidade');
+  if (!ctx) return;
+
+  if (chartCasasCidadeInstance) {
+    chartCasasCidadeInstance.destroy();
+  }
+
+  const totCasas = (listaCasasCidade || []).length;
+  let totQuartosCasas = 0;
+  let totCamasCasas = 0;
+  let totMoradoresCasas = 0;
+
+  (listaCasasCidade || []).forEach(c => {
+    (c.comodos || []).forEach(com => {
+      if (com.tipo === 'quarto') {
+        totQuartosCasas++;
+        totCamasCasas += Number(com.capacidade_camas || 0);
+        totMoradoresCasas += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+      }
+    });
+  });
+  const livresCasas = Math.max(0, totCamasCasas - totMoradoresCasas);
+  const taxaCasas = totCamasCasas > 0 ? Math.round((totMoradoresCasas / totCamasCasas) * 100) : 0;
+
+  // Atualizar textos e contadores no card
+  const elOcup = document.getElementById('chartCasasOcupadasNum');
+  if (elOcup) elOcup.textContent = `${totMoradoresCasas} camas`;
+  const elLivres = document.getElementById('chartCasasLivresNum');
+  if (elLivres) elLivres.textContent = `${livresCasas} vagas`;
+  const elTaxa = document.getElementById('chartCasasTaxaTexto');
+  if (elTaxa) elTaxa.textContent = `${taxaCasas}%`;
+  const elSub = document.getElementById('chartCasasSubInfo');
+  if (elSub) elSub.textContent = `${totCasas} casa${totCasas === 1 ? '' : 's'} • ${totQuartosCasas} quarto${totQuartosCasas === 1 ? '' : 's'}`;
+
+  const dataVals = totCamasCasas === 0 ? [0, 1] : [totMoradoresCasas, livresCasas];
+  const bgColors = totCamasCasas === 0 ? ['#cbd5e1', '#f1f5f9'] : ['#6366f1', '#10b981'];
+
+  chartCasasCidadeInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Camas Ocupadas', 'Camas Livres'],
+      datasets: [
+        {
+          data: dataVals,
+          backgroundColor: bgColors,
+          borderWidth: 2,
+          borderColor: '#ffffff',
+          hoverOffset: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '72%',
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              if (totCamasCasas === 0) return ' Nenhuma cama cadastrada';
+              const val = item.raw;
+              const pct = Math.round((val / totCamasCasas) * 100);
+              return ` ${item.label}: ${val} (${pct}%)`;
             }
           }
         }
@@ -3502,10 +3702,10 @@ function renderChartEmpresas(empresas) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'right',
+          position: 'bottom',
           labels: {
-            boxWidth: 12,
-            font: { size: 10, family: 'Inter' }
+            boxWidth: 10,
+            font: { size: 9, family: 'Inter' }
           }
         },
         tooltip: {
@@ -7327,12 +7527,111 @@ function atualizarContadoresCasasUI() {
       elKpiTaxa.textContent = `${Math.round(((alojO + totMoradores) / totGeral) * 100)}%`;
     }
   }
+
+  // Atualiza gráficos de Casas se presentes no DOM
+  if (typeof renderChartCasasCidade === 'function' && document.getElementById('chartCasasCidade')) {
+    renderChartCasasCidade();
+  }
+  if (typeof renderChartCasasTab === 'function' && document.getElementById('chartCasasTab')) {
+    renderChartCasasTab();
+  }
+  if (typeof renderChartBlocos === 'function' && typeof globalStats !== 'undefined' && globalStats?.blocos && document.getElementById('chartBlocos')) {
+    renderChartBlocos(globalStats.blocos);
+  }
 }
 
 // Carregar e filtrar casas
 function carregarCasasCidade() {
   atualizarContadoresCasasUI();
   filtrarCasasCidadeUI();
+  renderChartCasasTab();
+}
+
+function renderChartCasasTab() {
+  const ctx = document.getElementById('chartCasasTab');
+  if (!ctx) return;
+
+  if (chartCasasTabInstance) {
+    chartCasasTabInstance.destroy();
+  }
+
+  if (!listaCasasCidade || listaCasasCidade.length === 0) {
+    return;
+  }
+
+  const labels = [];
+  const ocupadas = [];
+  const livres = [];
+  const meta = [];
+
+  listaCasasCidade.forEach(c => {
+    let camas = 0;
+    let ocup = 0;
+    let quartos = 0;
+    (c.comodos || []).forEach(com => {
+      if (com.tipo === 'quarto') {
+        quartos++;
+        camas += Number(com.capacidade_camas || 0);
+        ocup += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+      }
+    });
+    labels.push(c.nome || 'Casa');
+    ocupadas.push(ocup);
+    livres.push(Math.max(0, camas - ocup));
+    meta.push({ camas, ocup, quartos, taxa: camas > 0 ? Math.round((ocup / camas) * 100) : 0 });
+  });
+
+  chartCasasTabInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Camas Ocupadas',
+          data: ocupadas,
+          backgroundColor: '#6366f1',
+          borderRadius: 4
+        },
+        {
+          label: 'Camas Livres',
+          data: livres,
+          backgroundColor: '#10b981',
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { size: 11, family: 'Inter' } }
+        },
+        y: {
+          stacked: true,
+          grid: { color: '#f1f5f9' },
+          ticks: { font: { size: 10 }, stepSize: 1 }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { font: { size: 11, family: 'Inter' }, usePointStyle: true, boxWidth: 8 }
+        },
+        tooltip: {
+          callbacks: {
+            footer: (items) => {
+              const idx = items[0].dataIndex;
+              const m = meta[idx];
+              return m ? `Capacidade: ${m.camas} camas | ${m.quartos} quartos | ${m.taxa}% ocupação` : '';
+            }
+          }
+        }
+      }
+    }
+  });
 }
 
 function filtrarCasasCidadeUI() {
@@ -10976,6 +11275,12 @@ window.renderizarFeedAuditoriaDashboard = renderizarFeedAuditoriaDashboard;
 window.carregarAuditoria = carregarAuditoria;
 window.filtrarAuditoriaUI = filtrarAuditoriaUI;
 window.exportarAuditoriaExcel = exportarAuditoriaExcel;
+
+// Exposição das funções de Gráficos de Ocupação e Casas
+window.alternarModoGraficoBlocos = alternarModoGraficoBlocos;
+window.renderChartCasasCidade = renderChartCasasCidade;
+window.renderChartCasasTab = renderChartCasasTab;
+
 
 
 

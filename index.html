@@ -480,33 +480,101 @@
           </div>
         </div>
 
-        <!-- Gráficos: Ocupação por Empresa & Ocupação por Bloco -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- Gráfico por Bloco (Barra) -->
-          <div class="lg:col-span-7 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <i class="fa-solid fa-chart-column text-sky-500"></i>
-                Vagas Ocupadas vs. Disponíveis por Bloco
-              </h3>
-              <span class="text-xs text-slate-400 font-medium">Canteiro Taboca 2</span>
+        <!-- Gráficos: Ocupação por Empresa & Ocupação por Bloco & Ocupação das Casas -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+          <!-- Gráfico de Vagas: Blocos & Casas (Barra) -->
+          <div class="md:col-span-2 lg:col-span-6 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div>
+                  <h3 id="tituloGraficoVagas" class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-chart-column text-sky-500"></i>
+                    Vagas Ocupadas vs. Disponíveis (Blocos & Casas)
+                  </h3>
+                  <span id="subtituloGraficoVagas" class="text-xs text-slate-400 font-medium">Canteiro Taboca 2 + Casas Urbanas</span>
+                </div>
+                <!-- Filtros do Gráfico -->
+                <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px] font-semibold self-start sm:self-auto">
+                  <button id="btnChartModoTodos" onclick="alternarModoGraficoBlocos('todos')" class="px-2 py-1 rounded-md transition shadow-xs bg-white text-slate-800 font-bold" title="Exibe Blocos do Canteiro e Casas na Cidade">
+                    <i class="fa-solid fa-chart-column mr-1 text-sky-600"></i> Todos
+                  </button>
+                  <button id="btnChartModoCasas" onclick="alternarModoGraficoBlocos('casas')" class="px-2 py-1 rounded-md transition text-slate-500 hover:text-slate-800" title="Exibe detalhamento Casa por Casa">
+                    <i class="fa-solid fa-house mr-1 text-indigo-600"></i> Por Casa
+                  </button>
+                  <button id="btnChartModoBlocos" onclick="alternarModoGraficoBlocos('blocos')" class="px-2 py-1 rounded-md transition text-slate-500 hover:text-slate-800" title="Exibe apenas os Blocos do Canteiro">
+                    <i class="fa-solid fa-hotel mr-1 text-slate-500"></i> Canteiro
+                  </button>
+                </div>
+              </div>
             </div>
-            <div class="h-64">
+            <div class="h-64 mt-2">
               <canvas id="chartBlocos"></canvas>
             </div>
           </div>
 
-          <!-- Gráfico por Empresa (Donut / Barra) -->
-          <div class="lg:col-span-5 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <i class="fa-solid fa-chart-pie text-emerald-500"></i>
-                Distribuição de Alojados por Empresa
-              </h3>
+          <!-- Gráficozinho Dedicado: Casas na Cidade (Contagem & Ocupação) -->
+          <div class="md:col-span-1 lg:col-span-3 bg-white p-5 rounded-xl border border-indigo-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-1.5 truncate">
+                  <i class="fa-solid fa-house-chimney text-indigo-600"></i>
+                  Casas na Cidade
+                </h3>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 uppercase">Urbano</span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-medium">Contagem de Vagas e Ocupação</p>
+            </div>
+
+            <!-- Gráfico Donut de Casas com porcentagem central -->
+            <div class="h-44 relative flex items-center justify-center my-1">
+              <canvas id="chartCasasCidade"></canvas>
+              <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span id="chartCasasTaxaTexto" class="text-xl font-extrabold text-indigo-700 leading-none">--%</span>
+                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Ocupação</span>
+              </div>
+            </div>
+
+            <!-- Resumo e Métricas Rápidas -->
+            <div class="pt-2 border-t border-slate-100 text-xs space-y-1.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="flex items-center gap-1.5 font-semibold text-slate-600">
+                  <span class="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block"></span>
+                  Camas Ocupadas:
+                </span>
+                <span id="chartCasasOcupadasNum" class="font-bold text-indigo-700">0</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="flex items-center gap-1.5 font-semibold text-slate-600">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                  Camas Livres:
+                </span>
+                <span id="chartCasasLivresNum" class="font-bold text-emerald-600">0</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                <span id="chartCasasSubInfo">0 casas • 0 quartos</span>
+                <button onclick="switchTab('casas_cidade')" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
+                  Gerenciar <i class="fa-solid fa-arrow-right text-[9px]"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gráfico por Empresa (Donut) -->
+          <div class="md:col-span-1 lg:col-span-3 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-1.5 truncate">
+                  <i class="fa-solid fa-chart-pie text-emerald-500"></i>
+                  Alojados por Empresa
+                </h3>
+              </div>
               <span class="text-xs text-slate-400 font-medium" id="totalEmpresasCount">-- empresas</span>
             </div>
-            <div class="h-64 relative flex items-center justify-center">
+            <div class="h-44 relative flex items-center justify-center my-1">
               <canvas id="chartEmpresas"></canvas>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-400 text-center">
+              Distribuição percentual de colaboradores
             </div>
           </div>
         </div>
@@ -997,6 +1065,25 @@
             <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
               <i class="fa-solid fa-file-invoice-dollar"></i>
             </div>
+          </div>
+        </div>
+
+        <!-- Gráfico Comparativo das Casas na Cidade -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-chart-column text-indigo-600"></i>
+                Capacidade & Ocupação por Casa na Cidade
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">Comparativo de camas ocupadas e disponíveis em cada imóvel</p>
+            </div>
+            <span class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
+              <i class="fa-solid fa-city mr-1"></i> Gestão Urbana
+            </span>
+          </div>
+          <div class="h-56">
+            <canvas id="chartCasasTab"></canvas>
           </div>
         </div>
 
