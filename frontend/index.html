@@ -3213,7 +3213,7 @@ service cloud.firestore {
               </p>
               <div class="flex items-center gap-2 mt-1.5 flex-wrap text-xs text-slate-400">
                 <span id="modalCasaDetalhesOcupacaoBadge" class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">0 vagas ocupadas</span>
-                <span id="modalCasaDetalhesComodosCount" class="text-slate-300">0 cômodos</span>
+                <span id="modalCasaDetalhesComodosCount" class="text-slate-300 flex items-center gap-1"><i class="fa-solid fa-border-all text-amber-400 text-xs"></i> 0 cômodos</span>
                 <span id="modalCasaDetalhesResponsavel" class="text-slate-400">Resp: --</span>
               </div>
             </div>
@@ -3232,7 +3232,7 @@ service cloud.firestore {
         <!-- Abas Internas da Casa -->
         <div class="flex items-center px-4 bg-slate-950 border-t border-slate-800 gap-1 overflow-x-auto">
           <button onclick="trocarAbaCasaDetalhes('comodos')" id="btnAbaCasa_comodos" class="px-4 py-2.5 text-xs font-bold border-b-2 border-indigo-500 text-white transition flex items-center gap-1.5">
-            <i class="fa-solid fa-door-open text-indigo-400"></i> Cômodos, Moradores & Móveis
+            <i class="fa-solid fa-border-all text-indigo-400"></i> Cômodos, Moradores & Móveis
           </button>
           <button onclick="trocarAbaCasaDetalhes('despesas')" id="btnAbaCasa_despesas" class="px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5">
             <i class="fa-solid fa-file-invoice-dollar text-amber-400"></i> Despesas (Luz, Água, Aluguel...)

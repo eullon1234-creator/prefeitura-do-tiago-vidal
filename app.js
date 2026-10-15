@@ -7792,7 +7792,7 @@ function renderizarCasasCidadeGrid(casas) {
                 <i class="fa-solid fa-door-open text-indigo-500"></i> ${totQuartos} Quartos
               </span>
               <span class="px-2 py-1 rounded bg-slate-100 font-semibold flex items-center gap-1">
-                <i class="fa-solid fa-couch text-amber-500"></i> ${(c.comodos || []).length} Cômodos
+                <i class="fa-solid fa-border-all text-amber-500"></i> ${(c.comodos || []).length} Cômodos
               </span>
               ${c.responsavel ? `
                 <span class="px-2 py-1 rounded bg-slate-100 font-semibold text-slate-600 truncate max-w-[140px]" title="Responsável: ${c.responsavel}">
