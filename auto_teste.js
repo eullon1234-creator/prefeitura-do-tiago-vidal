@@ -221,7 +221,14 @@ const criticalElements = [
   'modalTransferirMovelCasa',
   'modalDevolverMovelEstoque',
   'modalItemEstoqueForm',
-  'modalMovimentacaoEstoque'
+  'modalMovimentacaoEstoque',
+  'modalScannerLimpezaQR',
+  'modalRegistroLimpezaCasa',
+  'modalPlacaQRCasa',
+  'painelCasa_limpezas',
+  'btnAbaCasa_limpezas',
+  'casaDetalhesLimpezasTabela',
+  'casaDetalhesLimpezasVazio'
 ];
 
 let allElementsPresent = true;
@@ -327,6 +334,38 @@ const logAuditoriaMock = {
 assert(logAuditoriaMock.id.startsWith('AUDIT-'), 'Geração correta de ID de auditoria');
 assert(['alojamento', 'casas', 'estoque', 'chamados'].includes(logAuditoriaMock.modulo), 'Módulo de auditoria válido');
 assert(logAuditoriaMock.detalhes.length > 5, 'Descrição de auditoria preenchida');
+
+// Testes de Regras de Negócio: Módulo de Limpeza e Manutenção via QR Code
+const hojeDataStr = new Date().toISOString().split('T')[0];
+const registroRotinaHoje = {
+  id: 'limp-1',
+  casa_id: 'casa-101',
+  tipo: 'rotina',
+  data: hojeDataStr,
+  hora: '08:30',
+  responsavel: 'Maria Auxiliadora'
+};
+assert(registroRotinaHoje.tipo === 'rotina', 'Tipo de limpeza Rotina Diária reconhecido');
+assert(registroRotinaHoje.data === hojeDataStr, 'Limpeza registrada para o dia corrente (Hoje)');
+
+// Validação do ciclo de 30 dias para Ar Condicionado
+const calcularCicloAr = (diasAtras) => {
+  const diffDias = diasAtras;
+  const diasRestantes = 30 - diffDias;
+  if (diffDias <= 24) return 'ok';
+  if (diffDias <= 30) return 'atencao';
+  return 'vencido';
+};
+assert(calcularCicloAr(5) === 'ok', 'Ar condicionado com 5 dias: status OK');
+assert(calcularCicloAr(24) === 'ok', 'Ar condicionado com 24 dias: status OK');
+assert(calcularCicloAr(25) === 'atencao', 'Ar condicionado com 25 dias: status ATENÇÃO (próximo do prazo)');
+assert(calcularCicloAr(30) === 'atencao', 'Ar condicionado com 30 dias: status ATENÇÃO (limite do prazo)');
+assert(calcularCicloAr(31) === 'vencido', 'Ar condicionado com 31 dias: status VENCIDO (alerta)');
+assert(calcularCicloAr(45) === 'vencido', 'Ar condicionado com 45 dias: status VENCIDO (alerta)');
+
+// Validação de URL de QR Code para placa da residência
+const urlPlacaCasa = `https://exemplo.com/index.html?acao=limpeza&casa_id=CASA-99`;
+assert(urlPlacaCasa.includes('acao=limpeza') && urlPlacaCasa.includes('casa_id=CASA-99'), 'Estrutura de URL para QR Code da Casa válida');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

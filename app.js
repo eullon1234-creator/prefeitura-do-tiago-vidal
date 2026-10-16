@@ -2949,6 +2949,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadInitialData();
   updateUserRoleUI();
   inicializarAuditoria();
+  verificarAcaoUrlParametros();
 });
 
 // Alternar entre modo Prefeito (Admin) e Consulta
@@ -7345,9 +7346,11 @@ async function salvarConfigWhatsappPrefeito(event) {
 // ========================================================
 let listaCasasCidade = [];
 let listaDespesasCasas = [];
+let listaLimpezasCasas = [];
 let casaSelecionadaId = null;
 let abaAtivaCasaDetalhes = 'comodos';
 let listenerCasasAtivo = false;
+let html5QrScannerInstance = null;
 
 // Variaveis Globais de Estoque
 var listaEstoqueItens = [];
@@ -7365,7 +7368,7 @@ function getMesAtualStr() {
   return `${d.getFullYear()}-${m}`;
 }
 
-// Inicializar ouvinte em tempo real do Firestore para Casas e Despesas
+// Inicializar ouvinte em tempo real do Firestore para Casas, Despesas e Limpezas
 function iniciarListenerCasasCidade() {
   if (!firestoreDb || listenerCasasAtivo) return;
   listenerCasasAtivo = true;
@@ -7381,6 +7384,10 @@ function iniciarListenerCasasCidade() {
     const cachedDespesas = localStorage.getItem('casas_despesas_cache');
     if (cachedDespesas) {
       listaDespesasCasas = JSON.parse(cachedDespesas);
+    }
+    const cachedLimpezas = localStorage.getItem('casas_limpezas_cache');
+    if (cachedLimpezas) {
+      listaLimpezasCasas = JSON.parse(cachedLimpezas);
     }
     atualizarContadoresCasasUI();
   } catch (e) {}
@@ -7447,6 +7454,36 @@ function iniciarListenerCasasCidade() {
     });
   } catch (err) {
     console.warn("Erro ao registrar snapshot de casas_despesas:", err);
+  }
+
+  // 4. Ouvir coleção de casas_limpezas (Controle de Limpeza e Manutenção via QR Code)
+  try {
+    firestoreDb.collection('casas_limpezas').onSnapshot((snapshot) => {
+      const novasLimpezas = [];
+      snapshot.forEach(doc => {
+        novasLimpezas.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Ordenar por data e hora decrescente
+      novasLimpezas.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
+
+      listaLimpezasCasas = novasLimpezas;
+      try {
+        localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
+      } catch (e) {}
+
+      if (activeTab === 'casas_cidade') {
+        filtrarCasasCidadeUI();
+      }
+
+      if (casaSelecionadaId && abaAtivaCasaDetalhes === 'limpezas') {
+        renderizarHistoricoLimpezasCasa(casaSelecionadaId);
+      }
+    }, (err) => {
+      console.warn("Aviso ao escutar casas_limpezas no Firestore:", err);
+    });
+  } catch (err) {
+    console.warn("Erro ao registrar snapshot de casas_limpezas:", err);
   }
 }
 
@@ -7723,6 +7760,9 @@ function renderizarCasasCidadeGrid(casas) {
     const totalGastoCasa = despCasaMes.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
     const pendentesCount = despCasaMes.filter(d => d.status === 'pendente').length;
 
+    // Status de Limpeza & Manutenção (QR)
+    const stLimpeza = calcularStatusLimpezasCasa(c.id);
+
     // Foto da casa com fallback
     const fotoHtml = c.foto_url 
       ? `<img src="${c.foto_url}" alt="${c.nome}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">`
@@ -7820,6 +7860,24 @@ function renderizarCasasCidadeGrid(casas) {
               `}
             </div>
 
+            <!-- Indicadores de Limpeza & Manutenção (QR Code) -->
+            <div class="grid grid-cols-2 gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+              <div class="flex items-center gap-1.5 overflow-hidden" title="${stLimpeza.rotina.tooltip}">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${stLimpeza.rotina.badgeDot}"></span>
+                <div class="min-w-0 flex-1">
+                  <span class="text-[9px] uppercase font-bold text-slate-400 block truncate">Faxina Casa</span>
+                  <span class="font-bold text-slate-800 text-[11px] truncate block">${stLimpeza.rotina.textoCurto}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 overflow-hidden" title="${stLimpeza.ar.tooltip}">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${stLimpeza.ar.badgeDot}"></span>
+                <div class="min-w-0 flex-1">
+                  <span class="text-[9px] uppercase font-bold text-slate-400 block truncate">Ar Cond. (30d)</span>
+                  <span class="font-bold text-slate-800 text-[11px] truncate block">${stLimpeza.ar.textoCurto}</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Resumo Financeiro do Mês -->
             <div class="flex items-center justify-between p-2 rounded-xl bg-amber-50/40 border border-amber-200/60 text-xs">
               <div>
@@ -7848,6 +7906,12 @@ function renderizarCasasCidadeGrid(casas) {
             </div>
 
             <div class="flex items-center gap-1.5">
+              <button onclick="abrirModalPlacaQRCasa('${c.id}')" class="btn-prefeito p-2 rounded-lg text-slate-500 hover:text-teal-600 hover:bg-slate-100 text-xs transition" title="Ver Placa QR Code da Casa">
+                <i class="fa-solid fa-qrcode text-teal-600"></i>
+              </button>
+              <button onclick="abrirModalRegistroLimpeza('${c.id}')" class="btn-prefeito p-2 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-slate-100 text-xs transition" title="Registrar Limpeza">
+                <i class="fa-solid fa-broom text-emerald-600"></i>
+              </button>
               <button onclick="editarCasa('${c.id}')" class="btn-prefeito p-2 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-slate-100 text-xs transition" title="Editar Casa">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
@@ -8107,25 +8171,38 @@ function trocarAbaCasaDetalhes(aba) {
 
   const btnComodos = document.getElementById('btnAbaCasa_comodos');
   const btnDespesas = document.getElementById('btnAbaCasa_despesas');
+  const btnLimpezas = document.getElementById('btnAbaCasa_limpezas');
   const painelComodos = document.getElementById('painelCasa_comodos');
   const painelDespesas = document.getElementById('painelCasa_despesas');
+  const painelLimpezas = document.getElementById('painelCasa_limpezas');
+
+  if (btnComodos) btnComodos.className = 'px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5';
+  if (btnDespesas) btnDespesas.className = 'px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5';
+  if (btnLimpezas) btnLimpezas.className = 'px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5';
+
+  if (painelComodos) painelComodos.classList.add('hidden');
+  if (painelDespesas) painelDespesas.classList.add('hidden');
+  if (painelLimpezas) painelLimpezas.classList.add('hidden');
 
   if (aba === 'comodos') {
-    btnComodos.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-indigo-500 text-white transition flex items-center gap-1.5';
-    btnDespesas.className = 'px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5';
-    painelComodos.classList.remove('hidden');
-    painelDespesas.classList.add('hidden');
-  } else {
-    btnComodos.className = 'px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-white transition flex items-center gap-1.5';
-    btnDespesas.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-amber-500 text-white transition flex items-center gap-1.5';
-    painelComodos.classList.add('hidden');
-    painelDespesas.classList.remove('hidden');
+    if (btnComodos) btnComodos.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-indigo-500 text-white transition flex items-center gap-1.5';
+    if (painelComodos) painelComodos.classList.remove('hidden');
+  } else if (aba === 'despesas') {
+    if (btnDespesas) btnDespesas.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-amber-500 text-white transition flex items-center gap-1.5';
+    if (painelDespesas) painelDespesas.classList.remove('hidden');
 
     const inputMes = document.getElementById('filtroMesDespesaCasaInput');
     if (inputMes && !inputMes.value) {
       inputMes.value = getMesAtualStr();
     }
     carregarDespesasCasaAtual();
+  } else if (aba === 'limpezas') {
+    if (btnLimpezas) btnLimpezas.className = 'px-4 py-2.5 text-xs font-bold border-b-2 border-teal-500 text-white transition flex items-center gap-1.5';
+    if (painelLimpezas) painelLimpezas.classList.remove('hidden');
+
+    if (casaSelecionadaId) {
+      renderizarHistoricoLimpezasCasa(casaSelecionadaId);
+    }
   }
 }
 
@@ -9726,8 +9803,9 @@ function recarregarCasasCidadeManual() {
   if (firestoreDb) {
     Promise.all([
       firestoreDb.collection('casas_cidade').get(),
-      firestoreDb.collection('casas_despesas').get()
-    ]).then(([snapCasas, snapDesp]) => {
+      firestoreDb.collection('casas_despesas').get(),
+      firestoreDb.collection('casas_limpezas').get()
+    ]).then(([snapCasas, snapDesp, snapLimp]) => {
       const novasCasas = [];
       snapCasas.forEach(doc => novasCasas.push({ id: doc.id, ...doc.data() }));
       novasCasas.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
@@ -9738,8 +9816,14 @@ function recarregarCasasCidadeManual() {
       novasDesp.sort((a, b) => new Date(b.vencimento || 0) - new Date(a.vencimento || 0));
       listaDespesasCasas = novasDesp;
 
+      const novasLimp = [];
+      snapLimp.forEach(doc => novasLimp.push({ id: doc.id, ...doc.data() }));
+      novasLimp.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
+      listaLimpezasCasas = novasLimp;
+
       localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
       localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+      localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
 
       atualizarContadoresCasasUI();
       filtrarCasasCidadeUI();
@@ -9752,6 +9836,659 @@ function recarregarCasasCidadeManual() {
   } else {
     if (icone) icone.classList.remove('fa-spin');
     filtrarCasasCidadeUI();
+  }
+}
+
+// ========================================================
+// MÓDULO DE CONTROLE DE LIMPEZA & MANUTENÇÃO VIA QR CODE
+// ========================================================
+
+// Formatador seguro de data sem problemas de fuso horário
+function formatarDataLimpezaBR(dataStr) {
+  if (!dataStr) return '--/--/----';
+  try {
+    const partes = dataStr.split('-');
+    if (partes.length === 3) {
+      return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    return new Date(dataStr + 'T12:00:00').toLocaleDateString('pt-BR');
+  } catch (e) {
+    return dataStr;
+  }
+}
+
+// Obter link público direto para o QR Code da Casa
+function getQRCodeUrlCasa(casaId) {
+  const loc = window.location;
+  let origin = loc.origin;
+  if (!origin || origin === 'null') {
+    origin = `${loc.protocol}//${loc.host}`;
+  }
+  let pathname = loc.pathname;
+  if (!pathname.endsWith('.html') && !pathname.endsWith('/')) {
+    pathname += '/';
+  }
+  return `${origin}${pathname}?acao=limpeza&casa_id=${encodeURIComponent(casaId)}`;
+}
+
+// Calcular status de limpeza da casa (Rotina Diária e Ar Condicionado 30 dias)
+function calcularStatusLimpezasCasa(casaId) {
+  const limpezasCasa = (listaLimpezasCasas || []).filter(l => l.casa_id === casaId);
+
+  // Ordenar por data_hora decrescente
+  const rotinas = limpezasCasa
+    .filter(l => l.tipo === 'rotina' || !l.tipo)
+    .sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
+
+  const arConds = limpezasCasa
+    .filter(l => l.tipo === 'ar_condicionado')
+    .sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
+
+  const hoje = new Date();
+  const hojeZero = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+  // 1. Status Rotina Diária
+  let stRotina = {
+    status: 'nunca',
+    textoCurto: 'Sem registro',
+    textoDetalhe: 'Nenhuma limpeza de rotina registrada',
+    subtexto: 'Aguardando primeira limpeza',
+    badgeDot: 'bg-slate-400',
+    cor: 'slate',
+    tooltip: 'Nenhuma limpeza de rotina registrada ainda'
+  };
+
+  if (rotinas.length > 0) {
+    const ultRotina = rotinas[0];
+    const dataUlt = new Date(ultRotina.data + 'T12:00:00');
+    const dataUltZero = new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
+    const diffDias = Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24));
+
+    if (diffDias === 0) {
+      stRotina = {
+        status: 'ok',
+        textoCurto: `Hoje às ${ultRotina.hora || '--:--'}`,
+        textoDetalhe: `Realizada hoje às ${ultRotina.hora || '--:--'} (${ultRotina.responsavel || 'Equipe'})`,
+        subtexto: `Hoje às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}`,
+        badgeDot: 'bg-emerald-500 shadow-xs',
+        cor: 'emerald',
+        tooltip: `Limpeza realizada hoje às ${ultRotina.hora} por ${ultRotina.responsavel}`
+      };
+    } else if (diffDias === 1) {
+      stRotina = {
+        status: 'atrasado',
+        textoCurto: 'Ontem (pendente)',
+        textoDetalhe: 'Pendente: última limpeza realizada ontem',
+        subtexto: `Ontem às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}`,
+        badgeDot: 'bg-amber-500',
+        cor: 'amber',
+        tooltip: `Última limpeza foi ontem às ${ultRotina.hora}. Necessária rotina de hoje.`
+      };
+    } else {
+      stRotina = {
+        status: 'atrasado',
+        textoCurto: `Atrasada (${diffDias}d)`,
+        textoDetalhe: `Atrasada há ${diffDias} dias (>24h sem faxina)`,
+        subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultRotina.data)})`,
+        badgeDot: 'bg-rose-500 animate-pulse',
+        cor: 'rose',
+        tooltip: `Limpeza atrasada há ${diffDias} dias! Última em ${formatarDataLimpezaBR(ultRotina.data)}.`
+      };
+    }
+  }
+
+  // 2. Status Ar Condicionado (Ciclo 30 dias)
+  let stAr = {
+    status: 'nunca',
+    textoCurto: 'Sem registro',
+    textoDetalhe: 'Nenhuma higienização de ar condicionado registrada',
+    subtexto: 'Ciclo de 30 dias pendente',
+    badgeDot: 'bg-slate-400',
+    cor: 'slate',
+    tooltip: 'Nenhuma higienização de ar registrada ainda'
+  };
+
+  if (arConds.length > 0) {
+    const ultAr = arConds[0];
+    const dataUlt = new Date(ultAr.data + 'T12:00:00');
+    const dataUltZero = new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
+    const diffDias = Math.max(0, Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24)));
+    const diasRestantes = 30 - diffDias;
+
+    if (diffDias <= 24) {
+      stAr = {
+        status: 'ok',
+        textoCurto: `Em dia (${diffDias}d atrás)`,
+        textoDetalhe: `Em dia: faltam ${diasRestantes} dias para o próximo ciclo`,
+        subtexto: `Última há ${diffDias} dia${diffDias === 1 ? '' : 's'} (${formatarDataLimpezaBR(ultAr.data)})`,
+        badgeDot: 'bg-emerald-500 shadow-xs',
+        cor: 'emerald',
+        tooltip: `Higienizado há ${diffDias} dias. Próxima higienização recomendada em ${diasRestantes} dias.`
+      };
+    } else if (diffDias <= 30) {
+      stAr = {
+        status: 'atencao',
+        textoCurto: `Atenção: vence em ${diasRestantes}d`,
+        textoDetalhe: `Atenção: ciclo de 30 dias vence em ${diasRestantes} dia${diasRestantes === 1 ? '' : 's'}!`,
+        subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultAr.data)})`,
+        badgeDot: 'bg-amber-500 animate-pulse',
+        cor: 'amber',
+        tooltip: `Atenção: faltam apenas ${diasRestantes} dias para completar o ciclo de 30 dias.`
+      };
+    } else {
+      const diasVencido = diffDias - 30;
+      stAr = {
+        status: 'vencido',
+        textoCurto: `Vencido (${diasVencido}d)`,
+        textoDetalhe: `VENCIDO: ultrapassou 30 dias (${diasVencido} dia${diasVencido === 1 ? '' : 's'} de atraso)`,
+        subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultAr.data)})`,
+        badgeDot: 'bg-rose-500 animate-ping',
+        cor: 'rose',
+        tooltip: `Vencido há ${diasVencido} dias! Prazo de 30 dias estourado.`
+      };
+    }
+  }
+
+  return {
+    rotina: stRotina,
+    ar: stAr,
+    totalRegistros: limpezasCasa.length
+  };
+}
+
+// Abrir modal com placa QR Code da Casa (Impressão A4)
+function abrirModalPlacaQRCasa(casaId) {
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
+  if (!c) {
+    showToast('Casa não encontrada para gerar placa.', 'warning');
+    return;
+  }
+
+  const qrUrl = getQRCodeUrlCasa(casaId);
+  const imgEl = document.getElementById('imgPlacaQRCasa');
+  const txtUrlEl = document.getElementById('textoPlacaQRCasaUrl');
+  const titEl = document.getElementById('placaCasaTitulo');
+  const endEl = document.getElementById('placaCasaEndereco');
+
+  if (titEl) titEl.textContent = (c.nome || 'Casa').toUpperCase();
+  if (endEl) endEl.textContent = `Endereço: ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+  if (txtUrlEl) txtUrlEl.textContent = qrUrl;
+
+  // Alta resolução para impressão
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
+  if (imgEl) imgEl.src = qrApiUrl;
+
+  abrirModal('modalPlacaQRCasa');
+}
+
+function imprimirPlacaQRCasa() {
+  document.body.classList.add('imprimindo-plaquinha-casa');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('imprimindo-plaquinha-casa');
+  }, 1000);
+}
+
+// Leitor de QR Code com a câmera do celular (html5-qrcode)
+function abrirScannerLimpezaQR() {
+  abrirModal('modalScannerLimpezaQR');
+
+  // Preencher seleção manual de casas
+  const sel = document.getElementById('selectCasaScannerManual');
+  if (sel) {
+    sel.innerHTML = '<option value="">Selecione uma casa...</option>' + 
+      (listaCasasCidade || []).map(c => `<option value="${c.id}">${c.nome} - ${c.endereco || ''}</option>`).join('');
+  }
+
+  setTimeout(() => {
+    iniciarCameraScannerQR();
+  }, 350);
+}
+
+function fecharScannerLimpezaQR() {
+  pararCameraScannerQR();
+  fecharModal('modalScannerLimpezaQR');
+}
+
+function iniciarCameraScannerQR() {
+  const qrArea = document.getElementById('qrReaderCameraArea');
+  if (!qrArea) return;
+
+  if (typeof Html5Qrcode === 'undefined') {
+    console.warn("Html5Qrcode não carregado");
+    qrArea.innerHTML = `
+      <div class="h-full flex flex-col items-center justify-center p-4 text-center text-slate-400">
+        <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-400 mb-2"></i>
+        <p class="text-xs text-slate-300">Biblioteca do leitor QR não carregada</p>
+        <p class="text-[10px] text-slate-500 mt-1">Utilize a seleção manual abaixo.</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (html5QrScannerInstance) {
+    try {
+      html5QrScannerInstance.stop().catch(() => {}).finally(() => {
+        html5QrScannerInstance.clear();
+        html5QrScannerInstance = null;
+      });
+    } catch (e) {}
+  }
+
+  try {
+    html5QrScannerInstance = new Html5Qrcode("qrReaderCameraArea");
+    const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+
+    html5QrScannerInstance.start(
+      { facingMode: "environment" },
+      config,
+      (decodedText) => {
+        fecharScannerLimpezaQR();
+        processarLeituraQRCasa(decodedText);
+      },
+      (error) => {
+        // Ignorar erros de quadro individual
+      }
+    ).catch(err => {
+      console.warn("Aviso ao abrir câmera:", err);
+      if (qrArea) {
+        qrArea.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center p-4 text-center text-slate-400">
+            <i class="fa-solid fa-camera-slash text-3xl mb-2 text-rose-400"></i>
+            <p class="text-xs font-semibold text-slate-300">Câmera indisponível ou permissão negada</p>
+            <p class="text-[10px] text-slate-500 mt-1">Selecione a casa na lista manual logo abaixo.</p>
+          </div>
+        `;
+      }
+    });
+  } catch (err) {
+    console.warn("Erro ao iniciar Html5Qrcode:", err);
+  }
+}
+
+function pararCameraScannerQR() {
+  if (html5QrScannerInstance) {
+    try {
+      html5QrScannerInstance.stop().then(() => {
+        html5QrScannerInstance.clear();
+        html5QrScannerInstance = null;
+      }).catch(() => {
+        html5QrScannerInstance = null;
+      });
+    } catch (e) {
+      html5QrScannerInstance = null;
+    }
+  }
+}
+
+function confirmarCasaManualScanner() {
+  const sel = document.getElementById('selectCasaScannerManual');
+  const casaId = sel ? sel.value : null;
+  if (!casaId) {
+    showToast('Selecione uma casa para registrar o serviço', 'warning');
+    return;
+  }
+  fecharScannerLimpezaQR();
+  abrirModalRegistroLimpeza(casaId);
+}
+
+// Processador inteligente do texto decodificado do QR Code
+function processarLeituraQRCasa(texto) {
+  if (!texto) return;
+  texto = String(texto).trim();
+
+  let casaId = null;
+  let tipoPadrao = 'rotina';
+
+  // 1. Formato URL: ?acao=limpeza&casa_id=...
+  try {
+    let urlObj = null;
+    if (texto.startsWith('http://') || texto.startsWith('https://')) {
+      urlObj = new URL(texto);
+    } else if (texto.startsWith('?') || texto.includes('casa_id=')) {
+      urlObj = new URL(`https://dummy.local/${texto.startsWith('?') ? texto : '?' + texto}`);
+    }
+
+    if (urlObj) {
+      const qCasaId = urlObj.searchParams.get('casa_id');
+      const qTipo = urlObj.searchParams.get('tipo');
+      if (qCasaId) casaId = qCasaId;
+      if (qTipo && (qTipo === 'ar_condicionado' || qTipo === 'rotina')) tipoPadrao = qTipo;
+    }
+  } catch (e) {}
+
+  // 2. Formato JSON
+  if (!casaId && texto.startsWith('{') && texto.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(texto);
+      if (parsed.casa_id || parsed.id) casaId = parsed.casa_id || parsed.id;
+      if (parsed.tipo) tipoPadrao = parsed.tipo;
+    } catch (e) {}
+  }
+
+  // 3. Formato casa:ID
+  if (!casaId && texto.toLowerCase().startsWith('casa:')) {
+    casaId = texto.split(':')[1].trim();
+  }
+
+  // 4. ID direto ou busca por nome
+  if (!casaId) {
+    const achou = (listaCasasCidade || []).find(c => c.id === texto || (c.nome && c.nome.toLowerCase() === texto.toLowerCase()));
+    if (achou) casaId = achou.id;
+  }
+
+  if (!casaId) {
+    casaId = texto;
+  }
+
+  const casaEncontrada = (listaCasasCidade || []).find(c => c.id === casaId);
+  if (!casaEncontrada) {
+    showToast(`QR Code lido ("${casaId}"), mas a casa não foi localizada no cadastro.`, 'warning');
+    return;
+  }
+
+  showToast(`Casa "${casaEncontrada.nome}" identificada com sucesso!`, 'success');
+  abrirModalRegistroLimpeza(casaId, tipoPadrao);
+}
+
+// Abrir formulário para registrar limpeza ou manutenção
+function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
+  const c = (listaCasasCidade || []).find(x => x.id === casaId);
+  if (!c) {
+    showToast('Casa não encontrada para registrar limpeza', 'error');
+    return;
+  }
+
+  const idInput = document.getElementById('registroLimpezaCasaId');
+  const nomeEl = document.getElementById('registroLimpezaCasaNome');
+  const endEl = document.getElementById('registroLimpezaCasaEndereco');
+  const subTit = document.getElementById('modalRegistroLimpezaCasaSubtitulo');
+
+  if (idInput) idInput.value = casaId;
+  if (nomeEl) nomeEl.textContent = c.nome;
+  if (endEl) endEl.innerHTML = `<i class="fa-solid fa-location-dot text-rose-500"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+  if (subTit) subTit.textContent = `Casa: ${c.nome}`;
+
+  // Data e hora atuais
+  const agora = new Date();
+  const dataHojeStr = agora.toISOString().split('T')[0];
+  const horaHojeStr = agora.toTimeString().slice(0, 5);
+
+  const dtEl = document.getElementById('registroLimpezaData');
+  const hrEl = document.getElementById('registroLimpezaHora');
+  if (dtEl) dtEl.value = dataHojeStr;
+  if (hrEl) hrEl.value = horaHojeStr;
+
+  // Responsável
+  const respEl = document.getElementById('registroLimpezaResponsavel');
+  if (respEl) {
+    respEl.value = (currentUserName && currentUserName !== 'Prefeito da Obra') ? currentUserName : '';
+  }
+
+  // Obs
+  const obsEl = document.getElementById('registroLimpezaObservacoes');
+  if (obsEl) obsEl.value = '';
+
+  // Selecionar tipo de serviço
+  const radio = document.querySelector(`input[name="registroLimpezaTipo"][value="${tipoPadrao}"]`);
+  if (radio) radio.checked = true;
+  atualizarEstiloTipoLimpeza();
+
+  abrirModal('modalRegistroLimpezaCasa');
+}
+
+// Alternar estilo visual dos seletores de tipo de serviço
+function atualizarEstiloTipoLimpeza() {
+  const tipo = document.querySelector('input[name="registroLimpezaTipo"]:checked')?.value || 'rotina';
+  const lblRotina = document.getElementById('labelTipoLimpezaRotina');
+  const lblAr = document.getElementById('labelTipoLimpezaAr');
+
+  if (tipo === 'rotina') {
+    if (lblRotina) lblRotina.className = 'cursor-pointer border-2 border-emerald-500 bg-emerald-50/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (lblAr) lblAr.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-3 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+  } else {
+    if (lblRotina) lblRotina.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-3 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+    if (lblAr) lblAr.className = 'cursor-pointer border-2 border-sky-500 bg-sky-50/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none shadow-xs';
+  }
+}
+
+// Salvar registro de limpeza no estado local, auditoria e Firestore
+async function salvarRegistroLimpeza(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const casaId = document.getElementById('registroLimpezaCasaId').value;
+  const tipo = document.querySelector('input[name="registroLimpezaTipo"]:checked')?.value || 'rotina';
+  const data = document.getElementById('registroLimpezaData').value;
+  const hora = document.getElementById('registroLimpezaHora').value;
+  const responsavel = document.getElementById('registroLimpezaResponsavel').value.trim();
+  const observacoes = document.getElementById('registroLimpezaObservacoes').value.trim();
+
+  if (!casaId) {
+    showToast('Erro: nenhuma casa selecionada para a limpeza.', 'error');
+    return;
+  }
+  if (!data || !hora) {
+    showToast('Informe a data e o horário da limpeza.', 'warning');
+    return;
+  }
+  if (!responsavel) {
+    showToast('Informe o nome do responsável pela limpeza.', 'warning');
+    return;
+  }
+
+  const dataHoraStr = `${data}T${hora}:00`;
+  const casa = (listaCasasCidade || []).find(x => x.id === casaId);
+  const casaNome = casa ? casa.nome : 'Casa';
+
+  const novoId = 'limpeza_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+  const registro = {
+    id: novoId,
+    casa_id: casaId,
+    casa_nome: casaNome,
+    tipo: tipo,
+    data: data,
+    hora: hora,
+    data_hora: dataHoraStr,
+    responsavel: responsavel,
+    observacoes: observacoes || '',
+    criado_em: new Date().toISOString(),
+    criado_por: currentUserName || 'Usuário'
+  };
+
+  // 1. Salvar no estado local
+  listaLimpezasCasas.unshift(registro);
+  try {
+    localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
+  } catch (err) {}
+
+  // 2. Registrar na auditoria central
+  if (typeof registrarAuditoria === 'function') {
+    const descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado (Ciclo 30d)';
+    registrarAuditoria(
+      'casas',
+      'LIMPEZA',
+      `${descTipo} registrada para ${casaNome} por ${responsavel}. Obs: ${observacoes || 'Nenhuma'}`
+    );
+  }
+
+  // 3. Salvar no Firestore se disponível
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_limpezas').doc(novoId).set(registro);
+    } catch (err) {
+      console.warn("Aviso ao salvar limpeza no Firestore:", err);
+    }
+  }
+
+  fecharModal('modalRegistroLimpezaCasa');
+  showToast(`✅ Limpeza (${tipo === 'rotina' ? 'Rotina Diária' : 'Ar Condicionado'}) registrada com sucesso!`, 'success');
+
+  // Atualizar visualizações
+  if (activeTab === 'casas_cidade') {
+    filtrarCasasCidadeUI();
+  }
+  if (casaSelecionadaId === casaId) {
+    renderizarHistoricoLimpezasCasa(casaId);
+  }
+}
+
+// Renderizar histórico de limpezas da casa no modal de detalhes
+function renderizarHistoricoLimpezasCasa(casaId) {
+  const container = document.getElementById('casaDetalhesLimpezasTabela');
+  const vazio = document.getElementById('casaDetalhesLimpezasVazio');
+  if (!container) return;
+
+  const st = calcularStatusLimpezasCasa(casaId);
+
+  // Atualizar cards de status resumo no topo da aba de limpezas
+  const txtRotina = document.getElementById('statusTextoLimpezaRotina');
+  const subRotina = document.getElementById('subtextoLimpezaRotina');
+  const cardRotina = document.getElementById('statusCardLimpezaRotina');
+  if (txtRotina) txtRotina.textContent = st.rotina.textoDetalhe;
+  if (subRotina) subRotina.textContent = `Última: ${st.rotina.subtexto}`;
+  if (cardRotina) {
+    cardRotina.className = st.rotina.cor === 'emerald'
+      ? 'bg-emerald-50/40 p-4 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-between'
+      : (st.rotina.cor === 'rose'
+        ? 'bg-rose-50/40 p-4 rounded-xl border border-rose-200 shadow-sm flex items-center justify-between'
+        : 'bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between');
+  }
+
+  const txtAr = document.getElementById('statusTextoLimpezaAr');
+  const subAr = document.getElementById('subtextoLimpezaAr');
+  const cardAr = document.getElementById('statusCardLimpezaAr');
+  if (txtAr) txtAr.textContent = st.ar.textoDetalhe;
+  if (subAr) subAr.textContent = `Última: ${st.ar.subtexto}`;
+  if (cardAr) {
+    cardAr.className = st.ar.cor === 'emerald'
+      ? 'bg-emerald-50/40 p-4 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-between'
+      : (st.ar.cor === 'amber'
+        ? 'bg-amber-50/50 p-4 rounded-xl border border-amber-300 shadow-sm flex items-center justify-between'
+        : (st.ar.cor === 'rose'
+          ? 'bg-rose-50/40 p-4 rounded-xl border border-rose-200 shadow-sm flex items-center justify-between'
+          : 'bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between'));
+  }
+
+  // Obter registros e ordenar por data_hora desc
+  const registros = (listaLimpezasCasas || [])
+    .filter(l => l.casa_id === casaId)
+    .sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
+
+  if (registros.length === 0) {
+    container.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+
+  if (vazio) vazio.classList.add('hidden');
+
+  const hoje = new Date();
+  const hojeZero = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+  container.innerHTML = registros.map(reg => {
+    const isAr = reg.tipo === 'ar_condicionado';
+    const dataReg = new Date((reg.data || '') + 'T12:00:00');
+    const dataRegZero = new Date(dataReg.getFullYear(), dataReg.getMonth(), dataReg.getDate());
+    const diffDias = Math.floor((hojeZero - dataRegZero) / (1000 * 60 * 60 * 24));
+
+    let decorridoStr = '';
+    if (diffDias === 0) decorridoStr = 'Hoje';
+    else if (diffDias === 1) decorridoStr = 'Ontem';
+    else decorridoStr = `Há ${diffDias} dias`;
+
+    return `
+      <div class="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl ${isAr ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'} flex items-center justify-center flex-shrink-0 text-base">
+            <i class="fa-solid ${isAr ? 'fa-snowflake' : 'fa-broom'}"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2 py-0.5 rounded text-[11px] font-bold ${isAr ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}">
+                ${isAr ? 'Ar Condicionado (30d)' : 'Limpeza de Rotina'}
+              </span>
+              <span class="text-xs font-bold text-slate-800">
+                ${formatarDataLimpezaBR(reg.data)} às ${reg.hora || '--:--'}
+              </span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">
+                ${decorridoStr}
+              </span>
+            </div>
+
+            <p class="text-xs text-slate-600 mt-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-user-check text-slate-400 text-[11px]"></i>
+              <span class="font-semibold text-slate-800">${reg.responsavel || 'Não informado'}</span>
+            </p>
+
+            ${reg.observacoes ? `
+              <p class="text-xs text-slate-500 mt-1 bg-slate-50 p-2 rounded-lg border border-slate-100 leading-relaxed italic">
+                "${reg.observacoes}"
+              </p>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 sm:self-center ml-auto sm:ml-0">
+          <button onclick="excluirRegistroLimpeza('${reg.id}')" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir este registro">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Excluir registro do histórico de limpeza
+async function excluirRegistroLimpeza(id) {
+  if (!confirm('Deseja realmente excluir este registro de limpeza do histórico?')) return;
+
+  const idx = (listaLimpezasCasas || []).findIndex(x => x.id === id);
+  if (idx !== -1) {
+    listaLimpezasCasas.splice(idx, 1);
+    try {
+      localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
+    } catch (e) {}
+
+    if (firestoreDb) {
+      try {
+        await firestoreDb.collection('casas_limpezas').doc(id).delete();
+      } catch (e) {}
+    }
+
+    showToast('Registro de limpeza excluído do histórico.', 'info');
+    if (casaSelecionadaId) {
+      renderizarHistoricoLimpezasCasa(casaSelecionadaId);
+    }
+    if (activeTab === 'casas_cidade') {
+      filtrarCasasCidadeUI();
+    }
+  }
+}
+
+// Verificar parâmetros de URL (Deep Linking ao ler o QR Code com a câmera do celular)
+function verificarAcaoUrlParametros() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const acao = params.get('acao');
+    const casaId = params.get('casa_id');
+
+    if (acao === 'limpeza' && casaId) {
+      if (typeof switchTab === 'function') {
+        switchTab('casas_cidade');
+      }
+
+      const tentarAbrir = (tentativas = 0) => {
+        const casa = (listaCasasCidade || []).find(c => c.id === casaId);
+        if (casa) {
+          abrirModalRegistroLimpeza(casaId);
+        } else if (tentativas < 12) {
+          setTimeout(() => tentarAbrir(tentativas + 1), 300);
+        }
+      };
+      setTimeout(() => tentarAbrir(), 300);
+    }
+  } catch (e) {
+    console.warn("Erro ao verificar parâmetros de URL:", e);
   }
 }
 
@@ -9781,6 +10518,22 @@ window.alternarStatusDespesaCasa = alternarStatusDespesaCasa;
 window.excluirDespesaCasa = excluirDespesaCasa;
 window.recarregarCasasCidadeManual = recarregarCasasCidadeManual;
 window.filtrarCasasCidadeUI = filtrarCasasCidadeUI;
+
+// Funções de Limpeza & Manutenção via QR Code
+window.listaLimpezasCasas = listaLimpezasCasas;
+window.abrirScannerLimpezaQR = abrirScannerLimpezaQR;
+window.fecharScannerLimpezaQR = fecharScannerLimpezaQR;
+window.confirmarCasaManualScanner = confirmarCasaManualScanner;
+window.processarLeituraQRCasa = processarLeituraQRCasa;
+window.abrirModalRegistroLimpeza = abrirModalRegistroLimpeza;
+window.atualizarEstiloTipoLimpeza = atualizarEstiloTipoLimpeza;
+window.salvarRegistroLimpeza = salvarRegistroLimpeza;
+window.excluirRegistroLimpeza = excluirRegistroLimpeza;
+window.abrirModalPlacaQRCasa = abrirModalPlacaQRCasa;
+window.imprimirPlacaQRCasa = imprimirPlacaQRCasa;
+window.renderizarHistoricoLimpezasCasa = renderizarHistoricoLimpezasCasa;
+window.calcularStatusLimpezasCasa = calcularStatusLimpezasCasa;
+window.verificarAcaoUrlParametros = verificarAcaoUrlParametros;
 
 
 
