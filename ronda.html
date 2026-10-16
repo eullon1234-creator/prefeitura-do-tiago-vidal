@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Ronda do Canteiro • Higiene & Bebedouros | GEL Engenharia</title>
+  
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#0f172a">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  
+  <!-- Firebase SDKs compat v10 -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    .avaliacao-chip.active {
+      border-color: #0d9488;
+      background-color: #0d9488;
+      color: #ffffff;
+      font-weight: 700;
+    }
+    .check-item {
+      transition: all 0.2s ease;
+    }
+    .check-item.checked {
+      background-color: rgba(13, 148, 136, 0.15);
+      border-color: #0d9488;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-teal-500 selection:text-slate-950 pb-8">
+
+  <!-- Header Mobile Friendly (Identificação Oficial GEL) -->
+  <header class="bg-slate-950/90 backdrop-blur border-b border-slate-800 sticky top-0 z-30 px-4 py-3 shadow-md">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-11 px-2.5 py-1 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-700/50 flex-shrink-0">
+          <img src="logo_gel_oficial.png" alt="Logo GEL Oficial" class="h-8 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-sm font-black text-white leading-tight uppercase tracking-wide">GEL Engenharia</h1>
+            <span class="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
+          </div>
+          <p class="text-[11px] text-teal-400 font-semibold flex items-center gap-1 mt-0.5">
+            <i class="fa-solid fa-clipboard-check text-[10px]"></i> Ronda do Canteiro • Higiene & Bebedouros
+          </p>
+        </div>
+      </div>
+      <div class="text-right">
+        <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800">
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span> QR Ativo
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+
+    <!-- Card de Identificação do Ponto -->
+    <div class="bg-gradient-to-br from-slate-800 to-slate-850 p-4 rounded-2xl border border-slate-700/80 shadow-lg space-y-2">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div id="displayPontoIcone" class="w-12 h-12 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center flex-shrink-0 text-2xl border border-teal-500/30">
+            <i class="fa-solid fa-restroom"></i>
+          </div>
+          <div>
+            <span id="displayPontoTipoBadge" class="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">Banheiro Identificado</span>
+            <h2 id="displayPontoNome" class="text-base font-black text-white leading-tight">Carregando ponto...</h2>
+          </div>
+        </div>
+        <span id="displayMetaFrequencia" class="text-[10px] px-2 py-1 rounded-md bg-slate-900 text-amber-300 font-bold border border-slate-700 whitespace-nowrap">
+          Meta: 2x/dia
+        </span>
+      </div>
+
+      <p id="displayPontoSetor" class="text-xs text-slate-300 flex items-center gap-1.5 pt-1 border-t border-slate-700/50">
+        <i class="fa-solid fa-location-dot text-rose-400"></i>
+        <span>Consultando localização...</span>
+      </p>
+
+      <!-- Resumo das limpezas de hoje -->
+      <div id="resumoLimpezasHojeContainer" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/70 text-xs space-y-1">
+        <div class="flex items-center justify-between text-slate-400 font-semibold text-[11px]">
+          <span>Limpezas registradas hoje:</span>
+          <span id="badgeProgressoHoje" class="text-amber-400 font-bold">0 de 2</span>
+        </div>
+        <p id="textoStatusHoje" class="text-slate-300 text-[11px]">
+          Nenhuma limpeza realizada hoje ainda. Registrando a 1ª limpeza do dia.
+        </p>
+      </div>
+
+      <!-- Dropdown alternativo se ponto não tiver sido passado na URL -->
+      <div id="containerSelecaoPonto" class="hidden pt-2">
+        <label for="selectPontoManual" class="block text-xs font-bold text-slate-300 mb-1">
+          Selecione o Ponto que você está atendendo:
+        </label>
+        <select id="selectPontoManual" onchange="selecionarPontoManual(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
+          <option value="">Carregando pontos de ronda...</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Formulário de Registro (Acessado pelo Colaborador da Ronda) -->
+    <form id="formRonda" onsubmit="salvarRondaPublica(event)" class="bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-slate-700/80 shadow-xl space-y-4">
+      <input type="hidden" id="inputPontoId">
+      <input type="hidden" id="inputPontoNome">
+      <input type="hidden" id="inputPontoTipo" value="banheiro">
+      <input type="hidden" id="inputPontoSetor">
+      <input type="hidden" id="inputPontoMeta" value="2">
+      <input type="hidden" id="inputAvaliacao" value="Excelente / Em Ordem">
+
+      <!-- Nome do Responsável com Memória Local -->
+      <div>
+        <label for="inputResponsavel" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span><i class="fa-solid fa-user-check text-teal-400 mr-1"></i> Seu Nome (Responsável) *</span>
+          <span class="text-[10px] text-slate-400 font-normal">Identificação</span>
+        </label>
+        <input 
+          type="text" 
+          id="inputResponsavel" 
+          required 
+          placeholder="Ex: Maria Silva / João Santos" 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white font-semibold text-xs outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500"
+        >
+      </div>
+
+      <!-- Data e Hora (Fuso Local) -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="inputData" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+            Data *
+          </label>
+          <input 
+            type="date" 
+            id="inputData" 
+            required 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3 py-2 text-white font-semibold text-xs outline-none transition"
+          >
+        </div>
+        <div>
+          <label for="inputHora" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+            Horário *
+          </label>
+          <input 
+            type="time" 
+            id="inputHora" 
+            required 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3 py-2 text-white font-semibold text-xs outline-none transition"
+          >
+        </div>
+      </div>
+
+      <!-- Checklist Dinâmico de Serviços -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span><i class="fa-solid fa-list-check text-teal-400 mr-1"></i> O que foi realizado?</span>
+          <span class="text-[10px] text-teal-400 font-bold">Marque os itens</span>
+        </label>
+        
+        <!-- Checklist para Banheiro -->
+        <div id="checklistBanheiro" class="space-y-2">
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Recolhimento de Lixo e Troca de Saco" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🗑️ Esvaziamento de Lixeiras & Troca de Sacos</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Lavagem e Desinfecção Geral (Vaso/Piso)" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🧼 Lavagem e Desinfecção (Vaso, Mictório e Piso)</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Reposição de Papel Higiênico" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🧻 Reposição de Papel Higiênico</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Reposição de Sabonete / Álcool 70%" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🧴 Reposição de Sabonete Líquido / Álcool</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Pia Limpa e Checagem de Descarga/Água" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🚿 Limpeza da Pia e Checagem de Descarga</span>
+          </label>
+        </div>
+
+        <!-- Checklist para Bebedouro -->
+        <div id="checklistBebedouro" class="hidden space-y-2">
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Higienização das Bicas com Álcool 70%" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🚰 Higienização e Desinfecção das Bicas / Torneiras</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Lavagem da Cuba, Ralo e Bandeja" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>✨ Limpeza da Cuba, Ralo e Bandeja Pingadeira</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Troca ou Abastecimento de Água/Galão" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>💧 Troca de Garrafão / Abastecimento de Água</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Checagem de Refrigeração (Água Gelada)" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>❄️ Checagem de Refrigeração (Água Gelando)</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Inspeção Visual de Filtro e Sem Vazamento" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🔍 Inspeção do Filtro e Ausência de Vazamento</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Estado Geral / Avaliação -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <i class="fa-solid fa-star text-amber-400"></i> Condições do Local
+        </label>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <button type="button" onclick="escolherAvaliacao(this, 'Excelente / Em Ordem')" class="avaliacao-chip active p-2.5 rounded-xl border border-teal-500 bg-teal-600 text-white font-bold text-center transition text-[11px]">
+            ✨ Tudo OK
+          </button>
+          <button type="button" onclick="escolherAvaliacao(this, 'Atenção / Falta Insumo')" class="avaliacao-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-center transition text-[11px]">
+            ⚠️ Falta Insumo
+          </button>
+          <button type="button" onclick="escolherAvaliacao(this, 'Aviso / Precisa Reparo')" class="avaliacao-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-center transition text-[11px]">
+            🛠️ Precisa Reparo
+          </button>
+        </div>
+      </div>
+
+      <!-- Observações Opcionais -->
+      <div>
+        <label for="inputObservacoes" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <i class="fa-solid fa-comment-dots text-slate-400"></i> Observações / Recado ao Prefeito (Opcional)
+        </label>
+        <textarea 
+          id="inputObservacoes" 
+          rows="2" 
+          placeholder="Ex: Torneira com leve gotejamento, saboneteira reposta, filtro limpo..." 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white text-xs outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500 resize-none"
+        ></textarea>
+      </div>
+
+      <!-- Botão de Envio -->
+      <div class="pt-2">
+        <button 
+          type="submit" 
+          id="btnConfirmarRonda" 
+          class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 transition transform active:scale-98"
+        >
+          <i class="fa-solid fa-check text-base"></i>
+          <span>Confirmar Registro de Ronda</span>
+        </button>
+      </div>
+
+    </form>
+
+    <!-- Tela de Conclusão / Sucesso -->
+    <div id="telaSucessoRonda" class="hidden bg-slate-800/90 backdrop-blur rounded-2xl p-6 border border-teal-500/50 shadow-2xl text-center space-y-4 animate-in fade-in duration-300">
+      <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-3xl border-2 border-emerald-500 shadow-md">
+        <i class="fa-solid fa-check"></i>
+      </div>
+
+      <div>
+        <h3 class="text-lg font-black text-white">Ronda Registrada com Sucesso!</h3>
+        <p class="text-xs text-slate-300 mt-1">Obrigado! O Prefeito da Obra já recebeu a confirmação em tempo real.</p>
+      </div>
+
+      <!-- Resumo do Registro -->
+      <div class="bg-slate-900/90 rounded-xl p-4 text-left text-xs border border-slate-700/80 space-y-2">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">Protocolo:</span>
+          <span id="sucessoProtocolo" class="font-mono font-bold text-teal-400">#RONDA-000000</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Ponto:</span>
+          <span id="sucessoPontoNome" class="font-bold text-white">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Setor:</span>
+          <span id="sucessoSetor" class="text-slate-200">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Progresso Hoje:</span>
+          <span id="sucessoOrdemDia" class="font-bold text-amber-400">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Responsável:</span>
+          <span id="sucessoResponsavel" class="font-bold text-slate-200">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Data e Hora:</span>
+          <span id="sucessoDataHora" class="text-slate-300">-</span>
+        </div>
+      </div>
+
+      <div class="p-3 bg-teal-950/40 border border-teal-800/60 rounded-xl text-teal-300 text-xs text-left flex items-start gap-2">
+        <i class="fa-solid fa-shield-halved text-teal-400 mt-0.5"></i>
+        <span>Dados arquivados em auditoria de canteiro (NR-18). Você já pode fechar esta página ou seguir para o próximo ponto de ronda.</span>
+      </div>
+
+      <!-- Botão para outro registro -->
+      <div class="pt-2">
+        <button onclick="fazerOutroRegistroRonda()" class="w-full py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span>Registrar Outro Ponto de Ronda</span>
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Rodapé Institucional -->
+  <footer class="max-w-md mx-auto px-4 text-center text-[11px] text-slate-500 mt-4 space-y-1">
+    <p>Prefeitura de Canteiro • GEL (Goetze Lobato Eng. S.A.)</p>
+    <p class="text-slate-600">Sistema Seguro de Auditoria de Serviços Prediais & Sanitários</p>
+  </footer>
+
+  <!-- Scripts e Lógica Firebase -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCd1Uu_dRx8k4EcgifWUmsmfeqnAcB4PHw",
+      authDomain: "prefeitura-cc71b.firebaseapp.com",
+      projectId: "prefeitura-cc71b",
+      storageBucket: "prefeitura-cc71b.firebasestorage.app",
+      messagingSenderId: "395936672533",
+      appId: "1:395936672533:web:d7d17537d2c38c47bc971c",
+      measurementId: "G-YYXMDWCM4Q"
+    };
+
+    let firestoreDb = null;
+    let listaPontosDisponiveis = [];
+    let pontoCarregado = null;
+    let registrosPontoHoje = [];
+
+    // Inicialização do Firebase
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      firestoreDb = firebase.firestore();
+      firestoreDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    } catch (e) {
+      console.warn("Aviso Firebase:", e);
+    }
+
+    // Helper para obter data local (YYYY-MM-DD) sem problemas de fuso horário UTC
+    function getDataHojeLocal(dataObj = new Date()) {
+      const d = dataObj instanceof Date ? dataObj : new Date(dataObj);
+      if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-CA');
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    // Inicialização ao carregar a página
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. Preencher data e hora atuais no fuso local
+      const agora = new Date();
+      document.getElementById('inputData').value = getDataHojeLocal(agora);
+      document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
+
+      // 2. Preencher nome do responsável se já salvo anteriormente
+      try {
+        const salvoNome = localStorage.getItem('ronda_responsavel_nome');
+        if (salvoNome) document.getElementById('inputResponsavel').value = salvoNome;
+      } catch (e) {}
+
+      // 3. Obter ponto_id dos parâmetros da URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id');
+
+      // 4. Carregar ponto
+      carregarPontoRonda(urlPontoId);
+    });
+
+    // Carregar informações do ponto
+    async function carregarPontoRonda(pontoId) {
+      // Tentar ler cache de pontos do localStorage
+      try {
+        const cachedPontos = localStorage.getItem('ronda_pontos_cache');
+        if (cachedPontos) {
+          listaPontosDisponiveis = JSON.parse(cachedPontos);
+        }
+      } catch (e) {}
+
+      // Buscar no Firestore
+      if (firestoreDb) {
+        try {
+          const snap = await firestoreDb.collection('ronda_pontos').get();
+          const remotas = [];
+          snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+          if (remotas.length > 0) {
+            listaPontosDisponiveis = remotas;
+          }
+        } catch (err) {
+          console.warn("Aviso ao buscar pontos de ronda no Firestore:", err);
+        }
+      }
+
+      // Preencher select manual
+      const selEl = document.getElementById('selectPontoManual');
+      if (selEl && listaPontosDisponiveis.length > 0) {
+        selEl.innerHTML = '<option value="">Selecione o ponto de ronda...</option>' + 
+          listaPontosDisponiveis.map(p => `<option value="${p.id}">${p.tipo === 'banheiro' ? '🚻' : '🚰'} ${p.nome} (${p.setor || 'Canteiro'})</option>`).join('');
+      }
+
+      if (pontoId) {
+        pontoCarregado = listaPontosDisponiveis.find(p => p.id === pontoId);
+        if (!pontoCarregado && firestoreDb) {
+          try {
+            const doc = await firestoreDb.collection('ronda_pontos').doc(pontoId).get();
+            if (doc.exists) {
+              pontoCarregado = { id: doc.id, ...doc.data() };
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (pontoCarregado) {
+        aplicarDadosPonto(pontoCarregado);
+      } else {
+        // Se não identificado na URL, exibe o seletor manual
+        document.getElementById('displayPontoNome').textContent = 'Selecione o Ponto Abaixo';
+        document.getElementById('displayPontoSetor').innerHTML = '<i class="fa-solid fa-circle-info text-amber-400"></i> Escolha na lista qual banheiro ou bebedouro você está atendendo:';
+        document.getElementById('containerSelecaoPonto').classList.remove('hidden');
+      }
+    }
+
+    async function aplicarDadosPonto(p) {
+      document.getElementById('inputPontoId').value = p.id;
+      document.getElementById('inputPontoNome').value = p.nome;
+      document.getElementById('inputPontoTipo').value = p.tipo || 'banheiro';
+      document.getElementById('inputPontoSetor').value = p.setor || 'Canteiro Geral';
+      
+      const meta = Number(p.frequencia_diaria || (p.tipo === 'banheiro' ? 2 : 1));
+      document.getElementById('inputPontoMeta').value = meta;
+
+      document.getElementById('displayPontoNome').textContent = p.nome;
+      document.getElementById('displayPontoSetor').innerHTML = `<i class="fa-solid fa-location-dot text-rose-400"></i> ${p.setor || 'Canteiro Central'} ${p.observacoes ? '• ' + p.observacoes : ''}`;
+      document.getElementById('displayMetaFrequencia').textContent = `Meta: ${meta}x ao dia`;
+      document.getElementById('containerSelecaoPonto').classList.add('hidden');
+
+      const isBanheiro = (p.tipo || 'banheiro') === 'banheiro';
+      const iconeEl = document.getElementById('displayPontoIcone');
+      const badgeTipoEl = document.getElementById('displayPontoTipoBadge');
+      const checkBanheiro = document.getElementById('checklistBanheiro');
+      const checkBebedouro = document.getElementById('checklistBebedouro');
+
+      if (isBanheiro) {
+        if (iconeEl) {
+          iconeEl.className = 'w-12 h-12 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center flex-shrink-0 text-2xl border border-teal-500/30';
+          iconeEl.innerHTML = '<i class="fa-solid fa-restroom"></i>';
+        }
+        if (badgeTipoEl) badgeTipoEl.textContent = 'Banheiro Identificado';
+        if (checkBanheiro) checkBanheiro.classList.remove('hidden');
+        if (checkBebedouro) checkBebedouro.classList.add('hidden');
+      } else {
+        if (iconeEl) {
+          iconeEl.className = 'w-12 h-12 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0 text-2xl border border-sky-500/30';
+          iconeEl.innerHTML = '<i class="fa-solid fa-faucet-drip"></i>';
+        }
+        if (badgeTipoEl) badgeTipoEl.textContent = 'Bebedouro Identificado';
+        if (checkBanheiro) checkBanheiro.classList.add('hidden');
+        if (checkBebedouro) checkBebedouro.classList.remove('hidden');
+      }
+
+      // Buscar registros do dia de hoje para calcular progresso
+      await carregarRegistrosPontoHoje(p.id, meta);
+    }
+
+    async function carregarRegistrosPontoHoje(pontoId, meta) {
+      const dataHoje = getDataHojeLocal();
+      let regs = [];
+
+      try {
+        const cached = localStorage.getItem('ronda_registros_cache');
+        if (cached) {
+          const todos = JSON.parse(cached);
+          regs = todos.filter(r => r.ponto_id === pontoId && r.data === dataHoje);
+        }
+      } catch (e) {}
+
+      if (firestoreDb) {
+        try {
+          const snap = await firestoreDb.collection('ronda_registros')
+            .where('ponto_id', '==', pontoId)
+            .where('data', '==', dataHoje)
+            .get();
+          const remotas = [];
+          snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+          if (remotas.length > 0) regs = remotas;
+        } catch (e) {}
+      }
+
+      regs.sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
+      registrosPontoHoje = regs;
+
+      const qtdHoje = regs.length;
+      const badgeEl = document.getElementById('badgeProgressoHoje');
+      const textoEl = document.getElementById('textoStatusHoje');
+
+      if (badgeEl) {
+        badgeEl.textContent = `${qtdHoje} de ${meta}`;
+        if (qtdHoje >= meta) {
+          badgeEl.className = 'text-emerald-400 font-bold';
+        } else {
+          badgeEl.className = 'text-amber-400 font-bold';
+        }
+      }
+
+      if (textoEl) {
+        if (qtdHoje === 0) {
+          textoEl.innerHTML = `<span class="text-amber-300 font-semibold">Pendente:</span> Nenhuma limpeza registrada hoje ainda. Esta será a <b>1ª limpeza do dia</b>.`;
+        } else if (qtdHoje < meta) {
+          const ult = regs[regs.length - 1];
+          textoEl.innerHTML = `<span class="text-amber-300 font-semibold">Em andamento:</span> ${qtdHoje}ª limpeza realizada às ${ult.hora || '--:--'} por ${ult.responsavel || 'Colaborador'}. Registrando a <b>${qtdHoje + 1}ª limpeza do dia</b>.`;
+        } else {
+          const ult = regs[regs.length - 1];
+          textoEl.innerHTML = `<span class="text-emerald-400 font-semibold">Meta de hoje batida!</span> (${qtdHoje} limpezas feitas, última às ${ult.hora || '--:--'}). Você pode registrar uma limpeza extra se necessário.`;
+        }
+      }
+    }
+
+    function selecionarPontoManual(id) {
+      const p = listaPontosDisponiveis.find(x => x.id === id);
+      if (p) {
+        pontoCarregado = p;
+        aplicarDadosPonto(p);
+      }
+    }
+
+    // Alternar avaliação
+    function escolherAvaliacao(btn, valor) {
+      document.getElementById('inputAvaliacao').value = valor;
+      document.querySelectorAll('.avaliacao-chip').forEach(el => {
+        el.className = 'avaliacao-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-center transition text-[11px]';
+      });
+      btn.className = 'avaliacao-chip active p-2.5 rounded-xl border border-teal-500 bg-teal-600 text-white font-bold text-center transition text-[11px]';
+    }
+
+    // Salvar Registro de Ronda
+    async function salvarRondaPublica(e) {
+      if (e) e.preventDefault();
+
+      const pontoId = document.getElementById('inputPontoId').value;
+      const pontoNome = document.getElementById('inputPontoNome').value || document.getElementById('displayPontoNome').textContent;
+      const pontoTipo = document.getElementById('inputPontoTipo').value || 'banheiro';
+      const pontoSetor = document.getElementById('inputPontoSetor').value || 'Canteiro Central';
+      const meta = parseInt(document.getElementById('inputPontoMeta').value || '1', 10);
+      const responsavel = document.getElementById('inputResponsavel').value.trim();
+      const data = document.getElementById('inputData').value;
+      const hora = document.getElementById('inputHora').value;
+      const avaliacao = document.getElementById('inputAvaliacao').value;
+      const observacoes = document.getElementById('inputObservacoes').value.trim();
+
+      if (!pontoId) {
+        alert('Por favor, selecione qual banheiro ou bebedouro você está atendendo.');
+        return;
+      }
+      if (!responsavel) {
+        alert('Por favor, digite o seu nome.');
+        document.getElementById('inputResponsavel').focus();
+        return;
+      }
+      if (!data || !hora) {
+        alert('Informe a data e o horário.');
+        return;
+      }
+
+      // Coletar itens marcados no checklist
+      const checksChecked = [];
+      const checklistContainerId = pontoTipo === 'banheiro' ? 'checklistBanheiro' : 'checklistBebedouro';
+      document.querySelectorAll(`#${checklistContainerId} input[name="checkItem"]:checked`).forEach(c => {
+        checksChecked.push(c.value);
+      });
+
+      // Salvar nome do responsável na memória local para agilizar próximos pontos
+      try {
+        localStorage.setItem('ronda_responsavel_nome', responsavel);
+      } catch (e) {}
+
+      const btn = document.getElementById('btnConfirmarRonda');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Gravando Ronda...';
+
+      const protocolo = 'RONDA-' + Math.floor(100000 + Math.random() * 900000);
+      const dataHoraStr = `${data}T${hora}:00`;
+      const ordemDia = registrosPontoHoje.length + 1;
+
+      const registro = {
+        id: protocolo,
+        ponto_id: pontoId,
+        ponto_nome: pontoNome,
+        tipo: pontoTipo,
+        setor: pontoSetor,
+        data: data,
+        hora: hora,
+        data_hora: dataHoraStr,
+        responsavel: responsavel,
+        ordem_dia: ordemDia,
+        meta_dia: meta,
+        checklist: checksChecked,
+        avaliacao: avaliacao,
+        observacoes: observacoes || '',
+        criado_em: new Date().toISOString()
+      };
+
+      // 1. Salvar no Firestore
+      if (firestoreDb) {
+        try {
+          await firestoreDb.collection('ronda_registros').doc(protocolo).set(registro);
+
+          // Salvar log na auditoria central para o Prefeito ver
+          const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+          const descTipo = pontoTipo === 'banheiro' ? 'Banheiro' : 'Bebedouro';
+          const logObj = {
+            id: logId,
+            data_hora: new Date().toISOString(),
+            usuario: String(responsavel),
+            modulo: 'ronda',
+            acao: 'RONDA_HIGIENE',
+            entidade: String(pontoNome),
+            detalhes: `Ronda de ${descTipo} (${ordemDia}ª de hoje). Local: ${pontoSetor}. Avaliação: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
+          };
+          await firestoreDb.collection('auditoria_logs').doc(logId).set(logObj);
+        } catch (err) {
+          console.warn("Aviso ao salvar registro no Firestore:", err);
+        }
+      }
+
+      // 2. Atualizar cache local
+      try {
+        const cached = localStorage.getItem('ronda_registros_cache');
+        const lista = cached ? JSON.parse(cached) : [];
+        lista.unshift(registro);
+        localStorage.setItem('ronda_registros_cache', JSON.stringify(lista.slice(0, 200)));
+      } catch (e) {}
+
+      // 3. Exibir Tela de Sucesso
+      document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
+      document.getElementById('sucessoPontoNome').textContent = pontoNome;
+      document.getElementById('sucessoSetor').textContent = pontoSetor;
+      document.getElementById('sucessoOrdemDia').textContent = `${ordemDia}ª limpeza de hoje (Meta: ${meta}x)`;
+      document.getElementById('sucessoResponsavel').textContent = responsavel;
+      document.getElementById('sucessoDataHora').textContent = `${data.split('-').reverse().join('/')} às ${hora}`;
+
+      document.getElementById('formRonda').classList.add('hidden');
+      document.getElementById('telaSucessoRonda').classList.remove('hidden');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function fazerOutroRegistroRonda() {
+      const agora = new Date();
+      document.getElementById('inputData').value = getDataHojeLocal(agora);
+      document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
+      document.getElementById('inputObservacoes').value = '';
+
+      const btn = document.getElementById('btnConfirmarRonda');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check text-base mr-2"></i><span>Confirmar Registro de Ronda</span>';
+
+      document.getElementById('telaSucessoRonda').classList.add('hidden');
+      document.getElementById('formRonda').classList.remove('hidden');
+
+      // Se temos o ponto carregado, recarrega os contadores do dia
+      if (pontoCarregado) {
+        carregarRegistrosPontoHoje(pontoCarregado.id, Number(pontoCarregado.frequencia_diaria || 2));
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+
+</body>
+</html>

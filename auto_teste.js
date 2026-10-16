@@ -664,6 +664,124 @@ assert(statsAposAumentar.totalVagas === 382, 'Aumento de Quarto: Capacidade de B
 assert(qAumentar.vagas.length === 6, 'Aumento de Quarto: Array de vagas do quarto agora possui 6 camas');
 
 // -------------------------------------------------------------
+// 12. VERIFICAÇÃO DA RONDA DO CANTEIRO (BANHEIROS & BEBEDOUROS)
+// -------------------------------------------------------------
+console.log('\n🚰 12. Verificação do Módulo Ronda do Canteiro (Banheiros & Bebedouros)');
+
+// 1. Arquivos físicos e paridade
+assert(fs.existsSync('ronda.html'), 'Arquivo ronda.html presente na raiz');
+assert(fs.existsSync('frontend/ronda.html'), 'Arquivo frontend/ronda.html presente');
+
+const conteudoRondaRaiz = fs.readFileSync('ronda.html', 'utf8');
+const conteudoRondaFront = fs.readFileSync('frontend/ronda.html', 'utf8');
+assert(conteudoRondaRaiz === conteudoRondaFront, 'Paridade 100% entre ronda.html e frontend/ronda.html');
+
+// 2. Elementos de interface em index.html
+const conteudoIndex = fs.readFileSync('index.html', 'utf8');
+assert(conteudoIndex.includes('id="tab-ronda"'), 'Aba tab-ronda presente em index.html');
+assert(conteudoIndex.includes('switchTab(\'ronda\')'), 'Botão switchTab(\'ronda\') presente na sidebar');
+assert(conteudoIndex.includes('id="kpiRondaTotalPontos"'), 'Card KPI Total Pontos presente');
+assert(conteudoIndex.includes('id="kpiRondaProgressoTaxa"'), 'Card KPI Progresso Hoje presente');
+assert(conteudoIndex.includes('id="kpiRondaEmDia"'), 'Card KPI 100% Em Dia presente');
+assert(conteudoIndex.includes('id="kpiRondaEmAndamento"'), 'Card KPI Em Andamento presente');
+assert(conteudoIndex.includes('id="kpiRondaPendentes"'), 'Card KPI Pendentes presente');
+assert(conteudoIndex.includes('id="kpiRondaAlertas"'), 'Card KPI Precisa Reparo presente');
+assert(conteudoIndex.includes('id="modalNovoPontoRonda"'), 'Modal Novo/Editar Ponto de Ronda presente');
+assert(conteudoIndex.includes('id="modalPlacaQRRonda"'), 'Modal Placa QR Code A4 de Ronda presente');
+assert(conteudoIndex.includes('id="modalConfigRonda"'), 'Modal Configuração de Metas da Ronda presente');
+assert(conteudoIndex.includes('id="modalRegistroManualRonda"'), 'Modal Registro Manual do Prefeito presente');
+assert(conteudoIndex.includes('id="modalHistoricoPontoRonda"'), 'Modal Histórico de Limpezas presente');
+assert(conteudoIndex.includes('id="modalScannerRondaQR"'), 'Modal Scanner de Câmera da Ronda presente');
+assert(conteudoIndex.includes('imprimindo-placa-ronda'), 'Regras de impressão A4 imprimindo-placa-ronda presentes');
+
+// 3. Funções em app.js
+const conteudoApp = fs.readFileSync('app.js', 'utf8');
+const funcoesRonda = [
+  'inicializarRondaCanteiro',
+  'carregarRondaCanteiro',
+  'calcularStatusPontoRonda',
+  'filtrarRondaUI',
+  'renderizarGridRonda',
+  'abrirModalNovoPontoRonda',
+  'salvarPontoRonda',
+  'excluirPontoRonda',
+  'getQRCodeUrlRonda',
+  'abrirModalPlacaQRRonda',
+  'imprimirPlacaQRRonda',
+  'abrirModalConfigRonda',
+  'salvarConfigRonda',
+  'abrirModalRegistroManualRonda',
+  'salvarRegistroManualRonda',
+  'abrirModalHistoricoPontoRonda',
+  'recarregarRondaManual',
+  'exportarRondaExcel',
+  'abrirScannerRondaQR'
+];
+funcoesRonda.forEach(fn => {
+  assert(conteudoApp.includes(fn), `Função de Ronda ${fn} implementada em app.js`);
+});
+
+// 4. Simulação de Cálculo de Metas e Status
+function simularStatusRonda(ponto, registrosHoje) {
+  const qtdHoje = registrosHoje.length;
+  const meta = Number(ponto.frequencia_diaria || (ponto.tipo === 'banheiro' ? 2 : 1));
+  const temAlerta = registrosHoje.some(r => r.avaliacao && r.avaliacao.includes('Precisa Reparo'));
+
+  if (temAlerta) {
+    return { statusKey: 'alerta', label: 'PRECISA REPARO', cor: 'rose' };
+  } else if (qtdHoje >= meta) {
+    return { statusKey: 'ok', label: `EM DIA (${qtdHoje}/${meta})`, cor: 'emerald' };
+  } else if (qtdHoje > 0) {
+    return { statusKey: 'andamento', label: `EM ANDAMENTO (${qtdHoje}/${meta})`, cor: 'amber' };
+  } else {
+    return { statusKey: 'pendente', label: `PENDENTE (0/${meta})`, cor: 'orange' };
+  }
+}
+
+// Teste Banheiro: Meta 2x
+const mockBanheiro = { id: 'b1', nome: 'Banheiro KM 14', tipo: 'banheiro', frequencia_diaria: 2 };
+
+const stB1_zero = simularStatusRonda(mockBanheiro, []);
+assert(stB1_zero.statusKey === 'pendente' && stB1_zero.label === 'PENDENTE (0/2)', 'Ronda Banheiro (0/2): Status PENDENTE');
+
+const stB1_um = simularStatusRonda(mockBanheiro, [{ id: 'r1', hora: '08:30', avaliacao: 'Excelente / Em Ordem' }]);
+assert(stB1_um.statusKey === 'andamento' && stB1_um.label === 'EM ANDAMENTO (1/2)', 'Ronda Banheiro (1/2): Status EM ANDAMENTO (Amarelo)');
+
+const stB1_dois = simularStatusRonda(mockBanheiro, [
+  { id: 'r1', hora: '08:30', avaliacao: 'Excelente / Em Ordem' },
+  { id: 'r2', hora: '14:15', avaliacao: 'Excelente / Em Ordem' }
+]);
+assert(stB1_dois.statusKey === 'ok' && stB1_dois.label === 'EM DIA (2/2)', 'Ronda Banheiro (2/2): Status EM DIA (Verde)');
+
+// Teste Bebedouro: Meta 1x
+const mockBebedouro = { id: 'beb1', nome: 'Bebedouro Refeitório', tipo: 'bebedouro', frequencia_diaria: 1 };
+
+const stBeb_zero = simularStatusRonda(mockBebedouro, []);
+assert(stBeb_zero.statusKey === 'pendente' && stBeb_zero.label === 'PENDENTE (0/1)', 'Ronda Bebedouro (0/1): Status PENDENTE');
+
+const stBeb_um = simularStatusRonda(mockBebedouro, [{ id: 'r3', hora: '07:45', avaliacao: 'Tudo OK' }]);
+assert(stBeb_um.statusKey === 'ok' && stBeb_um.label === 'EM DIA (1/1)', 'Ronda Bebedouro (1/1): Status EM DIA (Verde)');
+
+// Teste Alerta de Manutenção
+const stAlerta = simularStatusRonda(mockBanheiro, [
+  { id: 'r4', hora: '08:30', avaliacao: 'Aviso / Precisa Reparo (Vazamento)' }
+]);
+assert(stAlerta.statusKey === 'alerta' && stAlerta.label === 'PRECISA REPARO', 'Ronda Alerta: Status PRECISA REPARO (Vermelho)');
+
+// Teste de Geração de Link de QR Code para a Ronda
+function simularGetQRCodeUrlRonda(baseUrl, pontoId) {
+  let cleanUrl = baseUrl.split('?')[0].split('#')[0];
+  if (cleanUrl.includes('index.html')) {
+    cleanUrl = cleanUrl.replace('index.html', 'ronda.html');
+  } else {
+    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}ronda.html` : `${cleanUrl}/ronda.html`;
+  }
+  return `${cleanUrl}?ponto_id=${encodeURIComponent(pontoId)}`;
+}
+const urlGerada = simularGetQRCodeUrlRonda('https://prefeitura-obras.web.app/index.html', 'ponto_banheiro_02');
+assert(urlGerada.includes('ronda.html?ponto_id=ponto_banheiro_02'), 'Geração de URL de QR Code para ronda.html válida');
+
+// -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
 console.log('\n============================================================');

@@ -121,6 +121,25 @@
         background: white !important;
         padding: 0 !important;
       }
+      /* Impressão da Placa QR da Ronda do Canteiro (Banheiros e Bebedouros) */
+      body.imprimindo-placa-ronda > *:not(#modalPlacaQRRonda) { display: none !important; }
+      body.imprimindo-placa-ronda #modalPlacaQRRonda {
+        position: static !important;
+        display: block !important;
+        background: transparent !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+      }
+      body.imprimindo-placa-ronda #modalPlacaQRRonda > div {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      body.imprimindo-placa-ronda #areaImpressaoPlacaRonda {
+        background: white !important;
+        padding: 0 !important;
+      }
       @page {
         size: A4 portrait;
         margin: 8mm;
@@ -314,6 +333,12 @@
           <i class="fa-solid fa-house-chimney-user w-5 text-indigo-400"></i>
           <span>Casas na Cidade</span>
           <span id="sideCountCasas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
+        </button>
+
+        <button onclick="switchTab('ronda')" data-tab="ronda" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-clipboard-check w-5 text-teal-400"></i>
+          <span>Ronda do Canteiro</span>
+          <span id="sideCountRonda" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
         </button>
 
         <button onclick="switchTab('estoque')" data-tab="estoque" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
@@ -2502,6 +2527,182 @@ service cloud.firestore {
               </div>
             </div>
           </div>
+      </div>
+
+      <!-- ================= TAB: RONDA DO CANTEIRO (BANHEIROS & BEBEDOUROS) ================= -->
+      <div id="tab-ronda" class="tab-content hidden space-y-5">
+        <!-- Topo da Aba de Ronda -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                <i class="fa-solid fa-clipboard-check text-teal-600 mr-1"></i> NR-18 & NR-24 • SMS Canteiro
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Ronda do Canteiro</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Controle em tempo real de higienização de <b class="text-slate-700">Banheiros</b> (2x/dia) e <b class="text-slate-700">Bebedouros</b> (1x/dia) via leitura de QR Code.
+            </p>
+          </div>
+
+          <!-- Ações Rápidas no Topo -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="recarregarRondaManual()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Sincronizar com a Nuvem">
+              <i class="fa-solid fa-arrows-rotate" id="iconeReloadRonda"></i>
+              <span class="hidden sm:inline">Atualizar</span>
+            </button>
+
+            <button onclick="abrirScannerRondaQR()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-qrcode text-amber-400"></i>
+              <span>Ler QR Code</span>
+            </button>
+
+            <button onclick="abrirModalConfigRonda()" class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-2 transition" title="Configurar frequências diárias">
+              <i class="fa-solid fa-sliders text-indigo-600"></i>
+              <span class="hidden md:inline">Configurar Metas</span>
+            </button>
+
+            <button onclick="exportarRondaExcel()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>Relatório Excel</span>
+            </button>
+
+            <button onclick="abrirModalNovoPontoRonda()" class="btn-prefeito px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition transform active:scale-95">
+              <i class="fa-solid fa-plus"></i>
+              <span>Novo Ponto</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPIs Consolidados do Dia -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <!-- Total Pontos -->
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Total de Pontos</span>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span id="kpiRondaTotalPontos" class="text-2xl font-black text-slate-900">0</span>
+              <span class="text-[11px] text-slate-500">locais</span>
+            </div>
+            <p id="kpiRondaSubPontos" class="text-[10px] text-slate-400 mt-0.5 truncate">0 banheiros • 0 bebedouros</p>
+          </div>
+
+          <!-- Metas Batidas Hoje -->
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Progresso Hoje</span>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span id="kpiRondaProgressoTaxa" class="text-2xl font-black text-teal-600">0%</span>
+              <span id="kpiRondaProgressoFracao" class="text-[11px] text-slate-500 font-semibold">0/0</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+              <div id="kpiRondaProgressoBarra" class="bg-teal-500 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- 100% Em Dia -->
+          <div class="bg-white p-3.5 rounded-2xl border border-emerald-200 shadow-xs bg-emerald-50/20">
+            <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 100% Em Dia
+            </span>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span id="kpiRondaEmDia" class="text-2xl font-black text-emerald-700">0</span>
+              <span class="text-[11px] text-emerald-600">pontos</span>
+            </div>
+            <p class="text-[10px] text-emerald-600/80 mt-0.5">Todas as limpezas feitas</p>
+          </div>
+
+          <!-- Em Andamento (1 de 2) -->
+          <div class="bg-white p-3.5 rounded-2xl border border-amber-200 shadow-xs bg-amber-50/20">
+            <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider block flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Em Andamento
+            </span>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span id="kpiRondaEmAndamento" class="text-2xl font-black text-amber-700">0</span>
+              <span class="text-[11px] text-amber-600">pontos</span>
+            </div>
+            <p class="text-[10px] text-amber-600/80 mt-0.5">Falta 1 limpeza p/ meta</p>
+          </div>
+
+          <!-- Pendentes (0 de X) -->
+          <div class="bg-white p-3.5 rounded-2xl border border-orange-200 shadow-xs bg-orange-50/20">
+            <span class="text-[11px] font-bold text-orange-800 uppercase tracking-wider block flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-orange-500"></span> Pendentes Hoje
+            </span>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span id="kpiRondaPendentes" class="text-2xl font-black text-orange-700">0</span>
+              <span class="text-[11px] text-orange-600">sem limpeza</span>
+            </div>
+            <p class="text-[10px] text-orange-600/80 mt-0.5">Aguardando ronda</p>
+          </div>
+
+          <!-- Precisa Reparo / Atenção -->
+          <div class="bg-white p-3.5 rounded-2xl border border-rose-200 shadow-xs bg-rose-50/20">
+            <span class="text-[11px] font-bold text-rose-800 uppercase tracking-wider block flex items-center gap-1">
+              <i class="fa-solid fa-triangle-exclamation text-rose-500 text-xs"></i> Precisa Reparo
+            </span>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span id="kpiRondaAlertas" class="text-2xl font-black text-rose-700">0</span>
+              <span class="text-[11px] text-rose-600">avisos</span>
+            </div>
+            <p class="text-[10px] text-rose-600/80 mt-0.5">Relatado pela limpeza</p>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros e Busca -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <!-- Campo de Busca -->
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input 
+              type="text" 
+              id="buscaRondaInput" 
+              oninput="filtrarRondaUI()" 
+              placeholder="Buscar ponto por nome, setor (ex: Refeitório, KM 14, Britagem)..." 
+              class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition"
+            >
+          </div>
+
+          <!-- Filtro por Tipo -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <select id="filtroTipoRonda" onchange="filtrarRondaUI()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-teal-500">
+              <option value="todos">Todos os Tipos</option>
+              <option value="banheiro">🚻 Apenas Banheiros</option>
+              <option value="bebedouro">🚰 Apenas Bebedouros</option>
+            </select>
+
+            <!-- Filtro por Status do Dia -->
+            <select id="filtroStatusRonda" onchange="filtrarRondaUI()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-teal-500">
+              <option value="todos">Todos os Status</option>
+              <option value="ok">🟢 100% Em Dia</option>
+              <option value="andamento">🟡 Em Andamento (1/2)</option>
+              <option value="pendente">🟠 Pendente (0 limpezas)</option>
+              <option value="alerta">🔴 Precisa de Reparo</option>
+            </select>
+
+            <!-- Filtro por Setor -->
+            <select id="filtroSetorRonda" onchange="filtrarRondaUI()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-teal-500">
+              <option value="todos">Todos os Setores</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Grid de Cards dos Pontos de Ronda -->
+        <div id="gridPontosRonda" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <!-- Renderizado dinamicamente via renderizarGridRonda() -->
+        </div>
+
+        <!-- Estado Vazio -->
+        <div id="rondaVazio" class="hidden bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center space-y-3">
+          <div class="w-16 h-16 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center mx-auto text-2xl">
+            <i class="fa-solid fa-clipboard-check"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Nenhum Ponto de Ronda Encontrado</h3>
+          <p class="text-xs text-slate-500 max-w-md mx-auto">
+            Cadastre os banheiros e bebedouros do canteiro de obras para gerar as plaquinhas de QR Code e acompanhar as limpezas ao vivo.
+          </p>
+          <button onclick="abrirModalNovoPontoRonda()" class="btn-prefeito px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition">
+            <i class="fa-solid fa-plus"></i>
+            <span>Cadastrar Primeiro Ponto</span>
+          </button>
         </div>
 
       </div>
@@ -5284,6 +5485,15 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Imóveis alugados, cômodos, móveis e contas</span>
         </button>
 
+        <button onclick="fecharMenuMobileMais(); switchTab('ronda')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
+          <div class="flex items-center justify-between w-full">
+            <i class="fa-solid fa-clipboard-check text-teal-400 text-lg mb-1.5"></i>
+            <span id="drawerBadgeRonda" class="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">0 pontos</span>
+          </div>
+          <span class="text-xs font-bold text-white">Ronda do Canteiro (Banheiros & Bebedouros)</span>
+          <span class="text-[10px] text-slate-300">Controle de higienização por QR Code em tempo real</span>
+        </button>
+
         <button onclick="fecharMenuMobileMais(); switchTab('estoque')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-boxes-stacked text-teal-400 text-lg mb-1.5"></i>
@@ -5646,6 +5856,470 @@ service cloud.firestore {
           <button type="button" onclick="imprimirPlacaQRCasa()" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition">
             <i class="fa-solid fa-print"></i> Imprimir Placa
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL NOVO/EDITAR PONTO DE RONDA ================= -->
+  <div id="modalNovoPontoRonda" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center">
+            <i class="fa-solid fa-clipboard-check text-base"></i>
+          </div>
+          <div>
+            <h3 id="modalNovoPontoRondaTitulo" class="text-sm font-bold text-white">Cadastrar Ponto de Ronda</h3>
+            <p class="text-[11px] text-slate-400">Banheiro químico/fixo ou bebedouro de água</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalNovoPontoRonda')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="salvarPontoRonda(event)" class="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <input type="hidden" id="pontoRondaId">
+
+        <!-- Tipo do Ponto -->
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Tipo de Instalação *
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="cursor-pointer border-2 border-teal-500 bg-teal-50/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none" id="labelTipoPontoBanheiro">
+              <input type="radio" name="pontoRondaTipo" value="banheiro" checked onchange="aoMudarTipoPontoRonda('banheiro')" class="hidden">
+              <span class="text-2xl mb-1">🚻</span>
+              <span class="font-extrabold text-slate-900 text-xs">Banheiro</span>
+              <span class="text-[10px] text-slate-500">Químico / Contêiner / Alvenaria</span>
+            </label>
+
+            <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-3 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70" id="labelTipoPontoBebedouro">
+              <input type="radio" name="pontoRondaTipo" value="bebedouro" onchange="aoMudarTipoPontoRonda('bebedouro')" class="hidden">
+              <span class="text-2xl mb-1">🚰</span>
+              <span class="font-extrabold text-slate-900 text-xs">Bebedouro</span>
+              <span class="text-[10px] text-slate-500">Industrial / Coluna / Galão</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Nome do Ponto -->
+        <div>
+          <label for="pontoRondaNome" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Nome / Identificação do Ponto *
+          </label>
+          <input 
+            type="text" 
+            id="pontoRondaNome" 
+            required 
+            placeholder="Ex: Banheiro Químico 02 ou Bebedouro Central" 
+            class="w-full bg-slate-50 border border-slate-300 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-slate-900 font-semibold outline-none transition"
+          >
+        </div>
+
+        <!-- Setor / Localização -->
+        <div>
+          <label for="pontoRondaSetor" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Setor / Frente de Serviço da Obra *
+          </label>
+          <input 
+            type="text" 
+            id="pontoRondaSetor" 
+            required 
+            list="listaSugestaoSetores" 
+            placeholder="Ex: Canteiro Central, Frente KM 14, Britagem, Refeitório..." 
+            class="w-full bg-slate-50 border border-slate-300 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-slate-900 font-semibold outline-none transition"
+          >
+          <datalist id="listaSugestaoSetores">
+            <option value="Canteiro Central">
+            <option value="Refeitório">
+            <option value="Oficina Mecânica">
+            <option value="Alojamentos">
+            <option value="Escritório Técnico">
+            <option value="Frente de Terraplenagem">
+            <option value="Britagem">
+            <option value="Usina de Asfalto">
+            <option value="Frente KM 10">
+            <option value="Frente KM 14">
+            <option value="Portaria Principal">
+          </datalist>
+        </div>
+
+        <!-- Frequência Diária Configurável -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="pontoRondaFrequencia" class="block font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Meta Diária de Limpezas *</span>
+            </label>
+            <select 
+              id="pontoRondaFrequencia" 
+              class="w-full bg-slate-50 border border-slate-300 focus:border-teal-500 rounded-xl px-3 py-2.5 text-slate-900 font-semibold outline-none transition"
+            >
+              <option value="1">1 vez ao dia</option>
+              <option value="2" selected>2 vezes ao dia (Manhã e Tarde)</option>
+              <option value="3">3 vezes ao dia</option>
+              <option value="4">4 vezes ao dia</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="pontoRondaHorarios" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Horários Sugeridos (Opcional)
+            </label>
+            <input 
+              type="text" 
+              id="pontoRondaHorarios" 
+              placeholder="Ex: 08:30 e 14:00" 
+              class="w-full bg-slate-50 border border-slate-300 focus:border-teal-500 rounded-xl px-3 py-2.5 text-slate-900 font-semibold outline-none transition"
+            >
+          </div>
+        </div>
+
+        <!-- Observações / Instruções para a Limpeza -->
+        <div>
+          <label for="pontoRondaObs" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Observações / Cuidados Especiais (Opcional)
+          </label>
+          <textarea 
+            id="pontoRondaObs" 
+            rows="2" 
+            placeholder="Ex: Chave na portaria, usar produto desinfetante hospitalar, verificar reposição de copos..." 
+            class="w-full bg-slate-50 border border-slate-300 focus:border-teal-500 rounded-xl px-3.5 py-2 text-slate-900 outline-none transition resize-none"
+          ></textarea>
+        </div>
+
+        <!-- Rodapé do Formulário -->
+        <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button type="button" onclick="fecharModal('modalNovoPontoRonda')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-check"></i>
+            <span>Salvar Ponto</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL PLACA QR CODE DA RONDA (IMPRIMÍVEL A4) ================= -->
+  <div id="modalPlacaQRRonda" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      
+      <!-- Topo Modal -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between no-print flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center">
+            <i class="fa-solid fa-qrcode text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Placa de Identificação & QR Code de Ronda</h3>
+            <p class="text-[11px] text-slate-400">Pronta para imprimir em A4 e fixar no banheiro ou bebedouro</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="imprimirPlacaQRRonda()" class="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-print"></i> Imprimir Placa A4
+          </button>
+          <button onclick="fecharModal('modalPlacaQRRonda')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo Visual da Placa (Imprimível) -->
+      <div class="p-6 overflow-y-auto flex-1 bg-slate-100 flex items-center justify-center" id="areaImpressaoPlacaRonda">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 sm:p-8 border-4 border-slate-900 shadow-xl text-center space-y-4 text-slate-900">
+          
+          <!-- Cabeçalho da Placa -->
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3">
+            <div class="h-11 px-2.5 py-1 rounded-lg bg-white flex items-center justify-center border border-slate-300">
+              <img src="logo_gel_oficial.png" alt="Logo GEL Oficial" class="h-8 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] font-black uppercase tracking-widest text-slate-500 block">NR-18 & NR-24 • SMS Canteiro</span>
+              <span class="text-xs font-black text-teal-700 uppercase">GEL Engenharia</span>
+            </div>
+          </div>
+
+          <!-- Título e Identificação do Ponto -->
+          <div class="bg-slate-900 text-white py-2.5 px-3 rounded-xl shadow-xs">
+            <span class="text-[10px] font-bold text-teal-400 uppercase tracking-widest block" id="placaRondaTipoHeader">CONTROLE DE HIGIENE & BEBEDOUROS</span>
+            <h2 id="placaRondaTitulo" class="text-base sm:text-lg font-black tracking-wide uppercase mt-0.5">PONTO --</h2>
+            <p id="placaRondaSetor" class="text-[11px] font-semibold text-slate-300 mt-0.5">Setor: --</p>
+          </div>
+
+          <!-- Meta de Frequência em Destaque -->
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-300 text-teal-900 font-extrabold text-xs">
+            <i class="fa-solid fa-clock-rotate-left text-teal-600"></i>
+            <span id="placaRondaFrequencia">Meta: 2x ao dia (Manhã e Tarde)</span>
+          </div>
+
+          <p class="text-xs sm:text-sm font-semibold text-slate-700 leading-snug">
+            Aponte a câmera do celular para confirmar a <span class="text-teal-700 font-bold underline">Ronda de Higienização</span> e registrar o checklist em tempo real.
+          </p>
+
+          <!-- Imagem do QR Code -->
+          <div class="bg-white p-3 rounded-2xl border-2 border-dashed border-slate-400 inline-block mx-auto shadow-inner">
+            <img id="imgPlacaQRRonda" src="" alt="QR Code Ronda do Canteiro" class="w-48 h-48 sm:w-56 sm:h-56 mx-auto object-contain">
+            <p class="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-wider">Aponte a câmera do celular</p>
+          </div>
+
+          <!-- Instruções de Uso -->
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-left space-y-2 text-xs">
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-teal-600 text-white font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+              <p class="text-slate-800 font-medium">Abra a câmera do celular ou leitor de QR Code.</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-teal-600 text-white font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <p class="text-slate-800 font-medium">Escaneie o código para abrir a ficha de ronda.</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+              <p class="text-slate-800 font-medium">Marque os itens limpos, digite seu nome e confirme!</p>
+            </div>
+          </div>
+
+          <!-- Rodapé com Link Alternativo -->
+          <div class="pt-2 border-t border-slate-200 text-slate-500 text-[10px] leading-tight space-y-0.5">
+            <p class="font-bold text-slate-700">Prefeitura de Canteiro • Ronda de Higiene & NR-18</p>
+            <p class="font-mono text-[9px] text-slate-500 break-all" id="textoPlacaQRRondaUrl"></p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Rodapé Modal -->
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between no-print flex-shrink-0">
+        <span class="text-xs text-slate-500">Fixar na porta do sanitário ou lateral do bebedouro.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="fecharModal('modalPlacaQRRonda')" class="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+            Fechar
+          </button>
+          <button type="button" onclick="imprimirPlacaQRRonda()" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-print"></i> Imprimir Placa
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL CONFIGURAÇÃO DE FREQUÊNCIAS DA RONDA ================= -->
+  <div id="modalConfigRonda" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+            <i class="fa-solid fa-sliders text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Configurar Metas de Ronda</h3>
+            <p class="text-[11px] text-slate-400">Padrões de higiene definidos pelo Prefeito</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalConfigRonda')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="salvarConfigRonda(event)" class="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-900 text-xs space-y-1">
+          <span class="font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-info-circle text-indigo-600"></i> Metas Gerais de Canteiro
+          </span>
+          <p class="text-[11px] text-indigo-800">
+            Defina a quantidade de limpezas obrigatórias por dia. Você também pode personalizar pontos específicos individualmente no card de cada um.
+          </p>
+        </div>
+
+        <div>
+          <label for="configFreqPadraoBanheiro" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Meta Padrão para Banheiros *
+          </label>
+          <select id="configFreqPadraoBanheiro" class="w-full bg-slate-50 border border-slate-300 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none transition">
+            <option value="1">1 vez ao dia</option>
+            <option value="2" selected>2 vezes ao dia (Manhã e Tarde)</option>
+            <option value="3">3 vezes ao dia (Manhã, Tarde e Noite)</option>
+          </select>
+          <span class="text-[10px] text-slate-500 mt-0.5 block">Recomendado para sanitários com grande fluxo de trabalhadores.</span>
+        </div>
+
+        <div>
+          <label for="configFreqPadraoBebedouro" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Meta Padrão para Bebedouros *
+          </label>
+          <select id="configFreqPadraoBebedouro" class="w-full bg-slate-50 border border-slate-300 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none transition">
+            <option value="1" selected>1 vez ao dia</option>
+            <option value="2">2 vezes ao dia</option>
+          </select>
+          <span class="text-[10px] text-slate-500 mt-0.5 block">Higienização de bicas, cuba e checagem de água.</span>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button type="button" onclick="fecharModal('modalConfigRonda')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-check"></i>
+            <span>Salvar Configuração</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL REGISTRO MANUAL / VISTORIA DO PREFEITO ================= -->
+  <div id="modalRegistroManualRonda" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center">
+            <i class="fa-solid fa-pen-to-square text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Lançar Limpeza / Vistoria Manual</h3>
+            <p id="subtituloRegistroManualRonda" class="text-[11px] text-slate-400">Ponto: --</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalRegistroManualRonda')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="salvarRegistroManualRonda(event)" class="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <input type="hidden" id="regManualRondaPontoId">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="regManualRondaData" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Data *
+            </label>
+            <input type="date" id="regManualRondaData" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none focus:border-teal-500">
+          </div>
+          <div>
+            <label for="regManualRondaHora" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Horário *
+            </label>
+            <input type="time" id="regManualRondaHora" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none focus:border-teal-500">
+          </div>
+        </div>
+
+        <div>
+          <label for="regManualRondaResponsavel" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Nome do Responsável pela Limpeza *
+          </label>
+          <input type="text" id="regManualRondaResponsavel" required placeholder="Ex: Maria Santos" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 font-semibold outline-none focus:border-teal-500">
+        </div>
+
+        <div>
+          <label for="regManualRondaAvaliacao" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Condição do Ponto *
+          </label>
+          <select id="regManualRondaAvaliacao" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none focus:border-teal-500">
+            <option value="Excelente / Em Ordem">✨ Tudo OK / Em Ordem</option>
+            <option value="Atenção / Falta Insumo">⚠️ Falta Insumo (Papel/Sabão)</option>
+            <option value="Aviso / Precisa Reparo">🛠️ Precisa de Reparo / Manutenção</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="regManualRondaObs" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Observações / Checklist Realizado
+          </label>
+          <textarea id="regManualRondaObs" rows="2" placeholder="Ex: Limpeza completa de vaso, piso e reposição de papel." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 outline-none focus:border-teal-500 resize-none"></textarea>
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button type="button" onclick="fecharModal('modalRegistroManualRonda')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-check"></i>
+            <span>Confirmar Lançamento</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL HISTÓRICO DE RONDA DO PONTO ================= -->
+  <div id="modalHistoricoPontoRonda" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center">
+            <i class="fa-solid fa-clock-rotate-left text-base"></i>
+          </div>
+          <div>
+            <h3 id="histRondaPontoNome" class="text-sm font-bold text-white">Histórico de Limpezas</h3>
+            <p id="histRondaPontoSetor" class="text-[11px] text-slate-400">Setor: --</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalHistoricoPontoRonda')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto flex-1 space-y-3" id="listaHistoricoRondaContainer">
+        <div id="listaHistoricoRondaCorpo" class="space-y-2">
+          <!-- Renderizado dinamicamente -->
+        </div>
+        <div id="historicoRondaVazio" class="hidden p-8 text-center text-slate-400 text-xs">
+          Nenhuma limpeza ou vistoria registrada ainda para este ponto.
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end flex-shrink-0">
+        <button type="button" onclick="fecharModal('modalHistoricoPontoRonda')" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL SCANNER QR CODE DA RONDA (CÂMERA) ================= -->
+  <div id="modalScannerRondaQR" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center">
+            <i class="fa-solid fa-camera text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Escanear Placa QR Code</h3>
+            <p class="text-[11px] text-slate-400">Aponte a câmera para a placa do banheiro ou bebedouro</p>
+          </div>
+        </div>
+        <button onclick="fecharScannerRondaQR()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+        <!-- Área da Câmera -->
+        <div class="relative w-full aspect-square bg-slate-950 rounded-2xl overflow-hidden border-2 border-dashed border-teal-500/50 flex flex-col items-center justify-center text-slate-400">
+          <div id="leitorCameraRonda" class="w-full h-full"></div>
+        </div>
+
+        <p class="text-center text-slate-500 text-[11px]">
+          Posicione o QR Code dentro do enquadramento. A leitura será imediata.
+        </p>
+
+        <!-- Seleção Manual Alternativa -->
+        <div class="pt-3 border-t border-slate-200 space-y-2">
+          <label for="selectPontoScannerManual" class="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+            Ou selecione o ponto manualmente:
+          </label>
+          <div class="flex gap-2">
+            <select id="selectPontoScannerManual" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none focus:border-teal-500 text-xs">
+              <option value="">Selecione o ponto...</option>
+            </select>
+            <button onclick="confirmarPontoManualScanner()" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-sm transition">
+              Abrir
+            </button>
+          </div>
         </div>
       </div>
     </div>
