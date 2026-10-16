@@ -297,11 +297,21 @@
       console.warn("Aviso Firebase:", e);
     }
 
+    // Helper para obter data local (YYYY-MM-DD) sem problemas de fuso horário UTC
+    function getDataHojeLocal(dataObj = new Date()) {
+      const d = dataObj instanceof Date ? dataObj : new Date(dataObj);
+      if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-CA');
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
     // Inicialização ao carregar a página
     window.addEventListener('DOMContentLoaded', () => {
-      // 1. Preencher data e hora atuais
+      // 1. Preencher data e hora atuais no fuso horário local
       const agora = new Date();
-      document.getElementById('inputData').value = agora.toISOString().split('T')[0];
+      document.getElementById('inputData').value = getDataHojeLocal(agora);
       document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
 
       // 2. Obter casa_id dos parâmetros da URL
@@ -511,6 +521,9 @@
     }
 
     function fazerOutroRegistro() {
+      const agora = new Date();
+      document.getElementById('inputData').value = getDataHojeLocal(agora);
+      document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
       document.getElementById('inputObservacoes').value = '';
       escolherTipoServico('ar_condicionado'); // sugere o outro serviço
 

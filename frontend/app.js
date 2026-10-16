@@ -9429,6 +9429,9 @@ function atualizarContadoresCasasUI() {
 
 // Carregar e filtrar casas
 function carregarCasasCidade() {
+  if (typeof sanitizarDatasLimpezasCache === 'function') {
+    sanitizarDatasLimpezasCache();
+  }
   atualizarContadoresCasasUI();
   filtrarCasasCidadeUI();
   renderChartCasasTab();
@@ -9569,6 +9572,9 @@ function filtrarCasasCidadeUI() {
 
 // Renderização dos cards de casas
 function renderizarCasasCidadeGrid(casas) {
+  if (typeof sanitizarDatasLimpezasCache === 'function') {
+    sanitizarDatasLimpezasCache();
+  }
   const grid = document.getElementById('casasCidadeGrid');
   const vazio = document.getElementById('casasCidadeVazio');
   if (!grid) return;
@@ -11729,6 +11735,9 @@ function recarregarCasasCidadeManual() {
       snapLimp.forEach(doc => novasLimp.push({ id: doc.id, ...doc.data() }));
       novasLimp.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
       listaLimpezasCasas = novasLimp;
+      if (typeof sanitizarDatasLimpezasCache === 'function') {
+        sanitizarDatasLimpezasCache();
+      }
 
       localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
       localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
@@ -11780,6 +11789,121 @@ function getQRCodeUrlCasa(casaId) {
   return `${cleanUrl}?casa_id=${encodeURIComponent(casaId)}`;
 }
 
+// Helper universal para obter data no fuso local (YYYY-MM-DD) sem problemas de fuso horário UTC
+function getDataHojeLocal(dataObj = new Date()) {
+  const d = dataObj instanceof Date ? dataObj : new Date(dataObj);
+  if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-CA');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Obter data/hora efetiva do registro considerando fuso horário local e criado_em
+function obterDataHoraEfetivaLimpeza(registro) {
+  if (!registro) return null;
+
+  const agora = new Date();
+  const hojeZero = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+
+  // 1. Se tem criado_em com ISO timestamp, converter para a data local real do Brasil
+  if (registro.criado_em) {
+    const dtCriado = new Date(registro.criado_em);
+    if (!isNaN(dtCriado.getTime())) {
+      const dataStr = getDataHojeLocal(dtCriado);
+      const dataZero = new Date(dtCriado.getFullYear(), dtCriado.getMonth(), dtCriado.getDate());
+      return {
+        dataStr: dataStr,
+        dataZero: dataZero,
+        hora: registro.hora || dtCriado.toTimeString().slice(0, 5),
+        diffDias: Math.max(0, Math.floor((hojeZero - dataZero) / (1000 * 60 * 60 * 24)))
+      };
+    }
+  }
+
+  // 2. Extrair data e hora dos campos
+  const strData = String(registro.data || '').split('T')[0].trim();
+  if (strData) {
+    const partes = strData.split('-');
+    if (partes.length === 3) {
+      const ano = parseInt(partes[0], 10);
+      const mes = parseInt(partes[1], 10) - 1;
+      const dia = parseInt(partes[2], 10);
+      let dt = new Date(ano, mes, dia);
+
+      // Correção de timezone: Se a data foi salva como "hoje", mas o horário é no futuro em relação ao horário atual
+      // (ex: hora 21:58 ou 22:26 e agora são 13:00): indica que o registro foi feito ontem à noite sob o bug do UTC!
+      if (ano === agora.getFullYear() && mes === agora.getMonth() && dia === agora.getDate()) {
+        if (registro.hora) {
+          const [hReg, mReg] = String(registro.hora).split(':').map(Number);
+          const minReg = (hReg || 0) * 60 + (mReg || 0);
+          const minAgora = agora.getHours() * 60 + agora.getMinutes();
+          if (minReg > minAgora + 30) {
+            // Corrige para ontem
+            dt = new Date(ano, mes, dia - 1);
+          }
+        }
+      }
+
+      const diff = Math.max(0, Math.floor((hojeZero - dt) / (1000 * 60 * 60 * 24)));
+      return {
+        dataStr: getDataHojeLocal(dt),
+        dataZero: dt,
+        hora: registro.hora || '--:--',
+        diffDias: diff
+      };
+    }
+  }
+
+  return null;
+}
+
+// Sanitização automática de registros com data futura por fuso horário UTC
+function sanitizarDatasLimpezasCache() {
+  if (!Array.isArray(listaLimpezasCasas)) return;
+  let alterado = false;
+  const agora = new Date();
+  listaLimpezasCasas.forEach(reg => {
+    if (reg.criado_em) {
+      const dtCriado = new Date(reg.criado_em);
+      if (!isNaN(dtCriado.getTime())) {
+        const dataReal = getDataHojeLocal(dtCriado);
+        if (reg.data !== dataReal) {
+          reg.data = dataReal;
+          alterado = true;
+        }
+      }
+    } else if (reg.data && reg.hora) {
+      const partes = String(reg.data).split('-');
+      if (partes.length === 3) {
+        const y = parseInt(partes[0], 10);
+        const m = parseInt(partes[1], 10) - 1;
+        const d = parseInt(partes[2], 10);
+        if (y === agora.getFullYear() && m === agora.getMonth() && d === agora.getDate()) {
+          const [h, min] = String(reg.hora).split(':').map(Number);
+          if ((h * 60 + min) > (agora.getHours() * 60 + agora.getMinutes() + 30)) {
+            const dtOntem = new Date(y, m, d - 1);
+            reg.data = getDataHojeLocal(dtOntem);
+            alterado = true;
+          }
+        }
+      }
+    }
+  });
+  if (alterado) {
+    try {
+      localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
+    } catch(e) {}
+    if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+      listaLimpezasCasas.forEach(reg => {
+        if (reg.id) {
+          firestoreDb.collection('casas_limpezas').doc(reg.id).update({ data: reg.data }).catch(() => {});
+        }
+      });
+    }
+  }
+}
+
 // Calcular status de limpeza da casa (Rotina Diária e Ar Condicionado 30 dias)
 function calcularStatusLimpezasCasa(casaId) {
   const limpezasCasa = (listaLimpezasCasas || []).filter(l => l.casa_id === casaId);
@@ -11792,9 +11916,6 @@ function calcularStatusLimpezasCasa(casaId) {
   const arConds = limpezasCasa
     .filter(l => l.tipo === 'ar_condicionado')
     .sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
-
-  const hoje = new Date();
-  const hojeZero = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
 
   // 1. Status Faxina Diária (Rotina)
   // Regra do Usuário:
@@ -11817,38 +11938,37 @@ function calcularStatusLimpezasCasa(casaId) {
 
   if (rotinas.length > 0) {
     const ultRotina = rotinas[0];
-    const strDataRot = String(ultRotina.data || '').split('T')[0].trim();
-    const dataUlt = new Date(strDataRot + 'T12:00:00');
-    const dataUltZero = isNaN(dataUlt.getTime()) ? hojeZero : new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
-    const diffDias = Math.max(0, Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24)));
+    const infoRotina = obterDataHoraEfetivaLimpeza(ultRotina);
+    const diffDias = infoRotina ? infoRotina.diffDias : 1;
+    const horaFormatada = (infoRotina && infoRotina.hora) || ultRotina.hora || '--:--';
 
     if (diffDias === 0) {
       // FEITA HOJE: VERDE
       stRotina = {
         status: 'ok',
-        textoCurto: `Hoje às ${ultRotina.hora || '--:--'}`,
-        textoDetalhe: `Realizada hoje às ${ultRotina.hora || '--:--'} (${ultRotina.responsavel || 'Equipe'})`,
-        subtexto: `Hoje às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}`,
+        textoCurto: `Hoje às ${horaFormatada}`,
+        textoDetalhe: `Realizada hoje às ${horaFormatada} (${ultRotina.responsavel || 'Equipe'})`,
+        subtexto: `Hoje às ${horaFormatada} por ${ultRotina.responsavel || 'Equipe'}`,
         badgeLabel: 'EM DIA',
         badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
         cardBg: 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-300',
         badgeDot: 'bg-emerald-500 shadow-xs',
         cor: 'emerald',
-        tooltip: `Limpeza realizada hoje às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}. Clique para ver histórico.`
+        tooltip: `Limpeza realizada hoje às ${horaFormatada} por ${ultRotina.responsavel || 'Equipe'}. Clique para ver histórico.`
       };
     } else if (diffDias === 1) {
       // NÃO FEITA HOJE (última ontem): AMARELINHO
       stRotina = {
         status: 'pendente',
         textoCurto: 'Pendente hoje',
-        textoDetalhe: 'Pendente: faxina de hoje ainda não realizada (última foi ontem)',
-        subtexto: `Ontem às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}`,
+        textoDetalhe: `Pendente: faxina de hoje ainda não realizada (última ontem às ${horaFormatada})`,
+        subtexto: `Ontem às ${horaFormatada} por ${ultRotina.responsavel || 'Equipe'}`,
         badgeLabel: 'PENDENTE',
         badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
         cardBg: 'bg-amber-50/80 border-amber-300 hover:border-amber-400',
         badgeDot: 'bg-amber-500 animate-pulse',
         cor: 'amber',
-        tooltip: `Última faxina foi ontem às ${ultRotina.hora || '--:--'}. Faxina de hoje pendente!`
+        tooltip: `Última faxina foi ontem às ${horaFormatada}. Faxina de hoje pendente!`
       };
     } else {
       // PASSOU DO DIA: AMARELINHO PENDENTE
@@ -11856,13 +11976,13 @@ function calcularStatusLimpezasCasa(casaId) {
         status: 'pendente',
         textoCurto: `Pendente (${diffDias}d)`,
         textoDetalhe: `Pendente: há ${diffDias} dias sem faxina diária`,
-        subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultRotina.data)})`,
+        subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(infoRotina ? infoRotina.dataStr : ultRotina.data)})`,
         badgeLabel: 'PENDENTE',
         badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
         cardBg: 'bg-amber-50/80 border-amber-300 hover:border-amber-400',
         badgeDot: 'bg-amber-500 animate-pulse',
         cor: 'amber',
-        tooltip: `Faxina pendente! Última realizada há ${diffDias} dias (${formatarDataLimpezaBR(ultRotina.data)}).`
+        tooltip: `Faxina pendente! Última realizada há ${diffDias} dias (${formatarDataLimpezaBR(infoRotina ? infoRotina.dataStr : ultRotina.data)}).`
       };
     }
   }
@@ -11886,11 +12006,10 @@ function calcularStatusLimpezasCasa(casaId) {
 
   if (arConds.length > 0) {
     const ultAr = arConds[0];
-    const strDataAr = String(ultAr.data || '').split('T')[0].trim();
-    const dataUlt = new Date(strDataAr + 'T12:00:00');
-    const dataUltZero = isNaN(dataUlt.getTime()) ? hojeZero : new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
-    const diffDias = Math.max(0, Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24)));
+    const infoAr = obterDataHoraEfetivaLimpeza(ultAr);
+    const diffDias = infoAr ? infoAr.diffDias : 0;
     const diasRestantes = Math.max(0, 30 - diffDias);
+    const dataStrFormatada = formatarDataLimpezaBR(infoAr ? infoAr.dataStr : ultAr.data);
 
     if (diffDias <= 30) {
       // DENTRO DOS 30 DIAS: VERDINHO TUDO CERTO
@@ -11898,7 +12017,7 @@ function calcularStatusLimpezasCasa(casaId) {
         status: 'ok',
         textoCurto: diffDias === 0 ? 'Em dia (hoje)' : `Em dia (${diffDias}d atrás)`,
         textoDetalhe: `Tudo certo: faltam ${diasRestantes} dias para o próximo ciclo de 30 dias`,
-        subtexto: `Última há ${diffDias} dia${diffDias === 1 ? '' : 's'} (${formatarDataLimpezaBR(ultAr.data)})`,
+        subtexto: `Última há ${diffDias} dia${diffDias === 1 ? '' : 's'} (${dataStrFormatada})`,
         badgeLabel: 'EM DIA',
         badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
         cardBg: 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-300',
@@ -11913,7 +12032,7 @@ function calcularStatusLimpezasCasa(casaId) {
         status: 'vencido',
         textoCurto: `Passou do tempo! (+${diasVencido}d)`,
         textoDetalhe: `PASSOU DO TEMPO: prazo de 30 dias ultrapassado em ${diasVencido} dia${diasVencido === 1 ? '' : 's'}!`,
-        subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultAr.data)})`,
+        subtexto: `Última há ${diffDias} dias (${dataStrFormatada})`,
         badgeLabel: 'PASSOU TEMPO',
         badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
         cardBg: 'bg-rose-50/90 border-rose-300 hover:border-rose-400',
@@ -12146,7 +12265,7 @@ function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
 
   // Data e hora atuais
   const agora = new Date();
-  const dataHojeStr = agora.toISOString().split('T')[0];
+  const dataHojeStr = getDataHojeLocal(agora);
   const horaHojeStr = agora.toTimeString().slice(0, 5);
 
   const dtEl = document.getElementById('registroLimpezaData');
