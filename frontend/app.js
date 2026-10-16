@@ -3179,6 +3179,10 @@ async function refreshAllData() {
     if (activeTab === 'gestao_cadastros') carregarGestaoCadastros();
     if (activeTab === 'relatorios') carregarRelatoriosPreview();
     if (activeTab === 'auditoria') carregarAuditoria();
+    if (typeof atualizarContadoresCasasUI === 'function') atualizarContadoresCasasUI();
+    if (activeTab === 'casas_cidade' && typeof filtrarCasasCidadeUI === 'function') filtrarCasasCidadeUI();
+    if (activeTab === 'estoque' && typeof carregarEstoqueUI === 'function') carregarEstoqueUI();
+    if (activeTab === 'chamados' && typeof filtrarChamadosUI === 'function') filtrarChamadosUI();
     showToast('Dados atualizados com sucesso!', 'success');
   } catch (err) {
     showToast('Erro ao atualizar dados', 'error');
@@ -4298,6 +4302,9 @@ function renderTabelaAlojados(data) {
           <td class="py-3 px-4">${statusBadge}</td>
           <td class="py-3 px-4 text-right whitespace-nowrap">
             ${isAtivo ? `
+              <button onclick="gerarTermoResponsabilidadeAlojado(${a.id})" class="btn-prefeito px-2 py-1 rounded bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold text-xs mr-1" title="Imprimir Termo de Responsabilidade A4">
+                <i class="fa-solid fa-file-contract"></i> Termo
+              </button>
               <button onclick="abrirModalRealocar(${a.id}, '${a.nome_completo}', '${a.bloco_nome}', '${a.quarto_numero}', ${a.numero_cama})" class="btn-prefeito px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs mr-1" title="Realocar para outra vaga">
                 <i class="fa-solid fa-arrows-turn-to-dots"></i> Mover
               </button>
@@ -4369,6 +4376,11 @@ function renderTabelaAlojados(data) {
               <button onclick="${clickFoto}" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Ver foto">
                 <i class="fa-solid fa-camera"></i>
               </button>
+              ${isAtivo ? `
+                <button onclick="gerarTermoResponsabilidadeAlojado(${a.id})" class="btn-prefeito p-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs shadow-xs" title="Imprimir Termo de Responsabilidade A4">
+                  <i class="fa-solid fa-file-contract"></i>
+                </button>
+              ` : ''}
               <button onclick="abrirModalEditarAlojado(${a.id})" class="btn-prefeito p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs shadow-xs" title="Editar">
                 <i class="fa-solid fa-pen"></i>
               </button>
@@ -6208,6 +6220,1105 @@ function exportarPlanilhaOficial() {
 }
 
 // ========================================================
+// RELATÓRIOS & EXPORTAÇÕES EXCEL PARA CASAS NA CIDADE
+// ========================================================
+
+function exportarCasasCidadeExcel() {
+  if (typeof XLSX !== 'undefined') {
+    showToast('🏙️ Gerando Relatório de Casas na Cidade em Excel...', 'info');
+    const wb = XLSX.utils.book_new();
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    // 1. ABA RESUMO DAS CASAS
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CASAS URBANAS NA CIDADE (LIDERANÇA & ENGENHARIA)`, `${empresaNome} • Ocupação e Capacidade dos Imóveis Alugados • Emissão: ${dataHora}`, 10);
+    const headers1 = ['Identificação da Casa', 'Endereço Completo', 'Bairro / Região', 'Responsável do Imóvel', 'Telefone Contato', 'Total Cômodos', 'Capacidade (Camas)', 'Camas Ocupadas', 'Camas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    headers1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    let totCapacidade = 0;
+    let totOcupadas = 0;
+
+    listaCasasCidade.forEach((c, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+
+      let comodosQtd = (c.comodos || []).length;
+      let camas = 0;
+      let ocup = 0;
+      (c.comodos || []).forEach(com => {
+        if (com.tipo === 'quarto') {
+          camas += Number(com.capacidade_camas || 0);
+          ocup += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+        }
+      });
+      totCapacidade += camas;
+      totOcupadas += ocup;
+      const livres = Math.max(0, camas - ocup);
+      const taxa = camas > 0 ? (ocup / camas) : 0;
+
+      ExcelProGenerator.addCell(ws1, r, 0, c.nome || 'Casa', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 1, c.endereco || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 2, c.bairro || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 3, c.responsavel || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 4, c.telefone_responsavel ? (typeof formatarTelefoneTexto === 'function' ? formatarTelefoneTexto(c.telefone_responsavel) : c.telefone_responsavel) : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 5, comodosQtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 6, camas, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 7, ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 8, livres, { f: `G${rowEx}-H${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 9, taxa, { f: `IF(G${rowEx}>0,H${rowEx}/G${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow1 = 4 + listaCasasCidade.length;
+    const totEx1 = totRow1 + 1;
+    const firstRow1 = 5;
+    const lastRow1 = totRow1;
+    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL GERAL CASAS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRow1, 1, `${listaCasasCidade.length} imóveis`, { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 4, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 5, '-', { s: ExcelProGenerator.estilos.total('center') });
+
+    if (listaCasasCidade.length > 0) {
+      ExcelProGenerator.addCell(ws1, totRow1, 6, totCapacidade, { f: `SUM(G${firstRow1}:G${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 7, totOcupadas, { f: `SUM(H${firstRow1}:H${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 8, Math.max(0, totCapacidade - totOcupadas), { f: `G${totEx1}-H${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 9, totCapacidade > 0 ? (totOcupadas / totCapacidade) : 0, { f: `IF(G${totEx1}>0,H${totEx1}/G${totEx1},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    } else {
+      ExcelProGenerator.addCell(ws1, totRow1, 6, 0, { s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 7, 0, { s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 8, 0, { s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 9, 0, { z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws1['!ref'] = `A1:J${totEx1}`;
+    ws1['!cols'] = [{ wch: 25 }, { wch: 32 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 24 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "RESUMO CASAS");
+
+    // 2. ABA MORADORES DAS CASAS
+    const ws2 = {};
+    ExcelProGenerator.addCabecalhoObra(ws2, `${obraNome.toUpperCase()} — MORADORES ALOJADOS NAS CASAS URBANAS`, `${empresaNome} • Engenheiros, Mestres e Liderança Alocada • Emissão: ${dataHora}`, 8);
+    const headers2 = ['Casa / Imóvel', 'Cômodo / Quarto', 'Cama Nº', 'Nome do Morador', 'Matrícula', 'Função / Cargo', 'Telefone / WhatsApp', 'Observações'];
+    headers2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const moradoresList = [];
+    listaCasasCidade.forEach(c => {
+      (c.comodos || []).forEach(com => {
+        (com.camas || []).forEach(cm => {
+          if (cm.morador && cm.morador.nome) {
+            moradoresList.push({
+              casa: c.nome,
+              comodo: com.nome,
+              cama: cm.numero,
+              nome: cm.morador.nome,
+              matricula: cm.morador.matricula || '-',
+              funcao: cm.morador.funcao || 'Liderança',
+              telefone: cm.morador.telefone || cm.morador.whatsapp || '-',
+              obs: cm.morador.observacoes || ''
+            });
+          }
+        });
+      });
+    });
+
+    moradoresList.forEach((m, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      ExcelProGenerator.addCell(ws2, r, 0, m.casa, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r, 1, m.comodo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r, 2, m.cama, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 3, m.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r, 4, m.matricula, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 5, m.funcao, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r, 6, m.telefone, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 7, m.obs, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow2 = 4 + moradoresList.length;
+    const totEx2 = totRow2 + 1;
+    ExcelProGenerator.addCell(ws2, totRow2, 0, 'TOTAL DE MORADORES', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, totRow2, 1, `${moradoresList.length} pessoas`, { s: ExcelProGenerator.estilos.total('center') });
+    for (let col = 2; col < 8; col++) {
+      ExcelProGenerator.addCell(ws2, totRow2, col, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws2['!ref'] = `A1:H${totEx2}`;
+    ws2['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 34 }, { wch: 16 }, { wch: 22 }, { wch: 20 }, { wch: 30 }];
+    ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "MORADORES DAS CASAS");
+
+    // 3. ABA INVENTÁRIO PATRIMONIAL
+    const ws3 = {};
+    ExcelProGenerator.addCabecalhoObra(ws3, `${obraNome.toUpperCase()} — INVENTÁRIO DE MÓVEIS DAS CASAS URBANAS`, `${empresaNome} • Bens Patrimoniais e Estado de Conservação • Emissão: ${dataHora}`, 7);
+    const headers3 = ['Casa / Imóvel', 'Cômodo / Ambiente', 'Móvel / Equipamento', 'Quantidade', 'Estado de Conservação', 'Necessita Manutenção', 'Última Vistoria'];
+    headers3.forEach((h, col) => ExcelProGenerator.addCell(ws3, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const moveisList = [];
+    listaCasasCidade.forEach(c => {
+      (c.comodos || []).forEach(com => {
+        (com.moveis || []).forEach(mv => {
+          moveisList.push({
+            casa: c.nome,
+            comodo: com.nome,
+            nome: mv.tipo || mv.nome || mv.tipo_item || 'Móvel',
+            qtd: mv.quantidade || 1,
+            estado: mv.estado_conservacao || mv.estado || 'Bom',
+            manut: (mv.precisa_manutencao || mv.manutencao) ? 'SIM (ALERTA)' : 'NÃO',
+            vistoria: mv.data_vistoria || (mv.patrimonio ? `Patr: ${mv.patrimonio}` : '-')
+          });
+        });
+      });
+    });
+
+    moveisList.forEach((mv, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      ExcelProGenerator.addCell(ws3, r, 0, mv.casa, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 1, mv.comodo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 2, mv.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r, 3, mv.qtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 4, mv.estado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 5, mv.manut, { s: mv.manut.includes('SIM') ? ExcelProGenerator.estilos.statusAlerta : ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 6, mv.vistoria, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow3 = 4 + moveisList.length;
+    const totEx3 = totRow3 + 1;
+    ExcelProGenerator.addCell(ws3, totRow3, 0, 'TOTAL BENS MAPEADOS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws3, totRow3, 1, `${moveisList.length} itens`, { s: ExcelProGenerator.estilos.total('center') });
+    for (let col = 2; col < 7; col++) {
+      ExcelProGenerator.addCell(ws3, totRow3, col, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws3['!ref'] = `A1:G${totEx3}`;
+    ws3['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 18 }];
+    ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws3, "INVENTARIO BENS");
+
+    const dataArquivo = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `casas_urbanas_ocupacao_${dataArquivo}.xlsx`);
+    showToast('Planilha de Casas na Cidade baixada com sucesso!', 'success');
+    return;
+  }
+  showToast('Biblioteca SheetJS (XLSX) não carregada.', 'error');
+}
+
+function exportarLimpezasExcel() {
+  if (typeof XLSX !== 'undefined') {
+    showToast('🧹 Gerando Relatório de Limpezas em Excel...', 'info');
+    const wb = XLSX.utils.book_new();
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    // 1. ABA HISTÓRICO DE LIMPEZAS
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — HISTÓRICO DE LIMPEZAS E VISTORIAS DAS CASAS`, `${empresaNome} • Registros de Manutenções e Higienização QR Code • Emissão: ${dataHora}`, 7);
+    const headers1 = ['Data do Registro', 'Horário', 'Casa / Imóvel', 'Tipo de Serviço', 'Responsável pela Execução', 'Status', 'Observações'];
+    headers1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const limpezas = [...listaLimpezasCasas];
+    limpezas.forEach((l, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const casa = listaCasasCidade.find(c => c.id === l.casa_id);
+      const casaNome = l.casa_nome || (casa ? casa.nome : 'Casa Urbana');
+      const tipoLabel = l.tipo === 'rotina' ? 'Rotina Diária' : l.tipo === 'ar_condicionado' ? 'Limpeza de Ar-Condicionado' : (l.tipo || 'Limpeza Geral');
+      const dataFormatada = l.data ? (l.data.includes('-') ? l.data.split('-').reverse().join('/') : l.data) : '--/--/----';
+
+      ExcelProGenerator.addCell(ws1, r, 0, dataFormatada, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 1, l.hora || '--:--', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 2, casaNome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 3, tipoLabel, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 4, l.responsavel || 'Equipe de Limpeza', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 5, (l.status || 'CONCLUÍDO').toUpperCase(), { s: ExcelProGenerator.estilos.statusLivre });
+      ExcelProGenerator.addCell(ws1, r, 6, l.observacoes || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    });
+
+    const totRow1 = 4 + limpezas.length;
+    const totEx1 = totRow1 + 1;
+    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL DE LIMPEZAS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRow1, 1, `${limpezas.length} registros`, { s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 2; c < 7; c++) {
+      ExcelProGenerator.addCell(ws1, totRow1, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws1['!ref'] = `A1:G${totEx1}`;
+    ws1['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 28 }, { wch: 28 }, { wch: 25 }, { wch: 16 }, { wch: 35 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "HISTORICO LIMPEZAS");
+
+    // 2. ABA CICLO PREVENTIVO DE AR CONDICIONADO (30 DIAS)
+    const ws2 = {};
+    ExcelProGenerator.addCabecalhoObra(ws2, `${obraNome.toUpperCase()} — CONTROLE PREVENTIVO DE AR-CONDICIONADO (CICLO 30 DIAS)`, `${empresaNome} • Monitoramento do Prazo de Limpeza dos Filtros de Climatização • Emissão: ${dataHora}`, 6);
+    const headers2 = ['Casa / Imóvel', 'Qtd Cômodos', 'Última Limpeza Realizada', 'Dias Decorridos', 'Prazo Restante (Fórmula)', 'Status do Ciclo'];
+    headers2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    listaCasasCidade.forEach((c, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+
+      // Buscar última limpeza de ar-condicionado desta casa
+      const limpsAr = limpezas.filter(l => l.casa_id === c.id && l.tipo === 'ar_condicionado');
+      limpsAr.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+      const ultAr = limpsAr[0];
+
+      let dias = 45;
+      let dataUlt = 'NUNCA REGISTRADO';
+      if (ultAr && ultAr.data) {
+        dataUlt = ultAr.data.includes('-') ? ultAr.data.split('-').reverse().join('/') : ultAr.data;
+        const diffMs = Date.now() - new Date(ultAr.data + 'T12:00:00').getTime();
+        dias = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      }
+
+      let stText = 'OK (REGULAR)';
+      let stStyle = ExcelProGenerator.estilos.statusLivre;
+      if (dias > 30) {
+        stText = 'VENCIDO (URGENTE)';
+        stStyle = ExcelProGenerator.estilos.statusAlerta;
+      } else if (dias >= 25) {
+        stText = 'ATENÇÃO (VENCE EM BREVE)';
+        stStyle = ExcelProGenerator.estilos.td(zebra, 'center');
+      }
+
+      ExcelProGenerator.addCell(ws2, r, 0, c.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r, 1, (c.comodos || []).length, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 2, dataUlt, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 3, dias, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 4, 30 - dias, { f: `30-D${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 5, stText, { s: stStyle });
+    });
+
+    const totRow2 = 4 + listaCasasCidade.length;
+    const totEx2 = totRow2 + 1;
+    ExcelProGenerator.addCell(ws2, totRow2, 0, 'TOTAL DE CASAS MONITORADAS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, totRow2, 1, `${listaCasasCidade.length} imóveis`, { s: ExcelProGenerator.estilos.total('center') });
+    for (let c = 2; c < 6; c++) {
+      ExcelProGenerator.addCell(ws2, totRow2, c, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws2['!ref'] = `A1:F${totEx2}`;
+    ws2['!cols'] = [{ wch: 28 }, { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 22 }, { wch: 26 }];
+    ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "CICLO AR CONDICIONADO");
+
+    const dataArquivo = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `relatorio_limpezas_casas_${dataArquivo}.xlsx`);
+    showToast('Planilha de limpezas baixada com sucesso!', 'success');
+    return;
+  }
+  showToast('Biblioteca SheetJS (XLSX) não carregada.', 'error');
+}
+
+function exportarDespesasCasasExcel() {
+  if (typeof XLSX !== 'undefined') {
+    showToast('💵 Gerando Relatório Consolidado de Contas em Excel...', 'info');
+    const wb = XLSX.utils.book_new();
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+    // 1. ABA CONTAS E DESPESAS
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CONTAS & DESPESAS CONSOLIDADAS DAS CASAS`, `${empresaNome} • Controle de Energia, Água, Aluguel e Internet • Emissão: ${dataHora}`, 8);
+    const headers1 = ['Casa / Imóvel', 'Tipo de Despesa', 'Descrição / Detalhes', 'Mês Ref.', 'Data de Vencimento', 'Valor da Conta (R$)', 'Status', 'Data de Pagamento'];
+    headers1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const despesas = [...listaDespesasCasas];
+    let totValor = 0;
+
+    despesas.forEach((d, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const ehPago = d.status === 'pago';
+      const casa = listaCasasCidade.find(c => c.id === d.casa_id);
+      const casaNome = d.casa_nome || (casa ? casa.nome : 'Casa Urbana');
+      const vencFormatado = d.vencimento ? (d.vencimento.includes('-') ? d.vencimento.split('-').reverse().join('/') : d.vencimento) : '--/--/----';
+      const valorNum = Number(d.valor) || 0;
+      totValor += valorNum;
+
+      ExcelProGenerator.addCell(ws1, r, 0, casaNome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 1, d.categoria || 'Despesa', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 2, d.observacoes || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 3, d.mes_referencia || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 4, vencFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 5, valorNum, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 6, ehPago ? 'PAGO' : 'PENDENTE', { s: ehPago ? ExcelProGenerator.estilos.statusLivre : ExcelProGenerator.estilos.statusAlerta });
+      ExcelProGenerator.addCell(ws1, r, 7, d.data_pagamento || (ehPago ? 'CONFIRMADO' : '-'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow1 = 4 + despesas.length;
+    const totEx1 = totRow1 + 1;
+    const firstRow1 = 5;
+    const lastRow1 = totRow1;
+    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL GERAL DAS CONTAS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRow1, 1, `${despesas.length} lançamentos`, { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 4, '-', { s: ExcelProGenerator.estilos.total('center') });
+    if (despesas.length > 0) {
+      ExcelProGenerator.addCell(ws1, totRow1, 5, totValor, { f: `SUM(F${firstRow1}:F${lastRow1})`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    } else {
+      ExcelProGenerator.addCell(ws1, totRow1, 5, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    }
+    ExcelProGenerator.addCell(ws1, totRow1, 6, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 7, '-', { s: ExcelProGenerator.estilos.total('center') });
+
+    ws1['!ref'] = `A1:H${totEx1}`;
+    ws1['!cols'] = [{ wch: 28 }, { wch: 22 }, { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 20 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "CONTAS E DESPESAS");
+
+    // 2. ABA RESUMO POR CASA
+    const ws2 = {};
+    ExcelProGenerator.addCabecalhoObra(ws2, `${obraNome.toUpperCase()} — CONSOLIDADO DE GASTOS POR IMÓVEL`, `${empresaNome} • Totalização de Contas Pagas e Pendentes por Casa • Emissão: ${dataHora}`, 6);
+    const headers2 = ['Casa / Imóvel', 'Total Lançamentos', 'Total Pago (R$)', 'Total Pendente (R$)', 'Total Geral (Fórmula)', '% Quitado (Fórmula)'];
+    headers2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    listaCasasCidade.forEach((c, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      const rowEx = r + 1;
+      const despsCasa = despesas.filter(d => d.casa_id === c.id);
+      const pago = despsCasa.filter(d => d.status === 'pago').reduce((a, b) => a + (Number(b.valor) || 0), 0);
+      const pend = despsCasa.filter(d => d.status !== 'pago').reduce((a, b) => a + (Number(b.valor) || 0), 0);
+      const totCasa = pago + pend;
+      const pct = totCasa > 0 ? (pago / totCasa) : 0;
+
+      ExcelProGenerator.addCell(ws2, r, 0, c.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r, 1, despsCasa.length, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r, 2, pago, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws2, r, 3, pend, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws2, r, 4, totCasa, { f: `C${rowEx}+D${rowEx}`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws2, r, 5, pct, { f: `IF(E${rowEx}>0,C${rowEx}/E${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const totRow2 = 4 + listaCasasCidade.length;
+    const totEx2 = totRow2 + 1;
+    const firstRow2 = 5;
+    const lastRow2 = totRow2;
+    ExcelProGenerator.addCell(ws2, totRow2, 0, 'TOTAL GERAL', { s: ExcelProGenerator.estilos.total('left') });
+    if (listaCasasCidade.length > 0) {
+      ExcelProGenerator.addCell(ws2, totRow2, 1, despesas.length, { f: `SUM(B${firstRow2}:B${lastRow2})`, s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws2, totRow2, 2, despesas.filter(d => d.status === 'pago').reduce((a, b) => a + (Number(b.valor) || 0), 0), { f: `SUM(C${firstRow2}:C${lastRow2})`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRow2, 3, despesas.filter(d => d.status !== 'pago').reduce((a, b) => a + (Number(b.valor) || 0), 0), { f: `SUM(D${firstRow2}:D${lastRow2})`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRow2, 4, totValor, { f: `C${totEx2}+D${totEx2}`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRow2, 5, totValor > 0 ? (despesas.filter(d => d.status === 'pago').reduce((a, b) => a + (Number(b.valor) || 0), 0) / totValor) : 0, { f: `IF(E${totEx2}>0,C${totEx2}/E${totEx2},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    } else {
+      ExcelProGenerator.addCell(ws2, totRow2, 1, 0, { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws2, totRow2, 2, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRow2, 3, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRow2, 4, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRow2, 5, 0, { z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    }
+
+    ws2['!ref'] = `A1:F${totEx2}`;
+    ws2['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 18 }];
+    ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "CONSOLIDADO POR CASA");
+
+    const dataArquivo = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `despesas_contas_casas_${dataArquivo}.xlsx`);
+    showToast('Planilha de despesas consolidada baixada com sucesso!', 'success');
+    return;
+  }
+  showToast('Biblioteca SheetJS (XLSX) não carregada.', 'error');
+}
+
+// ========================================================
+// TERMO DE RESPONSABILIDADE & FICHA DE ACOMODAÇÃO (A4)
+// ========================================================
+
+function preencherItensTermoResponsabilidade(itens) {
+  const tbody = document.getElementById('termoTabelaItensCorpo');
+  if (!tbody) return;
+
+  let listaFinal = [];
+  if (Array.isArray(itens) && itens.length > 0) {
+    listaFinal = itens;
+  } else {
+    listaFinal = [
+      { item: 'Cama individual metálica / Beliche', qtd: 1, estado: 'Bom / Em perfeitas condições', check: '[ X ] Recebido em ordem' },
+      { item: 'Colchão Densidade D33 c/ Capa Protetora', qtd: 1, estado: 'Novo / Higienizado', check: '[ X ] Recebido em ordem' },
+      { item: 'Travesseiro e Roupa de Cama', qtd: 1, estado: 'Limpo e lacrado', check: '[ X ] Recebido em ordem' },
+      { item: 'Armário / Guarda-roupa c/ Fecho', qtd: 1, estado: 'Bom estado', check: '[ X ] Recebido em ordem' },
+      { item: 'Chaves de Acesso à Acomodação', qtd: 1, estado: 'Funcional', check: '[ X ] Recebido em ordem' },
+      { item: 'Ar-Condicionado / Climatizador', qtd: 1, estado: 'Operacional / Filtro Limpo', check: '[ X ] Conferido' }
+    ];
+  }
+
+  tbody.innerHTML = listaFinal.map(i => `
+    <tr>
+      <td class="py-1 px-2 font-medium">${i.item || i.tipo || i.tipo_item || i.nome || 'Item'}</td>
+      <td class="py-1 px-2 text-center">${i.qtd || i.quantidade || 1}</td>
+      <td class="py-1 px-2">${i.estado || i.estado_conservacao || 'Bom / Operacional'}</td>
+      <td class="py-1 px-2 font-bold text-emerald-700">${i.check || '[ X ] Conferido e Aceito'}</td>
+    </tr>
+  `).join('');
+}
+
+function abrirModalTermoResponsabilidadeGenerico() {
+  const obraNome = localStorage.getItem('appCustomObraNome') || 'Taboca 2';
+  const elObra = document.getElementById('termoCabecalhoObra');
+  if (elObra) elObra.textContent = obraNome;
+  const elData = document.getElementById('termoDataEmissao');
+  if (elData) elData.textContent = new Date().toLocaleDateString('pt-BR');
+  const elNome = document.getElementById('termoMoradorNome');
+  if (elNome) elNome.textContent = 'COLABORADOR DA OBRA';
+  const elMat = document.getElementById('termoMoradorMatricula');
+  if (elMat) elMat.textContent = 'REG-0000';
+  const elEmp = document.getElementById('termoMoradorEmpresa');
+  if (elEmp) elEmp.textContent = localStorage.getItem('appCustomEmpresaNome') || 'GEL • Goetze Lobato Eng. S.A.';
+  const elFunc = document.getElementById('termoMoradorFuncao');
+  if (elFunc) elFunc.textContent = 'Colaborador';
+  const elTel = document.getElementById('termoMoradorTelefone');
+  if (elTel) elTel.textContent = '--';
+  const elEnt = document.getElementById('termoDataEntrada');
+  if (elEnt) elEnt.textContent = new Date().toLocaleDateString('pt-BR');
+  const elTipo = document.getElementById('termoTipoLocal');
+  if (elTipo) elTipo.textContent = 'Alojamento Canteiro / Casa Urbana';
+  const elBloco = document.getElementById('termoBlocoOuCasa');
+  if (elBloco) elBloco.textContent = 'Bloco / Casa Padrão';
+  const elQuarto = document.getElementById('termoQuartoOuComodo');
+  if (elQuarto) elQuarto.textContent = 'Quarto / Cômodo';
+  const elCama = document.getElementById('termoCamaNumero');
+  if (elCama) elCama.textContent = 'Leito 1';
+  const elAss = document.getElementById('termoAssinaturaMorador');
+  if (elAss) elAss.textContent = 'Assinatura do Colaborador';
+  const elDoc = document.getElementById('termoDocMorador');
+  if (elDoc) elDoc.textContent = 'CPF / Matrícula';
+
+  preencherItensTermoResponsabilidade(null);
+  abrirModal('modalTermoResponsabilidade');
+}
+
+function gerarTermoResponsabilidadeAlojado(alojadoId) {
+  const alojados = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) || [];
+  const a = alojados.find(x => String(x.id) === String(alojadoId));
+  if (!a) {
+    showToast('Colaborador não encontrado.', 'error');
+    return;
+  }
+
+  const obraNome = localStorage.getItem('appCustomObraNome') || 'Taboca 2';
+  const elObra = document.getElementById('termoCabecalhoObra');
+  if (elObra) elObra.textContent = obraNome;
+  const elData = document.getElementById('termoDataEmissao');
+  if (elData) elData.textContent = new Date().toLocaleDateString('pt-BR');
+  const elNome = document.getElementById('termoMoradorNome');
+  if (elNome) elNome.textContent = a.nome_completo || a.nome || '--';
+  const elMat = document.getElementById('termoMoradorMatricula');
+  if (elMat) elMat.textContent = a.matricula || '--';
+  const elEmp = document.getElementById('termoMoradorEmpresa');
+  if (elEmp) elEmp.textContent = a.empresa_nome || 'GEL • Goetze Lobato';
+  const elFunc = document.getElementById('termoMoradorFuncao');
+  if (elFunc) elFunc.textContent = a.funcao || 'Colaborador';
+  const elTel = document.getElementById('termoMoradorTelefone');
+  if (elTel) elTel.textContent = a.whatsapp ? (typeof formatarTelefoneTexto === 'function' ? formatarTelefoneTexto(a.whatsapp) : a.whatsapp) : '--';
+  const elEnt = document.getElementById('termoDataEntrada');
+  if (elEnt) elEnt.textContent = a.data_entrada ? (a.data_entrada.includes('-') ? a.data_entrada.split('-').reverse().join('/') : a.data_entrada) : new Date().toLocaleDateString('pt-BR');
+  const elTipo = document.getElementById('termoTipoLocal');
+  if (elTipo) elTipo.textContent = 'Alojamento Canteiro';
+  const elBloco = document.getElementById('termoBlocoOuCasa');
+  if (elBloco) elBloco.textContent = a.bloco_nome || 'Bloco Alojamento';
+  const elQuarto = document.getElementById('termoQuartoOuComodo');
+  if (elQuarto) elQuarto.textContent = `Quarto ${a.quarto_numero || '--'}`;
+  const elCama = document.getElementById('termoCamaNumero');
+  if (elCama) elCama.textContent = `Cama / Leito ${a.numero_cama || 1}`;
+  const elAss = document.getElementById('termoAssinaturaMorador');
+  if (elAss) elAss.textContent = a.nome_completo || 'Colaborador';
+  const elDoc = document.getElementById('termoDocMorador');
+  if (elDoc) elDoc.textContent = `Matrícula: ${a.matricula || '--'}`;
+
+  // Se houver móveis no quarto correspondente, incorporar ao inventário
+  let itensAlojamento = null;
+  const quartos = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.quartos) || [];
+  const q = quartos.find(quarto => String(quarto.numero) === String(a.quarto_numero) && (!a.bloco_id || String(quarto.bloco_id) === String(a.bloco_id)));
+  if (q && q.moveis && q.moveis.length > 0) {
+    itensAlojamento = [
+      { item: `Cama / Leito ${a.numero_cama || 1}`, qtd: 1, estado: 'Bom estado', check: '[ X ] Entregue' },
+      { item: 'Colchão Densidade D33 c/ Capa', qtd: 1, estado: 'Higienizado', check: '[ X ] Entregue' },
+      ...q.moveis.map(m => ({
+        item: m.tipo_item || m.tipo || m.nome || 'Móvel Quarto',
+        qtd: m.quantidade || 1,
+        estado: m.estado_conservacao || 'Bom',
+        check: '[ X ] Conferido'
+      })),
+      { item: 'Chaves de Acesso ao Quarto', qtd: 1, estado: 'Funcional', check: '[ X ] Entregue' }
+    ];
+  }
+  preencherItensTermoResponsabilidade(itensAlojamento);
+
+  abrirModal('modalTermoResponsabilidade');
+}
+
+function gerarTermoResponsabilidadeMoradorCasa(casaId, comodoId, camaNum, moradorNome) {
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+  const obraNome = localStorage.getItem('appCustomObraNome') || 'Taboca 2';
+  const elObra = document.getElementById('termoCabecalhoObra');
+  if (elObra) elObra.textContent = obraNome;
+  const elData = document.getElementById('termoDataEmissao');
+  if (elData) elData.textContent = new Date().toLocaleDateString('pt-BR');
+
+  let comodoNome = 'Quarto';
+  let morador = null;
+  let comodoObj = null;
+
+  if (casa) {
+    comodoObj = (casa.comodos || []).find(x => x.id === comodoId);
+    if (comodoObj) {
+      comodoNome = comodoObj.nome;
+      const cm = (comodoObj.camas || []).find(x => Number(x.numero) === Number(camaNum));
+      if (cm && cm.morador) morador = cm.morador;
+    }
+  }
+
+  const nomeFinal = moradorNome || (morador ? morador.nome : 'Morador');
+  const matFinal = morador ? (morador.matricula || '--') : '--';
+  const empresaFinal = morador ? (morador.empresa || 'GEL • Goetze Lobato') : 'GEL • Goetze Lobato';
+  const funcaoFinal = morador ? (morador.funcao || 'Liderança / Engenharia') : 'Liderança / Engenharia';
+  const telFinal = morador ? (morador.telefone || morador.whatsapp || '--') : '--';
+
+  const elNome = document.getElementById('termoMoradorNome');
+  if (elNome) elNome.textContent = nomeFinal;
+  const elMat = document.getElementById('termoMoradorMatricula');
+  if (elMat) elMat.textContent = matFinal;
+  const elEmp = document.getElementById('termoMoradorEmpresa');
+  if (elEmp) elEmp.textContent = empresaFinal;
+  const elFunc = document.getElementById('termoMoradorFuncao');
+  if (elFunc) elFunc.textContent = funcaoFinal;
+  const elTel = document.getElementById('termoMoradorTelefone');
+  if (elTel) elTel.textContent = telFinal;
+  const elEnt = document.getElementById('termoDataEntrada');
+  if (elEnt) elEnt.textContent = new Date().toLocaleDateString('pt-BR');
+  const elTipo = document.getElementById('termoTipoLocal');
+  if (elTipo) elTipo.textContent = 'Casa Urbana na Cidade';
+  const elBloco = document.getElementById('termoBlocoOuCasa');
+  if (elBloco) elBloco.textContent = casa ? casa.nome : 'Casa na Cidade';
+  const elQuarto = document.getElementById('termoQuartoOuComodo');
+  if (elQuarto) elQuarto.textContent = comodoNome;
+  const elCama = document.getElementById('termoCamaNumero');
+  if (elCama) elCama.textContent = `Cama ${camaNum || 1}`;
+  const elAss = document.getElementById('termoAssinaturaMorador');
+  if (elAss) elAss.textContent = nomeFinal;
+  const elDoc = document.getElementById('termoDocMorador');
+  if (elDoc) elDoc.textContent = `Matrícula: ${matFinal}`;
+
+  // Preencher inventário de bens com móveis reais do cômodo da casa
+  let itensCasa = null;
+  if (comodoObj && Array.isArray(comodoObj.moveis) && comodoObj.moveis.length > 0) {
+    itensCasa = [
+      { item: `Cama individual / Leito ${camaNum || 1}`, qtd: 1, estado: 'Bom estado', check: '[ X ] Recebido em ordem' },
+      { item: 'Colchão com Capa Protetora', qtd: 1, estado: 'Higienizado / Bom', check: '[ X ] Recebido em ordem' },
+      ...comodoObj.moveis.map(m => ({
+        item: m.tipo || m.nome || m.tipo_item || 'Móvel',
+        qtd: m.quantidade || 1,
+        estado: m.estado_conservacao || 'Bom estado',
+        check: '[ X ] Recebido em ordem'
+      })),
+      { item: 'Chaves de Acesso ao Imóvel / Cômodo', qtd: 1, estado: 'Funcional', check: '[ X ] Recebido em ordem' }
+    ];
+  }
+  preencherItensTermoResponsabilidade(itensCasa);
+
+  abrirModal('modalTermoResponsabilidade');
+}
+
+function gerarTermoResponsabilidadeDoModalFoto() {
+  const alojadoId = document.getElementById('modalFotoAlojadoId')?.value;
+  if (!alojadoId) {
+    showToast('Identificador do colaborador não encontrado.', 'error');
+    return;
+  }
+  fecharModal('modalFotoAlojado');
+  gerarTermoResponsabilidadeAlojado(alojadoId);
+}
+
+function imprimirTermoResponsabilidadeAtual() {
+  document.body.classList.add('imprimindo-termo');
+  window.print();
+  const removerClassePrint = () => {
+    document.body.classList.remove('imprimindo-termo');
+  };
+  window.addEventListener('afterprint', removerClassePrint, { once: true });
+  setTimeout(removerClassePrint, 2000);
+}
+
+// ========================================================
+// PAINEL CONSOLIDADO DE CONTAS DAS CASAS (VISÃO GERAL)
+// ========================================================
+
+function alternarSubAbaCasas(aba) {
+  const btnImoveis = document.getElementById('btnSubAbaCasasImoveis');
+  const btnDespesas = document.getElementById('btnSubAbaCasasDespesas');
+  const subImoveis = document.getElementById('subPainelCasasImoveis');
+  const subDespesas = document.getElementById('subPainelCasasDespesas');
+
+  if (aba === 'despesas') {
+    if (btnDespesas) btnDespesas.className = "px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-indigo-600 text-white shadow-sm";
+    if (btnImoveis) btnImoveis.className = "px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200";
+    if (subImoveis) subImoveis.classList.add('hidden');
+    if (subDespesas) subDespesas.classList.remove('hidden');
+    carregarPainelConsolidadoDespesas();
+  } else {
+    if (btnImoveis) btnImoveis.className = "px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-indigo-600 text-white shadow-sm";
+    if (btnDespesas) btnDespesas.className = "px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200";
+    if (subDespesas) subDespesas.classList.add('hidden');
+    if (subImoveis) subImoveis.classList.remove('hidden');
+    filtrarCasasCidadeUI();
+  }
+}
+
+function carregarPainelConsolidadoDespesas() {
+  const selectCasa = document.getElementById('filtroPainelDespesasCasa');
+  if (selectCasa) {
+    const valAtual = selectCasa.value;
+    selectCasa.innerHTML = '<option value="todas">Todas as Casas</option>' +
+      listaCasasCidade.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+    if (valAtual) selectCasa.value = valAtual;
+  }
+
+  const inputMes = document.getElementById('filtroPainelDespesasMes');
+  if (inputMes && !inputMes.value) {
+    inputMes.value = getMesAtualStr();
+  }
+
+  filtrarPainelDespesasCasasUI();
+}
+
+function filtrarPainelDespesasCasasUI() {
+  const casaFiltro = document.getElementById('filtroPainelDespesasCasa')?.value || 'todas';
+  const tipoFiltro = document.getElementById('filtroPainelDespesasTipo')?.value || 'todas';
+  const mesFiltro = document.getElementById('filtroPainelDespesasMes')?.value || '';
+  const statusFiltro = document.getElementById('filtroPainelDespesasStatus')?.value || 'todos';
+
+  let filtradas = [...listaDespesasCasas];
+
+  if (casaFiltro !== 'todas') {
+    filtradas = filtradas.filter(d => d.casa_id === casaFiltro);
+  }
+
+  if (tipoFiltro !== 'todas') {
+    filtradas = filtradas.filter(d => (d.categoria || '').toLowerCase().includes(tipoFiltro.toLowerCase()));
+  }
+
+  if (mesFiltro) {
+    filtradas = filtradas.filter(d => {
+      if (!d.mes_referencia) return false;
+      const ref = String(d.mes_referencia).trim();
+      if (ref === mesFiltro || ref.startsWith(mesFiltro)) return true;
+      if (mesFiltro.includes('-')) {
+        const [ano, mes] = mesFiltro.split('-');
+        const refInvertida = `${mes}/${ano}`;
+        if (ref === refInvertida || ref.includes(refInvertida)) return true;
+      }
+      return false;
+    });
+  }
+
+  if (statusFiltro !== 'todos') {
+    filtradas = filtradas.filter(d => d.status === statusFiltro);
+  }
+
+  // Atualizar KPIs do painel
+  const total = filtradas.reduce((a, b) => a + (Number(b.valor) || 0), 0);
+  const pago = filtradas.filter(d => d.status === 'pago').reduce((a, b) => a + (Number(b.valor) || 0), 0);
+  const pend = filtradas.filter(d => d.status !== 'pago').reduce((a, b) => a + (Number(b.valor) || 0), 0);
+  const qtdPend = filtradas.filter(d => d.status !== 'pago').length;
+
+  const elTot = document.getElementById('kpiPainelDespesasTotal');
+  if (elTot) elTot.textContent = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const elPago = document.getElementById('kpiPainelDespesasPago');
+  if (elPago) elPago.textContent = pago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const elPend = document.getElementById('kpiPainelDespesasPendente');
+  if (elPend) elPend.textContent = pend.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const elQtdPend = document.getElementById('kpiPainelDespesasQtdPendentes');
+  if (elQtdPend) elQtdPend.textContent = qtdPend;
+
+  // Renderizar tabela
+  const tbody = document.getElementById('tabelaPainelDespesasCorpo');
+  const vazio = document.getElementById('painelDespesasVazio');
+  if (!tbody) return;
+
+  if (filtradas.length === 0) {
+    tbody.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+  if (vazio) vazio.classList.add('hidden');
+
+  const iconeDespesa = (cat) => {
+    const c = (cat || '').toLowerCase();
+    if (c.includes('energia') || c.includes('luz')) return 'fa-solid fa-bolt text-yellow-500';
+    if (c.includes('água') || c.includes('agua')) return 'fa-solid fa-droplet text-cyan-500';
+    if (c.includes('aluguel')) return 'fa-solid fa-house text-emerald-500';
+    if (c.includes('internet') || c.includes('wifi')) return 'fa-solid fa-wifi text-indigo-500';
+    if (c.includes('gás') || c.includes('gas')) return 'fa-solid fa-fire text-amber-500';
+    if (c.includes('limpeza') || c.includes('faxina')) return 'fa-solid fa-broom text-teal-500';
+    return 'fa-solid fa-file-invoice-dollar text-slate-500';
+  };
+
+  tbody.innerHTML = filtradas.map(d => {
+    const ehPago = d.status === 'pago';
+    const vencFormatado = d.vencimento ? (d.vencimento.includes('-') ? d.vencimento.split('-').reverse().join('/') : d.vencimento) : '--/--/----';
+    const casa = listaCasasCidade.find(c => c.id === d.casa_id);
+    const casaNome = d.casa_nome || (casa ? casa.nome : 'Casa');
+
+    let avisoVencida = false;
+    if (!ehPago && d.vencimento) {
+      const hojeStr = new Date().toISOString().split('T')[0];
+      if (d.vencimento < hojeStr) avisoVencida = true;
+    }
+
+    return `
+      <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+        <td class="py-3 px-4 font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-house text-indigo-600 text-xs"></i>
+          <span>${casaNome}</span>
+        </td>
+        <td class="py-3 px-4">
+          <span class="inline-flex items-center gap-1.5 font-semibold text-slate-800">
+            <i class="${iconeDespesa(d.categoria)}"></i>
+            <span>${d.categoria || 'Despesa'}</span>
+          </span>
+        </td>
+        <td class="py-3 px-4">
+          <div class="text-xs text-slate-700">${d.observacoes || '<span class="text-slate-400 italic">Sem observações</span>'}</div>
+          <div class="text-[10px] ${avisoVencida ? 'text-red-600 font-bold' : 'text-slate-500'}">
+            Vencimento: ${vencFormatado} ${avisoVencida ? '<span class="ml-1 px-1.5 py-0.2 rounded bg-red-100 text-red-700 font-bold">VENCIDA</span>' : ''}
+          </div>
+        </td>
+        <td class="py-3 px-4 text-center font-mono font-semibold text-slate-700">
+          ${d.mes_referencia || '--'}
+        </td>
+        <td class="py-3 px-4 text-right font-black text-slate-900 text-xs">
+          ${(Number(d.valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </td>
+        <td class="py-3 px-4 text-center">
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${ehPago ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
+            <i class="fa-solid ${ehPago ? 'fa-circle-check text-emerald-600' : 'fa-clock text-amber-600'}"></i>
+            <span>${ehPago ? 'PAGO' : 'PENDENTE'}</span>
+          </span>
+        </td>
+        <td class="py-3 px-4 text-center">
+          ${d.comprovante_url ? `
+            <a href="${d.comprovante_url}" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-xs font-bold inline-flex items-center gap-1">
+              <i class="fa-solid fa-paperclip"></i> Anexo
+            </a>
+          ` : '<span class="text-slate-400 text-[10px]">Sem anexo</span>'}
+        </td>
+        <td class="py-3 px-4 text-right">
+          <div class="inline-flex items-center gap-1">
+            <button onclick="marcarDespesaComoPaga('${d.id}', '${ehPago ? 'pendente' : 'pago'}')" class="px-2.5 py-1.5 rounded-lg ${ehPago ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} text-[11px] font-bold transition flex items-center gap-1 shadow-xs" title="${ehPago ? 'Reabrir / Marcar Pendente' : 'Marcar como Paga'}">
+              <i class="fa-solid ${ehPago ? 'fa-rotate-left' : 'fa-check'} text-[10px]"></i>
+              <span>${ehPago ? 'Reabrir' : 'Marcar Paga'}</span>
+            </button>
+            <button onclick="excluirDespesaCasa('${d.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Despesa">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function marcarDespesaComoPaga(despesaId, novoStatus) {
+  const d = listaDespesasCasas.find(x => x.id === despesaId);
+  if (!d) return;
+
+  d.status = novoStatus;
+  d.data_pagamento = novoStatus === 'pago' ? new Date().toLocaleDateString('pt-BR') : '';
+  d.atualizado_em = new Date().toISOString();
+
+  localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+  atualizarContadoresCasasUI();
+  filtrarPainelDespesasCasasUI();
+  if (casaSelecionadaId && abaAtivaCasaDetalhes === 'despesas') {
+    carregarDespesasCasaAtual();
+  }
+
+  showToast(`Conta de ${d.categoria} marcada como "${novoStatus === 'pago' ? 'PAGA' : 'PENDENTE'}"!`, 'success');
+
+  try {
+    if (typeof registrarAuditoria === 'function') {
+      registrarAuditoria({
+        modulo: 'casas',
+        acao: 'EDITAR',
+        entidade: d.categoria,
+        detalhes: `Conta de ${d.categoria} (${d.casa_nome}) marcada como ${novoStatus.toUpperCase()}`
+      });
+    }
+  } catch (e) {}
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_despesas').doc(despesaId).update({
+        status: novoStatus,
+        data_pagamento: d.data_pagamento,
+        atualizado_em: d.atualizado_em
+      });
+    } catch (err) {
+      console.warn("Erro ao atualizar status da conta no Firestore:", err);
+    }
+  }
+}
+
+function limparFiltrosPainelDespesas() {
+  const c = document.getElementById('filtroPainelDespesasCasa');
+  if (c) c.value = 'todas';
+  const t = document.getElementById('filtroPainelDespesasTipo');
+  if (t) t.value = 'todas';
+  const m = document.getElementById('filtroPainelDespesasMes');
+  if (m) m.value = '';
+  const s = document.getElementById('filtroPainelDespesasStatus');
+  if (s) s.value = 'todos';
+  filtrarPainelDespesasCasasUI();
+  showToast('Filtros do painel de contas limpos.', 'info');
+}
+
+// ========================================================
+// BACKUP COMPLETO JSON & RESTAURAÇÃO SEGURA (1 CLIQUE)
+// ========================================================
+
+let backupPendenteRestauracao = null;
+
+async function fazerBackupCompletoJSON() {
+  try {
+    showToast('💾 Gerando Backup Completo da base de dados...', 'info');
+
+    if (window.StaticApiEngine && !window.StaticApiEngine.initialized) {
+      await window.StaticApiEngine.init();
+    }
+
+    const db = (window.StaticApiEngine && window.StaticApiEngine.dbState) || {};
+    const backupObj = {
+      sistema: 'Prefeitura de Canteiro - Taboca 2 (GEL)',
+      versao_schema: '3.0',
+      data_backup: new Date().toISOString(),
+      data_formatada: new Date().toLocaleString('pt-BR'),
+      autor: 'Prefeito Tiago Vidal',
+      empresa: localStorage.getItem('appCustomEmpresaNome') || 'GEL • Goetze Lobato Engenharia S.A.',
+      obra: localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2',
+      dados: {
+        geral: db.geral || {},
+        blocos: db.blocos || [],
+        quartos: db.quartos || [],
+        alojados: db.alojados || [],
+        empresas: db.empresas || [],
+        casas_cidade: listaCasasCidade || [],
+        casas_despesas: listaDespesasCasas || [],
+        casas_limpezas: listaLimpezasCasas || [],
+        estoque_itens: typeof listaEstoqueItens !== 'undefined' ? listaEstoqueItens : [],
+        estoque_movimentacoes: typeof listaEstoqueMovimentacoes !== 'undefined' ? listaEstoqueMovimentacoes : [],
+        chamados: typeof listaChamados !== 'undefined' ? listaChamados : [],
+        auditoria_logs: db.auditoria_logs || db.auditoria || []
+      }
+    };
+
+    const jsonStr = JSON.stringify(backupObj, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const timestampStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `backup_completo_prefeitura_${timestampStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    try {
+      if (typeof registrarAuditoria === 'function') {
+        registrarAuditoria({
+          modulo: 'alojamento',
+          acao: 'CRIAR',
+          entidade: 'Backup Geral',
+          detalhes: 'Exportou arquivo JSON de backup completo com todas as bases do sistema'
+        });
+      }
+    } catch (e) {}
+
+    showToast('🎉 Backup completo baixado com sucesso em arquivo .json!', 'success');
+  } catch (err) {
+    console.error('Erro ao fazer backup:', err);
+    showToast('Erro ao exportar backup: ' + err.message, 'error');
+  }
+}
+
+function analisarArquivoBackupJSON(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const conteudo = JSON.parse(e.target.result);
+      const dados = conteudo.dados || conteudo;
+
+      if (!dados.blocos && !dados.quartos && !dados.alojados && !dados.casas_cidade) {
+        throw new Error('O arquivo selecionado não contém uma estrutura de dados válida de backup da Prefeitura.');
+      }
+
+      backupPendenteRestauracao = {
+        dados: dados,
+        meta: {
+          empresa: conteudo.empresa || dados.empresa,
+          obra: conteudo.obra || dados.obra,
+          data_formatada: conteudo.data_formatada || new Date().toLocaleString('pt-BR')
+        }
+      };
+
+      const elData = document.getElementById('restaurarBackupData');
+      if (elData) elData.textContent = conteudo.data_formatada || new Date().toLocaleString('pt-BR');
+      const elBlocos = document.getElementById('restaurarBackupBlocos');
+      if (elBlocos) elBlocos.textContent = (dados.blocos || []).length;
+      const elQuartos = document.getElementById('restaurarBackupQuartos');
+      if (elQuartos) elQuartos.textContent = (dados.quartos || []).length;
+      const elAloj = document.getElementById('restaurarBackupAlojados');
+      if (elAloj) elAloj.textContent = (dados.alojados || []).length;
+      const elCasas = document.getElementById('restaurarBackupCasas');
+      if (elCasas) elCasas.textContent = (dados.casas_cidade || []).length;
+      const elDesp = document.getElementById('restaurarBackupDespesas');
+      if (elDesp) elDesp.textContent = (dados.casas_despesas || []).length;
+      const elLimp = document.getElementById('restaurarBackupLimpezas');
+      if (elLimp) elLimp.textContent = (dados.casas_limpezas || []).length;
+      const elEst = document.getElementById('restaurarBackupEstoque');
+      if (elEst) elEst.textContent = (dados.estoque_itens || []).length;
+      const elCham = document.getElementById('restaurarBackupChamados');
+      if (elCham) elCham.textContent = (dados.chamados || []).length;
+
+      const elCheck = document.getElementById('checkConfirmarRestauracaoBackup');
+      if (elCheck) elCheck.checked = false;
+
+      abrirModal('modalConfirmarRestauracaoBackup');
+    } catch (err) {
+      showToast('Arquivo de backup inválido: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+async function executarRestauracaoBackupConfirmada() {
+  const check = document.getElementById('checkConfirmarRestauracaoBackup');
+  if (!check || !check.checked) {
+    showToast('Por favor, marque a caixa confirmando a substituição segura antes de prosseguir.', 'warning');
+    return;
+  }
+
+  if (!backupPendenteRestauracao) {
+    showToast('Nenhum dado de backup pendente para restaurar.', 'error');
+    return;
+  }
+
+  const payload = backupPendenteRestauracao;
+  const dados = payload.dados || payload;
+  const meta = payload.meta || {};
+  showToast('🔄 Restaurando banco de dados completo...', 'info');
+
+  try {
+    if (window.StaticApiEngine) {
+      if (dados.blocos) StaticApiEngine.dbState.blocos = dados.blocos;
+      if (dados.quartos) StaticApiEngine.dbState.quartos = dados.quartos;
+      if (dados.alojados) StaticApiEngine.dbState.alojados = dados.alojados;
+      if (dados.empresas) StaticApiEngine.dbState.empresas = dados.empresas;
+      if (dados.geral) StaticApiEngine.dbState.geral = dados.geral;
+      if (dados.auditoria_logs) StaticApiEngine.dbState.auditoria_logs = dados.auditoria_logs;
+      if (dados.auditoria) StaticApiEngine.dbState.auditoria = dados.auditoria;
+
+      StaticApiEngine.recomputeStats();
+      StaticApiEngine.saveToStorage();
+    }
+
+    localStorage.setItem('dados_iniciais_taboca_custom', JSON.stringify(StaticApiEngine.dbState));
+    if (meta.empresa) localStorage.setItem('appCustomEmpresaNome', meta.empresa);
+    if (meta.obra) localStorage.setItem('appCustomObraNome', meta.obra);
+
+    if (dados.casas_cidade) {
+      listaCasasCidade = dados.casas_cidade;
+      localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+    }
+    if (dados.casas_despesas) {
+      listaDespesasCasas = dados.casas_despesas;
+      localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
+    }
+    if (dados.casas_limpezas) {
+      listaLimpezasCasas = dados.casas_limpezas;
+      localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
+    }
+
+    if (dados.estoque_itens) {
+      listaEstoqueItens = dados.estoque_itens;
+      localStorage.setItem('estoque_itens_cache', JSON.stringify(listaEstoqueItens));
+    }
+    if (dados.estoque_movimentacoes) {
+      listaEstoqueMovimentacoes = dados.estoque_movimentacoes;
+      localStorage.setItem('estoque_movimentacoes_cache', JSON.stringify(listaEstoqueMovimentacoes));
+    }
+
+    if (dados.chamados) {
+      listaChamados = dados.chamados;
+      localStorage.setItem('chamados_suporte_cache', JSON.stringify(listaChamados));
+    }
+
+    if (firestoreDb) {
+      try {
+        const batch = firestoreDb.batch();
+        const snapshotRef = firestoreDb.collection('configuracoes').doc('snapshot_canteiro');
+        batch.set(snapshotRef, {
+          dados_consolidados: JSON.stringify(StaticApiEngine.dbState),
+          atualizado_em: new Date().toISOString()
+        }, { merge: true });
+
+        (listaCasasCidade || []).forEach(c => {
+          if (c && c.id) {
+            batch.set(firestoreDb.collection('casas_cidade').doc(String(c.id)), c);
+          }
+        });
+
+        (listaDespesasCasas || []).forEach(d => {
+          if (d && d.id) {
+            batch.set(firestoreDb.collection('casas_despesas').doc(String(d.id)), d);
+          }
+        });
+
+        await batch.commit();
+        console.log('[FIREBASE] Restauração sincronizada na nuvem com sucesso.');
+      } catch (err) {
+        console.warn('Aviso ao sincronizar restauração no Firestore:', err);
+      }
+    }
+
+    try {
+      if (typeof registrarAuditoria === 'function') {
+        registrarAuditoria({
+          modulo: 'alojamento',
+          acao: 'IMPORTACAO',
+          entidade: 'Base Completa',
+          detalhes: 'Restauração de backup seguro em arquivo JSON executada com sucesso pelo Prefeito'
+        });
+      }
+    } catch (e) {}
+
+    fecharModal('modalConfirmarRestauracaoBackup');
+    backupPendenteRestauracao = null;
+
+    showToast('🎉 Banco de dados e todas as abas restauradas com 100% de sucesso!', 'success');
+    refreshAllData();
+    if (typeof filtrarPainelDespesasCasasUI === 'function') filtrarPainelDespesasCasasUI();
+  } catch (err) {
+    console.error('Erro na restauração:', err);
+    showToast('Erro ao restaurar banco: ' + err.message, 'error');
+  }
+}
+
+// ========================================================
 // 7. IMPORTAÇÃO & SINCRONIZAÇÃO
 // ========================================================
 
@@ -6910,6 +8021,10 @@ function iniciarListenerChamados() {
         novosChamados.push({
           id: doc.id,
           protocolo: d.protocolo || doc.id,
+          tipo_local: d.tipo_local || (d.casa_nome || (d.bloco && d.bloco.toLowerCase().includes('casa')) ? 'casa_cidade' : 'alojamento'),
+          casa_nome: d.casa_nome || '',
+          comodo: d.comodo || '',
+          local_formatado: d.local_formatado || '',
           quarto: d.quarto || 'N/A',
           bloco: d.bloco || 'Não informado',
           nome_solicitante: d.nome_solicitante || 'Colaborador',
@@ -6999,8 +8114,17 @@ function filtrarChamadosUI() {
   const busca = (document.getElementById('buscaChamadosInput')?.value || '').toLowerCase().trim();
   const st = document.getElementById('filtroStatusChamados')?.value || 'todos';
   const cat = document.getElementById('filtroCategoriaChamados')?.value || 'todas';
+  const local = document.getElementById('filtroLocalChamados')?.value || 'todos';
 
   let filtrados = [...listaChamados];
+
+  if (local !== 'todos') {
+    if (local === 'casa_cidade') {
+      filtrados = filtrados.filter(c => c.tipo_local === 'casa_cidade' || c.casa_nome || (c.bloco && c.bloco.toLowerCase().includes('casa')));
+    } else if (local === 'alojamento') {
+      filtrados = filtrados.filter(c => c.tipo_local !== 'casa_cidade' && !c.casa_nome && !(c.bloco && c.bloco.toLowerCase().includes('casa')));
+    }
+  }
 
   if (st !== 'todos') {
     if (st === 'pendente') {
@@ -7018,6 +8142,9 @@ function filtrarChamadosUI() {
     filtrados = filtrados.filter(c => 
       (c.quarto && String(c.quarto).toLowerCase().includes(busca)) ||
       (c.bloco && String(c.bloco).toLowerCase().includes(busca)) ||
+      (c.casa_nome && String(c.casa_nome).toLowerCase().includes(busca)) ||
+      (c.comodo && String(c.comodo).toLowerCase().includes(busca)) ||
+      (c.local_formatado && String(c.local_formatado).toLowerCase().includes(busca)) ||
       (c.nome_solicitante && c.nome_solicitante.toLowerCase().includes(busca)) ||
       (c.descricao && c.descricao.toLowerCase().includes(busca)) ||
       (c.protocolo && c.protocolo.toLowerCase().includes(busca)) ||
@@ -7066,7 +8193,33 @@ function renderizarGridChamados(chamados) {
 
   grid.innerHTML = chamados.map(c => {
     const dataDisplay = c.data_formatada || (c.criado_em ? new Date(c.criado_em).toLocaleString('pt-BR') : '');
-    const blocoTexto = c.bloco && c.bloco !== 'Não especificado' ? ` • ${c.bloco}` : '';
+    const isCasa = c.tipo_local === 'casa_cidade' || c.casa_nome || (c.bloco && c.bloco.toLowerCase().includes('casa'));
+
+    let tituloLocal = '';
+    let subtituloLocal = '';
+    let iconeLocal = '';
+    let corIcone = '';
+
+    if (isCasa) {
+      const nomeCasa = c.casa_nome || c.bloco || 'Casa Urbana';
+      const comodo = c.comodo || c.quarto || 'Cômodo Geral';
+      tituloLocal = nomeCasa;
+      subtituloLocal = ` • ${comodo}`;
+      iconeLocal = 'fa-solid fa-house-chimney';
+      corIcone = c.status === 'pendente' ? 'bg-indigo-500/10 text-indigo-600 border border-indigo-300' : 'bg-indigo-50 text-indigo-700';
+    } else {
+      const blocoTexto = c.bloco && c.bloco !== 'Não especificado' ? ` • ${c.bloco}` : '';
+      tituloLocal = `Quarto ${c.quarto}`;
+      subtituloLocal = blocoTexto;
+      iconeLocal = 'fa-solid fa-door-open';
+      corIcone = c.status === 'pendente' ? 'bg-amber-500/10 text-amber-600 border border-amber-300' : 'bg-slate-100 text-slate-700';
+    }
+
+    const badgeTipo = isCasa 
+      ? '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200"><i class="fa-solid fa-city text-[9px]"></i> Casa Urbana</span>'
+      : '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-hotel text-[9px]"></i> Alojamento Obra</span>';
+
+    const textoLocalMsg = isCasa ? `${tituloLocal} (${c.comodo || 'Geral'})` : `${tituloLocal} ${subtituloLocal}`;
 
     return `
       <div class="bg-white rounded-2xl border ${c.status === 'pendente' ? 'border-amber-300 shadow-md ring-1 ring-amber-100' : 'border-slate-200 shadow-sm'} p-4 flex flex-col justify-between transition hover:shadow-md">
@@ -7075,13 +8228,16 @@ function renderizarGridChamados(chamados) {
         <div>
           <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
             <div class="flex items-center gap-2.5">
-              <div class="w-10 h-10 rounded-xl ${c.status === 'pendente' ? 'bg-amber-500/10 text-amber-600 border border-amber-300' : 'bg-slate-100 text-slate-700'} flex items-center justify-center text-base font-extrabold flex-shrink-0">
-                <i class="fa-solid fa-door-open"></i>
+              <div class="w-10 h-10 rounded-xl ${corIcone} flex items-center justify-center text-base font-extrabold flex-shrink-0">
+                <i class="${iconeLocal}"></i>
               </div>
               <div>
-                <h4 class="text-sm font-extrabold text-slate-900 leading-tight">
-                  Quarto ${c.quarto}<span class="text-xs font-semibold text-slate-500">${blocoTexto}</span>
-                </h4>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h4 class="text-sm font-extrabold text-slate-900 leading-tight">
+                    ${tituloLocal}<span class="text-xs font-semibold text-slate-500">${subtituloLocal}</span>
+                  </h4>
+                  ${badgeTipo}
+                </div>
                 <p class="text-[10px] font-mono text-slate-400 mt-0.5">#${c.protocolo}</p>
               </div>
             </div>
@@ -7114,7 +8270,7 @@ function renderizarGridChamados(chamados) {
               ${c.whatsapp_solicitante ? `
                 <div class="flex items-center justify-between pt-0.5">
                   <span class="text-slate-500">Contato: ${c.whatsapp_solicitante}</span>
-                  <a href="https://wa.me/55${c.whatsapp_solicitante.replace(/\D/g, '')}?text=${encodeURIComponent('Olá ' + c.nome_solicitante + ', sobre seu chamado de manutenção do Quarto ' + c.quarto + ':')}" target="_blank" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  <a href="https://wa.me/55${c.whatsapp_solicitante.replace(/\D/g, '')}?text=${encodeURIComponent('Olá ' + c.nome_solicitante + ', sobre seu chamado de manutenção no ' + textoLocalMsg + ':')}" target="_blank" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                     <i class="fa-brands fa-whatsapp"></i> Responder
                   </a>
                 </div>
@@ -7265,6 +8421,10 @@ function recarregarChamadosManual() {
         novos.push({
           id: doc.id,
           protocolo: d.protocolo || doc.id,
+          tipo_local: d.tipo_local || (d.casa_nome || (d.bloco && d.bloco.toLowerCase().includes('casa')) ? 'casa_cidade' : 'alojamento'),
+          casa_nome: d.casa_nome || '',
+          comodo: d.comodo || '',
+          local_formatado: d.local_formatado || '',
           quarto: d.quarto || 'N/A',
           bloco: d.bloco || 'Não informado',
           nome_solicitante: d.nome_solicitante || 'Colaborador',
@@ -8311,6 +9471,9 @@ function renderizarComodosCasaDetalhes(c) {
                       <div class="flex items-center gap-1">
                         <button onclick="${clickFoto}" class="btn-prefeito p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 text-xs transition" title="Ver / alterar foto de ${safeNome}">
                           <i class="fa-solid fa-camera"></i>
+                        </button>
+                        <button onclick="gerarTermoResponsabilidadeMoradorCasa('${c.id}', '${com.id}', ${camaNum}, '${safeNome}')" class="btn-prefeito p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 text-xs transition" title="Imprimir Termo de Responsabilidade A4 de ${safeNome}">
+                          <i class="fa-solid fa-file-contract"></i>
                         </button>
                         <button onclick="openModalEditarMoradorCasa('${c.id}', '${com.id}', ${camaNum})" class="btn-prefeito p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 text-xs transition" title="Editar dados do morador">
                           <i class="fa-solid fa-pen"></i>
@@ -9777,7 +10940,10 @@ async function alternarStatusDespesaCasa(despesaId) {
 
   localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
   atualizarContadoresCasasUI();
-  carregarDespesasCasaAtual();
+  if (typeof filtrarPainelDespesasCasasUI === 'function') filtrarPainelDespesasCasasUI();
+  if (casaSelecionadaId && abaAtivaCasaDetalhes === 'despesas') {
+    carregarDespesasCasaAtual();
+  }
   showToast(`Conta de ${d.categoria} marcada como "${novoStatus === 'pago' ? 'Paga' : 'Pendente'}"!`, 'success');
 
   if (firestoreDb) {
@@ -9798,7 +10964,10 @@ async function excluirDespesaCasa(despesaId) {
   listaDespesasCasas = listaDespesasCasas.filter(x => x.id !== despesaId);
   localStorage.setItem('casas_despesas_cache', JSON.stringify(listaDespesasCasas));
   atualizarContadoresCasasUI();
-  carregarDespesasCasaAtual();
+  if (typeof filtrarPainelDespesasCasasUI === 'function') filtrarPainelDespesasCasasUI();
+  if (casaSelecionadaId && abaAtivaCasaDetalhes === 'despesas') {
+    carregarDespesasCasaAtual();
+  }
   showToast('Lançamento excluído com sucesso.', 'info');
 
   if (firestoreDb) {
@@ -12042,6 +13211,25 @@ window.exportarAuditoriaExcel = exportarAuditoriaExcel;
 window.alternarModoGraficoBlocos = alternarModoGraficoBlocos;
 window.renderChartCasasCidade = renderChartCasasCidade;
 window.renderChartCasasTab = renderChartCasasTab;
+
+// Exposição das funções de Relatórios Excel, Termos A4, Painel de Despesas e Backup JSON
+window.exportarCasasCidadeExcel = exportarCasasCidadeExcel;
+window.exportarLimpezasExcel = exportarLimpezasExcel;
+window.exportarDespesasCasasExcel = exportarDespesasCasasExcel;
+window.abrirModalTermoResponsabilidadeGenerico = abrirModalTermoResponsabilidadeGenerico;
+window.gerarTermoResponsabilidadeAlojado = gerarTermoResponsabilidadeAlojado;
+window.gerarTermoResponsabilidadeMoradorCasa = gerarTermoResponsabilidadeMoradorCasa;
+window.imprimirTermoResponsabilidadeAtual = imprimirTermoResponsabilidadeAtual;
+window.alternarSubAbaCasas = alternarSubAbaCasas;
+window.carregarPainelConsolidadoDespesas = carregarPainelConsolidadoDespesas;
+window.filtrarPainelDespesasCasasUI = filtrarPainelDespesasCasasUI;
+window.marcarDespesaComoPaga = marcarDespesaComoPaga;
+window.limparFiltrosPainelDespesas = limparFiltrosPainelDespesas;
+window.fazerBackupCompletoJSON = fazerBackupCompletoJSON;
+window.analisarArquivoBackupJSON = analisarArquivoBackupJSON;
+window.executarRestauracaoBackupConfirmada = executarRestauracaoBackupConfirmada;
+window.preencherItensTermoResponsabilidade = preencherItensTermoResponsabilidade;
+window.gerarTermoResponsabilidadeDoModalFoto = gerarTermoResponsabilidadeDoModalFoto;
 
 
 

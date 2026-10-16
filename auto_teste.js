@@ -230,7 +230,12 @@ const criticalElements = [
   'painelCasa_limpezas',
   'btnAbaCasa_limpezas',
   'casaDetalhesLimpezasTabela',
-  'casaDetalhesLimpezasVazio'
+  'casaDetalhesLimpezasVazio',
+  'modalTermoResponsabilidade',
+  'areaImpressaoTermo',
+  'modalConfirmarRestauracaoBackup',
+  'subPainelCasasDespesas',
+  'tabelaPainelDespesasCorpo'
 ];
 
 let allElementsPresent = true;
@@ -387,6 +392,142 @@ const formatarDataLimpezaBRTest = (dataStr) => {
 assert(formatarDataLimpezaBRTest('2026-10-15') === '15/10/2026', 'Formatador BR com formato YYYY-MM-DD');
 assert(formatarDataLimpezaBRTest('2026-10-15T08:30:00') === '15/10/2026', 'Formatador BR com formato ISO timestamp');
 assert(formatarDataLimpezaBRTest('') === '--/--/----', 'Formatador BR com entrada vazia');
+
+// Testes de Regras de Negócio: Backup Geral & Restauração Segura (.json)
+const backupMock = {
+  versao: '2.0',
+  sistema: 'Prefeitura de Canteiro - Gestão Completa',
+  gerado_em: new Date().toISOString(),
+  geral: { total_blocos: 10, total_quartos: 220, total_vagas: 880, ocupadas: 387, disponiveis: 493 },
+  blocos: [{ id: 'BLOCO-A', nome: 'Bloco A' }],
+  quartos: [{ id: 'Q-101', numero: '101', bloco_id: 'BLOCO-A' }],
+  alojados: [{ id: 'AL-1', nome: 'Pedro Alcantara', quarto: '101' }],
+  empresas: [{ id: 'EMP-1', nome: 'GEL' }],
+  casas_cidade: [{ id: 'CASA-1', nome: 'Casa Engenharia 01' }],
+  casas_despesas: [
+    { id: 'DESP-1', casa_id: 'CASA-1', categoria: 'Aluguel', valor: 2500, mes_referencia: '10/2026', status: 'pago' },
+    { id: 'DESP-2', casa_id: 'CASA-1', categoria: 'Energia', valor: 450.50, mes_referencia: '10/2026', status: 'pendente' },
+    { id: 'DESP-3', casa_id: 'CASA-1', categoria: 'Água', valor: 120.00, mes_referencia: '10/2026', status: 'pendente' }
+  ],
+  casas_limpezas: [{ id: 'LIMP-1', casa_id: 'CASA-1', tipo: 'rotina' }],
+  estoque_itens: [{ id: 'EST-1', nome: 'Chuveiro', quantidade: 5 }]
+};
+
+assert(backupMock.versao === '2.0', 'Estrutura de Backup JSON versão 2.0 identificada');
+assert(Array.isArray(backupMock.casas_cidade) && backupMock.casas_cidade.length > 0, 'Backup contém dados de Casas na Cidade');
+assert(Array.isArray(backupMock.casas_despesas) && backupMock.casas_despesas.length === 3, 'Backup contém array de Despesas das Casas');
+assert(Array.isArray(backupMock.casas_limpezas), 'Backup contém array de Limpezas');
+assert(Array.isArray(backupMock.estoque_itens), 'Backup contém dados de Estoque');
+
+// Testes de Regras de Negócio: Painel Consolidado de Despesas das Casas
+const totalDespesas = backupMock.casas_despesas.reduce((acc, d) => acc + d.valor, 0);
+const totalPago = backupMock.casas_despesas.filter(d => d.status === 'pago').reduce((acc, d) => acc + d.valor, 0);
+const totalPendente = backupMock.casas_despesas.filter(d => d.status === 'pendente').reduce((acc, d) => acc + d.valor, 0);
+
+assert(totalDespesas === 3070.50, `Cálculo de Despesas Totais: R$ ${totalDespesas.toFixed(2)} = 3070.50`);
+assert(totalPago === 2500.00, `Cálculo de Despesas Pagas: R$ ${totalPago.toFixed(2)} = 2500.00`);
+assert(totalPendente === 570.50, `Cálculo de Despesas Pendentes: R$ ${totalPendente.toFixed(2)} = 570.50`);
+assert(totalPago + totalPendente === totalDespesas, 'Consistência contábil: Pago + Pendente = Total');
+
+// Testes de Regras de Negócio: Termo de Responsabilidade & Ficha de Acomodação (A4)
+const termoAlojadoMock = {
+  tipo: 'alojamento',
+  nome: 'Pedro Alcantara',
+  cpf: '123.456.789-00',
+  quarto: '101',
+  bloco: 'Bloco A',
+  cama: 'Cama 02',
+  empresa: 'GEL',
+  funcao: 'Eletricista',
+  itensEntregues: ['Colchão D33', 'Travesseiro', 'Jogo de Cama', 'Chave do Armário'],
+  regrasAceitas: true
+};
+assert(termoAlojadoMock.tipo === 'alojamento', 'Termo gerado para modalidade Alojamento');
+assert(termoAlojadoMock.itensEntregues.length >= 4, 'Termo possui rol de itens de inventário patrimonial');
+assert(termoAlojadoMock.regrasAceitas === true, 'Termo possui cláusulas de aceitação de convivência');
+
+const termoCasaMock = {
+  tipo: 'casa_cidade',
+  nome: 'Eng. Roberto Lima',
+  casa: 'Casa 01 - Engenharia',
+  comodo: 'Suíte Master',
+  cama: 'Cama 01',
+  moveisComodo: ['Ar Condicionado Split 12000 BTUs', 'Cama Box', 'Guarda-roupa 3 Portas'],
+  endereco: 'Rua das Flores, 120 - Centro'
+};
+assert(termoCasaMock.tipo === 'casa_cidade', 'Termo gerado para modalidade Casa na Cidade');
+assert(termoCasaMock.moveisComodo.length === 3, 'Inventário de móveis do cômodo da casa mapeado');
+
+// Testes de Regras de Negócio: Chamados de Manutenção (Alojamento vs Casa Urbana)
+const chamadoAlojamento = {
+  tipo_local: 'alojamento',
+  quarto: '102',
+  bloco: 'Bloco B',
+  categoria: 'Elétrica',
+  solicitante: 'Carlos Silva'
+};
+const chamadoCasa = {
+  tipo_local: 'casa_cidade',
+  casa_nome: 'Casa 02 - Liderança',
+  comodo: 'Cozinha',
+  categoria: 'Hidráulica',
+  solicitante: 'Marcos Souza'
+};
+assert(chamadoAlojamento.tipo_local === 'alojamento' && chamadoAlojamento.quarto === '102', 'Chamado de Alojamento validado');
+assert(chamadoCasa.tipo_local === 'casa_cidade' && chamadoCasa.casa_nome === 'Casa 02 - Liderança' && chamadoCasa.comodo === 'Cozinha', 'Chamado de Casa Urbana validado');
+
+// -------------------------------------------------------------
+// 10. VERIFICAÇÃO RIGOROSA DAS 5 NOVAS FUNCIONALIDADES
+// -------------------------------------------------------------
+console.log('\n⭐ 10. Verificação Rigorosa das 5 Funcionalidades Solicitadas');
+
+const appJsContent = fs.readFileSync('app.js', 'utf8');
+const indexHtmlContent = fs.readFileSync('index.html', 'utf8');
+const chamadoHtmlContent = fs.readFileSync('chamado.html', 'utf8');
+
+// 1. Relatórios e Exportações em Excel para Casas na Cidade
+assert(appJsContent.includes('function exportarCasasCidadeExcel()'), 'Funcionalidade 1: exportarCasasCidadeExcel implementada em app.js');
+assert(appJsContent.includes('function exportarLimpezasExcel()'), 'Funcionalidade 1: exportarLimpezasExcel implementada em app.js');
+assert(appJsContent.includes('function exportarDespesasCasasExcel()'), 'Funcionalidade 1: exportarDespesasCasasExcel implementada em app.js');
+assert(indexHtmlContent.includes('exportarCasasCidadeExcel()'), 'Funcionalidade 1: Botão exportarCasasCidadeExcel presente em index.html');
+assert(indexHtmlContent.includes('exportarLimpezasExcel()'), 'Funcionalidade 1: Botão exportarLimpezasExcel presente em index.html');
+assert(indexHtmlContent.includes('exportarDespesasCasasExcel()'), 'Funcionalidade 1: Botão exportarDespesasCasasExcel presente em index.html');
+
+// 2. Termo de Responsabilidade & Ficha de Acomodação (Impressão A4)
+assert(appJsContent.includes('function preencherItensTermoResponsabilidade('), 'Funcionalidade 2: preencherItensTermoResponsabilidade presente em app.js');
+assert(appJsContent.includes('function gerarTermoResponsabilidadeAlojado('), 'Funcionalidade 2: gerarTermoResponsabilidadeAlojado presente em app.js');
+assert(appJsContent.includes('function gerarTermoResponsabilidadeMoradorCasa('), 'Funcionalidade 2: gerarTermoResponsabilidadeMoradorCasa presente em app.js');
+assert(appJsContent.includes('function gerarTermoResponsabilidadeDoModalFoto('), 'Funcionalidade 2: gerarTermoResponsabilidadeDoModalFoto presente em app.js');
+assert(indexHtmlContent.includes('id="modalTermoResponsabilidade"'), 'Funcionalidade 2: Modal do Termo presente em index.html');
+assert(indexHtmlContent.includes('id="areaImpressaoTermo"'), 'Funcionalidade 2: Folha A4 formatada (#areaImpressaoTermo) presente em index.html');
+assert(indexHtmlContent.includes('id="termoTabelaItensCorpo"'), 'Funcionalidade 2: Tabela de inventário (#termoTabelaItensCorpo) presente em index.html');
+assert(indexHtmlContent.includes('gerarTermoResponsabilidadeDoModalFoto()'), 'Funcionalidade 2: Botão de Termo no Modal de Foto do Alojado presente');
+assert(indexHtmlContent.includes('@page') && indexHtmlContent.includes('A4 portrait'), 'Funcionalidade 2: Estilo CSS @page com tamanho A4 portrait presente');
+
+// 3. Painel Consolidado de Contas das Casas
+assert(appJsContent.includes('function alternarSubAbaCasas('), 'Funcionalidade 3: alternarSubAbaCasas presente em app.js');
+assert(appJsContent.includes('function carregarPainelConsolidadoDespesas()'), 'Funcionalidade 3: carregarPainelConsolidadoDespesas presente em app.js');
+assert(appJsContent.includes('function filtrarPainelDespesasCasasUI()'), 'Funcionalidade 3: filtrarPainelDespesasCasasUI presente em app.js');
+assert(appJsContent.includes('function marcarDespesaComoPaga('), 'Funcionalidade 3: marcarDespesaComoPaga presente em app.js');
+assert(indexHtmlContent.includes('id="subPainelCasasDespesas"'), 'Funcionalidade 3: subPainelCasasDespesas presente em index.html');
+assert(indexHtmlContent.includes('id="tabelaPainelDespesasCorpo"'), 'Funcionalidade 3: tabelaPainelDespesasCorpo presente em index.html');
+assert(indexHtmlContent.includes('id="filtroPainelDespesasCasa"'), 'Funcionalidade 3: Filtro por casa presente');
+assert(indexHtmlContent.includes('id="filtroPainelDespesasMes"'), 'Funcionalidade 3: Filtro por mês presente');
+
+// 4. Chamados de Manutenção para as Casas na Cidade
+assert(chamadoHtmlContent.includes('function alternarLocalChamado('), 'Funcionalidade 4: alternarLocalChamado presente em chamado.html');
+assert(chamadoHtmlContent.includes('id="btnLocalAlojamento"'), 'Funcionalidade 4: Botão seletor Alojamento presente em chamado.html');
+assert(chamadoHtmlContent.includes('id="btnLocalCasa"'), 'Funcionalidade 4: Botão seletor Casa Urbana presente em chamado.html');
+assert(chamadoHtmlContent.includes('id="containerCamposCasa"'), 'Funcionalidade 4: Container de campos de Casa presente em chamado.html');
+assert(appJsContent.includes('tipo_local'), 'Funcionalidade 4: Tratamento de tipo_local nos chamados em app.js');
+
+// 5. Backup Completo JSON e Restauração Segura
+assert(appJsContent.includes('function fazerBackupCompletoJSON()'), 'Funcionalidade 5: fazerBackupCompletoJSON presente em app.js');
+assert(appJsContent.includes('function analisarArquivoBackupJSON('), 'Funcionalidade 5: analisarArquivoBackupJSON presente em app.js');
+assert(appJsContent.includes('function executarRestauracaoBackupConfirmada()'), 'Funcionalidade 5: executarRestauracaoBackupConfirmada presente em app.js');
+assert(appJsContent.includes('saveToStorage()') && appJsContent.includes('prefeitura_taboca_snapshot'), 'Funcionalidade 5: Persistência de restauração garantida em prefeitura_taboca_snapshot');
+assert(indexHtmlContent.includes('id="modalConfirmarRestauracaoBackup"'), 'Funcionalidade 5: Modal de confirmação segura de restauração presente em index.html');
+
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

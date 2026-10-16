@@ -77,8 +77,26 @@
     <!-- Formulário do Chamado -->
     <form id="formChamado" onsubmit="event.preventDefault();" class="bg-slate-800/60 backdrop-blur rounded-2xl p-4 sm:p-5 border border-slate-700/60 shadow-xl space-y-4">
       
-      <!-- Linha 1: Quarto e Bloco -->
-      <div class="grid grid-cols-2 gap-3">
+      <!-- Alternador de Local: Alojamento vs Casa Urbana -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <i class="fa-solid fa-location-dot text-amber-400"></i> Local da Ocorrência *
+        </label>
+        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-950/70 rounded-xl border border-slate-700/60">
+          <button type="button" id="btnLocalAlojamento" onclick="alternarLocalChamado('alojamento')" class="py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-amber-500 text-slate-950 shadow-sm">
+            <i class="fa-solid fa-hotel"></i>
+            <span>Alojamento Obra</span>
+          </button>
+          <button type="button" id="btnLocalCasa" onclick="alternarLocalChamado('casa_cidade')" class="py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800">
+            <i class="fa-solid fa-house-chimney"></i>
+            <span>Casa Urbana</span>
+          </button>
+        </div>
+        <input type="hidden" id="inputTipoLocal" name="tipo_local" value="alojamento">
+      </div>
+
+      <!-- Container Campos Alojamento -->
+      <div id="containerCamposAlojamento" class="grid grid-cols-2 gap-3">
         <div>
           <label for="inputQuarto" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
             <i class="fa-solid fa-door-open text-amber-400"></i> Quarto Nº *
@@ -113,6 +131,34 @@
             <option value="Bloco I">Bloco I</option>
             <option value="Outro Bloco">Outro</option>
           </select>
+        </div>
+      </div>
+
+      <!-- Container Campos Casa Urbana -->
+      <div id="containerCamposCasa" class="space-y-3 hidden">
+        <div>
+          <label for="inputCasaNome" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+            <i class="fa-solid fa-house text-indigo-400"></i> Nome / Identificação da Casa *
+          </label>
+          <input 
+            type="text" 
+            id="inputCasaNome" 
+            name="casa_nome" 
+            placeholder="Ex: Casa 01 - Engenharia ou Rua das Flores, 120" 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white font-semibold text-sm outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-amber-500"
+          >
+        </div>
+        <div>
+          <label for="inputCasaComodo" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+            <i class="fa-solid fa-door-open text-sky-400"></i> Cômodo / Área da Casa *
+          </label>
+          <input 
+            type="text" 
+            id="inputCasaComodo" 
+            name="casa_comodo" 
+            placeholder="Ex: Quarto 1, Sala, Cozinha, Banheiro..." 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white font-medium text-sm outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-amber-500"
+          >
         </div>
       </div>
 
@@ -321,14 +367,57 @@
       console.warn("Erro ao iniciar Firebase:", e);
     }
 
-    // Pré-preenchimento por parâmetros da URL se houver (ex: ?quarto=105&bloco=Bloco%20A)
+    // Alternador de Local: Alojamento vs Casa Urbana
+    function alternarLocalChamado(tipo) {
+      const inputTipo = document.getElementById('inputTipoLocal');
+      const btnAloj = document.getElementById('btnLocalAlojamento');
+      const btnCasa = document.getElementById('btnLocalCasa');
+      const cAloj = document.getElementById('containerCamposAlojamento');
+      const cCasa = document.getElementById('containerCamposCasa');
+      const inputQuarto = document.getElementById('inputQuarto');
+      const inputCasaNome = document.getElementById('inputCasaNome');
+      const inputCasaComodo = document.getElementById('inputCasaComodo');
+
+      inputTipo.value = tipo;
+      if (tipo === 'casa_cidade') {
+        btnCasa.className = "py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-indigo-600 text-white shadow-sm";
+        btnAloj.className = "py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800";
+        cAloj.classList.add('hidden');
+        cCasa.classList.remove('hidden');
+        if (inputQuarto) inputQuarto.removeAttribute('required');
+        if (inputCasaNome) inputCasaNome.setAttribute('required', 'required');
+        if (inputCasaComodo) inputCasaComodo.setAttribute('required', 'required');
+      } else {
+        btnAloj.className = "py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-amber-500 text-slate-950 shadow-sm";
+        btnCasa.className = "py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800";
+        cCasa.classList.add('hidden');
+        cAloj.classList.remove('hidden');
+        if (inputCasaNome) inputCasaNome.removeAttribute('required');
+        if (inputCasaComodo) inputCasaComodo.removeAttribute('required');
+        if (inputQuarto) inputQuarto.setAttribute('required', 'required');
+      }
+    }
+
+    // Pré-preenchimento por parâmetros da URL se houver (ex: ?quarto=105&bloco=Bloco%20A ou ?tipo=casa&casa=Casa%2001)
     window.addEventListener('DOMContentLoaded', () => {
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.has('quarto')) {
-        document.getElementById('inputQuarto').value = urlParams.get('quarto');
-      }
-      if (urlParams.has('bloco')) {
-        document.getElementById('inputBloco').value = urlParams.get('bloco');
+      const tipo = urlParams.get('tipo');
+      if (tipo === 'casa' || tipo === 'casa_cidade' || urlParams.has('casa_id') || urlParams.has('casa_nome') || urlParams.has('casa')) {
+        alternarLocalChamado('casa_cidade');
+        const casaNome = urlParams.get('casa_nome') || urlParams.get('casa') || urlParams.get('casa_id') || '';
+        if (casaNome) {
+          document.getElementById('inputCasaNome').value = casaNome;
+        }
+        if (urlParams.has('comodo')) {
+          document.getElementById('inputCasaComodo').value = urlParams.get('comodo') || '';
+        }
+      } else {
+        if (urlParams.has('quarto')) {
+          document.getElementById('inputQuarto').value = urlParams.get('quarto');
+        }
+        if (urlParams.has('bloco')) {
+          document.getElementById('inputBloco').value = urlParams.get('bloco');
+        }
       }
     });
 
@@ -346,19 +435,36 @@
 
     // Enviar chamado
     async function enviarChamado(destino) {
-      const quarto = document.getElementById('inputQuarto').value.trim();
-      const bloco = document.getElementById('inputBloco').value.trim();
+      const tipoLocal = document.getElementById('inputTipoLocal')?.value || 'alojamento';
+      const quarto = document.getElementById('inputQuarto')?.value.trim() || '';
+      const bloco = document.getElementById('inputBloco')?.value.trim() || '';
+      const casaNome = document.getElementById('inputCasaNome')?.value.trim() || '';
+      const casaComodo = document.getElementById('inputCasaComodo')?.value.trim() || '';
       const nome = document.getElementById('inputNome').value.trim();
       const whatsapp = document.getElementById('inputWhatsapp').value.trim();
       const categoria = document.getElementById('inputCategoria').value.trim();
       const descricao = document.getElementById('inputDescricao').value.trim();
 
-      // Validações
-      if (!quarto) {
-        alert("Por favor, informe o número do seu quarto.");
-        document.getElementById('inputQuarto').focus();
-        return;
+      // Validações específicas por local
+      if (tipoLocal === 'casa_cidade') {
+        if (!casaNome) {
+          alert("Por favor, informe o nome ou identificação da Casa na Cidade.");
+          document.getElementById('inputCasaNome').focus();
+          return;
+        }
+        if (!casaComodo) {
+          alert("Por favor, informe em qual cômodo ou área ocorreu o problema.");
+          document.getElementById('inputCasaComodo').focus();
+          return;
+        }
+      } else {
+        if (!quarto) {
+          alert("Por favor, informe o número do seu quarto.");
+          document.getElementById('inputQuarto').focus();
+          return;
+        }
       }
+
       if (!nome) {
         alert("Por favor, digite seu nome completo.");
         document.getElementById('inputNome').focus();
@@ -386,10 +492,18 @@
       const dataHoraNow = new Date();
       const dataHoraStr = dataHoraNow.toLocaleString('pt-BR');
 
+      const localExibicao = tipoLocal === 'casa_cidade' 
+        ? `${casaNome} • Cômodo: ${casaComodo}`
+        : `Quarto ${quarto} ${bloco ? '(' + bloco + ')' : ''}`;
+
       const chamadoData = {
         protocolo: protocolo,
-        quarto: quarto,
-        bloco: bloco || 'Não especificado',
+        tipo_local: tipoLocal, // 'alojamento' ou 'casa_cidade'
+        quarto: tipoLocal === 'casa_cidade' ? (casaComodo || 'Casa Urbana') : quarto,
+        bloco: tipoLocal === 'casa_cidade' ? casaNome : (bloco || 'Não especificado'),
+        casa_nome: tipoLocal === 'casa_cidade' ? casaNome : '',
+        comodo: tipoLocal === 'casa_cidade' ? casaComodo : '',
+        local_formatado: localExibicao,
         nome_solicitante: nome,
         whatsapp_solicitante: whatsapp || '',
         categoria: categoria,
@@ -412,10 +526,23 @@
 
       // 2. Se for destino WhatsApp, redirecionar para a conversa do Prefeito
       if (destino === 'whatsapp') {
-        const blocoTexto = bloco ? ` (${bloco})` : '';
-        const zapTexto = whatsapp ? `\n📱 *Contato do Alojado:* ${whatsapp}` : '';
+        const zapTexto = whatsapp ? `\n📱 *Contato do Solicitante:* ${whatsapp}` : '';
         
-        const mensagemFormatada = 
+        let mensagemFormatada = '';
+        if (tipoLocal === 'casa_cidade') {
+          mensagemFormatada = 
+`🚨 *SOLICITAÇÃO DE MANUTENÇÃO - CASA NA CIDADE* 🚨
+
+👤 *Nome:* ${nome}
+🏡 *Casa:* ${casaNome}
+🚪 *Cômodo:* ${casaComodo}
+🔧 *Problema:* ${categoria}
+📝 *Detalhes:* ${descricao}${zapTexto}
+⏰ *Horário:* ${dataHoraStr}
+🎫 *Protocolo:* ${protocolo}`;
+        } else {
+          const blocoTexto = bloco ? ` (${bloco})` : '';
+          mensagemFormatada = 
 `🚨 *SOLICITAÇÃO DE MANUTENÇÃO - ALOJAMENTO* 🚨
 
 👤 *Nome:* ${nome}
@@ -424,6 +551,7 @@
 📝 *Detalhes:* ${descricao}${zapTexto}
 ⏰ *Horário:* ${dataHoraStr}
 🎫 *Protocolo:* ${protocolo}`;
+        }
 
         const waUrl = `https://api.whatsapp.com/send?phone=${WHATSAPP_PREFEITO}&text=${encodeURIComponent(mensagemFormatada)}`;
         
@@ -433,7 +561,7 @@
 
       // 3. Exibe tela de confirmação
       document.getElementById('sucessoProtocolo').innerText = protocolo;
-      document.getElementById('sucessoQuarto').innerText = `${quarto} ${bloco ? '(' + bloco + ')' : ''}`;
+      document.getElementById('sucessoQuarto').innerText = localExibicao;
       document.getElementById('sucessoProblema').innerText = categoria;
       document.getElementById('sucessoData').innerText = dataHoraStr;
 
@@ -446,6 +574,7 @@
 
     function novoChamadoReset() {
       document.getElementById('formChamado').reset();
+      alternarLocalChamado('alojamento');
       document.getElementById('inputCategoria').value = '';
       document.querySelectorAll('.problem-chip').forEach(btn => btn.classList.remove('active'));
 
