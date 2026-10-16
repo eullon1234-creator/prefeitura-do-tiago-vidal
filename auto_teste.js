@@ -235,7 +235,14 @@ const criticalElements = [
   'areaImpressaoTermo',
   'modalConfirmarRestauracaoBackup',
   'subPainelCasasDespesas',
-  'tabelaPainelDespesasCorpo'
+  'tabelaPainelDespesasCorpo',
+  'statGestaoTotalBlocos',
+  'statGestaoTotalQuartos',
+  'statGestaoTotalVagas',
+  'statGestaoOcupacao',
+  'modalGerenciarQuartosBloco',
+  'tabelaQuartosBlocoModalCorpo',
+  'modalEditarCapacidadeQuarto'
 ];
 
 let allElementsPresent = true;
@@ -528,6 +535,112 @@ assert(appJsContent.includes('function executarRestauracaoBackupConfirmada()'), 
 assert(appJsContent.includes('saveToStorage()') && appJsContent.includes('prefeitura_taboca_snapshot'), 'Funcionalidade 5: Persistência de restauração garantida em prefeitura_taboca_snapshot');
 assert(indexHtmlContent.includes('id="modalConfirmarRestauracaoBackup"'), 'Funcionalidade 5: Modal de confirmação segura de restauração presente em index.html');
 
+// -------------------------------------------------------------
+// 11. GESTÃO DE ESTRUTURA FÍSICA, QUARTOS E CAPACIDADE DE BLOCOS
+// -------------------------------------------------------------
+console.log('\n🏢 11. Verificação de Gestão de Blocos, Quartos e Capacidades');
+
+// 1. Funções de Gestão de Quartos e Blocos
+assert(appJsContent.includes('function carregarBlocosCadastros()'), 'Gestão Blocos: carregarBlocosCadastros implementada em app.js');
+assert(appJsContent.includes('function abrirModalGerenciarQuartosBloco('), 'Gestão Blocos: abrirModalGerenciarQuartosBloco implementada em app.js');
+assert(appJsContent.includes('function filtrarQuartosBlocoModalUI()'), 'Gestão Blocos: filtrarQuartosBlocoModalUI implementada em app.js');
+assert(appJsContent.includes('function renderizarQuartosBlocoModal('), 'Gestão Blocos: renderizarQuartosBlocoModal implementada em app.js');
+assert(appJsContent.includes('function desativarQuartoBloco('), 'Gestão Blocos: desativarQuartoBloco implementada em app.js');
+assert(appJsContent.includes('function reativarQuartoBloco('), 'Gestão Blocos: reativarQuartoBloco implementada em app.js');
+assert(appJsContent.includes('function abrirModalNovoQuartoNoBloco('), 'Gestão Blocos: abrirModalNovoQuartoNoBloco implementada em app.js');
+assert(appJsContent.includes('function abrirModalEditarCapacidadeQuarto('), 'Gestão Blocos: abrirModalEditarCapacidadeQuarto implementada em app.js');
+assert(appJsContent.includes('function salvarCapacidadeQuartoModal('), 'Gestão Blocos: salvarCapacidadeQuartoModal implementada em app.js');
+assert(appJsContent.includes('function exportarResumoEstruturaBlocosExcel()'), 'Gestão Blocos: exportarResumoEstruturaBlocosExcel implementada em app.js');
+
+// 2. Elementos no index.html
+assert(indexHtmlContent.includes('exportarResumoEstruturaBlocosExcel()'), 'Gestão Blocos: Botão Relatório Estrutura (.xlsx) presente em index.html');
+assert(indexHtmlContent.includes('id="statGestaoTotalBlocos"'), 'Gestão Blocos: Card KPI Total Blocos presente em index.html');
+assert(indexHtmlContent.includes('id="statGestaoTotalQuartos"'), 'Gestão Blocos: Card KPI Total Quartos presente em index.html');
+assert(indexHtmlContent.includes('id="statGestaoTotalVagas"'), 'Gestão Blocos: Card KPI Capacidade Operacional presente em index.html');
+assert(indexHtmlContent.includes('id="statGestaoOcupacao"'), 'Gestão Blocos: Card KPI Ocupação presente em index.html');
+assert(indexHtmlContent.includes('id="modalGerenciarQuartosBloco"'), 'Gestão Blocos: Modal de Gerenciamento de Quartos presente em index.html');
+assert(indexHtmlContent.includes('id="tabelaQuartosBlocoModalCorpo"'), 'Gestão Blocos: Tabela de quartos do modal presente em index.html');
+assert(indexHtmlContent.includes('id="buscaQuartosBlocoModalInput"'), 'Gestão Blocos: Campo de busca de quartos presente em index.html');
+assert(indexHtmlContent.includes('id="filtroStatusQuartosBlocoModal"'), 'Gestão Blocos: Filtro de status de quartos presente em index.html');
+assert(indexHtmlContent.includes('id="modalEditarCapacidadeQuarto"'), 'Gestão Blocos: Modal de ajuste de capacidade presente em index.html');
+
+// 3. Simulação de Redução e Aumento de Capacidade Operacional de Bloco
+const blocoMock = {
+  id: 1,
+  nome: 'Bloco 1',
+  tipo: 'alojamento',
+  quartos: []
+};
+
+// Gerar 96 quartos com 4 vagas = 384 vagas totais
+for (let i = 1; i <= 96; i++) {
+  blocoMock.quartos.push({
+    id: 1000 + i,
+    bloco_id: 1,
+    numero: String(i),
+    capacidade: 4,
+    ativo: true,
+    status: 'ativo',
+    vagas: [
+      { id: i * 10 + 1, numero_cama: 1, status: 'ocupada' },
+      { id: i * 10 + 2, numero_cama: 2, status: 'ocupada' },
+      { id: i * 10 + 3, numero_cama: 3, status: 'livre' },
+      { id: i * 10 + 4, numero_cama: 4, status: 'livre' }
+    ]
+  });
+}
+
+function calcularEstatisticasBloco(bloco, quartos) {
+  const qDoBloco = quartos.filter(q => q.bloco_id === bloco.id);
+  const qAtivos = qDoBloco.filter(q => q.ativo !== false && q.status !== 'desativado');
+  const qDesativados = qDoBloco.filter(q => q.ativo === false || q.status === 'desativado');
+  const totalVagas = qAtivos.reduce((s, q) => s + (Number(q.capacidade) || 4), 0);
+  const vagasDesativadas = qDesativados.reduce((s, q) => s + (Number(q.capacidade) || 4), 0);
+  return {
+    totalQuartos: qDoBloco.length,
+    quartosAtivos: qAtivos.length,
+    quartosDesativados: qDesativados.length,
+    totalVagas: totalVagas,
+    vagasDesativadas: vagasDesativadas
+  };
+}
+
+let statsInicial = calcularEstatisticasBloco(blocoMock, blocoMock.quartos);
+assert(statsInicial.totalQuartos === 96, 'Simulação Inicial: Bloco 1 possui 96 quartos');
+assert(statsInicial.totalVagas === 384, 'Simulação Inicial: Bloco 1 possui 384 vagas ativas (96 * 4)');
+assert(statsInicial.quartosDesativados === 0, 'Simulação Inicial: 0 quartos desativados');
+
+// Desativar 1 quarto (capacidade diminui para 380 vagas)
+blocoMock.quartos[0].ativo = false;
+blocoMock.quartos[0].status = 'desativado';
+let statsAposDesativar1 = calcularEstatisticasBloco(blocoMock, blocoMock.quartos);
+assert(statsAposDesativar1.quartosAtivos === 95, 'Desativação: Quartos ativos reduzidos de 96 para 95');
+assert(statsAposDesativar1.quartosDesativados === 1, 'Desativação: 1 quarto desativado');
+assert(statsAposDesativar1.totalVagas === 380, 'Desativação: Capacidade do Bloco 1 reduzida de 384 para 380 vagas (-4)');
+assert(statsAposDesativar1.vagasDesativadas === 4, 'Desativação: 4 vagas desativadas identificadas');
+
+// Desativar mais 1 quarto (capacidade diminui para 376 vagas)
+blocoMock.quartos[1].ativo = false;
+blocoMock.quartos[1].status = 'desativado';
+let statsAposDesativar2 = calcularEstatisticasBloco(blocoMock, blocoMock.quartos);
+assert(statsAposDesativar2.totalVagas === 376, 'Desativação dupla: Capacidade do Bloco 1 reduzida para 376 vagas (-8)');
+
+// Reativar quarto (capacidade é restaurada)
+blocoMock.quartos[0].ativo = true;
+blocoMock.quartos[0].status = 'ativo';
+let statsAposReativar = calcularEstatisticasBloco(blocoMock, blocoMock.quartos);
+assert(statsAposReativar.totalVagas === 380, 'Reativação: Capacidade do Bloco 1 restaurada para 380 vagas');
+
+// Aumentar capacidade de um quarto de 4 para 6 camas
+const qAumentar = blocoMock.quartos[2];
+const capAntiga = qAumentar.capacidade;
+qAumentar.capacidade = 6;
+for (let c = capAntiga + 1; c <= 6; c++) {
+  qAumentar.vagas.push({ id: 9990 + c, numero_cama: c, status: 'livre' });
+}
+let statsAposAumentar = calcularEstatisticasBloco(blocoMock, blocoMock.quartos);
+assert(statsAposAumentar.totalVagas === 382, 'Aumento de Quarto: Capacidade de Bloco 1 aumentada em +2 camas (380 -> 382 vagas)');
+assert(qAumentar.vagas.length === 6, 'Aumento de Quarto: Array de vagas do quarto agora possui 6 camas');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

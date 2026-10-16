@@ -282,30 +282,43 @@ const StaticApiEngine = {
       q.vagas_livres = liv >= 0 ? liv : 0;
       
       const moveisAlerta = (q.moveis || []).filter(m => m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado').length;
-      q.itens_alerta = moveisAlerta;
-
-      if (liv <= 0) {
-        q.status_visual = 'lotado';
-        q.cor_status = 'red';
-      } else if (oc >= cap - 1 && liv > 0) {
-        q.status_visual = 'quase_cheio';
-        q.cor_status = 'amber';
-      } else if (oc === 0) {
-        q.status_visual = 'vazio';
+      const isDesativado = q.ativo === false || q.status === 'desativado';
+      if (isDesativado) {
+        q.ativo = false;
+        q.status = 'desativado';
+        q.status_visual = 'desativado';
         q.cor_status = 'slate';
       } else {
-        q.status_visual = 'com_vagas';
-        q.cor_status = 'emerald';
+        q.ativo = true;
+        if (q.status !== 'desativado') q.status = 'ativo';
+        if (liv <= 0) {
+          q.status_visual = 'lotado';
+          q.cor_status = 'red';
+        } else if (oc >= cap - 1 && liv > 0) {
+          q.status_visual = 'quase_cheio';
+          q.cor_status = 'amber';
+        } else if (oc === 0) {
+          q.status_visual = 'vazio';
+          q.cor_status = 'slate';
+        } else {
+          q.status_visual = 'com_vagas';
+          q.cor_status = 'emerald';
+        }
       }
     });
 
     // Recalcular blocos
     blocos.forEach(b => {
       const qBloco = quartos.filter(q => q.bloco_id == b.id);
+      const qAtivos = qBloco.filter(q => q.ativo !== false && q.status !== 'desativado');
+      const qDesativados = qBloco.filter(q => q.ativo === false || q.status === 'desativado');
       b.total_quartos = qBloco.length;
-      b.total_vagas = qBloco.reduce((s, q) => s + (q.capacidade || 4), 0);
-      b.ocupadas = qBloco.reduce((s, q) => s + (q.vagas_ocupadas || 0), 0);
-      b.livres = b.total_vagas - b.ocupadas;
+      b.quartos_ativos = qAtivos.length;
+      b.quartos_desativados = qDesativados.length;
+      b.total_vagas = qAtivos.reduce((s, q) => s + (Number(q.capacidade) || 4), 0);
+      b.vagas_desativadas = qDesativados.reduce((s, q) => s + (Number(q.capacidade) || 4), 0);
+      b.ocupadas = qAtivos.reduce((s, q) => s + (q.vagas_ocupadas || 0), 0);
+      b.livres = Math.max(0, b.total_vagas - b.ocupadas);
       b.taxa_ocupacao = b.total_vagas > 0 ? Number(((b.ocupadas / b.total_vagas) * 100).toFixed(1)) : 0;
       b.itens_alerta = qBloco.reduce((s, q) => s + (q.itens_alerta || 0), 0);
     });
@@ -317,17 +330,23 @@ const StaticApiEngine = {
 
     // Recalcular Geral
     const totVagas = blocos.reduce((s, b) => s + b.total_vagas, 0);
+    const totVagasDesativadas = blocos.reduce((s, b) => s + (b.vagas_desativadas || 0), 0);
+    const totQuartosAtivos = quartos.filter(q => q.ativo !== false && q.status !== 'desativado').length;
+    const totQuartosDesativados = quartos.filter(q => q.ativo === false || q.status === 'desativado').length;
     const totOcup = alojados.filter(a => a.status === 'ativo').length;
     const totDesl = alojados.filter(a => a.status === 'desligado').length;
     const totAlertas = quartos.reduce((s, q) => s + (q.itens_alerta || 0), 0);
 
     this.dbState.geral = {
-      total_vagas: totVagas || 880,
+      total_vagas: totVagas,
+      total_vagas_desativadas: totVagasDesativadas,
       ocupadas: totOcup,
       disponiveis: (totVagas - totOcup) >= 0 ? (totVagas - totOcup) : 0,
       taxa_ocupacao: totVagas > 0 ? Number(((totOcup / totVagas) * 100).toFixed(1)) : 0,
       total_blocos: blocos.length,
       total_quartos: quartos.length,
+      total_quartos_ativos: totQuartosAtivos,
+      total_quartos_desativados: totQuartosDesativados,
       total_alojados_ativos: totOcup,
       total_desligados: totDesl,
       total_alertas_manutencao: totAlertas
@@ -459,6 +478,7 @@ const StaticApiEngine = {
       this.recomputeStats();
       const livres = [];
       this.dbState.quartos.forEach(q => {
+        if (q.ativo === false || q.status === 'desativado') return; // Quartos desativados não ofertam vagas livres!
         (q.vagas || []).forEach(v => {
           if (v.status === 'livre') {
             livres.push({
@@ -487,15 +507,46 @@ const StaticApiEngine = {
       const qId = Number(matchQuartoDetalhe[1]);
       const q = this.dbState.quartos.find(x => x.id === qId);
       if (q) {
-        q.numero = body.numero || q.numero;
-        q.capacidade = Number(body.capacidade) || q.capacidade;
-        q.observacoes = body.observacoes !== undefined ? body.observacoes : q.observacoes;
+        if (body.numero !== undefined) q.numero = String(body.numero);
+        if (body.capacidade !== undefined) {
+          const novaCap = Number(body.capacidade) || q.capacidade;
+          const qtdAtual = (q.vagas || []).length;
+          if (novaCap > qtdAtual) {
+            for (let c = qtdAtual + 1; c <= novaCap; c++) {
+              q.vagas.push({ id: Date.now() + c, numero_cama: c, status: q.status === 'desativado' ? 'desativada' : 'livre', alojado: null });
+            }
+          }
+          q.capacidade = novaCap;
+        }
+        if (body.ativo !== undefined) {
+          q.ativo = Boolean(body.ativo);
+          q.status = q.ativo ? 'ativo' : 'desativado';
+        }
+        if (body.status !== undefined) {
+          q.status = body.status;
+          q.ativo = (body.status !== 'desativado');
+        }
+        if (body.observacoes !== undefined) q.observacoes = body.observacoes;
+        
+        // Ajustar status das vagas se desativado/ativado
+        if (q.status === 'desativado') {
+          (q.vagas || []).forEach(v => {
+            if (v.status !== 'ocupada') v.status = 'desativada';
+          });
+        } else if (q.status === 'ativo') {
+          (q.vagas || []).forEach(v => {
+            if (v.status === 'desativada') v.status = 'livre';
+          });
+        }
+
         this.recomputeStats();
         this.saveToStorage();
         sincronizarAlteracaoLeveFirebase('quartos', q.id, {
           id: q.id,
           numero: q.numero,
           capacidade: q.capacidade,
+          ativo: q.ativo,
+          status: q.status,
           observacoes: q.observacoes,
           bloco_id: q.bloco_id,
           bloco_nome: q.bloco_nome
@@ -516,9 +567,10 @@ const StaticApiEngine = {
         const novoId = Date.now();
         const bloco = this.dbState.blocos.find(b => b.id == body.bloco_id) || { nome: 'Bloco', tipo: 'alojamento' };
         const cap = Number(body.capacidade) || 4;
+        const isAtivo = body.ativo !== false && body.status !== 'desativado';
         const vagas = [];
         for (let i = 1; i <= cap; i++) {
-          vagas.push({ id: novoId + i, numero_cama: i, status: 'livre', alojado: null });
+          vagas.push({ id: novoId + i, numero_cama: i, status: isAtivo ? 'livre' : 'desativada', alojado: null });
         }
         const moveis = [
           { id: novoId + 10, tipo_item: 'Ar-Condicionado', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Funcionando' },
@@ -531,8 +583,10 @@ const StaticApiEngine = {
           bloco_id: Number(body.bloco_id),
           bloco_nome: bloco.nome,
           bloco_tipo: bloco.tipo,
-          numero: body.numero,
+          numero: String(body.numero),
           capacidade: cap,
+          ativo: isAtivo,
+          status: isAtivo ? 'ativo' : 'desativado',
           observacoes: body.observacoes || '',
           vagas: vagas,
           moveis: moveis
@@ -3857,16 +3911,21 @@ function renderQuartosCards(quartos) {
 
   container.innerHTML = quartos.map(q => {
     // Determina badge de ocupação
-    let borderClass = 'border-emerald-300 hover:border-emerald-500';
+    const isDesativado = q.status === 'desativado' || q.ativo === false;
+    let borderClass = 'bg-white border-emerald-300 hover:border-emerald-500';
     let badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-300';
     let statusTexto = `${q.vagas_livres} Vaga(s) Livre(s)`;
 
-    if (q.status_visual === 'lotado') {
-      borderClass = 'border-red-300 hover:border-red-500';
+    if (isDesativado) {
+      borderClass = 'bg-slate-50/80 border-slate-300 border-dashed opacity-90';
+      badgeColor = 'bg-slate-200 text-slate-700 border-slate-400 font-bold';
+      statusTexto = '⚫ Quarto Desativado';
+    } else if (q.status_visual === 'lotado') {
+      borderClass = 'bg-white border-red-300 hover:border-red-500';
       badgeColor = 'bg-red-100 text-red-800 border-red-300';
       statusTexto = 'Lotado (100%)';
     } else if (q.status_visual === 'quase_cheio') {
-      borderClass = 'border-amber-300 hover:border-amber-500';
+      borderClass = 'bg-white border-amber-300 hover:border-amber-500';
       badgeColor = 'bg-amber-100 text-amber-800 border-amber-300';
       statusTexto = 'Quase Cheio (1 livre)';
     }
@@ -3950,6 +4009,24 @@ function renderQuartosCards(quartos) {
         `;
       } else {
         const idVaga = v.id || v.vaga_id || '';
+        if (isDesativado) {
+          return `
+            <div class="p-2.5 rounded-lg bg-slate-200/50 border border-dashed border-slate-300 flex flex-col justify-between text-xs">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-600 flex items-center gap-1">
+                  <i class="fa-solid fa-bed text-slate-400"></i> Cama ${v.numero_cama}
+                </span>
+                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-300 text-slate-700">DESATIVADA</span>
+              </div>
+              <div class="my-2 text-center text-slate-500 text-[11px] italic">
+                Quarto fora de operação
+              </div>
+              <button onclick="reativarQuartoBloco(${q.id})" class="btn-prefeito w-full py-1 rounded bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-semibold flex items-center justify-center gap-1 transition">
+                <i class="fa-solid fa-rotate-left"></i> Reativar Quarto
+              </button>
+            </div>
+          `;
+        }
         return `
           <div class="p-2.5 rounded-lg bg-emerald-50/60 border border-dashed border-emerald-300 flex flex-col justify-between text-xs">
             <div class="flex items-center justify-between">
@@ -3972,7 +4049,7 @@ function renderQuartosCards(quartos) {
     }).join('');
 
     return `
-      <div class="bg-white rounded-xl border ${borderClass} shadow-sm transition p-4 flex flex-col justify-between space-y-3">
+      <div class="rounded-xl border ${borderClass} shadow-sm transition p-4 flex flex-col justify-between space-y-3">
         <!-- Topo do Card do Quarto -->
         <div class="flex items-start justify-between">
           <div>
@@ -3981,7 +4058,7 @@ function renderQuartosCards(quartos) {
               <span class="text-xs px-2 py-0.5 rounded font-semibold bg-slate-100 text-slate-700">${q.bloco_nome}</span>
             </div>
             <div class="text-xs text-slate-500 mt-0.5">
-              Capacidade: ${q.capacidade} vagas (${q.vagas_ocupadas} ocupadas)
+              ${isDesativado ? '<span class="text-rose-600 font-bold">Quarto desativado da capacidade</span>' : `Capacidade: ${q.capacidade} vagas (${q.vagas_ocupadas} ocupadas)`}
             </div>
           </div>
 
@@ -4007,7 +4084,15 @@ function renderQuartosCards(quartos) {
           <button onclick="abrirModalQuartoDetalhes(${q.id})" class="text-sky-600 hover:text-sky-800 font-semibold flex items-center gap-1.5">
             <i class="fa-solid fa-list-check"></i> Detalhes & Móveis
           </button>
-          <div class="flex items-center gap-2">
+            ${isDesativado ? `
+              <button onclick="reativarQuartoBloco(${q.id})" class="btn-prefeito px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition shadow-xs">
+                <i class="fa-solid fa-rotate-left"></i> Reativar
+              </button>
+            ` : `
+              <button onclick="desativarQuartoBloco(${q.id})" class="btn-prefeito px-2 py-1 rounded bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-800 font-semibold text-xs transition" title="Desativar este quarto para diminuir capacidade">
+                <i class="fa-solid fa-power-off"></i> Desativar
+              </button>
+            `}
             <button onclick="abrirModalEditarQuarto(${q.id}, '${q.numero}', ${q.capacidade}, '${q.observacoes || ''}')" class="btn-prefeito text-slate-400 hover:text-slate-700 p-1" title="Editar Quarto">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
@@ -5309,6 +5394,8 @@ async function carregarGestaoCadastros() {
   await carregarEmpresasCadastros();
 }
 
+let blocoGerenciandoId = null;
+
 async function carregarBlocosCadastros() {
   const tbody = document.getElementById('tabelaBlocosCadastros');
   if (!tbody) return;
@@ -5318,27 +5405,615 @@ async function carregarBlocosCadastros() {
     const blocos = await res.json();
     globalBlocos = blocos;
 
-    tbody.innerHTML = blocos.map(b => `
-      <tr class="hover:bg-slate-50">
-        <td class="py-2.5 px-3 font-bold text-slate-900">${b.nome}</td>
-        <td class="py-2.5 px-3 uppercase text-xs font-semibold text-slate-500">${b.tipo}</td>
-        <td class="py-2.5 px-3 text-center">${b.total_quartos}</td>
-        <td class="py-2.5 px-3 text-center font-bold text-slate-700">${b.total_vagas}</td>
-        <td class="py-2.5 px-3 text-right whitespace-nowrap">
-          <button onclick="abrirModalEditarBloco(${b.id}, '${b.nome}', '${b.tipo}', ${b.ordem || 0})" class="btn-prefeito text-slate-500 hover:text-sky-600 mr-2">
-            <i class="fa-solid fa-pen"></i>
-          </button>
-          <button onclick="confirmarExcluirBloco(${b.id}, '${b.nome}')" class="btn-prefeito text-slate-400 hover:text-red-600">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    `).join('');
+    // Atualizar Métricas / Relatóriozinho de Estrutura Física no Topo
+    const elTotBlocos = document.getElementById('statGestaoTotalBlocos');
+    const elTotQuartos = document.getElementById('statGestaoTotalQuartos');
+    const elQuartosSub = document.getElementById('statGestaoQuartosSub');
+    const elTotVagas = document.getElementById('statGestaoTotalVagas');
+    const elVagasSub = document.getElementById('statGestaoVagasSub');
+    const elOcupacao = document.getElementById('statGestaoOcupacao');
+    const elOcupacaoSub = document.getElementById('statGestaoOcupacaoSub');
+
+    let somaQuartos = 0;
+    let somaQuartosAtivos = 0;
+    let somaQuartosDesativados = 0;
+    let somaVagasAtivas = 0;
+    let somaVagasDesativadas = 0;
+    let somaOcupadas = 0;
+
+    blocos.forEach(b => {
+      somaQuartos += Number(b.total_quartos || 0);
+      somaQuartosAtivos += Number(b.quartos_ativos !== undefined ? b.quartos_ativos : b.total_quartos || 0);
+      somaQuartosDesativados += Number(b.quartos_desativados || 0);
+      somaVagasAtivas += Number(b.total_vagas || 0);
+      somaVagasDesativadas += Number(b.vagas_desativadas || 0);
+      somaOcupadas += Number(b.ocupadas || 0);
+    });
+
+    const somaLivres = Math.max(0, somaVagasAtivas - somaOcupadas);
+    const taxaGeral = somaVagasAtivas > 0 ? ((somaOcupadas / somaVagasAtivas) * 100).toFixed(1) : '0.0';
+
+    if (elTotBlocos) elTotBlocos.textContent = blocos.length;
+    if (elTotQuartos) elTotQuartos.textContent = somaQuartos;
+    if (elQuartosSub) elQuartosSub.textContent = `${somaQuartosAtivos} ativos • ${somaQuartosDesativados} desativados`;
+    if (elTotVagas) elTotVagas.textContent = somaVagasAtivas;
+    if (elVagasSub) elVagasSub.textContent = somaVagasDesativadas > 0 ? `Capacidade ativa (-${somaVagasDesativadas} vagas desativadas)` : 'Capacidade total em operação';
+    if (elOcupacao) elOcupacao.textContent = `${taxaGeral}%`;
+    if (elOcupacaoSub) elOcupacaoSub.textContent = `${somaOcupadas} ocupadas • ${somaLivres} livres`;
+
+    tbody.innerHTML = blocos.map(b => {
+      let badgeTipo = 'bg-slate-100 text-slate-700 border-slate-300';
+      if (b.tipo === 'adm') badgeTipo = 'bg-indigo-100 text-indigo-700 border-indigo-300';
+      if (b.tipo === 'conteiner') badgeTipo = 'bg-orange-100 text-orange-700 border-orange-300';
+
+      const qAtivos = b.quartos_ativos !== undefined ? b.quartos_ativos : b.total_quartos;
+      const qDesat = b.quartos_desativados || 0;
+      const taxa = b.taxa_ocupacao || 0;
+      let barCor = 'bg-emerald-500';
+      if (taxa >= 90) barCor = 'bg-rose-500';
+      else if (taxa >= 70) barCor = 'bg-amber-500';
+
+      return `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="py-3 px-3.5">
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center text-sm font-bold border border-sky-200">
+                <i class="fa-solid fa-hotel"></i>
+              </span>
+              <div>
+                <span class="font-extrabold text-slate-900 text-sm block">${b.nome}</span>
+                <span class="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded border ${badgeTipo}">
+                  ${b.tipo}
+                </span>
+              </div>
+            </div>
+          </td>
+
+          <td class="py-3 px-3 text-center">
+            <span class="font-bold text-slate-900 text-sm">${b.total_quartos}</span>
+            <div class="flex items-center justify-center gap-1 mt-0.5">
+              <span class="text-[10px] px-1.5 py-0.2 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Quartos Ativos em Operação">
+                ${qAtivos} ativos
+              </span>
+              ${qDesat > 0 ? `
+                <span class="text-[10px] px-1.5 py-0.2 rounded font-bold bg-slate-100 text-slate-600 border border-slate-300" title="Quartos Desativados">
+                  ${qDesat} desat.
+                </span>
+              ` : ''}
+            </div>
+          </td>
+
+          <td class="py-3 px-3 text-center">
+            <div class="font-extrabold text-slate-900 text-sm">${b.total_vagas}</div>
+            <span class="text-[10px] text-slate-500">vagas ativas</span>
+            ${(b.vagas_desativadas || 0) > 0 ? `
+              <span class="block text-[10px] text-rose-600 font-semibold">(-${b.vagas_desativadas} vagas)</span>
+            ` : ''}
+          </td>
+
+          <td class="py-3 px-3">
+            <div class="max-w-[150px] mx-auto text-xs">
+              <div class="flex items-center justify-between font-semibold mb-1">
+                <span class="text-blue-600 font-bold">${b.ocupadas || 0} ocu.</span>
+                <span class="text-slate-400">•</span>
+                <span class="text-emerald-600 font-bold">${b.livres || 0} liv.</span>
+                <span class="text-slate-700 font-bold ml-1">${taxa}%</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div class="${barCor} h-1.5 rounded-full" style="width: ${Math.min(100, taxa)}%"></div>
+              </div>
+            </div>
+          </td>
+
+          <td class="py-3 px-3 text-right whitespace-nowrap">
+            <div class="inline-flex items-center gap-1.5">
+              <button onclick="abrirModalGerenciarQuartosBloco(${b.id})" class="btn-prefeito px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-bold text-xs flex items-center gap-1.5 transition shadow-2xs" title="Gerenciar quartos, desativar ou adicionar quartos">
+                <i class="fa-solid fa-door-open text-sky-600"></i>
+                <span>Quartos</span>
+              </button>
+              <button onclick="abrirModalNovoQuartoNoBloco(${b.id})" class="btn-prefeito px-2 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs transition" title="Adicionar Quarto no Bloco (Aumentar capacidade)">
+                <i class="fa-solid fa-plus text-emerald-600"></i>
+              </button>
+              <button onclick="abrirModalEditarBloco(${b.id}, '${b.nome}', '${b.tipo}', ${b.ordem || 0})" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-sky-600 transition" title="Editar Dados do Bloco">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button onclick="confirmarExcluirBloco(${b.id}, '${b.nome}')" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-red-600 transition" title="Excluir Bloco">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
 
     updateUserRoleUI();
   } catch (err) {
     console.error('Erro blocos cadastros:', err);
   }
+}
+
+// ========================================================
+// GERENCIADOR DE QUARTOS DO BLOCO (DESATIVAR & AUMENTAR QUARTOS)
+// ========================================================
+
+function abrirModalGerenciarQuartosBloco(blocoId) {
+  if (!checkPrefeitoAccess()) return;
+  blocoGerenciandoId = blocoId;
+
+  const bloco = (globalBlocos || []).find(b => b.id == blocoId) ||
+                (window.StaticApiEngine?.dbState?.blocos || []).find(b => b.id == blocoId);
+
+  if (!bloco) {
+    showToast('Bloco não encontrado.', 'error');
+    return;
+  }
+
+  const quartosBloco = (window.StaticApiEngine?.dbState?.quartos || globalQuartos || []).filter(q => q.bloco_id == blocoId);
+
+  // Atualizar título e badges de topo do modal
+  const elTitulo = document.getElementById('modalGerenciarQuartosTitulo');
+  const elTot = document.getElementById('badgeModalTotalQuartos');
+  const elAtivos = document.getElementById('badgeModalQuartosAtivos');
+  const elDesat = document.getElementById('badgeModalQuartosDesativados');
+  const elVagas = document.getElementById('badgeModalTotalVagasAtivas');
+
+  const ativosQtd = quartosBloco.filter(q => q.ativo !== false && q.status !== 'desativado').length;
+  const desatQtd = quartosBloco.filter(q => q.ativo === false || q.status === 'desativado').length;
+  const vagasAtivas = quartosBloco.filter(q => q.ativo !== false && q.status !== 'desativado').reduce((s, q) => s + (Number(q.capacidade) || 4), 0);
+
+  if (elTitulo) elTitulo.textContent = `Quartos & Capacidade — ${bloco.nome}`;
+  if (elTot) elTot.textContent = `${quartosBloco.length} quartos`;
+  if (elAtivos) elAtivos.textContent = `${ativosQtd} ativos`;
+  if (elDesat) elDesat.textContent = `${desatQtd} desativados`;
+  if (elVagas) elVagas.textContent = `${vagasAtivas} vagas ativas`;
+
+  // Limpar busca e filtro
+  const inputBusca = document.getElementById('buscaQuartosBlocoModalInput');
+  const selectStatus = document.getElementById('filtroStatusQuartosBlocoModal');
+  if (inputBusca) inputBusca.value = '';
+  if (selectStatus) selectStatus.value = 'todos';
+
+  renderizarQuartosBlocoModal(quartosBloco);
+  abrirModal('modalGerenciarQuartosBloco');
+}
+
+function filtrarQuartosBlocoModalUI() {
+  if (!blocoGerenciandoId) return;
+  const quartosBloco = (window.StaticApiEngine?.dbState?.quartos || globalQuartos || []).filter(q => q.bloco_id == blocoGerenciandoId);
+  const busca = (document.getElementById('buscaQuartosBlocoModalInput')?.value || '').toLowerCase().trim();
+  const filtroStatus = document.getElementById('filtroStatusQuartosBlocoModal')?.value || 'todos';
+
+  let filtrados = quartosBloco.filter(q => {
+    const isDesativado = q.ativo === false || q.status === 'desativado';
+    if (filtroStatus === 'ativos' && isDesativado) return false;
+    if (filtroStatus === 'desativados' && !isDesativado) return false;
+
+    if (busca) {
+      const matchNum = String(q.numero || '').toLowerCase().includes(busca);
+      const matchObs = String(q.observacoes || '').toLowerCase().includes(busca);
+      const matchMorador = (q.vagas || []).some(v => v.nome_completo && v.nome_completo.toLowerCase().includes(busca));
+      if (!matchNum && !matchObs && !matchMorador) return false;
+    }
+    return true;
+  });
+
+  renderizarQuartosBlocoModal(filtrados);
+}
+
+function renderizarQuartosBlocoModal(quartos) {
+  const tbody = document.getElementById('tabelaQuartosBlocoModalCorpo');
+  const vazioEl = document.getElementById('quartosBlocoModalVazio');
+  if (!tbody) return;
+
+  if (quartos.length === 0) {
+    tbody.innerHTML = '';
+    if (vazioEl) vazioEl.classList.remove('hidden');
+    return;
+  }
+  if (vazioEl) vazioEl.classList.add('hidden');
+
+  tbody.innerHTML = quartos.map(q => {
+    const isDesativado = q.ativo === false || q.status === 'desativado';
+    const ocupadas = q.vagas_ocupadas !== undefined ? q.vagas_ocupadas : (q.vagas || []).filter(v => v.status === 'ocupada').length;
+    const livres = Math.max(0, (Number(q.capacidade) || 4) - ocupadas);
+    
+    // Lista de moradores atuais
+    const moradores = (q.vagas || []).filter(v => (v.status === 'ocupada' || v.alojado) && (v.nome_completo || (v.alojado && v.alojado.nome_completo))).map(v => {
+      const nome = v.nome_completo || (v.alojado && v.alojado.nome_completo);
+      return `<span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200" title="Cama ${v.numero_cama}"><i class="fa-solid fa-user text-[9px]"></i> ${nome}</span>`;
+    }).join(' ');
+
+    return `
+      <tr class="hover:bg-slate-50 transition border-b border-slate-100 ${isDesativado ? 'bg-slate-50/70 opacity-80' : ''}">
+        <td class="py-2.5 px-3">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-lg ${isDesativado ? 'bg-slate-200 text-slate-500' : 'bg-sky-100 text-sky-700'} flex items-center justify-center text-xs font-black">
+              ${q.numero}
+            </span>
+            <div>
+              <span class="font-bold text-slate-900 text-xs block">Quarto ${q.numero}</span>
+              ${q.observacoes ? `<span class="text-[10px] text-slate-400 block truncate max-w-[160px]">${q.observacoes}</span>` : ''}
+            </div>
+          </div>
+        </td>
+
+        <td class="py-2.5 px-3 text-center">
+          <div class="inline-flex items-center gap-1">
+            <span class="font-extrabold text-slate-800 text-xs">${q.capacidade || 4} camas</span>
+            <button onclick="abrirModalEditarCapacidadeQuarto(${q.id}, '${q.numero}', ${q.capacidade || 4}, '${q.observacoes || ''}')" class="btn-prefeito p-1 text-slate-400 hover:text-sky-600 transition" title="Alterar capacidade de camas deste quarto">
+              <i class="fa-solid fa-pen text-[10px]"></i>
+            </button>
+          </div>
+        </td>
+
+        <td class="py-2.5 px-3">
+          <div class="text-xs">
+            <div class="font-semibold text-slate-700 mb-1">
+              <span class="text-blue-700 font-bold">${ocupadas} ocupadas</span> • 
+              <span class="${isDesativado ? 'text-slate-400' : 'text-emerald-700'} font-bold">${isDesativado ? '0 disponíveis' : `${livres} livres`}</span>
+            </div>
+            <div class="flex items-center gap-1 flex-wrap">
+              ${moradores || '<span class="text-[11px] text-slate-400 italic">Quarto vazio</span>'}
+            </div>
+          </div>
+        </td>
+
+        <td class="py-2.5 px-3 text-center">
+          ${isDesativado ? `
+            <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 border border-slate-300">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> Desativado
+            </span>
+          ` : `
+            <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Ativo
+            </span>
+          `}
+        </td>
+
+        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+          <div class="inline-flex items-center gap-1.5">
+            ${isDesativado ? `
+              <button onclick="reativarQuartoBloco(${q.id})" class="btn-prefeito px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition shadow-xs" title="Reativar quarto e somar vagas na capacidade">
+                <i class="fa-solid fa-rotate-left"></i> Reativar
+              </button>
+            ` : `
+              <button onclick="desativarQuartoBloco(${q.id})" class="btn-prefeito px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 transition" title="Desativar quarto para diminuir a capacidade">
+                <i class="fa-solid fa-power-off text-amber-600"></i> Desativar
+              </button>
+            `}
+            <button onclick="confirmarExcluirQuarto(${q.id}, '${q.numero}', ${ocupadas})" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 transition" title="Excluir quarto permanentemente">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Desativar Quarto (Reduz Capacidade do Bloco)
+async function desativarQuartoBloco(quartoId) {
+  if (!checkPrefeitoAccess()) return;
+  const q = (window.StaticApiEngine?.dbState?.quartos || globalQuartos || []).find(x => x.id == quartoId);
+  if (!q) {
+    showToast('Quarto não encontrado.', 'error');
+    return;
+  }
+
+  const ocupadas = q.vagas_ocupadas !== undefined ? q.vagas_ocupadas : (q.vagas || []).filter(v => v.status === 'ocupada').length;
+  let confirmMsg = `Deseja realmente DESATIVAR o Quarto ${q.numero} do ${q.bloco_nome}?\n\nA capacidade operacional do bloco será reduzida em ${q.capacidade || 4} vagas.`;
+  if (ocupadas > 0) {
+    confirmMsg += `\n\n⚠️ ATENÇÃO: Há ${ocupadas} trabalhador(es) alojado(s) neste quarto! As vagas continuarão com eles até que sejam transferidos ou liberados.`;
+  }
+
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    if (window.StaticApiEngine && window.StaticApiEngine.dbState) {
+      const qEngine = window.StaticApiEngine.dbState.quartos.find(x => x.id == quartoId);
+      if (qEngine) {
+        qEngine.ativo = false;
+        qEngine.status = 'desativado';
+        qEngine.status_visual = 'desativado';
+        (qEngine.vagas || []).forEach(v => {
+          if (v.status !== 'ocupada') {
+            v.status = 'desativada';
+          }
+        });
+      }
+      window.StaticApiEngine.recomputeStats();
+      window.StaticApiEngine.saveToStorage();
+    }
+
+    try {
+      await fetch(`${API_BASE}/api/quartos/${quartoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ativo: false,
+          status: 'desativado',
+          usuario: currentUserName
+        })
+      });
+    } catch(e) {}
+
+    sincronizarAlteracaoLeveFirebase('quartos', quartoId, {
+      id: quartoId,
+      ativo: false,
+      status: 'desativado'
+    });
+
+    registrarAuditoria(
+      'alojamento',
+      'DESATIVAR_QUARTO',
+      q.bloco_nome || 'Alojamento',
+      `Quarto ${q.numero} desativado. Capacidade do bloco ${q.bloco_nome} reduzida em ${q.capacidade || 4} vagas.`
+    );
+
+    showToast(`Quarto ${q.numero} desativado! Capacidade do bloco reduzida.`, 'success');
+
+    await refreshAllData();
+    if (blocoGerenciandoId) {
+      abrirModalGerenciarQuartosBloco(blocoGerenciandoId);
+    }
+    carregarBlocosCadastros();
+  } catch(err) {
+    console.error('Erro ao desativar quarto:', err);
+    showToast('Erro ao desativar quarto', 'error');
+  }
+}
+
+// Reativar Quarto (Aumenta Capacidade do Bloco)
+async function reativarQuartoBloco(quartoId) {
+  if (!checkPrefeitoAccess()) return;
+  const q = (window.StaticApiEngine?.dbState?.quartos || globalQuartos || []).find(x => x.id == quartoId);
+  if (!q) {
+    showToast('Quarto não encontrado.', 'error');
+    return;
+  }
+
+  if (!confirm(`Deseja REATIVAR o Quarto ${q.numero} do ${q.bloco_nome}?\n\nA capacidade operacional do bloco será aumentada em ${q.capacidade || 4} vagas.`)) return;
+
+  try {
+    if (window.StaticApiEngine && window.StaticApiEngine.dbState) {
+      const qEngine = window.StaticApiEngine.dbState.quartos.find(x => x.id == quartoId);
+      if (qEngine) {
+        qEngine.ativo = true;
+        qEngine.status = 'ativo';
+        (qEngine.vagas || []).forEach(v => {
+          if (v.status === 'desativada') {
+            v.status = 'livre';
+          }
+        });
+      }
+      window.StaticApiEngine.recomputeStats();
+      window.StaticApiEngine.saveToStorage();
+    }
+
+    try {
+      await fetch(`${API_BASE}/api/quartos/${quartoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ativo: true,
+          status: 'ativo',
+          usuario: currentUserName
+        })
+      });
+    } catch(e) {}
+
+    sincronizarAlteracaoLeveFirebase('quartos', quartoId, {
+      id: quartoId,
+      ativo: true,
+      status: 'ativo'
+    });
+
+    registrarAuditoria(
+      'alojamento',
+      'REATIVAR_QUARTO',
+      q.bloco_nome || 'Alojamento',
+      `Quarto ${q.numero} reativado. Capacidade do bloco ${q.bloco_nome} restaurada em ${q.capacidade || 4} vagas.`
+    );
+
+    showToast(`Quarto ${q.numero} reativado! Capacidade do bloco restaurada.`, 'success');
+
+    await refreshAllData();
+    if (blocoGerenciandoId) {
+      abrirModalGerenciarQuartosBloco(blocoGerenciandoId);
+    }
+    carregarBlocosCadastros();
+  } catch(err) {
+    console.error('Erro ao reativar quarto:', err);
+    showToast('Erro ao reativar quarto', 'error');
+  }
+}
+
+// Atalho para adicionar novo quarto já vinculado ao bloco
+function abrirModalNovoQuartoNoBloco(blocoId) {
+  if (!checkPrefeitoAccess()) return;
+  openModalNovoQuarto();
+  const sel = document.getElementById('quartoFormBlocoId');
+  if (sel && blocoId) {
+    sel.value = blocoId;
+  }
+}
+
+// Modal Editar Capacidade de Camas do Quarto
+function abrirModalEditarCapacidadeQuarto(quartoId, numeroAtual, capAtual, obsAtual) {
+  if (!checkPrefeitoAccess()) return;
+  const inputId = document.getElementById('editarCapacidadeQuartoId');
+  const inputNum = document.getElementById('editarCapacidadeQuartoNumero');
+  const inputCap = document.getElementById('editarCapacidadeQuartoQtd');
+  const inputObs = document.getElementById('editarCapacidadeQuartoObs');
+  const elTitulo = document.getElementById('editarCapacidadeQuartoTitulo');
+
+  if (inputId) inputId.value = quartoId;
+  if (inputNum) inputNum.value = numeroAtual || '';
+  if (inputCap) inputCap.value = capAtual || 4;
+  if (inputObs) inputObs.value = obsAtual || '';
+  if (elTitulo) elTitulo.textContent = `Ajustar Capacidade — Quarto ${numeroAtual}`;
+
+  abrirModal('modalEditarCapacidadeQuarto');
+}
+
+async function salvarCapacidadeQuartoModal(e) {
+  if (e) e.preventDefault();
+  if (!checkPrefeitoAccess()) return;
+
+  const quartoId = document.getElementById('editarCapacidadeQuartoId').value;
+  const numero = document.getElementById('editarCapacidadeQuartoNumero').value.trim();
+  const capacidade = parseInt(document.getElementById('editarCapacidadeQuartoQtd').value) || 4;
+  const obs = document.getElementById('editarCapacidadeQuartoObs').value.trim();
+
+  if (!quartoId) return;
+
+  try {
+    if (window.StaticApiEngine && window.StaticApiEngine.dbState) {
+      const qEngine = window.StaticApiEngine.dbState.quartos.find(x => x.id == quartoId);
+      if (qEngine) {
+        qEngine.numero = numero;
+        const capAntiga = qEngine.capacidade || 4;
+        qEngine.capacidade = capacidade;
+        qEngine.observacoes = obs;
+
+        // Se aumentou capacidade, gerar novas camas livres
+        if (capacidade > (qEngine.vagas || []).length) {
+          const vagasExistentes = (qEngine.vagas || []).length;
+          for (let i = vagasExistentes + 1; i <= capacidade; i++) {
+            qEngine.vagas.push({
+              id: Date.now() + i,
+              numero_cama: i,
+              status: qEngine.status === 'desativado' ? 'desativada' : 'livre',
+              alojado: null
+            });
+          }
+        }
+
+        window.StaticApiEngine.recomputeStats();
+        window.StaticApiEngine.saveToStorage();
+        sincronizarAlteracaoLeveFirebase('quartos', qEngine.id, qEngine);
+      }
+    }
+
+    try {
+      await fetch(`${API_BASE}/api/quartos/${quartoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numero: numero,
+          capacidade: capacidade,
+          observacoes: obs,
+          usuario: currentUserName
+        })
+      });
+    } catch(e) {}
+
+    showToast(`Quarto ${numero} atualizado para capacidade de ${capacidade} camas!`, 'success');
+    fecharModal('modalEditarCapacidadeQuarto');
+
+    await refreshAllData();
+    if (blocoGerenciandoId) {
+      abrirModalGerenciarQuartosBloco(blocoGerenciandoId);
+    }
+    carregarBlocosCadastros();
+  } catch(err) {
+    showToast('Erro ao atualizar capacidade do quarto', 'error');
+  }
+}
+
+// Exportar Resumo Estrutura dos Blocos em Excel (.xlsx)
+function exportarResumoEstruturaBlocosExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('Biblioteca SheetJS (XLSX) não encontrada.', 'error');
+    return;
+  }
+
+  showToast('📊 Gerando Relatório de Estrutura dos Blocos em Excel...', 'info');
+  const wb = XLSX.utils.book_new();
+  const dataHora = new Date().toLocaleString('pt-BR');
+  const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+  const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+  const ws = {};
+  ExcelProGenerator.addCabecalhoObra(
+    ws,
+    `${obraNome.toUpperCase()} — ESTRUTURA FÍSICA DOS BLOCOS DE ALOJAMENTO`,
+    `${empresaNome} • Capacidade, Quartos Ativos/Desativados e Ocupação • Emissão: ${dataHora}`,
+    9
+  );
+
+  const headers = [
+    'Bloco de Alojamento',
+    'Classificação / Tipo',
+    'Total de Quartos',
+    'Quartos Ativos',
+    'Quartos Desativados',
+    'Capacidade Ativa (Camas)',
+    'Camas Ocupadas',
+    'Camas Livres (Fórmula)',
+    'Taxa Ocupação (Fórmula)'
+  ];
+  headers.forEach((h, col) => ExcelProGenerator.addCell(ws, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+  const blocos = globalBlocos || (window.StaticApiEngine?.dbState?.blocos) || [];
+  let totQuartos = 0;
+  let totAtivos = 0;
+  let totDesat = 0;
+  let totVagas = 0;
+  let totOcupadas = 0;
+
+  blocos.forEach((b, idx) => {
+    const r = 4 + idx;
+    const rowEx = r + 1;
+    const zebra = idx % 2 === 1;
+
+    const qTot = Number(b.total_quartos || 0);
+    const qAtiv = Number(b.quartos_ativos !== undefined ? b.quartos_ativos : b.total_quartos || 0);
+    const qDes = Number(b.quartos_desativados || 0);
+    const vagas = Number(b.total_vagas || 0);
+    const ocup = Number(b.ocupadas || 0);
+    const livres = Math.max(0, vagas - ocup);
+    const taxa = vagas > 0 ? (ocup / vagas) : 0;
+
+    totQuartos += qTot;
+    totAtivos += qAtiv;
+    totDesat += qDes;
+    totVagas += vagas;
+    totOcupadas += ocup;
+
+    ExcelProGenerator.addCell(ws, r, 0, b.nome || 'Bloco', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    ExcelProGenerator.addCell(ws, r, 1, String(b.tipo || 'alojamento').toUpperCase(), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws, r, 2, qTot, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws, r, 3, qAtiv, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws, r, 4, qDes, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws, r, 5, vagas, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws, r, 6, ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws, r, 7, livres, { f: `F${rowEx}-G${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws, r, 8, taxa, { f: `IF(F${rowEx}>0,G${rowEx}/F${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+  });
+
+  const totRow = 4 + blocos.length;
+  const totEx = totRow + 1;
+  const firstRow = 5;
+  const lastRow = totRow;
+
+  ExcelProGenerator.addCell(ws, totRow, 0, 'TOTAL GERAL ESTRUTURA', { s: ExcelProGenerator.estilos.total('left') });
+  ExcelProGenerator.addCell(ws, totRow, 1, `${blocos.length} Blocos`, { s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws, totRow, 2, totQuartos, { f: `SUM(C${firstRow}:C${lastRow})`, s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws, totRow, 3, totAtivos, { f: `SUM(D${firstRow}:D${lastRow})`, s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws, totRow, 4, totDesat, { f: `SUM(E${firstRow}:E${lastRow})`, s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws, totRow, 5, totVagas, { f: `SUM(F${firstRow}:F${lastRow})`, s: ExcelProGenerator.estilos.total('right') });
+  ExcelProGenerator.addCell(ws, totRow, 6, totOcupadas, { f: `SUM(G${firstRow}:G${lastRow})`, s: ExcelProGenerator.estilos.total('right') });
+  ExcelProGenerator.addCell(ws, totRow, 7, Math.max(0, totVagas - totOcupadas), { f: `F${totEx}-G${totEx}`, s: ExcelProGenerator.estilos.total('right') });
+  ExcelProGenerator.addCell(ws, totRow, 8, totVagas > 0 ? (totOcupadas / totVagas) : 0, { f: `IF(F${totEx}>0,G${totEx}/F${totEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+  ws['!ref'] = `A1:I${totEx + 1}`;
+  ws['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 18 }, { wch: 22 }, { wch: 22 }];
+  ws['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+  XLSX.utils.book_append_sheet(wb, ws, "ESTRUTURA BLOCOS");
+
+  XLSX.writeFile(wb, `estrutura_blocos_${obraNome.toLowerCase().replace(/\s+/g, '_')}.xlsx`);
+  showToast('Planilha de estrutura dos blocos baixada com sucesso!', 'success');
 }
 
 async function carregarEmpresasCadastros() {

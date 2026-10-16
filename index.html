@@ -1345,21 +1345,87 @@
       <!-- ================= TAB 5: GESTÃO DE CADASTROS (ESTRUTURA & EMPRESAS) ================= -->
       <div id="tab-gestao_cadastros" class="tab-content hidden space-y-6">
         
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <h1 class="text-xl md:text-2xl font-bold text-slate-900">Estrutura Física & Empresas Contratadas</h1>
-          <p class="text-sm text-slate-500">Cadastre e configure Blocos de alojamento, Quartos, Capacidades e Empresas prestadoras de serviço.</p>
+        <!-- Header da Aba de Estrutura Física -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-xs font-bold border border-sky-200">
+                <i class="fa-solid fa-cubes text-sky-600 mr-1"></i> Infraestrutura Obra
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Estrutura Física & Gestão de Blocos</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Controle de blocos, gestão de quartos, desativação/reativação para ajuste de capacidade e cadastro de empreiteiras.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="exportarResumoEstruturaBlocosExcel()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition" title="Exportar Relatório Geral de Estrutura e Capacidade dos Blocos em Excel (.xlsx)">
+              <i class="fa-solid fa-file-excel text-amber-300"></i> Relatório Estrutura (.xlsx)
+            </button>
+            <button onclick="openModalNovoBloco()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Novo Bloco
+            </button>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Cards de Métricas / Relatóriozinho Executivo de Estrutura -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Blocos Cadastrados</p>
+              <h3 id="statGestaoTotalBlocos" class="text-2xl font-extrabold text-slate-900 mt-1">0</h3>
+              <p class="text-[10px] text-slate-400 mt-0.5">Alojamento, ADM e Contêiner</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-cubes"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total de Quartos</p>
+              <h3 id="statGestaoTotalQuartos" class="text-2xl font-extrabold text-indigo-600 mt-1">0</h3>
+              <p id="statGestaoQuartosSub" class="text-[10px] text-slate-500 mt-0.5">0 ativos • 0 desativados</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-door-closed"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Capacidade Operacional</p>
+              <h3 id="statGestaoTotalVagas" class="text-2xl font-extrabold text-emerald-600 mt-1">0</h3>
+              <p id="statGestaoVagasSub" class="text-[10px] text-slate-500 mt-0.5">Capacidade total em operação</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-bed"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Ocupação dos Blocos</p>
+              <h3 id="statGestaoOcupacao" class="text-2xl font-extrabold text-blue-600 mt-1">0.0%</h3>
+              <p id="statGestaoOcupacaoSub" class="text-[10px] text-slate-500 mt-0.5">0 ocupadas • 0 livres</p>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-chart-pie"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
           
           <!-- Seção de Blocos -->
-          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="xl:col-span-7 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
                   <i class="fa-solid fa-cubes text-sky-600"></i> Blocos Cadastrados
                 </h3>
-                <p class="text-xs text-slate-400">Classificação por Alojamento, ADM ou Contêiner.</p>
+                <p class="text-xs text-slate-400">Gerencie quartos, desative para diminuir capacidade ou adicione novos quartos.</p>
               </div>
               <button onclick="openModalNovoBloco()" class="btn-prefeito px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-plus"></i> Novo Bloco
@@ -1370,10 +1436,10 @@
               <table class="w-full text-left text-sm">
                 <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
                   <tr>
-                    <th class="py-2.5 px-3">Nome</th>
-                    <th class="py-2.5 px-3">Tipo</th>
+                    <th class="py-2.5 px-3">Bloco & Tipo</th>
                     <th class="py-2.5 px-3 text-center">Quartos</th>
-                    <th class="py-2.5 px-3 text-center">Vagas</th>
+                    <th class="py-2.5 px-3 text-center">Capacidade</th>
+                    <th class="py-2.5 px-3 text-center">Ocupação</th>
                     <th class="py-2.5 px-3 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -1385,7 +1451,7 @@
           </div>
 
           <!-- Seção de Empresas -->
-          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="xl:col-span-5 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
@@ -3478,6 +3544,137 @@ service cloud.firestore {
     </div>
   </div>
 
+  <!-- Modal Gerenciador de Quartos do Bloco (Desativar / Aumentar Quartos) -->
+  <div id="modalGerenciarQuartosBloco" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+      
+      <!-- Topo Modal -->
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-base border border-sky-500/30">
+            <i class="fa-solid fa-door-open"></i>
+          </span>
+          <div>
+            <h3 id="modalGerenciarQuartosTitulo" class="text-base sm:text-lg font-bold">Quartos & Capacidade — Bloco</h3>
+            <p class="text-xs text-slate-400">Ative, desative ou ajuste a capacidade dos quartos deste bloco</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalGerenciarQuartosBloco')" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Resumo e Métricas Rápidas do Bloco -->
+      <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-2 text-xs">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="badgeModalTotalQuartos" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-700">0 quartos</span>
+          <span id="badgeModalQuartosAtivos" class="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 font-bold text-emerald-800">0 ativos</span>
+          <span id="badgeModalQuartosDesativados" class="px-2.5 py-1 rounded-lg bg-slate-200 border border-slate-300 font-bold text-slate-700">0 desativados</span>
+          <span id="badgeModalTotalVagasAtivas" class="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 font-bold text-sky-800">0 vagas ativas</span>
+        </div>
+        <div>
+          <button onclick="abrirModalNovoQuartoNoBloco(blocoGerenciandoId)" class="btn-prefeito px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs">
+            <i class="fa-solid fa-plus"></i> Adicionar Quarto no Bloco
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Filtros e Busca de Quartos -->
+      <div class="p-3 sm:px-5 sm:py-3 bg-white border-b border-slate-100 flex items-center gap-3">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input 
+            type="text" 
+            id="buscaQuartosBlocoModalInput" 
+            oninput="filtrarQuartosBlocoModalUI()" 
+            placeholder="Buscar por número do quarto, morador ou observação..." 
+            class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
+          >
+        </div>
+
+        <select id="filtroStatusQuartosBlocoModal" onchange="filtrarQuartosBlocoModalUI()" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white outline-none">
+          <option value="todos">Todos os Quartos</option>
+          <option value="ativos">Apenas Ativos</option>
+          <option value="desativados">Apenas Desativados</option>
+        </select>
+      </div>
+
+      <!-- Tabela de Quartos -->
+      <div class="flex-1 overflow-y-auto p-3 sm:p-5 custom-scrollbar">
+        <table class="w-full text-left text-xs sm:text-sm">
+          <thead class="bg-slate-100 text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200">
+            <tr>
+              <th class="py-2 px-3">Quarto</th>
+              <th class="py-2 px-3 text-center">Capacidade</th>
+              <th class="py-2 px-3">Moradores & Ocupação</th>
+              <th class="py-2 px-3 text-center">Status</th>
+              <th class="py-2 px-3 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaQuartosBlocoModalCorpo" class="divide-y divide-slate-100">
+            <!-- Populado via Javascript -->
+          </tbody>
+        </table>
+
+        <!-- Estado Vazio -->
+        <div id="quartosBlocoModalVazio" class="hidden py-10 text-center space-y-2">
+          <i class="fa-solid fa-door-closed text-slate-300 text-3xl"></i>
+          <p class="text-xs text-slate-500">Nenhum quarto encontrado com os filtros atuais.</p>
+        </div>
+      </div>
+
+      <!-- Rodapé Modal -->
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <span><i class="fa-solid fa-circle-info text-sky-500 mr-1"></i> Desativar um quarto reduz automaticamente a capacidade total do bloco.</span>
+        <button type="button" onclick="fecharModal('modalGerenciarQuartosBloco')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold transition">
+          Fechar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal Editar Capacidade de Camas do Quarto -->
+  <div id="modalEditarCapacidadeQuarto" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <h3 id="editarCapacidadeQuartoTitulo" class="text-base font-bold">Ajustar Capacidade do Quarto</h3>
+        <button onclick="fecharModal('modalEditarCapacidadeQuarto')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="formEditarCapacidadeQuarto" onsubmit="salvarCapacidadeQuartoModal(event)" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <input type="hidden" id="editarCapacidadeQuartoId">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Número do Quarto *</label>
+          <input type="text" id="editarCapacidadeQuartoNumero" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Capacidade de Camas *</label>
+          <input type="number" id="editarCapacidadeQuartoQtd" min="1" max="16" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+          <span class="text-[11px] text-slate-500 mt-1 block">Ao aumentar a capacidade, novas camas livres serão adicionadas ao quarto e somadas ao bloco.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700">Observações</label>
+          <input type="text" id="editarCapacidadeQuartoObs" placeholder="Ex: Cama extra para apoio..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalEditarCapacidadeQuarto')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">
+            Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal Nova Empresa -->
   <div id="modalEmpresaForm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden">
@@ -5458,6 +5655,6 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=3.8"></script>
+  <script src="app.js?v=3.9"></script>
 </body>
 </html>
