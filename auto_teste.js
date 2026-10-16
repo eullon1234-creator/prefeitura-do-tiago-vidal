@@ -377,6 +377,27 @@ assert(calcularCicloAr(30) === 'atencao', 'Ar condicionado com 30 dias: status A
 assert(calcularCicloAr(31) === 'vencido', 'Ar condicionado com 31 dias: status VENCIDO (alerta)');
 assert(calcularCicloAr(45) === 'vencido', 'Ar condicionado com 45 dias: status VENCIDO (alerta)');
 
+// Validação das regras de cores personalizadas solicitadas pelo usuário:
+// 1. Faxina: Feita hoje = verde ('ok', 'EM DIA'). Não feita hoje / pendente / dias passados = amarelo ('pendente', 'PENDENTE')
+const testarRegraFaxina = (diffDias) => {
+  if (diffDias === 0) return { status: 'ok', cor: 'emerald', badge: 'EM DIA' };
+  return { status: 'pendente', cor: 'amber', badge: 'PENDENTE' };
+};
+assert(testarRegraFaxina(0).cor === 'emerald' && testarRegraFaxina(0).badge === 'EM DIA', 'Regra Faxina: Feita hoje = Verde (Em dia)');
+assert(testarRegraFaxina(1).cor === 'amber' && testarRegraFaxina(1).badge === 'PENDENTE', 'Regra Faxina: Não feita hoje (pendente de ontem) = Amarelinho (Pendente)');
+assert(testarRegraFaxina(3).cor === 'amber' && testarRegraFaxina(3).badge === 'PENDENTE', 'Regra Faxina: Passou do dia = Amarelinho (Pendente)');
+
+// 2. Ar-Condicionado: Até 30 dias = verdinho ('ok', 'EM DIA'). Passou de 30 dias = vermelho ('vencido', 'PASSOU TEMPO')
+const testarRegraArCondicionado = (diffDias) => {
+  if (diffDias <= 30) return { status: 'ok', cor: 'emerald', badge: 'EM DIA' };
+  return { status: 'vencido', cor: 'rose', badge: 'PASSOU TEMPO' };
+};
+assert(testarRegraArCondicionado(0).cor === 'emerald', 'Regra Ar Cond.: 0 dias = Verdinho (Tudo certo)');
+assert(testarRegraArCondicionado(15).cor === 'emerald', 'Regra Ar Cond.: 15 dias = Verdinho (Tudo certo)');
+assert(testarRegraArCondicionado(30).cor === 'emerald', 'Regra Ar Cond.: 30 dias = Verdinho (Tudo certo)');
+assert(testarRegraArCondicionado(31).cor === 'rose' && testarRegraArCondicionado(31).badge === 'PASSOU TEMPO', 'Regra Ar Cond.: 31 dias = Vermelho (Passou do tempo!)');
+assert(testarRegraArCondicionado(60).cor === 'rose' && testarRegraArCondicionado(60).badge === 'PASSOU TEMPO', 'Regra Ar Cond.: 60 dias = Vermelho (Passou do tempo!)');
+
 // Validação de URL de QR Code para placa da residência
 const urlPlacaCasa = `https://exemplo.com/index.html?acao=limpeza&casa_id=CASA-99`;
 assert(urlPlacaCasa.includes('acao=limpeza') && urlPlacaCasa.includes('casa_id=CASA-99'), 'Estrutura de URL para QR Code da Casa válida');

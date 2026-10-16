@@ -9693,39 +9693,89 @@ function renderizarCasasCidadeGrid(casas) {
 
             <!-- Moradores Listados -->
             <div class="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-xs text-slate-700">
-              <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Moradores Alojados:</span>
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1">
+                  <i class="fa-solid fa-users text-indigo-500"></i> Moradores Alojados
+                  <span class="font-normal text-slate-400">(${totMoradores}/${totCamas})</span>
+                </span>
+                ${vagasLivres > 0 ? `
+                  <button onclick="event.stopPropagation(); abrirModalCasaDetalhes('${c.id}')" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1" title="Abrir casa para alocar morador">
+                    <i class="fa-solid fa-user-plus text-[9px]"></i> + Alocar
+                  </button>
+                ` : ''}
+              </div>
+
               ${nomesMoradores.length > 0 ? `
-                <div class="flex items-center gap-1 flex-wrap">
+                <div class="flex items-center gap-1.5 flex-wrap">
                   ${nomesMoradores.slice(0, 3).map(n => `
-                    <span class="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 text-[11px] font-medium truncate max-w-[130px]">
-                      ${n.split(' ')[0]} ${n.split(' ')[1] || ''}
+                    <span class="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 text-[11px] font-medium truncate max-w-[140px] inline-flex items-center gap-1 shadow-2xs" title="${n}">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                      <span class="truncate">${n.split(' ')[0]} ${n.split(' ')[1] || ''}</span>
                     </span>
                   `).join('')}
                   ${nomesMoradores.length > 3 ? `
-                    <span class="text-[10px] text-slate-500 font-bold">+${nomesMoradores.length - 3}</span>
+                    <span class="px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-600 font-bold text-[10px]">+${nomesMoradores.length - 3}</span>
                   ` : ''}
                 </div>
               ` : `
-                <span class="text-slate-400 italic text-[11px]">Nenhum morador alocado ainda</span>
+                <div class="flex items-center justify-between gap-2 py-0.5">
+                  <span class="text-slate-400 italic text-[11px] flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-slash text-slate-300"></i> Nenhum morador alocado
+                  </span>
+                  <button onclick="event.stopPropagation(); abrirModalCasaDetalhes('${c.id}')" class="btn-prefeito px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] border border-indigo-200 flex items-center gap-1 transition" title="Alocar primeiro morador">
+                    <i class="fa-solid fa-user-plus text-[9px]"></i> Alocar Morador
+                  </button>
+                </div>
               `}
             </div>
 
-            <!-- Indicadores de Limpeza & Manutenção (QR Code) -->
-            <div class="grid grid-cols-2 gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
-              <div class="flex items-center gap-1.5 overflow-hidden" title="${stLimpeza.rotina.tooltip}">
-                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${stLimpeza.rotina.badgeDot}"></span>
-                <div class="min-w-0 flex-1">
-                  <span class="text-[9px] uppercase font-bold text-slate-400 block truncate">Faxina Casa</span>
-                  <span class="font-bold text-slate-800 text-[11px] truncate block">${stLimpeza.rotina.textoCurto}</span>
+            <!-- Indicadores de Limpeza & Manutenção (QR Code / Interativos) -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              
+              <!-- Card Faxina Diária: Verde se feita hoje, Amarelo se pendente -->
+              <div 
+                onclick="event.stopPropagation(); abrirModalRegistroLimpeza('${c.id}', 'rotina')" 
+                class="p-2.5 rounded-xl border transition cursor-pointer select-none ${stLimpeza.rotina.cardBg || 'bg-slate-50 border-slate-200'} hover:shadow-xs group/limp" 
+                title="${stLimpeza.rotina.tooltip} — Clique para registrar faxina"
+              >
+                <div class="flex items-center justify-between gap-1 mb-1">
+                  <span class="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1 truncate">
+                    <i class="fa-solid fa-broom ${stLimpeza.rotina.cor === 'emerald' ? 'text-emerald-600' : 'text-amber-500'}"></i> Faxina Casa
+                  </span>
+                  <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase border ${stLimpeza.rotina.badgeClass}">
+                    ${stLimpeza.rotina.badgeLabel}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full flex-shrink-0 ${stLimpeza.rotina.badgeDot}"></span>
+                  <span class="font-extrabold text-[11px] truncate block ${stLimpeza.rotina.cor === 'emerald' ? 'text-emerald-900' : 'text-amber-900'}">
+                    ${stLimpeza.rotina.textoCurto}
+                  </span>
                 </div>
               </div>
-              <div class="flex items-center gap-1.5 overflow-hidden" title="${stLimpeza.ar.tooltip}">
-                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${stLimpeza.ar.badgeDot}"></span>
-                <div class="min-w-0 flex-1">
-                  <span class="text-[9px] uppercase font-bold text-slate-400 block truncate">Ar Cond. (30d)</span>
-                  <span class="font-bold text-slate-800 text-[11px] truncate block">${stLimpeza.ar.textoCurto}</span>
+
+              <!-- Card Ar Condicionado: Verde até 30d, Vermelho se passou de 30d -->
+              <div 
+                onclick="event.stopPropagation(); abrirModalRegistroLimpeza('${c.id}', 'ar_condicionado')" 
+                class="p-2.5 rounded-xl border transition cursor-pointer select-none ${stLimpeza.ar.cardBg || 'bg-slate-50 border-slate-200'} hover:shadow-xs group/ar" 
+                title="${stLimpeza.ar.tooltip} — Clique para registrar higienização"
+              >
+                <div class="flex items-center justify-between gap-1 mb-1">
+                  <span class="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1 truncate">
+                    <i class="fa-solid fa-snowflake ${stLimpeza.ar.cor === 'emerald' ? 'text-emerald-600' : 'text-rose-600'}"></i> Ar Cond. (30d)
+                  </span>
+                  <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase border ${stLimpeza.ar.badgeClass}">
+                    ${stLimpeza.ar.badgeLabel}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full flex-shrink-0 ${stLimpeza.ar.badgeDot}"></span>
+                  <span class="font-extrabold text-[11px] truncate block ${stLimpeza.ar.cor === 'emerald' ? 'text-emerald-900' : 'text-rose-900'}">
+                    ${stLimpeza.ar.textoCurto}
+                  </span>
                 </div>
               </div>
+
             </div>
 
             <!-- Resumo Financeiro do Mês -->
@@ -11746,15 +11796,23 @@ function calcularStatusLimpezasCasa(casaId) {
   const hoje = new Date();
   const hojeZero = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
 
-  // 1. Status Rotina Diária
+  // 1. Status Faxina Diária (Rotina)
+  // Regra do Usuário:
+  // - Feita no dia (hoje): VERDE (Em dia)
+  // - Não feita no dia (hoje pendente): AMARELINHO (Pendente)
+  // - Se passou o dia: AMARELINHO (Pendente / Atrasada)
+  // - Quando faz a faxina: fica VERDE
   let stRotina = {
-    status: 'nunca',
-    textoCurto: 'Sem registro',
-    textoDetalhe: 'Nenhuma limpeza de rotina registrada',
-    subtexto: 'Aguardando primeira limpeza',
-    badgeDot: 'bg-slate-400',
-    cor: 'slate',
-    tooltip: 'Nenhuma limpeza de rotina registrada ainda'
+    status: 'pendente',
+    textoCurto: 'Pendente hoje',
+    textoDetalhe: 'Pendente: nenhuma limpeza de rotina realizada hoje',
+    subtexto: 'Aguardando faxina diária',
+    badgeLabel: 'PENDENTE',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+    cardBg: 'bg-amber-50/80 border-amber-300 hover:border-amber-400',
+    badgeDot: 'bg-amber-500 animate-pulse',
+    cor: 'amber',
+    tooltip: 'Faxina de hoje pendente. Clique para registrar.'
   };
 
   if (rotinas.length > 0) {
@@ -11765,47 +11823,65 @@ function calcularStatusLimpezasCasa(casaId) {
     const diffDias = Math.max(0, Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24)));
 
     if (diffDias === 0) {
+      // FEITA HOJE: VERDE
       stRotina = {
         status: 'ok',
         textoCurto: `Hoje às ${ultRotina.hora || '--:--'}`,
         textoDetalhe: `Realizada hoje às ${ultRotina.hora || '--:--'} (${ultRotina.responsavel || 'Equipe'})`,
         subtexto: `Hoje às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}`,
+        badgeLabel: 'EM DIA',
+        badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        cardBg: 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-300',
         badgeDot: 'bg-emerald-500 shadow-xs',
         cor: 'emerald',
-        tooltip: `Limpeza realizada hoje às ${ultRotina.hora} por ${ultRotina.responsavel}`
+        tooltip: `Limpeza realizada hoje às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}. Clique para ver histórico.`
       };
     } else if (diffDias === 1) {
+      // NÃO FEITA HOJE (última ontem): AMARELINHO
       stRotina = {
-        status: 'atrasado',
-        textoCurto: 'Ontem (pendente)',
-        textoDetalhe: 'Pendente: última limpeza realizada ontem',
+        status: 'pendente',
+        textoCurto: 'Pendente hoje',
+        textoDetalhe: 'Pendente: faxina de hoje ainda não realizada (última foi ontem)',
         subtexto: `Ontem às ${ultRotina.hora || '--:--'} por ${ultRotina.responsavel || 'Equipe'}`,
-        badgeDot: 'bg-amber-500',
+        badgeLabel: 'PENDENTE',
+        badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+        cardBg: 'bg-amber-50/80 border-amber-300 hover:border-amber-400',
+        badgeDot: 'bg-amber-500 animate-pulse',
         cor: 'amber',
-        tooltip: `Última limpeza foi ontem às ${ultRotina.hora}. Necessária rotina de hoje.`
+        tooltip: `Última faxina foi ontem às ${ultRotina.hora || '--:--'}. Faxina de hoje pendente!`
       };
     } else {
+      // PASSOU DO DIA: AMARELINHO PENDENTE
       stRotina = {
-        status: 'atrasado',
-        textoCurto: `Atrasada (${diffDias}d)`,
-        textoDetalhe: `Atrasada há ${diffDias} dias (>24h sem faxina)`,
+        status: 'pendente',
+        textoCurto: `Pendente (${diffDias}d)`,
+        textoDetalhe: `Pendente: há ${diffDias} dias sem faxina diária`,
         subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultRotina.data)})`,
-        badgeDot: 'bg-rose-500 animate-pulse',
-        cor: 'rose',
-        tooltip: `Limpeza atrasada há ${diffDias} dias! Última em ${formatarDataLimpezaBR(ultRotina.data)}.`
+        badgeLabel: 'PENDENTE',
+        badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+        cardBg: 'bg-amber-50/80 border-amber-300 hover:border-amber-400',
+        badgeDot: 'bg-amber-500 animate-pulse',
+        cor: 'amber',
+        tooltip: `Faxina pendente! Última realizada há ${diffDias} dias (${formatarDataLimpezaBR(ultRotina.data)}).`
       };
     }
   }
 
   // 2. Status Ar Condicionado (Ciclo 30 dias)
+  // Regra do Usuário:
+  // - Nos 30 dias: VERDINHO (Tudo certo)
+  // - Passou dos 30 dias: VERMELHO (Passou do tempo)
   let stAr = {
-    status: 'nunca',
-    textoCurto: 'Sem registro',
-    textoDetalhe: 'Nenhuma higienização de ar condicionado registrada',
+    status: 'vencido',
+    textoCurto: 'Passou do tempo!',
+    textoDetalhe: 'Nenhuma higienização de ar condicionado registrada (prazo excedido)',
     subtexto: 'Ciclo de 30 dias pendente',
-    badgeDot: 'bg-slate-400',
-    cor: 'slate',
-    tooltip: 'Nenhuma higienização de ar registrada ainda'
+    badgeLabel: 'PASSOU TEMPO',
+    badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
+    cardBg: 'bg-rose-50/90 border-rose-300 hover:border-rose-400',
+    badgeDot: 'bg-rose-500 animate-pulse',
+    cor: 'rose',
+    tooltip: 'Nenhuma higienização de ar registrada. Prazo de 30 dias excedido!'
   };
 
   if (arConds.length > 0) {
@@ -11814,38 +11890,36 @@ function calcularStatusLimpezasCasa(casaId) {
     const dataUlt = new Date(strDataAr + 'T12:00:00');
     const dataUltZero = isNaN(dataUlt.getTime()) ? hojeZero : new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
     const diffDias = Math.max(0, Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24)));
-    const diasRestantes = 30 - diffDias;
+    const diasRestantes = Math.max(0, 30 - diffDias);
 
-    if (diffDias <= 24) {
+    if (diffDias <= 30) {
+      // DENTRO DOS 30 DIAS: VERDINHO TUDO CERTO
       stAr = {
         status: 'ok',
-        textoCurto: `Em dia (${diffDias}d atrás)`,
-        textoDetalhe: `Em dia: faltam ${diasRestantes} dias para o próximo ciclo`,
+        textoCurto: diffDias === 0 ? 'Em dia (hoje)' : `Em dia (${diffDias}d atrás)`,
+        textoDetalhe: `Tudo certo: faltam ${diasRestantes} dias para o próximo ciclo de 30 dias`,
         subtexto: `Última há ${diffDias} dia${diffDias === 1 ? '' : 's'} (${formatarDataLimpezaBR(ultAr.data)})`,
+        badgeLabel: 'EM DIA',
+        badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        cardBg: 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-300',
         badgeDot: 'bg-emerald-500 shadow-xs',
         cor: 'emerald',
-        tooltip: `Higienizado há ${diffDias} dias. Próxima higienização recomendada em ${diasRestantes} dias.`
-      };
-    } else if (diffDias <= 30) {
-      stAr = {
-        status: 'atencao',
-        textoCurto: `Atenção: vence em ${diasRestantes}d`,
-        textoDetalhe: `Atenção: ciclo de 30 dias vence em ${diasRestantes} dia${diasRestantes === 1 ? '' : 's'}!`,
-        subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultAr.data)})`,
-        badgeDot: 'bg-amber-500 animate-pulse',
-        cor: 'amber',
-        tooltip: `Atenção: faltam apenas ${diasRestantes} dias para completar o ciclo de 30 dias.`
+        tooltip: `Ar condicionado higienizado há ${diffDias} dia${diffDias === 1 ? '' : 's'}. Próxima manutenção em ${diasRestantes} dias.`
       };
     } else {
+      // PASSOU DOS 30 DIAS: VERMELHO PASSOU DO TEMPO
       const diasVencido = diffDias - 30;
       stAr = {
         status: 'vencido',
-        textoCurto: `Vencido (${diasVencido}d)`,
-        textoDetalhe: `VENCIDO: ultrapassou 30 dias (${diasVencido} dia${diasVencido === 1 ? '' : 's'} de atraso)`,
+        textoCurto: `Passou do tempo! (+${diasVencido}d)`,
+        textoDetalhe: `PASSOU DO TEMPO: prazo de 30 dias ultrapassado em ${diasVencido} dia${diasVencido === 1 ? '' : 's'}!`,
         subtexto: `Última há ${diffDias} dias (${formatarDataLimpezaBR(ultAr.data)})`,
+        badgeLabel: 'PASSOU TEMPO',
+        badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
+        cardBg: 'bg-rose-50/90 border-rose-300 hover:border-rose-400',
         badgeDot: 'bg-rose-500 animate-ping',
         cor: 'rose',
-        tooltip: `Vencido há ${diasVencido} dias! Prazo de 30 dias estourado.`
+        tooltip: `Atenção: Prazo de 30 dias estourado há ${diasVencido} dia${diasVencido === 1 ? '' : 's'}! Agendar higienização urgente.`
       };
     }
   }
