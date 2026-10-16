@@ -6292,15 +6292,30 @@ function registrarAuditoria(modulo, acao, entidade, detalhes, usuarioCustom = nu
   const usuario = usuarioCustom || (typeof currentUserName !== 'undefined' && currentUserName ? currentUserName : 'Prefeito');
   const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 
+  // Sanitização rigorosa para impedir campos undefined no Firestore
+  const safeModulo = modulo || 'geral';
+  const safeAcao = acao || 'INFO';
+  let safeEntidade = entidade || 'Geral';
+  let safeDetalhes = detalhes;
+
+  if (safeDetalhes === undefined || safeDetalhes === null) {
+    if (entidade) {
+      safeDetalhes = String(entidade);
+      safeEntidade = 'Sistema';
+    } else {
+      safeDetalhes = 'Ação registrada no sistema';
+    }
+  }
+
   const logObj = {
     id: logId,
     data_hora: dataHoraTexto,
     timestamp: agora.toISOString(),
-    usuario: usuario,
-    modulo: modulo, // 'alojamento' | 'casas' | 'estoque' | 'chamados'
-    acao: acao,     // 'ALOCAR' | 'TRANSFERIR' | 'DESALOJAR' | 'ENTRADA' | 'SAIDA' | 'MOVEL' | 'CHAMADO' | 'CONTA'
-    entidade: entidade,
-    detalhes: detalhes
+    usuario: String(usuario),
+    modulo: String(safeModulo),
+    acao: String(safeAcao),
+    entidade: String(safeEntidade),
+    detalhes: String(safeDetalhes)
   };
 
   listaAuditoriaGeral.unshift(logObj);
@@ -9859,18 +9874,16 @@ function formatarDataLimpezaBR(dataStr) {
   }
 }
 
-// Obter link público direto para o QR Code da Casa
+// Obter link público direto para o QR Code da Casa (Acesso exclusivo e isolado para a equipe de limpeza)
 function getQRCodeUrlCasa(casaId) {
-  const loc = window.location;
-  let origin = loc.origin;
-  if (!origin || origin === 'null') {
-    origin = `${loc.protocol}//${loc.host}`;
+  const href = window.location.href;
+  let cleanUrl = href.split('?')[0].split('#')[0];
+  if (cleanUrl.includes('index.html')) {
+    cleanUrl = cleanUrl.replace('index.html', 'limpeza.html');
+  } else {
+    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}limpeza.html` : `${cleanUrl}/limpeza.html`;
   }
-  let pathname = loc.pathname;
-  if (!pathname.endsWith('.html') && !pathname.endsWith('/')) {
-    pathname += '/';
-  }
-  return `${origin}${pathname}?acao=limpeza&casa_id=${encodeURIComponent(casaId)}`;
+  return `${cleanUrl}?casa_id=${encodeURIComponent(casaId)}`;
 }
 
 // Calcular status de limpeza da casa (Rotina Diária e Ar Condicionado 30 dias)
@@ -10311,7 +10324,9 @@ async function salvarRegistroLimpeza(e) {
     registrarAuditoria(
       'casas',
       'LIMPEZA',
-      `${descTipo} registrada para ${casaNome} por ${responsavel}. Obs: ${observacoes || 'Nenhuma'}`
+      casaNome,
+      `${descTipo} registrada para ${casaNome} por ${responsavel}. Obs: ${observacoes || 'Nenhuma'}`,
+      responsavel
     );
   }
 
@@ -10470,7 +10485,7 @@ async function excluirRegistroLimpeza(id) {
   }
 }
 
-// Verificar parâmetros de URL (Deep Linking ao ler o QR Code com a câmera do celular)
+// Verificar parâmetros de URL (Redirecionar leitura de QR Code da faxineira para página isolada)
 function verificarAcaoUrlParametros() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -10478,19 +10493,8 @@ function verificarAcaoUrlParametros() {
     const casaId = params.get('casa_id');
 
     if (acao === 'limpeza' && casaId) {
-      if (typeof switchTab === 'function') {
-        switchTab('casas_cidade');
-      }
-
-      const tentarAbrir = (tentativas = 0) => {
-        const casa = (listaCasasCidade || []).find(c => c.id === casaId);
-        if (casa) {
-          abrirModalRegistroLimpeza(casaId);
-        } else if (tentativas < 12) {
-          setTimeout(() => tentarAbrir(tentativas + 1), 300);
-        }
-      };
-      setTimeout(() => tentarAbrir(), 300);
+      window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(casaId)}`);
+      return;
     }
   } catch (e) {
     console.warn("Erro ao verificar parâmetros de URL:", e);

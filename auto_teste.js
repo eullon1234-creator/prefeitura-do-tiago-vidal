@@ -80,6 +80,8 @@ const parityPairs = [
   ['index.html', 'frontend/index.html'],
   ['app.js', 'frontend/app.js'],
   ['sw.js', 'frontend/sw.js'],
+  ['chamado.html', 'frontend/chamado.html'],
+  ['limpeza.html', 'frontend/limpeza.html'],
   ['dados_iniciais_taboca.json', 'frontend/dados_iniciais_taboca.json'],
   ['manifest.json', 'frontend/manifest.json']
 ];

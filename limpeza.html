@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Registro de Limpeza & Manutenção | GEL Engenharia</title>
+  
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#0f172a">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  
+  <!-- Firebase SDKs compat v10 -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    .tipo-card.active {
+      border-color: #0d9488;
+      background-color: rgba(13, 148, 136, 0.15);
+      box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25);
+    }
+    .avaliacao-chip.active {
+      border-color: #0d9488;
+      background-color: #0d9488;
+      color: #ffffff;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-teal-500 selection:text-slate-950 pb-8">
+
+  <!-- Header Mobile Friendly (Identificação Oficial GEL) -->
+  <header class="bg-slate-950/90 backdrop-blur border-b border-slate-800 sticky top-0 z-30 px-4 py-3 shadow-md">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-11 px-2.5 py-1 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-700/50 flex-shrink-0">
+          <img src="logo_gel_oficial.png" alt="Logo GEL Oficial" class="h-8 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+        </div>
+        <div>
+          <h1 class="text-sm font-black text-white leading-tight uppercase tracking-wide">GEL Engenharia</h1>
+          <p class="text-[11px] text-teal-400 font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-broom text-[10px]"></i> Controle de Limpeza Urbana
+          </p>
+        </div>
+      </div>
+      <div class="text-right">
+        <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800">
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span> QR Conectado
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+
+    <!-- Card de Identificação da Casa -->
+    <div class="bg-gradient-to-br from-slate-800 to-slate-850 p-4 rounded-2xl border border-slate-700/80 shadow-lg space-y-2">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center flex-shrink-0 text-xl border border-teal-500/30">
+            <i class="fa-solid fa-house"></i>
+          </div>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">Residência Identificada</span>
+            <h2 id="displayCasaNome" class="text-base font-black text-white leading-tight">Carregando casa...</h2>
+          </div>
+        </div>
+        <span id="badgeQrIdentificado" class="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 font-bold border border-emerald-800 whitespace-nowrap">
+          <i class="fa-solid fa-qrcode mr-1"></i> QR Ativo
+        </span>
+      </div>
+      <p id="displayCasaEndereco" class="text-xs text-slate-300 flex items-center gap-1.5 pt-1 border-t border-slate-700/50">
+        <i class="fa-solid fa-location-dot text-rose-400"></i>
+        <span>Consultando localização...</span>
+      </p>
+
+      <!-- Dropdown alternativo se casa não tiver sido passada na URL -->
+      <div id="containerSelecaoCasa" class="hidden pt-2">
+        <label for="selectCasaManual" class="block text-xs font-bold text-slate-300 mb-1">
+          Selecione a Casa que você está limpando:
+        </label>
+        <select id="selectCasaManual" onchange="selecionarCasaManual(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
+          <option value="">Carregando lista de casas...</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Formulário de Registro (Acessado pela Faxineira) -->
+    <form id="formLimpeza" onsubmit="salvarLimpezaPublica(event)" class="bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-slate-700/80 shadow-xl space-y-4">
+      <input type="hidden" id="inputCasaId">
+      <input type="hidden" id="inputCasaNome">
+      <input type="hidden" id="inputTipo" value="rotina">
+      <input type="hidden" id="inputAvaliacao" value="Excelente / Tudo Limpo">
+
+      <!-- Seleção do Tipo de Serviço -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <i class="fa-solid fa-list-check text-teal-400"></i> Qual serviço foi realizado? *
+        </label>
+        <div class="grid grid-cols-2 gap-2.5">
+          <div onclick="escolherTipoServico('rotina')" id="cardTipoRotina" class="tipo-card active cursor-pointer border-2 border-teal-500 bg-teal-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none">
+            <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg mb-1.5">
+              <i class="fa-solid fa-broom"></i>
+            </div>
+            <span class="text-xs font-extrabold text-white">Limpeza Rotina</span>
+            <span class="text-[10px] text-slate-400 mt-0.5">Faxina Diária Geral</span>
+          </div>
+
+          <div onclick="escolherTipoServico('ar_condicionado')" id="cardTipoAr" class="tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100">
+            <div class="w-10 h-10 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-lg mb-1.5">
+              <i class="fa-solid fa-snowflake"></i>
+            </div>
+            <span class="text-xs font-extrabold text-white">Ar Condicionado</span>
+            <span class="text-[10px] text-slate-400 mt-0.5">Higienização (30d)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nome da Responsável / Faxineira -->
+      <div>
+        <label for="inputResponsavel" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <i class="fa-solid fa-user-check text-emerald-400"></i> Seu Nome Completo *
+        </label>
+        <input 
+          type="text" 
+          id="inputResponsavel" 
+          required 
+          placeholder="Ex: Maria Auxiliadora, Ana Paula..." 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white font-semibold text-sm outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500"
+        >
+      </div>
+
+      <!-- Data e Hora -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="inputData" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+            Data da Limpeza *
+          </label>
+          <input 
+            type="date" 
+            id="inputData" 
+            required 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3 py-2 text-white font-semibold text-xs outline-none transition"
+          >
+        </div>
+        <div>
+          <label for="inputHora" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+            Horário *
+          </label>
+          <input 
+            type="time" 
+            id="inputHora" 
+            required 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3 py-2 text-white font-semibold text-xs outline-none transition"
+          >
+        </div>
+      </div>
+
+      <!-- Estado do Imóvel / Avaliação Rápida -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <i class="fa-solid fa-star text-amber-400"></i> Como ficou a casa?
+        </label>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button type="button" onclick="escolherAvaliacao(this, 'Excelente / Tudo Limpo')" class="avaliacao-chip active p-2.5 rounded-xl border border-teal-500 bg-teal-600 text-white font-bold text-left transition text-[11px]">
+            ✨ Tudo Limpo & OK
+          </button>
+          <button type="button" onclick="escolherAvaliacao(this, 'Bom / Em Ordem')" class="avaliacao-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-left transition text-[11px]">
+            👍 Bom / Normal
+          </button>
+          <button type="button" onclick="escolherAvaliacao(this, 'Atenção / Falta Material')" class="avaliacao-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-left transition text-[11px]">
+            ⚠️ Falta Material
+          </button>
+          <button type="button" onclick="escolherAvaliacao(this, 'Aviso / Precisa Manutenção')" class="avaliacao-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-left transition text-[11px]">
+            🛠️ Precisa de Reparo
+          </button>
+        </div>
+      </div>
+
+      <!-- Observações Opcionais -->
+      <div>
+        <label for="inputObservacoes" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <i class="fa-solid fa-comment-dots text-slate-400"></i> Observações / Recado ao Prefeito (Opcional)
+        </label>
+        <textarea 
+          id="inputObservacoes" 
+          rows="2" 
+          placeholder="Ex: Quarto 2 limpo, lixeira trocada, ar higienizado com produto bactericida..." 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white text-xs outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500 resize-none"
+        ></textarea>
+      </div>
+
+      <!-- Botão de Envio -->
+      <div class="pt-2">
+        <button 
+          type="submit" 
+          id="btnConfirmar" 
+          class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm shadow-lg flex items-center justify-center gap-2 transition transform active:scale-98"
+        >
+          <i class="fa-solid fa-check text-base"></i>
+          <span>Confirmar Registro de Limpeza</span>
+        </button>
+      </div>
+
+    </form>
+
+    <!-- Tela de Conclusão / Sucesso (Exibida após o envio) -->
+    <div id="telaSucesso" class="hidden bg-slate-800/90 backdrop-blur rounded-2xl p-6 border border-teal-500/50 shadow-2xl text-center space-y-4 animate-in fade-in duration-300">
+      <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-3xl border-2 border-emerald-500 shadow-md">
+        <i class="fa-solid fa-check"></i>
+      </div>
+
+      <div>
+        <h3 class="text-lg font-black text-white">Registro Concluído com Sucesso!</h3>
+        <p class="text-xs text-slate-300 mt-1">Muito obrigado pelo seu trabalho e dedicação.</p>
+      </div>
+
+      <!-- Resumo do Registro -->
+      <div class="bg-slate-900/90 rounded-xl p-4 text-left text-xs border border-slate-700/80 space-y-2">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">Protocolo:</span>
+          <span id="sucessoProtocolo" class="font-mono font-bold text-teal-400">#LIMP-0000</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Casa:</span>
+          <span id="sucessoCasaNome" class="font-bold text-white">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Tipo de Serviço:</span>
+          <span id="sucessoTipo" class="font-bold text-emerald-400">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Responsável:</span>
+          <span id="sucessoResponsavel" class="font-bold text-slate-200">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Data e Hora:</span>
+          <span id="sucessoDataHora" class="text-slate-300">-</span>
+        </div>
+      </div>
+
+      <div class="p-3 bg-teal-950/40 border border-teal-800/60 rounded-xl text-teal-300 text-xs">
+        <i class="fa-solid fa-shield-halved mr-1 text-teal-400"></i>
+        <span>Informação arquivada para o Prefeito da Obra. Você já pode fechar esta página no seu celular.</span>
+      </div>
+
+      <!-- Botão para outro registro se necessário (sem acesso ao app) -->
+      <div class="pt-2">
+        <button onclick="fazerOutroRegistro()" class="w-full py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs transition">
+          <i class="fa-solid fa-rotate-left mr-1.5"></i> Registrar Outro Serviço Nesta Casa
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Rodapé Institucional (Sem links de navegação para a administração) -->
+  <footer class="max-w-md mx-auto px-4 text-center text-[11px] text-slate-500 mt-4 space-y-1">
+    <p>Prefeitura de Canteiro • GEL (Goetze Lobato Eng. S.A.)</p>
+    <p class="text-slate-600">Sistema Seguro de Auditoria de Serviços Prediais</p>
+  </footer>
+
+  <!-- Scripts e Lógica Firebase -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCd1Uu_dRx8k4EcgifWUmsmfeqnAcB4PHw",
+      authDomain: "prefeitura-cc71b.firebaseapp.com",
+      projectId: "prefeitura-cc71b",
+      storageBucket: "prefeitura-cc71b.firebasestorage.app",
+      messagingSenderId: "395936672533",
+      appId: "1:395936672533:web:d7d17537d2c38c47bc971c",
+      measurementId: "G-YYXMDWCM4Q"
+    };
+
+    let firestoreDb = null;
+    let listaCasasDisponiveis = [];
+    let casaCarregada = null;
+
+    // Inicialização do Firebase
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      firestoreDb = firebase.firestore();
+      firestoreDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    } catch (e) {
+      console.warn("Aviso Firebase:", e);
+    }
+
+    // Inicialização ao carregar a página
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. Preencher data e hora atuais
+      const agora = new Date();
+      document.getElementById('inputData').value = agora.toISOString().split('T')[0];
+      document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
+
+      // 2. Obter casa_id dos parâmetros da URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlCasaId = urlParams.get('casa_id');
+
+      // 3. Carregar dados da casa do Firestore ou cache local
+      carregarCasa(urlCasaId);
+    });
+
+    // Carregar informações da casa identificada
+    async function carregarCasa(casaId) {
+      // Tentar ler cache de casas do localStorage se existir
+      try {
+        const cachedCasas = localStorage.getItem('casas_cidade_cache');
+        if (cachedCasas) {
+          listaCasasDisponiveis = JSON.parse(cachedCasas);
+        }
+      } catch (e) {}
+
+      // Buscar no Firestore
+      if (firestoreDb) {
+        try {
+          const snap = await firestoreDb.collection('casas_cidade').get();
+          const remotas = [];
+          snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+          if (remotas.length > 0) {
+            listaCasasDisponiveis = remotas;
+          }
+        } catch (err) {
+          console.warn("Aviso ao buscar casas do Firestore:", err);
+        }
+      }
+
+      // Preencher select manual
+      const selEl = document.getElementById('selectCasaManual');
+      if (selEl && listaCasasDisponiveis.length > 0) {
+        selEl.innerHTML = '<option value="">Selecione uma casa...</option>' + 
+          listaCasasDisponiveis.map(c => `<option value="${c.id}">${c.nome} - ${c.endereco || ''}</option>`).join('');
+      }
+
+      if (casaId) {
+        casaCarregada = listaCasasDisponiveis.find(c => c.id === casaId);
+        if (!casaCarregada && firestoreDb) {
+          try {
+            const doc = await firestoreDb.collection('casas_cidade').doc(casaId).get();
+            if (doc.exists) {
+              casaCarregada = { id: doc.id, ...doc.data() };
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (casaCarregada) {
+        aplicarDadosCasa(casaCarregada);
+      } else {
+        // Se não foi identificado pelo ID da URL, abre o dropdown para ela escolher
+        document.getElementById('displayCasaNome').textContent = 'Selecione a Casa Abaixo';
+        document.getElementById('displayCasaEndereco').innerHTML = '<i class="fa-solid fa-circle-info text-amber-400"></i> Escolha na lista qual residência você está atendendo:';
+        document.getElementById('containerSelecaoCasa').classList.remove('hidden');
+        document.getElementById('badgeQrIdentificado').classList.add('hidden');
+      }
+    }
+
+    function aplicarDadosCasa(c) {
+      document.getElementById('inputCasaId').value = c.id;
+      document.getElementById('inputCasaNome').value = c.nome;
+      document.getElementById('displayCasaNome').textContent = c.nome;
+      document.getElementById('displayCasaEndereco').innerHTML = `<i class="fa-solid fa-location-dot text-rose-400"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+      document.getElementById('containerSelecaoCasa').classList.add('hidden');
+      document.getElementById('badgeQrIdentificado').classList.remove('hidden');
+
+      const selEl = document.getElementById('selectCasaManual');
+      if (selEl) selEl.value = c.id;
+    }
+
+    function selecionarCasaManual(id) {
+      const c = listaCasasDisponiveis.find(x => x.id === id);
+      if (c) {
+        casaCarregada = c;
+        aplicarDadosCasa(c);
+      }
+    }
+
+    // Alternar tipo de serviço
+    function escolherTipoServico(tipo) {
+      document.getElementById('inputTipo').value = tipo;
+      const cardRotina = document.getElementById('cardTipoRotina');
+      const cardAr = document.getElementById('cardTipoAr');
+
+      if (tipo === 'rotina') {
+        cardRotina.className = 'tipo-card active cursor-pointer border-2 border-teal-500 bg-teal-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none';
+        cardAr.className = 'tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100';
+      } else {
+        cardRotina.className = 'tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100';
+        cardAr.className = 'tipo-card active cursor-pointer border-2 border-sky-500 bg-sky-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none';
+      }
+    }
+
+    // Alternar avaliação
+    function escolherAvaliacao(btn, valor) {
+      document.getElementById('inputAvaliacao').value = valor;
+      document.querySelectorAll('.avaliacao-chip').forEach(el => {
+        el.className = 'avaliacao-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:text-white text-left transition text-[11px]';
+      });
+      btn.className = 'avaliacao-chip active p-2.5 rounded-xl border border-teal-500 bg-teal-600 text-white font-bold text-left transition text-[11px]';
+    }
+
+    // Salvar Registro de Limpeza
+    async function salvarLimpezaPublica(e) {
+      if (e) e.preventDefault();
+
+      const casaId = document.getElementById('inputCasaId').value;
+      const casaNome = document.getElementById('inputCasaNome').value || document.getElementById('displayCasaNome').textContent;
+      const tipo = document.getElementById('inputTipo').value || 'rotina';
+      const responsavel = document.getElementById('inputResponsavel').value.trim();
+      const data = document.getElementById('inputData').value;
+      const hora = document.getElementById('inputHora').value;
+      const avaliacao = document.getElementById('inputAvaliacao').value;
+      const observacoes = document.getElementById('inputObservacoes').value.trim();
+
+      if (!casaId) {
+        alert('Por favor, selecione a casa que você está limpando.');
+        return;
+      }
+      if (!responsavel) {
+        alert('Por favor, digite o seu nome.');
+        document.getElementById('inputResponsavel').focus();
+        return;
+      }
+      if (!data || !hora) {
+        alert('Informe a data e o horário.');
+        return;
+      }
+
+      const btn = document.getElementById('btnConfirmar');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Gravando Limpeza...';
+
+      const agora = new Date();
+      const protocolo = 'LIMP-' + Math.floor(100000 + Math.random() * 900000);
+      const dataHoraStr = `${data}T${hora}:00`;
+      const descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado (Ciclo 30d)';
+
+      const registro = {
+        id: protocolo,
+        casa_id: casaId,
+        casa_nome: casaNome,
+        tipo: tipo,
+        data: data,
+        hora: hora,
+        data_hora: dataHoraStr,
+        responsavel: responsavel,
+        avaliacao: avaliacao || 'Normal',
+        observacoes: observacoes || '',
+        origem: 'QR Code (Plaquinha da Residência)',
+        criado_em: agora.toISOString(),
+        criado_por: responsavel
+      };
+
+      // 1. Salvar no Firestore
+      if (firestoreDb) {
+        try {
+          await firestoreDb.collection('casas_limpezas').doc(protocolo).set(registro);
+        } catch (err) {
+          console.warn("Aviso ao salvar limpeza:", err);
+        }
+
+        // 2. Log de Auditoria seguro (sem campos undefined)
+        try {
+          const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+          const logObj = {
+            id: logId,
+            data_hora: `${data.split('-').reverse().join('/')} ${hora}`,
+            timestamp: agora.toISOString(),
+            usuario: String(responsavel),
+            modulo: 'casas',
+            acao: 'LIMPEZA',
+            entidade: String(casaNome),
+            detalhes: `${descTipo} realizada por ${responsavel} via QR Code. Estado: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
+          };
+          await firestoreDb.collection('auditoria_logs').doc(logId).set(logObj);
+        } catch (err) {
+          console.warn("Aviso ao salvar auditoria:", err);
+        }
+      }
+
+      // 3. Atualizar cache local caso este celular abra o app offline
+      try {
+        const cached = localStorage.getItem('casas_limpezas_cache');
+        const lista = cached ? JSON.parse(cached) : [];
+        lista.unshift(registro);
+        localStorage.setItem('casas_limpezas_cache', JSON.stringify(lista.slice(0, 100)));
+      } catch (e) {}
+
+      // 4. Exibir Tela de Sucesso Isolada (Sem menu do app)
+      document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
+      document.getElementById('sucessoCasaNome').textContent = casaNome;
+      document.getElementById('sucessoTipo').textContent = descTipo;
+      document.getElementById('sucessoResponsavel').textContent = responsavel;
+      document.getElementById('sucessoDataHora').textContent = `${data.split('-').reverse().join('/')} às ${hora}`;
+
+      document.getElementById('formLimpeza').classList.add('hidden');
+      document.getElementById('telaSucesso').classList.remove('hidden');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function fazerOutroRegistro() {
+      document.getElementById('inputObservacoes').value = '';
+      escolherTipoServico('ar_condicionado'); // sugere o outro serviço
+
+      const btn = document.getElementById('btnConfirmar');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check text-base mr-1"></i><span>Confirmar Registro de Limpeza</span>';
+
+      document.getElementById('telaSucesso').classList.add('hidden');
+      document.getElementById('formLimpeza').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+
+</body>
+</html>
