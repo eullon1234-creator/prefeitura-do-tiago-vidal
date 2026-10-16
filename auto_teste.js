@@ -367,6 +367,25 @@ assert(calcularCicloAr(45) === 'vencido', 'Ar condicionado com 45 dias: status V
 const urlPlacaCasa = `https://exemplo.com/index.html?acao=limpeza&casa_id=CASA-99`;
 assert(urlPlacaCasa.includes('acao=limpeza') && urlPlacaCasa.includes('casa_id=CASA-99'), 'Estrutura de URL para QR Code da Casa válida');
 
+// Teste de formatação de data de limpeza
+const formatarDataLimpezaBRTest = (dataStr) => {
+  if (!dataStr) return '--/--/----';
+  try {
+    const limpo = String(dataStr).split('T')[0].trim();
+    const partes = limpo.split('-');
+    if (partes.length === 3 && partes[0].length === 4) {
+      return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    const d = new Date(limpo + 'T12:00:00');
+    return isNaN(d.getTime()) ? dataStr : d.toLocaleDateString('pt-BR');
+  } catch (e) {
+    return dataStr;
+  }
+};
+assert(formatarDataLimpezaBRTest('2026-10-15') === '15/10/2026', 'Formatador BR com formato YYYY-MM-DD');
+assert(formatarDataLimpezaBRTest('2026-10-15T08:30:00') === '15/10/2026', 'Formatador BR com formato ISO timestamp');
+assert(formatarDataLimpezaBRTest('') === '--/--/----', 'Formatador BR com entrada vazia');
+
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------

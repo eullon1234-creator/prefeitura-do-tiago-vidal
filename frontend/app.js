@@ -9847,11 +9847,13 @@ function recarregarCasasCidadeManual() {
 function formatarDataLimpezaBR(dataStr) {
   if (!dataStr) return '--/--/----';
   try {
-    const partes = dataStr.split('-');
-    if (partes.length === 3) {
+    const limpo = String(dataStr).split('T')[0].trim();
+    const partes = limpo.split('-');
+    if (partes.length === 3 && partes[0].length === 4) {
       return `${partes[2]}/${partes[1]}/${partes[0]}`;
     }
-    return new Date(dataStr + 'T12:00:00').toLocaleDateString('pt-BR');
+    const d = new Date(limpo + 'T12:00:00');
+    return isNaN(d.getTime()) ? dataStr : d.toLocaleDateString('pt-BR');
   } catch (e) {
     return dataStr;
   }
@@ -9900,9 +9902,10 @@ function calcularStatusLimpezasCasa(casaId) {
 
   if (rotinas.length > 0) {
     const ultRotina = rotinas[0];
-    const dataUlt = new Date(ultRotina.data + 'T12:00:00');
-    const dataUltZero = new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
-    const diffDias = Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24));
+    const strDataRot = String(ultRotina.data || '').split('T')[0].trim();
+    const dataUlt = new Date(strDataRot + 'T12:00:00');
+    const dataUltZero = isNaN(dataUlt.getTime()) ? hojeZero : new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
+    const diffDias = Math.max(0, Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24)));
 
     if (diffDias === 0) {
       stRotina = {
@@ -9950,8 +9953,9 @@ function calcularStatusLimpezasCasa(casaId) {
 
   if (arConds.length > 0) {
     const ultAr = arConds[0];
-    const dataUlt = new Date(ultAr.data + 'T12:00:00');
-    const dataUltZero = new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
+    const strDataAr = String(ultAr.data || '').split('T')[0].trim();
+    const dataUlt = new Date(strDataAr + 'T12:00:00');
+    const dataUltZero = isNaN(dataUlt.getTime()) ? hojeZero : new Date(dataUlt.getFullYear(), dataUlt.getMonth(), dataUlt.getDate());
     const diffDias = Math.max(0, Math.floor((hojeZero - dataUltZero) / (1000 * 60 * 60 * 24)));
     const diasRestantes = 30 - diffDias;
 
@@ -10387,9 +10391,10 @@ function renderizarHistoricoLimpezasCasa(casaId) {
 
   container.innerHTML = registros.map(reg => {
     const isAr = reg.tipo === 'ar_condicionado';
-    const dataReg = new Date((reg.data || '') + 'T12:00:00');
-    const dataRegZero = new Date(dataReg.getFullYear(), dataReg.getMonth(), dataReg.getDate());
-    const diffDias = Math.floor((hojeZero - dataRegZero) / (1000 * 60 * 60 * 24));
+    const strDataReg = String(reg.data || '').split('T')[0].trim();
+    const dataReg = new Date(strDataReg + 'T12:00:00');
+    const dataRegZero = isNaN(dataReg.getTime()) ? hojeZero : new Date(dataReg.getFullYear(), dataReg.getMonth(), dataReg.getDate());
+    const diffDias = Math.max(0, Math.floor((hojeZero - dataRegZero) / (1000 * 60 * 60 * 24)));
 
     let decorridoStr = '';
     if (diffDias === 0) decorridoStr = 'Hoje';
