@@ -82,6 +82,7 @@ const parityPairs = [
   ['sw.js', 'frontend/sw.js'],
   ['chamado.html', 'frontend/chamado.html'],
   ['limpeza.html', 'frontend/limpeza.html'],
+  ['ronda.html', 'frontend/ronda.html'],
   ['dados_iniciais_taboca.json', 'frontend/dados_iniciais_taboca.json'],
   ['manifest.json', 'frontend/manifest.json']
 ];
@@ -91,6 +92,73 @@ parityPairs.forEach(([f1, f2]) => {
   const h2 = getHash(f2);
   assert(h1 !== null && h1 === h2, `Paridade 100% entre ${f1} e ${f2}`);
 });
+
+// -------------------------------------------------------------
+// 3.1. VALIDADOR AUTOMÁTICO DE ESTRUTURA HTML & ANINHAMENTO DE ABAS
+// -------------------------------------------------------------
+console.log('\n🏗️ 3.1. Validação Estrita de Estrutura HTML & Fechamento de Tags');
+
+function validarEstruturaHtml(caminhoArquivo) {
+  const html = fs.readFileSync(caminhoArquivo, 'utf8');
+  const lines = html.split('\n');
+  const tagRegex = /<\/?([a-z0-9]+)(?:\s+[^>]*?)?\/?>/gi;
+  let stack = [];
+  let erros = [];
+  let tabsAbertas = [];
+
+  lines.forEach((line, lineIdx) => {
+    const lineNum = lineIdx + 1;
+    let match;
+    while ((match = tagRegex.exec(line)) !== null) {
+      const full = match[0];
+      const tagName = match[1].toLowerCase();
+      const isClosing = full.startsWith('</');
+      const isSelfClosing = full.endsWith('/>') || ['img', 'input', 'br', 'hr', 'meta', 'link'].includes(tagName);
+
+      if (['div', 'main', 'aside', 'header', 'body'].includes(tagName)) {
+        if (isClosing) {
+          if (stack.length > 0) {
+            const top = stack.pop();
+            if (top.tagName !== tagName) {
+              erros.push(`Linha ${lineNum}: Fechamento </${tagName}> incompatível com <${top.tagName}> da linha ${top.lineNum}`);
+            }
+            if (top.isTab) {
+              tabsAbertas.pop();
+            }
+          } else {
+            erros.push(`Linha ${lineNum}: Fechamento </${tagName}> inesperado sem abertura prévia`);
+          }
+        } else if (!isSelfClosing) {
+          const isTab = full.includes('tab-content');
+          const idMatch = full.match(/id="([^"]+)"/);
+          const elemId = idMatch ? idMatch[1] : '';
+
+          // REGRA DE OURO: Nenhuma aba .tab-content pode estar dentro de outra aba .tab-content!
+          if (isTab) {
+            if (tabsAbertas.length > 0) {
+              erros.push(`Linha ${lineNum}: Aba <div id="${elemId}"> aninhada indevidamente dentro da aba <div id="${tabsAbertas[tabsAbertas.length - 1]}">! Todas as abas devem ser irmãs diretas em <main>.`);
+            }
+            tabsAbertas.push(elemId || 'tab_anonima');
+          }
+
+          stack.push({ tagName, lineNum, id: elemId, isTab });
+        }
+      }
+    }
+  });
+
+  if (stack.length > 0) {
+    stack.forEach(s => erros.push(`Tag <${s.tagName}${s.id ? ' id="' + s.id + '"' : ''}> aberta na linha ${s.lineNum} não foi fechada`));
+  }
+
+  return erros;
+}
+
+const errosIndexRaiz = validarEstruturaHtml('index.html');
+assert(errosIndexRaiz.length === 0, 'Estrutura HTML de index.html 100% balanceada (0 tags órfãs ou aninhamentos inválidos)', errosIndexRaiz.join(' | '));
+
+const errosIndexFront = validarEstruturaHtml('frontend/index.html');
+assert(errosIndexFront.length === 0, 'Estrutura HTML de frontend/index.html 100% balanceada', errosIndexFront.join(' | '));
 
 // -------------------------------------------------------------
 // 4. INTEGRIDADE DOS ARQUIVOS JSON E BASE DE DADOS
