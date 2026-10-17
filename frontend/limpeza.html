@@ -249,6 +249,30 @@
         </div>
       </div>
 
+      <!-- Se for Alojamento / Bloco: Seleção do Quarto -->
+      <div id="boxQuartoAtendidoLimpeza" class="hidden p-3 rounded-xl bg-slate-900 border border-teal-500/40 space-y-1.5">
+        <label for="inputQuartoAtendidoNum" class="block text-xs font-bold text-teal-300 uppercase tracking-wider flex items-center justify-between">
+          <span><i class="fa-solid fa-door-open mr-1"></i> Qual Quarto Foi Limpo? *</span>
+          <span class="text-[10px] text-slate-400 font-normal">Ex: 14 ou Bloco Inteiro</span>
+        </label>
+        <div class="flex gap-2">
+          <input 
+            type="text" 
+            id="inputQuartoAtendidoNum" 
+            placeholder="Digite o nº do quarto (ex: 01, 14, 96)..." 
+            class="flex-1 bg-slate-950 border border-slate-700 focus:border-teal-500 rounded-xl px-3 py-2 text-white font-bold text-xs outline-none transition"
+          >
+          <button 
+            type="button" 
+            onclick="definirFaxinaGeralBloco()" 
+            class="px-2.5 py-1.5 rounded-xl bg-teal-800/60 hover:bg-teal-700 text-teal-200 text-[11px] font-bold border border-teal-700 whitespace-nowrap transition"
+            title="Registrar faxina em todas as áreas comuns/quartos do bloco"
+          >
+            Bloco Inteiro
+          </button>
+        </div>
+      </div>
+
       <!-- Nome da Responsável / Faxineira -->
       <div>
         <label for="inputResponsavel" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
@@ -388,6 +412,20 @@
           id="inputComodoOcorrencia" 
           placeholder="Ex: Quarto 1, Banheiro Social, Cozinha..." 
           class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2 text-white text-xs outline-none transition placeholder-slate-500"
+        >
+      </div>
+
+      <!-- Quarto do Alojamento (exibido quando for Alojamento/Bloco) -->
+      <div id="boxQuartoOcorrenciaAlojamento" class="hidden">
+        <label for="inputQuartoOcorrenciaNum" class="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <span><i class="fa-solid fa-door-open mr-1"></i> Qual é o seu Quarto? *</span>
+          <span class="text-[10px] text-slate-400 font-normal">Obrigatório para atendimento</span>
+        </label>
+        <input 
+          type="text" 
+          id="inputQuartoOcorrenciaNum" 
+          placeholder="Ex: Quarto 14, 05, 96..." 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2 text-white text-xs font-bold outline-none transition placeholder-slate-500"
         >
       </div>
 
@@ -692,7 +730,8 @@
       const urlCasaId = urlParams.get('casa_id');
       const urlQuartoId = urlParams.get('quarto_id');
       const urlQuartoNum = urlParams.get('quarto_num') || urlParams.get('quarto');
-      const urlBloco = urlParams.get('bloco') || 'Bloco 1';
+      const urlBloco = urlParams.get('bloco');
+      const urlBlocoId = urlParams.get('bloco_id');
       const urlModo = urlParams.get('modo');
 
       if (urlModo === 'problema' || urlModo === 'ocorrencia') {
@@ -700,11 +739,37 @@
       }
 
       if (urlQuartoId || urlQuartoNum) {
-        aplicarDadosQuartoAlojamento(urlQuartoId || `q_${urlBloco}_${urlQuartoNum}`, urlQuartoNum || urlQuartoId, urlBloco);
+        aplicarDadosQuartoAlojamento(urlQuartoId || `q_${urlBloco || 'Bloco'}_${urlQuartoNum}`, urlQuartoNum || urlQuartoId, urlBloco || 'Bloco 1');
+      } else if (urlBloco || urlBlocoId) {
+        aplicarDadosBlocoAlojamento(urlBloco || `Bloco ${urlBlocoId}`);
       } else {
         carregarCasa(urlCasaId);
       }
     });
+
+    function aplicarDadosBlocoAlojamento(blocoNome) {
+      document.getElementById('inputTipoLocal').value = 'alojamento';
+      document.getElementById('inputBlocoNome').value = String(blocoNome);
+      document.getElementById('inputCasaId').value = `bloco_${encodeURIComponent(blocoNome)}`;
+      document.getElementById('inputCasaNome').value = `${blocoNome} • Alojamento do Canteiro`;
+
+      document.getElementById('labelTipoUnidade').textContent = 'Alojamento do Canteiro (QR do Bloco)';
+      document.getElementById('displayCasaNome').textContent = String(blocoNome).toUpperCase();
+      document.getElementById('displayCasaEndereco').innerHTML = `<i class="fa-solid fa-hotel text-sky-400"></i> Canteiro de Obras Taboca 2 • GEL Engenharia`;
+      document.getElementById('iconeUnidade').className = 'fa-solid fa-hotel';
+      document.getElementById('badgeQrIdentificado').classList.remove('hidden');
+      document.getElementById('badgeQrIdentificado').innerHTML = `<i class="fa-solid fa-qrcode mr-1"></i> QR Bloco Ativo`;
+      
+      document.getElementById('boxComodoOcorrencia').classList.add('hidden');
+      document.getElementById('boxQuartoOcorrenciaAlojamento').classList.remove('hidden');
+      document.getElementById('boxQuartoAtendidoLimpeza').classList.remove('hidden');
+      document.getElementById('containerSelecaoCasa').classList.add('hidden');
+    }
+
+    function definirFaxinaGeralBloco() {
+      const input = document.getElementById('inputQuartoAtendidoNum');
+      if (input) input.value = 'Todos (Bloco Inteiro)';
+    }
 
     function aplicarDadosQuartoAlojamento(quartoId, quartoNum, blocoNome) {
       const idUnificado = `quarto_${quartoId}`;
@@ -722,6 +787,8 @@
       document.getElementById('displayCasaEndereco').innerHTML = `<i class="fa-solid fa-building-user text-sky-400"></i> Setor de Alojamentos • ${blocoNome}`;
       document.getElementById('iconeUnidade').className = 'fa-solid fa-bed';
       document.getElementById('boxComodoOcorrencia').classList.add('hidden');
+      document.getElementById('boxQuartoOcorrenciaAlojamento').classList.add('hidden');
+      document.getElementById('boxQuartoAtendidoLimpeza').classList.add('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
       document.getElementById('badgeQrIdentificado').classList.remove('hidden');
     }
@@ -866,11 +933,11 @@
     async function salvarLimpezaPublica(e) {
       if (e) e.preventDefault();
 
-      const casaId = document.getElementById('inputCasaId').value;
-      const casaNome = document.getElementById('inputCasaNome').value || document.getElementById('displayCasaNome').textContent;
+      let casaId = document.getElementById('inputCasaId').value;
+      let casaNome = document.getElementById('inputCasaNome').value || document.getElementById('displayCasaNome').textContent;
       const tipoLocal = document.getElementById('inputTipoLocal').value || 'casa';
-      const quartoId = document.getElementById('inputQuartoId').value || '';
-      const quartoNumero = document.getElementById('inputQuartoNumero').value || '';
+      let quartoId = document.getElementById('inputQuartoId').value || '';
+      let quartoNumero = document.getElementById('inputQuartoNumero').value || '';
       const blocoNome = document.getElementById('inputBlocoNome').value || '';
       const tipo = document.getElementById('inputTipo').value || 'rotina';
       const responsavel = document.getElementById('inputResponsavel').value.trim();
@@ -878,6 +945,16 @@
       const hora = document.getElementById('inputHora').value;
       const avaliacao = document.getElementById('inputAvaliacao').value;
       const observacoes = document.getElementById('inputObservacoes').value.trim();
+
+      if (tipoLocal === 'alojamento') {
+        const qAtendido = (document.getElementById('inputQuartoAtendidoNum')?.value || '').trim();
+        if (qAtendido) {
+          quartoNumero = qAtendido;
+          quartoId = qAtendido;
+          casaId = `quarto_${blocoNome}_${quartoNumero}`;
+          casaNome = `Quarto ${quartoNumero} • ${blocoNome}`;
+        }
+      }
 
       if (!casaId) {
         alert('Por favor, selecione a Casa ou o Quarto que você está limpando.');
@@ -968,11 +1045,11 @@
     async function salvarOcorrenciaLocalPublica(e, destino = 'app') {
       if (e) e.preventDefault();
 
-      const casaId = document.getElementById('inputCasaId').value;
-      const casaNome = document.getElementById('inputCasaNome').value || document.getElementById('displayCasaNome').textContent;
+      let casaId = document.getElementById('inputCasaId').value;
+      let casaNome = document.getElementById('inputCasaNome').value || document.getElementById('displayCasaNome').textContent;
       const tipoLocal = document.getElementById('inputTipoLocal').value || 'casa';
-      const quartoId = document.getElementById('inputQuartoId').value || '';
-      const quartoNumero = document.getElementById('inputQuartoNumero').value || '';
+      let quartoId = document.getElementById('inputQuartoId').value || '';
+      let quartoNumero = document.getElementById('inputQuartoNumero').value || '';
       const blocoNome = document.getElementById('inputBlocoNome').value || '';
 
       const categoria = document.getElementById('inputProblemaCategoria').value || 'Observação / Reclamação';
@@ -980,6 +1057,20 @@
       const descricao = (document.getElementById('inputDescricaoOcorrencia')?.value || '').trim();
       const nomeMorador = (document.getElementById('inputNomeMorador')?.value || '').trim() || 'Morador / Alojado (Via QR Code)';
       const zapMorador = (document.getElementById('inputZapMorador')?.value || '').trim();
+
+      if (tipoLocal === 'alojamento') {
+        const qOcorr = (document.getElementById('inputQuartoOcorrenciaNum')?.value || '').trim();
+        if (qOcorr) {
+          quartoNumero = qOcorr;
+          quartoId = qOcorr;
+          casaId = `quarto_${blocoNome}_${quartoNumero}`;
+          casaNome = `Quarto ${quartoNumero} • ${blocoNome}`;
+        } else if (!quartoNumero) {
+          alert('Por favor, informe o número do seu quarto no bloco para que a equipe possa te atender.');
+          document.getElementById('inputQuartoOcorrenciaNum')?.focus();
+          return;
+        }
+      }
 
       if (!casaId) {
         alert('Por favor, selecione acima qual é a Casa ou o Quarto.');

@@ -4173,11 +4173,8 @@ function renderQuartosCards(quartos) {
               <i class="fa-solid fa-list-check"></i> Detalhes
             </button>
             ${!isDesativado ? `
-              <button onclick="abrirModalPlacaQRQuarto(${q.id})" class="px-2 py-1 rounded bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-[10px] flex items-center gap-1 transition" title="Imprimir Placa QR Code do Quarto">
-                <i class="fa-solid fa-qrcode"></i> QR Code
-              </button>
-              <button onclick="abrirModalRegistroLimpezaQuarto(${q.id}, 'rotina')" class="p-1.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] transition" title="Registrar Limpeza ou Ar Condicionado">
-                <i class="fa-solid fa-broom"></i>
+              <button onclick="abrirModalRegistroLimpezaQuarto(${q.id}, 'rotina')" class="px-2.5 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[10px] flex items-center gap-1 transition" title="Registrar Limpeza ou Ar Condicionado deste Quarto">
+                <i class="fa-solid fa-broom"></i> Limpeza
               </button>
             ` : ''}
           </div>
@@ -12218,6 +12215,18 @@ function calcularStatusLimpezaQuarto(q) {
   return calcularStatusLimpezasCasa('quarto_' + q.id, q);
 }
 
+// Obter link público direto para o QR Code de um Bloco do Alojamento (1 QR Code por Bloco!)
+function getQRCodeUrlBloco(blocoNome) {
+  const href = window.location.href;
+  let cleanUrl = href.split('?')[0].split('#')[0];
+  if (cleanUrl.includes('index.html')) {
+    cleanUrl = cleanUrl.replace('index.html', 'limpeza.html');
+  } else {
+    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}limpeza.html` : `${cleanUrl}/limpeza.html`;
+  }
+  return `${cleanUrl}?bloco=${encodeURIComponent(blocoNome || 'Bloco 1')}`;
+}
+
 // Obter link público direto para o QR Code de um Quarto do Alojamento
 function getQRCodeUrlQuarto(q) {
   const href = window.location.href;
@@ -12241,6 +12250,9 @@ function abrirModalPlacaQRCasa(casaId) {
     return;
   }
 
+  const selBloco = document.getElementById('selectBlocoPlacaQR');
+  if (selBloco) selBloco.classList.add('hidden');
+
   const qrUrl = getQRCodeUrlCasa(casaId);
   const imgEl = document.getElementById('imgPlacaQRCasa');
   const txtUrlEl = document.getElementById('textoPlacaQRCasaUrl');
@@ -12260,6 +12272,54 @@ function abrirModalPlacaQRCasa(casaId) {
   abrirModal('modalPlacaQRCasa');
 }
 
+// Abrir modal com placa QR Code do Bloco do Alojamento (1 QR Code Oficial por Bloco - Impressão A4)
+function abrirModalPlacaQRBloco(blocoIdOuNome = null) {
+  let nomeBloco = 'Bloco 1';
+
+  if (blocoIdOuNome) {
+    const achou = (globalBlocos || []).find(b => String(b.id) === String(blocoIdOuNome) || b.nome === blocoIdOuNome);
+    nomeBloco = achou ? achou.nome : String(blocoIdOuNome);
+  } else if (filtroBlocoAtivo) {
+    const achou = (globalBlocos || []).find(b => String(b.id) === String(filtroBlocoAtivo));
+    if (achou) nomeBloco = achou.nome;
+  } else if (globalBlocos && globalBlocos.length > 0) {
+    nomeBloco = globalBlocos[0].nome;
+  }
+
+  // Preencher seletor de bloco no topo do modal
+  const selBloco = document.getElementById('selectBlocoPlacaQR');
+  if (selBloco) {
+    const nomesBlocos = (globalBlocos || []).map(b => b.nome);
+    if (!nomesBlocos.includes(nomeBloco)) nomesBlocos.unshift(nomeBloco);
+    selBloco.innerHTML = nomesBlocos.map(n => `<option value="${n}" ${n === nomeBloco ? 'selected' : ''}>🏢 ${n}</option>`).join('');
+    selBloco.classList.remove('hidden');
+  }
+
+  renderizarConteudoPlacaQRBloco(nomeBloco);
+  abrirModal('modalPlacaQRCasa');
+}
+
+function aoMudarBlocoPlacaQR(novoBlocoNome) {
+  renderizarConteudoPlacaQRBloco(novoBlocoNome);
+}
+
+function renderizarConteudoPlacaQRBloco(blocoNome) {
+  const qrUrl = getQRCodeUrlBloco(blocoNome);
+  const imgEl = document.getElementById('imgPlacaQRCasa');
+  const txtUrlEl = document.getElementById('textoPlacaQRCasaUrl');
+  const titEl = document.getElementById('placaCasaTitulo');
+  const endEl = document.getElementById('placaCasaEndereco');
+  const catEl = document.getElementById('placaCasaCategoriaLabel');
+
+  if (catEl) catEl.textContent = 'Prefeitura de Canteiro • Alojamento Operário';
+  if (titEl) titEl.textContent = `${blocoNome.toUpperCase()} — ALOJAMENTO`;
+  if (endEl) endEl.textContent = `Canteiro de Obras Taboca 2 • GEL Engenharia`;
+  if (txtUrlEl) txtUrlEl.textContent = qrUrl;
+
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
+  if (imgEl) imgEl.src = qrApiUrl;
+}
+
 // Abrir modal com placa QR Code do Quarto do Alojamento (Impressão A4)
 function abrirModalPlacaQRQuarto(quartoId) {
   const q = (allQuartosData || []).find(x => String(x.id) === String(quartoId));
@@ -12267,6 +12327,9 @@ function abrirModalPlacaQRQuarto(quartoId) {
     showToast('Quarto não encontrado para gerar placa QR.', 'warning');
     return;
   }
+
+  const selBloco = document.getElementById('selectBlocoPlacaQR');
+  if (selBloco) selBloco.classList.add('hidden');
 
   const qrUrl = getQRCodeUrlQuarto(q);
   const imgEl = document.getElementById('imgPlacaQRCasa');
@@ -13100,6 +13163,11 @@ function verificarAcaoUrlParametros() {
       window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(quartoId)}`);
       return;
     }
+    const bloco = params.get('bloco');
+    if (acao === 'limpeza' && bloco) {
+      window.location.replace(`limpeza.html?bloco=${encodeURIComponent(bloco)}`);
+      return;
+    }
   } catch (e) {
     console.warn("Erro ao verificar parâmetros de URL:", e);
   }
@@ -13144,6 +13212,9 @@ window.atualizarEstiloTipoLimpeza = atualizarEstiloTipoLimpeza;
 window.salvarRegistroLimpeza = salvarRegistroLimpeza;
 window.excluirRegistroLimpeza = excluirRegistroLimpeza;
 window.abrirModalPlacaQRCasa = abrirModalPlacaQRCasa;
+window.abrirModalPlacaQRBloco = abrirModalPlacaQRBloco;
+window.aoMudarBlocoPlacaQR = aoMudarBlocoPlacaQR;
+window.getQRCodeUrlBloco = getQRCodeUrlBloco;
 window.abrirModalPlacaQRQuarto = abrirModalPlacaQRQuarto;
 window.imprimirPlacaQRCasa = imprimirPlacaQRCasa;
 window.renderizarHistoricoLimpezasCasa = renderizarHistoricoLimpezasCasa;

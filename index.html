@@ -754,6 +754,9 @@
               <p class="text-sm text-slate-500">Monitore em tempo real cada cama, trabalhador alojado, faxina diária, ar-condicionado (30d) e reclamações por QR Code.</p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="abrirModalPlacaQRBloco()" class="px-3 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition" title="Gerar e Imprimir Placa QR Code do Bloco">
+                <i class="fa-solid fa-qrcode"></i> Placa QR do Bloco
+              </button>
               <button onclick="abrirModalRelatorioLimpezaExecutivo('alojamento')" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
                 <i class="fa-solid fa-file-pdf"></i> Relatório Limpeza (A4)
               </button>
@@ -5876,6 +5879,9 @@ service cloud.firestore {
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <select id="selectBlocoPlacaQR" onchange="aoMudarBlocoPlacaQR(this.value)" class="hidden bg-slate-800 text-teal-300 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none cursor-pointer">
+            <!-- Populado dinamicamente com os Blocos -->
+          </select>
           <button onclick="imprimirPlacaQRCasa()" class="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
             <i class="fa-solid fa-print"></i> Imprimir Placa
           </button>

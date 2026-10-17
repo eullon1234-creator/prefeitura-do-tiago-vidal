@@ -901,6 +901,15 @@ assert(conteudoIndex.includes('id="modalOcorrenciasUnidade"'), 'Modal de Ouvidor
 assert(conteudoIndex.includes('id="modalRelatorioLimpezaExecutivo"'), 'Modal do Relatório Executivo A4 de Limpeza (Casas & Alojamentos) presente em index.html');
 assert(conteudoIndex.includes('imprimindo-relatorio-limpeza'), 'Regras CSS @media print para imprimindo-relatorio-limpeza presentes em index.html');
 
+// 3. Verificação do Modelo "Apenas Um QR Code por Bloco no Alojamento"
+assert(conteudoIndex.includes('abrirModalPlacaQRBloco()'), 'Botão Placa QR do Bloco presente no cabeçalho do Mapa de Quartos em index.html');
+assert(conteudoIndex.includes('id="selectBlocoPlacaQR"'), 'Seletor rápido de Bloco presente no modal de impressão da Placa QR em index.html');
+assert(conteudoApp.includes('function abrirModalPlacaQRBloco('), 'Função abrirModalPlacaQRBloco implementada em app.js');
+assert(conteudoApp.includes('function getQRCodeUrlBloco('), 'Função getQRCodeUrlBloco implementada em app.js');
+assert(conteudoLimpezaRaiz.includes('id="boxQuartoAtendidoLimpeza"'), 'Campo de seleção do quarto atendido presente no form de limpeza de limpeza.html');
+assert(conteudoLimpezaRaiz.includes('id="boxQuartoOcorrenciaAlojamento"'), 'Campo de informe do quarto do alojado presente no form de ocorrência de limpeza.html');
+assert(conteudoLimpezaRaiz.includes('aplicarDadosBlocoAlojamento('), 'Função aplicarDadosBlocoAlojamento implementada em limpeza.html');
+
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
