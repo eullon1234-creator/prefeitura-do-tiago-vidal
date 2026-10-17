@@ -29,6 +29,12 @@
       color: #ffffff;
       font-weight: 700;
     }
+    .problema-chip.active {
+      border-color: #f59e0b !important;
+      background-color: rgba(245, 158, 11, 0.2) !important;
+      color: #fbbf24 !important;
+      font-weight: 700;
+    }
     .check-item {
       transition: all 0.2s ease;
     }
@@ -113,8 +119,93 @@
       </div>
     </div>
 
-    <!-- Formulário de Registro (Acessado pelo Colaborador da Ronda) -->
-    <form id="formRonda" onsubmit="salvarRondaPublica(event)" class="bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-slate-700/80 shadow-xl space-y-4">
+    <!-- SELETOR DE MODO: EQUIPE DE LIMPEZA OU OPERÁRIO RELATANDO PROBLEMA -->
+    <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl shadow-sm">
+      <button 
+        type="button" 
+        id="btnModoLimpeza" 
+        onclick="trocarModoRonda('limpeza')" 
+        class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-teal-600 text-white shadow-sm"
+      >
+        <i class="fa-solid fa-broom text-xs"></i>
+        <span>Equipe de Limpeza</span>
+      </button>
+
+      <button 
+        type="button" 
+        id="btnModoProblema" 
+        onclick="trocarModoRonda('problema')" 
+        class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900"
+      >
+        <i class="fa-solid fa-triangle-exclamation text-amber-400 text-xs"></i>
+        <span>Relatar Problema</span>
+      </button>
+    </div>
+
+    <!-- BLOCO 1: AUTENTICAÇÃO COM SENHA DA EQUIPE DE LIMPEZA -->
+    <div id="containerSenhaLimpeza" class="bg-slate-800/90 backdrop-blur rounded-2xl p-5 border border-slate-700/80 shadow-xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg flex-shrink-0 border border-teal-500/30">
+          <i class="fa-solid fa-key"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Acesso da Equipe de Limpeza</h3>
+          <p class="text-[11px] text-slate-400">Digite o PIN / Senha fornecido pelo Prefeito de Canteiro.</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 pt-1">
+        <div>
+          <label for="inputSenhaEquipeRonda" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+            Senha da Equipe *
+          </label>
+          <div class="relative">
+            <input 
+              type="password" 
+              id="inputSenhaEquipeRonda" 
+              placeholder="Digite a senha..." 
+              class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-4 py-3 text-center text-lg font-mono font-bold tracking-widest text-white outline-none transition placeholder-slate-600"
+              onkeydown="if(event.key === 'Enter') validarSenhaEquipeRonda()"
+            >
+            <button type="button" onclick="alternarVisibilidadeSenhaRonda()" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1">
+              <i class="fa-solid fa-eye" id="iconeOlhoSenhaRonda"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="msgErroSenhaRonda" class="hidden p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs text-center font-semibold">
+          <i class="fa-solid fa-circle-exclamation mr-1"></i> Senha incorreta! Solicite ao Prefeito da Obra.
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" id="checkLembrarSenhaHoje" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span class="text-[11px]">Lembrar senha neste aparelho hoje</span>
+          </label>
+        </div>
+
+        <button 
+          type="button" 
+          onclick="validarSenhaEquipeRonda()" 
+          class="w-full py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition"
+        >
+          <i class="fa-solid fa-unlock"></i>
+          <span>Entrar no Formulário de Limpeza</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Formulário de Registro (Acessado pela Equipe de Limpeza após Senha) -->
+    <form id="formRonda" onsubmit="salvarRondaPublica(event)" class="hidden bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-teal-500/40 shadow-xl space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
+        <span class="text-[11px] font-bold text-teal-400 flex items-center gap-1.5">
+          <i class="fa-solid fa-shield-check text-xs"></i> Acesso Liberado para Equipe
+        </span>
+        <button type="button" onclick="bloquearAcessoEquipeRonda()" class="text-[11px] text-slate-400 hover:text-rose-400 transition font-medium">
+          <i class="fa-solid fa-lock mr-1"></i> Bloquear / Sair
+        </button>
+      </div>
+
       <input type="hidden" id="inputPontoId">
       <input type="hidden" id="inputPontoNome">
       <input type="hidden" id="inputPontoTipo" value="banheiro">
@@ -264,6 +355,94 @@
 
     </form>
 
+    <!-- BLOCO 2: FORMULÁRIO DE RELATO DE PROBLEMA / RECLAMAÇÃO (SEM SENHA) -->
+    <form id="formOcorrenciaRonda" onsubmit="salvarOcorrenciaPublica(event)" class="hidden bg-slate-800/90 backdrop-blur rounded-2xl p-4 sm:p-5 border border-amber-500/40 shadow-xl space-y-4">
+      <div class="flex items-center gap-2.5 pb-2 border-b border-slate-700/60">
+        <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-base flex-shrink-0 border border-amber-500/30">
+          <i class="fa-solid fa-bullhorn"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white">Relatar Problema no Local</h3>
+          <p class="text-[11px] text-amber-300 font-semibold">Sem senha • Envio direto ao Prefeito da Obra</p>
+        </div>
+      </div>
+
+      <input type="hidden" id="inputTipoProblema" value="Falta Papel Higiênico">
+
+      <!-- Tags Rápidas de Problema -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+          Selecione o que está acontecendo: *
+        </label>
+        <div class="grid grid-cols-2 gap-2 text-xs" id="gridOpcoesProblema">
+          <button type="button" onclick="escolherTipoProblema(this, 'Falta Papel Higiênico')" class="problema-chip active p-2.5 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-300 font-bold text-left transition flex items-center gap-2">
+            <span>🧻</span>
+            <span>Falta Papel</span>
+          </button>
+          <button type="button" onclick="escolherTipoProblema(this, 'Falta Sabonete / Álcool')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-left transition flex items-center gap-2">
+            <span>🧴</span>
+            <span>Falta Sabão</span>
+          </button>
+          <button type="button" onclick="escolherTipoProblema(this, 'Bebedouro Sem Água / Não Gela')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-left transition flex items-center gap-2">
+            <span>💧</span>
+            <span>Sem Água / Gelo</span>
+          </button>
+          <button type="button" onclick="escolherTipoProblema(this, 'Vazamento / Descarga Quebrada')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-left transition flex items-center gap-2">
+            <span>🛠️</span>
+            <span>Vazamento / Quebrado</span>
+          </button>
+          <button type="button" onclick="escolherTipoProblema(this, 'Banheiro Precisa Limpeza Urgente')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-left transition flex items-center gap-2">
+            <span>🧹</span>
+            <span>Limpeza Urgente</span>
+          </button>
+          <button type="button" onclick="escolherTipoProblema(this, 'Outro Problema')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-left transition flex items-center gap-2">
+            <span>💬</span>
+            <span>Outro Assunto</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Detalhes do Problema -->
+      <div>
+        <label for="inputDescricaoProblema" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+          Descreva o que houve ou onde está o defeito: *
+        </label>
+        <textarea 
+          id="inputDescricaoProblema" 
+          rows="3" 
+          required 
+          placeholder="Ex: A torneira está vazando água pelo chão, ou a fechadura da porta emperrou..." 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white text-xs outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-amber-500 resize-none"
+        ></textarea>
+      </div>
+
+      <!-- Identificação Opcional -->
+      <div>
+        <label for="inputNomeColaboradorProblema" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span>Seu Nome / Função (Opcional)</span>
+          <span class="text-[10px] text-slate-500 font-normal">Pode deixar vazio p/ envio anônimo</span>
+        </label>
+        <input 
+          type="text" 
+          id="inputNomeColaboradorProblema" 
+          placeholder="Ex: Marcos - Eletricista (ou deixe vazio)" 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white text-xs outline-none transition placeholder-slate-500"
+        >
+      </div>
+
+      <!-- Botão de Envio de Reclamação -->
+      <div class="pt-2">
+        <button 
+          type="submit" 
+          id="btnEnviarProblema" 
+          class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm shadow-lg flex items-center justify-center gap-2 transition transform active:scale-98"
+        >
+          <i class="fa-solid fa-paper-plane text-base"></i>
+          <span>Enviar Alerta ao Prefeito da Obra</span>
+        </button>
+      </div>
+    </form>
+
     <!-- Tela de Conclusão / Sucesso -->
     <div id="telaSucessoRonda" class="hidden bg-slate-800/90 backdrop-blur rounded-2xl p-6 border border-teal-500/50 shadow-2xl text-center space-y-4 animate-in fade-in duration-300">
       <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-3xl border-2 border-emerald-500 shadow-md">
@@ -317,6 +496,49 @@
       </div>
     </div>
 
+    <!-- TELA DE SUCESSO DO RELATO DE PROBLEMA -->
+    <div id="telaSucessoProblema" class="hidden bg-slate-800/95 backdrop-blur rounded-2xl p-6 border border-amber-500/50 shadow-2xl text-center space-y-4 animate-in fade-in duration-300">
+      <div class="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-3xl border-2 border-amber-500 shadow-md">
+        <i class="fa-solid fa-bullhorn"></i>
+      </div>
+
+      <div>
+        <h3 class="text-lg font-black text-white">Alerta Enviado com Sucesso!</h3>
+        <p class="text-xs text-slate-300 mt-1">Obrigado pela informação! O Prefeito de Canteiro e a equipe já foram avisados em tempo real para resolver o problema.</p>
+      </div>
+
+      <div class="bg-slate-900/90 rounded-xl p-4 text-left text-xs border border-slate-700/80 space-y-2">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">Protocolo:</span>
+          <span id="sucessoProblemaProtocolo" class="font-mono font-bold text-amber-400">#OCORR-000000</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Local:</span>
+          <span id="sucessoProblemaPonto" class="font-bold text-white">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Problema:</span>
+          <span id="sucessoProblemaTipo" class="font-bold text-amber-300">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Data e Horário:</span>
+          <span id="sucessoProblemaHora" class="text-slate-200">-</span>
+        </div>
+      </div>
+
+      <div class="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-amber-300 text-xs text-left flex items-start gap-2">
+        <i class="fa-solid fa-triangle-exclamation text-amber-400 mt-0.5"></i>
+        <span>O ponto foi sinalizado no mapa da obra como "Precisa de Reparo / Insumo". A zeladoria foi despachada.</span>
+      </div>
+
+      <div class="pt-2">
+        <button type="button" onclick="voltarAposProblema()" class="w-full py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span>Voltar ao Ponto</span>
+        </button>
+      </div>
+    </div>
+
   </main>
 
   <!-- Rodapé Institucional -->
@@ -341,6 +563,13 @@
     let listaPontosDisponiveis = [];
     let pontoCarregado = null;
     let registrosPontoHoje = [];
+    let configRonda = {
+      freq_padrao_banheiro: 2,
+      freq_padrao_bebedouro: 1,
+      senha_equipe: '1234'
+    };
+    let modoAtual = 'limpeza';
+    let equipeAutenticada = false;
 
     // Inicialização do Firebase
     try {
@@ -363,11 +592,235 @@
       return `${y}-${m}-${day}`;
     }
 
+    // Carregar configurações de Ronda (incluindo senha do Prefeito)
+    async function carregarConfigRonda() {
+      try {
+        const cached = localStorage.getItem('ronda_config_cache');
+        if (cached) {
+          configRonda = Object.assign(configRonda, JSON.parse(cached));
+        }
+      } catch (e) {}
+
+      if (firestoreDb) {
+        try {
+          const doc = await firestoreDb.collection('ronda_config').doc('geral').get();
+          if (doc.exists) {
+            configRonda = Object.assign(configRonda, doc.data());
+            localStorage.setItem('ronda_config_cache', JSON.stringify(configRonda));
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Alternar entre modo Limpeza e Relatar Problema
+    function trocarModoRonda(modo) {
+      modoAtual = modo;
+      const btnLimp = document.getElementById('btnModoLimpeza');
+      const btnProb = document.getElementById('btnModoProblema');
+      const formProb = document.getElementById('formOcorrenciaRonda');
+      const containerSenha = document.getElementById('containerSenhaLimpeza');
+      const formRonda = document.getElementById('formRonda');
+      const telaSucessoRonda = document.getElementById('telaSucessoRonda');
+      const telaSucessoProblema = document.getElementById('telaSucessoProblema');
+
+      if (telaSucessoRonda) telaSucessoRonda.classList.add('hidden');
+      if (telaSucessoProblema) telaSucessoProblema.classList.add('hidden');
+
+      if (modo === 'limpeza') {
+        if (btnLimp) btnLimp.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-teal-600 text-white shadow-sm';
+        if (btnProb) btnProb.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900';
+        if (formProb) formProb.classList.add('hidden');
+
+        if (equipeAutenticada) {
+          if (containerSenha) containerSenha.classList.add('hidden');
+          if (formRonda) formRonda.classList.remove('hidden');
+        } else {
+          if (containerSenha) containerSenha.classList.remove('hidden');
+          if (formRonda) formRonda.classList.add('hidden');
+        }
+      } else {
+        if (btnProb) btnProb.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-amber-500 text-slate-950 font-black shadow-sm';
+        if (btnLimp) btnLimp.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900';
+        if (containerSenha) containerSenha.classList.add('hidden');
+        if (formRonda) formRonda.classList.add('hidden');
+        if (formProb) formProb.classList.remove('hidden');
+      }
+    }
+
+    // Validar Senha da Equipe de Limpeza
+    function validarSenhaEquipeRonda() {
+      const input = document.getElementById('inputSenhaEquipeRonda');
+      const erro = document.getElementById('msgErroSenhaRonda');
+      const val = (input ? input.value : '').trim();
+      const senhaEsperada = String(configRonda.senha_equipe || '1234').trim();
+
+      if (val === senhaEsperada) {
+        if (erro) erro.classList.add('hidden');
+        equipeAutenticada = true;
+        sessionStorage.setItem('ronda_equipe_autenticada', 'true');
+
+        const checkLembrar = document.getElementById('checkLembrarSenhaHoje');
+        if (checkLembrar && checkLembrar.checked) {
+          localStorage.setItem('ronda_lembrar_senha_data', getDataHojeLocal());
+          localStorage.setItem('ronda_equipe_autenticada_local', 'true');
+        }
+
+        const containerSenha = document.getElementById('containerSenhaLimpeza');
+        const formRonda = document.getElementById('formRonda');
+        if (containerSenha) containerSenha.classList.add('hidden');
+        if (formRonda) formRonda.classList.remove('hidden');
+      } else {
+        if (erro) erro.classList.remove('hidden');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }
+    }
+
+    function alternarVisibilidadeSenhaRonda() {
+      const input = document.getElementById('inputSenhaEquipeRonda');
+      const icone = document.getElementById('iconeOlhoSenhaRonda');
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (icone) { icone.classList.remove('fa-eye'); icone.classList.add('fa-eye-slash'); }
+      } else {
+        input.type = 'password';
+        if (icone) { icone.classList.remove('fa-eye-slash'); icone.classList.add('fa-eye'); }
+      }
+    }
+
+    function bloquearAcessoEquipeRonda() {
+      equipeAutenticada = false;
+      sessionStorage.removeItem('ronda_equipe_autenticada');
+      localStorage.removeItem('ronda_equipe_autenticada_local');
+      localStorage.removeItem('ronda_lembrar_senha_data');
+      const input = document.getElementById('inputSenhaEquipeRonda');
+      if (input) input.value = '';
+      trocarModoRonda('limpeza');
+    }
+
+    // Alternar tipo de problema relatado
+    function escolherTipoProblema(btn, tipo) {
+      const input = document.getElementById('inputTipoProblema');
+      if (input) input.value = tipo;
+      document.querySelectorAll('.problema-chip').forEach(el => {
+        el.className = 'problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 font-semibold text-left transition flex items-center gap-2';
+      });
+      btn.className = 'problema-chip active p-2.5 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-300 font-bold text-left transition flex items-center gap-2';
+    }
+
+    // Salvar relato de problema / reclamação (Sem Senha)
+    async function salvarOcorrenciaPublica(e) {
+      if (e) e.preventDefault();
+
+      const pontoId = document.getElementById('inputPontoId').value;
+      const pontoNome = document.getElementById('inputPontoNome').value || document.getElementById('displayPontoNome').textContent;
+      const pontoTipo = document.getElementById('inputPontoTipo').value || 'banheiro';
+      const pontoSetor = document.getElementById('inputPontoSetor').value || 'Canteiro Central';
+      const tipoProblema = document.getElementById('inputTipoProblema').value || 'Problema Geral';
+      const descricao = (document.getElementById('inputDescricaoProblema').value || '').trim();
+      const solicitante = (document.getElementById('inputNomeColaboradorProblema').value || '').trim() || 'Colaborador da Obra (Anônimo)';
+
+      if (!pontoId) {
+        alert('Por favor, selecione o ponto que você está relatando.');
+        return;
+      }
+      if (!descricao) {
+        alert('Por favor, descreva o que está acontecendo no local.');
+        document.getElementById('inputDescricaoProblema').focus();
+        return;
+      }
+
+      const btn = document.getElementById('btnEnviarProblema');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Transmitindo Alerta...';
+      }
+
+      const protocolo = 'OCORR-' + Math.floor(100000 + Math.random() * 900000);
+      const dataHoje = getDataHojeLocal();
+      const agora = new Date();
+      const horaStr = agora.toTimeString().slice(0, 5);
+
+      const ocorrencia = {
+        id: protocolo,
+        ponto_id: pontoId,
+        ponto_nome: pontoNome,
+        tipo_ponto: pontoTipo,
+        setor: pontoSetor,
+        tipo_problema: tipoProblema,
+        descricao: descricao,
+        solicitante: solicitante,
+        data: dataHoje,
+        hora: horaStr,
+        data_hora: agora.toISOString(),
+        status: 'aberto',
+        resolvido_em: null,
+        resolvido_por: null,
+        criado_em: agora.toISOString()
+      };
+
+      if (firestoreDb) {
+        try {
+          await firestoreDb.collection('ronda_ocorrencias').doc(protocolo).set(ocorrencia);
+
+          const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+          const logObj = {
+            id: logId,
+            data_hora: agora.toISOString(),
+            usuario: String(solicitante),
+            modulo: 'ronda',
+            acao: 'ALERTA_COLABORADOR',
+            entidade: String(pontoNome),
+            detalhes: `Alerta aberto por ${solicitante}: ${tipoProblema} - "${descricao}". Local: ${pontoSetor}`
+          };
+          await firestoreDb.collection('auditoria_logs').doc(logId).set(logObj);
+        } catch (err) {
+          console.warn("Aviso ao salvar ocorrência no Firestore:", err);
+        }
+      }
+
+      try {
+        const cached = localStorage.getItem('ronda_ocorrencias_cache');
+        const lista = cached ? JSON.parse(cached) : [];
+        lista.unshift(ocorrencia);
+        localStorage.setItem('ronda_ocorrencias_cache', JSON.stringify(lista.slice(0, 100)));
+      } catch (e) {}
+
+      document.getElementById('sucessoProblemaProtocolo').textContent = '#' + protocolo;
+      document.getElementById('sucessoProblemaPonto').textContent = `${pontoNome} (${pontoSetor})`;
+      document.getElementById('sucessoProblemaTipo').textContent = tipoProblema;
+      document.getElementById('sucessoProblemaHora').textContent = `${dataHoje.split('-').reverse().join('/')} às ${horaStr}`;
+
+      document.getElementById('formOcorrenciaRonda').classList.add('hidden');
+      document.getElementById('telaSucessoProblema').classList.remove('hidden');
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane text-base mr-2"></i><span>Enviar Alerta ao Prefeito da Obra</span>';
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function voltarAposProblema() {
+      const desc = document.getElementById('inputDescricaoProblema');
+      if (desc) desc.value = '';
+      const tela = document.getElementById('telaSucessoProblema');
+      if (tela) tela.classList.add('hidden');
+      trocarModoRonda('problema');
+    }
+
     // Inicialização ao carregar a página
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      await carregarConfigRonda();
+
       // 1. Preencher data e hora atuais no fuso local
       const agora = new Date();
-      document.getElementById('inputData').value = getDataHojeLocal(agora);
+      const hojeLocal = getDataHojeLocal(agora);
+      document.getElementById('inputData').value = hojeLocal;
       document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
 
       // 2. Preencher nome do responsável se já salvo anteriormente
@@ -376,11 +829,23 @@
         if (salvoNome) document.getElementById('inputResponsavel').value = salvoNome;
       } catch (e) {}
 
-      // 3. Obter ponto_id dos parâmetros da URL
+      // 3. Checar se a equipe já autenticou com a senha hoje
+      try {
+        const authSessao = sessionStorage.getItem('ronda_equipe_autenticada') === 'true';
+        const authLocalData = localStorage.getItem('ronda_lembrar_senha_data');
+        const authLocal = localStorage.getItem('ronda_equipe_autenticada_local') === 'true' && authLocalData === hojeLocal;
+        if (authSessao || authLocal) {
+          equipeAutenticada = true;
+          document.getElementById('containerSenhaLimpeza').classList.add('hidden');
+          document.getElementById('formRonda').classList.remove('hidden');
+        }
+      } catch (e) {}
+
+      // 4. Obter ponto_id dos parâmetros da URL
       const urlParams = new URLSearchParams(window.location.search);
       const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id');
 
-      // 4. Carregar ponto
+      // 5. Carregar ponto
       carregarPontoRonda(urlPontoId);
     });
 

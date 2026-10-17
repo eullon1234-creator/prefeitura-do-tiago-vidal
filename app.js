@@ -14071,11 +14071,13 @@ function exportarRelatorioEstoqueExcel() {
 
 let listaPontosRonda = [];
 let listaRegistrosRonda = [];
+let listaOcorrenciasRonda = [];
 let configRonda = {
   freq_padrao_banheiro: 2,
   freq_padrao_bebedouro: 1,
   limite_manha: '12:00',
-  limite_tarde: '17:00'
+  limite_tarde: '17:00',
+  senha_equipe: '1234'
 };
 
 const PONTOS_RONDA_PADRAO_SEED = [
@@ -14181,6 +14183,15 @@ function inicializarRondaCanteiro() {
   }
 
   try {
+    const cachedOcs = localStorage.getItem('ronda_ocorrencias_cache');
+    if (cachedOcs) {
+      listaOcorrenciasRonda = JSON.parse(cachedOcs);
+    }
+  } catch (e) {
+    listaOcorrenciasRonda = [];
+  }
+
+  try {
     const cachedConf = localStorage.getItem('ronda_config_cache');
     if (cachedConf) {
       configRonda = Object.assign(configRonda, JSON.parse(cachedConf));
@@ -14189,12 +14200,19 @@ function inicializarRondaCanteiro() {
 
   atualizarContadoresRondaUI();
 
-  // Se houver Firestore conectado, sincronizar
+  // Se houver Firestore conectado, sincronizar pontos, registros, ocorrências e config
   if (typeof firestoreDb !== 'undefined' && firestoreDb) {
     Promise.all([
       firestoreDb.collection('ronda_pontos').get(),
-      firestoreDb.collection('ronda_registros').get()
-    ]).then(([snapPontos, snapRegs]) => {
+      firestoreDb.collection('ronda_registros').get(),
+      firestoreDb.collection('ronda_ocorrencias').get(),
+      firestoreDb.collection('ronda_config').doc('geral').get().catch(() => null)
+    ]).then(([snapPontos, snapRegs, snapOcs, docConfig]) => {
+      if (docConfig && docConfig.exists) {
+        configRonda = Object.assign(configRonda, docConfig.data());
+        localStorage.setItem('ronda_config_cache', JSON.stringify(configRonda));
+      }
+
       if (!snapPontos.empty) {
         const remotas = [];
         snapPontos.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
@@ -14216,6 +14234,14 @@ function inicializarRondaCanteiro() {
         localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
       }
 
+      if (!snapOcs.empty) {
+        const remOcs = [];
+        snapOcs.forEach(doc => remOcs.push({ id: doc.id, ...doc.data() }));
+        remOcs.sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0));
+        listaOcorrenciasRonda = remOcs;
+        localStorage.setItem('ronda_ocorrencias_cache', JSON.stringify(listaOcorrenciasRonda));
+      }
+
       atualizarContadoresRondaUI();
       if (typeof activeTab !== 'undefined' && activeTab === 'ronda') {
         filtrarRondaUI();
@@ -14233,11 +14259,15 @@ function calcularStatusPontoRonda(ponto) {
     .filter(r => r.ponto_id === ponto.id && r.data === dataHoje)
     .sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
 
+  const ocsPonto = (listaOcorrenciasRonda || []).filter(o => o.ponto_id === ponto.id);
+  const ocsAberta = ocsPonto.filter(o => o.status === 'aberto');
+  const temOcorrenciaAberta = ocsAberta.length > 0;
+
   const qtdHoje = regsHoje.length;
   const meta = Number(ponto.frequencia_diaria || (ponto.tipo === 'banheiro' ? (configRonda.freq_padrao_banheiro || 2) : (configRonda.freq_padrao_bebedouro || 1)));
   const pct = Math.min(100, Math.round((qtdHoje / meta) * 100));
 
-  const temAlerta = regsHoje.some(r => r.avaliacao && (r.avaliacao.includes('Precisa Reparo') || r.avaliacao.includes('Aviso')));
+  const temAlerta = temOcorrenciaAberta || regsHoje.some(r => r.avaliacao && (r.avaliacao.includes('Precisa Reparo') || r.avaliacao.includes('Aviso')));
   const faltaInsumo = regsHoje.some(r => r.avaliacao && r.avaliacao.includes('Falta Insumo'));
 
   let statusKey = 'pendente';
@@ -14248,7 +14278,15 @@ function calcularStatusPontoRonda(ponto) {
   let bgClass = 'bg-white';
   let textoStatus = `Nenhuma limpeza realizada hoje ainda (Meta: ${meta}x)`;
 
-  if (temAlerta) {
+  if (temOcorrenciaAberta) {
+    statusKey = 'alerta';
+    badgeLabel = `🚨 ${ocsAberta.length} RECLAMAÇÃO(ÕES)`;
+    badgeClass = 'bg-rose-100 text-rose-800 border-rose-300 font-bold';
+    dotClass = 'bg-rose-500 animate-pulse';
+    cardBorder = 'border-rose-400 hover:border-rose-500 shadow-sm ring-1 ring-rose-300';
+    bgClass = 'bg-rose-50/40';
+    textoStatus = `Alerta de colaborador: ${ocsAberta[0].tipo_problema} ("${ocsAberta[0].descricao}")`;
+  } else if (temAlerta) {
     statusKey = 'alerta';
     badgeLabel = 'PRECISA REPARO';
     badgeClass = 'bg-rose-100 text-rose-800 border-rose-300';
@@ -14287,7 +14325,9 @@ function calcularStatusPontoRonda(ponto) {
     pct,
     regsHoje,
     temAlerta,
-    faltaInsumo
+    faltaInsumo,
+    ocsAberta,
+    ocsPonto
   };
 }
 
@@ -14498,6 +14538,24 @@ function renderizarGridRonda(pontos) {
             ${htmlRegs}
           </div>
 
+          ${st.ocsAberta && st.ocsAberta.length > 0 ? `
+            <!-- Alerta de Reclamações de Trabalhadores (QR Code) -->
+            <div class="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-950 text-xs space-y-1">
+              <div class="flex items-center justify-between font-bold">
+                <span class="flex items-center gap-1.5 text-rose-700">
+                  <i class="fa-solid fa-bullhorn animate-pulse"></i> ${st.ocsAberta.length} Reclamação(ões) Aberta(s)
+                </span>
+                <span class="text-[10px] text-rose-500">${st.ocsAberta[0].hora || ''}</span>
+              </div>
+              <p class="text-[11px] font-semibold text-rose-900 truncate">
+                <b>${st.ocsAberta[0].tipo_problema}:</b> "${st.ocsAberta[0].descricao}"
+              </p>
+              <button onclick="abrirModalOcorrenciasPontoRonda('${p.id}')" class="text-[10px] font-bold text-rose-700 hover:text-rose-900 underline flex items-center gap-1 mt-0.5">
+                <i class="fa-solid fa-eye"></i> Ver todas e dar baixa
+              </button>
+            </div>
+          ` : ''}
+
           ${p.observacoes ? `
             <p class="text-[10px] text-slate-500 italic bg-white/80 p-1.5 rounded-lg border border-slate-200">
               <i class="fa-solid fa-circle-info mr-1 text-slate-400"></i>${p.observacoes}
@@ -14520,6 +14578,11 @@ function renderizarGridRonda(pontos) {
 
             <button onclick="abrirModalHistoricoPontoRonda('${p.id}')" class="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Ver Histórico Completo de Limpezas">
               <i class="fa-solid fa-clock-rotate-left"></i>
+            </button>
+
+            <button onclick="abrirModalOcorrenciasPontoRonda('${p.id}')" class="px-2 py-1.5 rounded-lg ${st.ocsAberta && st.ocsAberta.length > 0 ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} text-xs transition" title="Ocorrências & Reclamações de Trabalhadores">
+              <i class="fa-solid fa-bullhorn text-xs"></i>
+              ${st.ocsAberta && st.ocsAberta.length > 0 ? `<span class="ml-1 text-[10px] font-black text-rose-600">${st.ocsAberta.length}</span>` : ''}
             </button>
           </div>
 
@@ -14751,12 +14814,14 @@ function imprimirPlacaQRRonda() {
   }, 1000);
 }
 
-// Configuração de frequências padrão
+// Configuração de frequências padrão e senha da equipe
 function abrirModalConfigRonda() {
   const selBan = document.getElementById('configFreqPadraoBanheiro');
   const selBeb = document.getElementById('configFreqPadraoBebedouro');
+  const inpSenha = document.getElementById('configSenhaEquipeRonda');
   if (selBan) selBan.value = String(configRonda.freq_padrao_banheiro || 2);
   if (selBeb) selBeb.value = String(configRonda.freq_padrao_bebedouro || 1);
+  if (inpSenha) inpSenha.value = String(configRonda.senha_equipe || '1234');
   abrirModal('modalConfigRonda');
 }
 
@@ -14764,15 +14829,25 @@ function salvarConfigRonda(e) {
   if (e && e.preventDefault) e.preventDefault();
   const fBan = parseInt(document.getElementById('configFreqPadraoBanheiro').value || '2', 10);
   const fBeb = parseInt(document.getElementById('configFreqPadraoBebedouro').value || '1', 10);
+  const inpSenha = document.getElementById('configSenhaEquipeRonda');
+  const senha = inpSenha ? inpSenha.value.trim() : (configRonda.senha_equipe || '1234');
 
   configRonda.freq_padrao_banheiro = fBan;
   configRonda.freq_padrao_bebedouro = fBeb;
+  configRonda.senha_equipe = senha || '1234';
 
   localStorage.setItem('ronda_config_cache', JSON.stringify(configRonda));
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    firestoreDb.collection('ronda_config').doc('geral').set(configRonda, { merge: true }).catch(err => {
+      console.warn("Aviso ao salvar config da ronda no Firestore:", err);
+    });
+  }
+
   fecharModal('modalConfigRonda');
   atualizarContadoresRondaUI();
   filtrarRondaUI();
-  showToast('Metas padrão atualizadas com sucesso!', 'success');
+  showToast('Metas e Senha da Equipe atualizadas com sucesso!', 'success');
 }
 
 // Registro Manual / Vistoria pelo Prefeito
@@ -15067,7 +15142,236 @@ function processarLeituraQRRonda(texto) {
   abrirModalRegistroManualRonda(pontoId);
 }
 
-// Exportação em Excel (.xlsx) da Ronda do Canteiro
+// Gestão de Ocorrências & Reclamações de Trabalhadores da Ronda
+function abrirModalOcorrenciasPontoRonda(pontoId) {
+  const p = (listaPontosRonda || []).find(x => x.id === pontoId);
+  if (!p) return;
+
+  const nomeEl = document.getElementById('ocorrenciasRondaPontoNome');
+  const setorEl = document.getElementById('ocorrenciasRondaPontoSetor');
+  const corpo = document.getElementById('listaOcorrenciasRondaCorpo');
+  const vazio = document.getElementById('ocorrenciasRondaVazio');
+
+  if (nomeEl) nomeEl.textContent = `${p.tipo === 'banheiro' ? '🚻' : '🚰'} ${p.nome}`;
+  if (setorEl) setorEl.textContent = `Setor: ${p.setor || 'Canteiro'} • Reclamações e Apontamentos via QR Code`;
+
+  const ocs = (listaOcorrenciasRonda || []).filter(o => o.ponto_id === pontoId);
+
+  if (!corpo) return;
+
+  if (ocs.length === 0) {
+    corpo.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+  } else {
+    if (vazio) vazio.classList.add('hidden');
+    corpo.innerHTML = ocs.map(o => {
+      const isAberto = o.status === 'aberto';
+      return `
+        <div class="p-3.5 rounded-xl border ${isAberto ? 'border-rose-300 bg-rose-50/50' : 'border-slate-200 bg-white'} shadow-xs space-y-2 text-xs">
+          <div class="flex items-center justify-between pb-1.5 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-[11px] font-bold ${isAberto ? 'text-rose-700 bg-rose-100' : 'text-slate-600 bg-slate-100'} px-2 py-0.5 rounded border border-rose-200">#${o.id}</span>
+              <span class="font-bold text-slate-800">${formatarDataLimpezaBR(o.data)} às ${o.hora || '--:--'}</span>
+            </div>
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${isAberto ? 'bg-rose-600 text-white animate-pulse' : 'bg-emerald-100 text-emerald-800'}">
+              ${isAberto ? '🚨 Pendente / Aberto' : '✓ Resolvido'}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between font-semibold text-slate-800">
+            <span class="text-sm font-bold text-rose-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> ${o.tipo_problema}
+            </span>
+            <span class="text-[11px] text-slate-500 font-normal">Por: <b>${o.solicitante || 'Anônimo'}</b></span>
+          </div>
+
+          <p class="text-xs text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
+            "${o.descricao}"
+          </p>
+
+          <div class="flex items-center justify-between pt-1 border-t border-slate-200/60">
+            <span class="text-[10px] text-slate-400">
+              ${isAberto ? 'Aguardando atendimento da zeladoria' : `Resolvido por ${o.resolvido_por || 'Prefeito'} em ${formatarDataLimpezaBR(o.resolvido_em ? o.resolvido_em.slice(0, 10) : o.data)}`}
+            </span>
+            ${isAberto ? `
+              <button onclick="resolverOcorrenciaRonda('${o.id}')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-check"></i>
+                <span>Dar Baixa (Marcar como Resolvido)</span>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  abrirModal('modalOcorrenciasPontoRonda');
+}
+
+async function resolverOcorrenciaRonda(ocorrenciaId) {
+  const oc = (listaOcorrenciasRonda || []).find(o => o.id === ocorrenciaId);
+  if (!oc) return;
+
+  const agora = new Date();
+  oc.status = 'resolvido';
+  oc.resolvido_em = agora.toISOString();
+  oc.resolvido_por = (typeof currentUserName !== 'undefined' && currentUserName && currentUserName !== 'Prefeito da Obra') ? currentUserName : 'Prefeito de Canteiro';
+
+  try {
+    localStorage.setItem('ronda_ocorrencias_cache', JSON.stringify(listaOcorrenciasRonda));
+  } catch (e) {}
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      await firestoreDb.collection('ronda_ocorrencias').doc(ocorrenciaId).set(oc, { merge: true });
+
+      const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      await firestoreDb.collection('auditoria_logs').doc(logId).set({
+        id: logId,
+        data_hora: agora.toISOString(),
+        usuario: String(oc.resolvido_por),
+        modulo: 'ronda',
+        acao: 'RESOLVER_ALERTA',
+        entidade: String(oc.ponto_nome),
+        detalhes: `Reclamação #${oc.id} (${oc.tipo_problema}) marcada como resolvida.`
+      });
+    } catch (err) {
+      console.warn("Aviso ao resolver ocorrência no Firestore:", err);
+    }
+  }
+
+  abrirModalOcorrenciasPontoRonda(oc.ponto_id);
+  atualizarContadoresRondaUI();
+  filtrarRondaUI();
+  showToast('Reclamação marcada como resolvida com sucesso!', 'success');
+}
+
+// Modal Relatório Executivo Oficial de Ronda (NR-18 e NR-24)
+function abrirModalRelatorioRondaExecutivo() {
+  const inpData = document.getElementById('relatorioRondaDataFiltro');
+  if (inpData) inpData.value = getDataHojeLocal();
+
+  renderizarRelatorioRondaExecutivoUI();
+  abrirModal('modalRelatorioRondaExecutivo');
+}
+
+function renderizarRelatorioRondaExecutivoUI() {
+  const inpData = document.getElementById('relatorioRondaDataFiltro');
+  const dataFiltro = (inpData ? inpData.value : '') || getDataHojeLocal();
+  const pontos = listaPontosRonda || [];
+
+  const dataFormatada = dataFiltro.split('-').reverse().join('/');
+  const txtData = document.getElementById('relatorioRondaDataEmissaoTexto');
+  const txtHora = document.getElementById('relatorioRondaHoraEmissaoTexto');
+  if (txtData) txtData.textContent = `Data: ${dataFormatada}`;
+  if (txtHora) txtHora.textContent = `Emissão: ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+  let somaMetas = 0;
+  let somaFeitas = 0;
+  let totBanheiros = 0;
+  let totBebedouros = 0;
+
+  const regsData = (listaRegistrosRonda || []).filter(r => r.data === dataFiltro);
+  const ocsData = (listaOcorrenciasRonda || []).filter(o => o.data === dataFiltro);
+  const ocsPendentes = ocsData.filter(o => o.status === 'aberto');
+
+  const corpoPontos = document.getElementById('relatorioRondaTabelaCorpo');
+  if (corpoPontos) {
+    corpoPontos.innerHTML = pontos.map(p => {
+      const isBanheiro = p.tipo === 'banheiro';
+      if (isBanheiro) totBanheiros++;
+      else totBebedouros++;
+
+      const meta = Number(p.frequencia_diaria || (isBanheiro ? (configRonda.freq_padrao_banheiro || 2) : (configRonda.freq_padrao_bebedouro || 1)));
+      const regsPonto = regsData.filter(r => r.ponto_id === p.id).sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
+      const ocsPonto = ocsData.filter(o => o.ponto_id === p.id);
+      const qtdFeitas = regsPonto.length;
+
+      somaMetas += meta;
+      somaFeitas += Math.min(meta, qtdFeitas);
+
+      let statusBadge = '';
+      if (ocsPonto.some(o => o.status === 'aberto')) {
+        statusBadge = '<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px]">RECLAMAÇÃO</span>';
+      } else if (qtdFeitas >= meta) {
+        statusBadge = '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">CONFORME</span>';
+      } else if (qtdFeitas > 0) {
+        statusBadge = '<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">EM ANDAMENTO</span>';
+      } else {
+        statusBadge = '<span class="px-2 py-0.5 rounded bg-orange-100 text-orange-800 font-bold text-[10px]">PENDENTE</span>';
+      }
+
+      const horariosStr = regsPonto.length > 0 ? regsPonto.map(r => `${r.hora} (${r.responsavel || 'Equipe'})`).join(' • ') : 'Nenhuma';
+      const obsStr = ocsPonto.length > 0 ? ocsPonto.map(o => `🚨 ${o.tipo_problema}: "${o.descricao}"`).join(' | ') : (regsPonto.length > 0 && regsPonto[regsPonto.length - 1].observacoes ? regsPonto[regsPonto.length - 1].observacoes : '-');
+
+      return `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2.5 px-3 font-bold text-slate-900">${isBanheiro ? '🚻' : '🚰'} ${p.nome}</td>
+          <td class="py-2.5 px-2 text-slate-600">${p.setor || '-'}</td>
+          <td class="py-2.5 px-2 text-center font-bold text-slate-700">${meta}x</td>
+          <td class="py-2.5 px-2 text-center font-bold ${qtdFeitas >= meta ? 'text-emerald-700' : 'text-amber-700'}">${qtdFeitas}</td>
+          <td class="py-2.5 px-3 text-slate-600">${horariosStr}</td>
+          <td class="py-2.5 px-2 text-center">${statusBadge}</td>
+          <td class="py-2.5 px-3 text-slate-500 italic text-[10px]">${obsStr}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Tabela de Ocorrências do dia
+  const secaoOcs = document.getElementById('relatorioRondaSecaoOcorrencias');
+  const corpoOcs = document.getElementById('relatorioRondaTabelaOcorrenciasCorpo');
+  if (secaoOcs && corpoOcs) {
+    if (ocsData.length === 0) {
+      corpoOcs.innerHTML = '<tr><td colspan="7" class="py-3 px-3 text-center text-slate-400 italic">Nenhum chamado ou reclamação registrada para esta data.</td></tr>';
+    } else {
+      corpoOcs.innerHTML = ocsData.map(o => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2 px-3 font-mono font-bold text-slate-800">#${o.id}</td>
+          <td class="py-2 px-2 text-slate-600">${o.hora || '--:--'}</td>
+          <td class="py-2 px-2 font-semibold text-slate-900">${o.ponto_nome || '-'}</td>
+          <td class="py-2 px-2 text-rose-700 font-bold">${o.tipo_problema}</td>
+          <td class="py-2 px-3 text-slate-700">"${o.descricao}"</td>
+          <td class="py-2 px-2 text-slate-600">${o.solicitante || 'Anônimo'}</td>
+          <td class="py-2 px-2 text-center">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${o.status === 'aberto' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
+              ${o.status === 'aberto' ? 'ABERTO' : 'RESOLVIDO'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  const taxaGeral = somaMetas > 0 ? Math.round((somaFeitas / somaMetas) * 100) : 0;
+  const taxaEl = document.getElementById('relatorioRondaTaxaConformidade');
+  if (taxaEl) taxaEl.textContent = `${taxaGeral}%`;
+  const fracaoEl = document.getElementById('relatorioRondaFracaoMetas');
+  if (fracaoEl) fracaoEl.textContent = `${somaFeitas} de ${somaMetas} metas batidas`;
+
+  const banEl = document.getElementById('relatorioRondaTotalBanheiros');
+  if (banEl) banEl.textContent = totBanheiros;
+  const bebEl = document.getElementById('relatorioRondaTotalBebedouros');
+  if (bebEl) bebEl.textContent = totBebedouros;
+
+  const ocsTotEl = document.getElementById('relatorioRondaTotalOcorrencias');
+  if (ocsTotEl) ocsTotEl.textContent = ocsData.length;
+  const ocsSubEl = document.getElementById('relatorioRondaSubOcorrencias');
+  if (ocsSubEl) ocsSubEl.textContent = `${ocsPendentes.length} pendente(s)`;
+
+  const contEl = document.getElementById('relatorioRondaContadorPontosTexto');
+  if (contEl) contEl.textContent = `${pontos.length} instalações monitoradas`;
+}
+
+function imprimirRelatorioRondaA4() {
+  document.body.classList.add('imprimindo-relatorio-ronda');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('imprimindo-relatorio-ronda');
+  }, 1000);
+}
+
+// Exportação em Excel (.xlsx) da Ronda do Canteiro com ExcelProGenerator
 function exportarRondaExcel() {
   if (typeof XLSX === 'undefined') {
     showToast('Biblioteca SheetJS ainda não foi carregada. Tente novamente.', 'error');
@@ -15075,44 +15379,135 @@ function exportarRondaExcel() {
   }
 
   try {
+    showToast('📊 Gerando Relatório Executivo de Ronda (NR-18/NR-24)...', 'info');
     const wb = XLSX.utils.book_new();
-
-    const dadosPontos = (listaPontosRonda || []).map(p => {
-      const st = calcularStatusPontoRonda(p);
-      return {
-        'Tipo': p.tipo === 'banheiro' ? 'Banheiro' : 'Bebedouro',
-        'Nome do Ponto': p.nome || '',
-        'Setor / Frente': p.setor || '',
-        'Meta Diária (x)': st.meta,
-        'Limpezas Feitas Hoje': st.qtdHoje,
-        'Status Hoje': st.badgeLabel,
-        'Horários Sugeridos': p.horarios_sugeridos || '',
-        'Observações': p.observacoes || ''
-      };
-    });
-    const wsPontos = XLSX.utils.json_to_sheet(dadosPontos);
-    XLSX.utils.book_append_sheet(wb, wsPontos, 'Pontos de Ronda');
-
-    const dadosRegistros = (listaRegistrosRonda || []).map(r => ({
-      'Protocolo': r.id || '',
-      'Data': formatarDataLimpezaBR(r.data),
-      'Horário': r.hora || '',
-      'Ponto': r.ponto_nome || '',
-      'Tipo': r.tipo === 'banheiro' ? 'Banheiro' : 'Bebedouro',
-      'Setor': r.setor || '',
-      'Responsável': r.responsavel || '',
-      'Ordem da Limpeza no Dia': r.ordem_dia ? `${r.ordem_dia}ª` : '',
-      'Meta do Ponto': r.meta_dia || '',
-      'Checklist Realizado': Array.isArray(r.checklist) ? r.checklist.join('; ') : '',
-      'Condição / Avaliação': r.avaliacao || '',
-      'Observações': r.observacoes || ''
-    }));
-    const wsRegs = XLSX.utils.json_to_sheet(dadosRegistros);
-    XLSX.utils.book_append_sheet(wb, wsRegs, 'Histórico de Limpezas');
-
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL • Goetze Lobato Engenharia S.A.';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
     const dataHoje = getDataHojeLocal();
-    XLSX.writeFile(wb, `ronda_canteiro_higiene_bebedouros_${dataHoje}.xlsx`);
-    showToast('Planilha da Ronda do Canteiro exportada com sucesso!', 'success');
+
+    // 1. ABA RESUMO DE CONFORMIDADE
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoObra(
+      ws1,
+      `${obraNome.toUpperCase()} — AUDITORIA DE HIGIENE & BEBEDOUROS (NR-18 / NR-24)`,
+      `${empresaNome} • Fiscalização de Canteiro: Tiago Vidal • Emissão: ${dataHora}`,
+      7
+    );
+
+    const h1 = ['Instalação / Ponto', 'Tipo', 'Setor da Obra', 'Meta Diária', 'Limpezas Hoje', 'Taxa (%)', 'Status Operacional'];
+    h1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const pontos = listaPontosRonda || [];
+    let r1 = 4;
+    let somaMetas = 0;
+    let somaFeitas = 0;
+
+    pontos.forEach((p, idx) => {
+      const zebra = idx % 2 === 1;
+      const st = calcularStatusPontoRonda(p);
+      const isBanheiro = p.tipo === 'banheiro';
+      const rowEx = r1 + 1;
+      somaMetas += st.meta;
+      somaFeitas += Math.min(st.meta, st.qtdHoje);
+
+      let statusStyle = ExcelProGenerator.estilos.statusLivre;
+      if (st.statusKey === 'alerta') statusStyle = ExcelProGenerator.estilos.statusAlerta;
+      else if (st.statusKey === 'andamento') statusStyle = ExcelProGenerator.estilos.statusOcupada;
+
+      ExcelProGenerator.addCell(ws1, r1, 0, p.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r1, 1, isBanheiro ? 'BANHEIRO' : 'BEBEDOURO', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r1, 2, p.setor || 'Canteiro', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r1, 3, st.meta, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r1, 4, st.qtdHoje, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r1, 5, (st.qtdHoje / st.meta), { f: `E${rowEx}/D${rowEx}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r1, 6, st.badgeLabel, { s: statusStyle });
+
+      r1++;
+    });
+
+    const totEx1 = r1 + 1;
+    ExcelProGenerator.addCell(ws1, r1, 0, 'TOTAL GERAL DE METAS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, r1, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, r1, 2, `${pontos.length} Pontos`, { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, r1, 3, somaMetas, { f: `SUM(D5:D${r1})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, r1, 4, somaFeitas, { f: `SUM(E5:E${r1})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, r1, 5, somaMetas > 0 ? (somaFeitas / somaMetas) : 0, { f: `E${totEx1}/D${totEx1}`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, r1, 6, somaFeitas >= somaMetas ? 'CONFORME NR-24' : 'EM ATENDIMENTO', { s: ExcelProGenerator.estilos.total('center') });
+
+    ws1['!ref'] = `A1:G${totEx1}`;
+    ws1['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 26 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "RESUMO CONFORMIDADE");
+
+    // 2. ABA HISTÓRICO DE LIMPEZAS
+    const ws2 = {};
+    ExcelProGenerator.addCabecalhoObra(
+      ws2,
+      `${obraNome.toUpperCase()} — LOG DE HIGIENIZAÇÕES REALIZADAS`,
+      `Auditoria Completa de Limpezas por Ponto, Responsável e Horário`,
+      9
+    );
+    const h2 = ['Protocolo', 'Data', 'Horário', 'Instalação / Ponto', 'Tipo', 'Setor', 'Responsável', 'Avaliação', 'Checklist Realizado'];
+    h2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const regs = listaRegistrosRonda || [];
+    let r2 = 4;
+    regs.forEach((rg, idx) => {
+      const zebra = idx % 2 === 1;
+      ExcelProGenerator.addCell(ws2, r2, 0, rg.id || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 1, formatarDataLimpezaBR(rg.data), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 2, rg.hora || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 3, rg.ponto_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r2, 4, (rg.tipo === 'banheiro' ? 'BANHEIRO' : 'BEBEDOURO'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 5, rg.setor || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r2, 6, rg.responsavel || 'Equipe', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r2, 7, rg.avaliacao || 'Tudo OK', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 8, Array.isArray(rg.checklist) ? rg.checklist.join('; ') : '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      r2++;
+    });
+
+    ws2['!ref'] = `A1:I${Math.max(5, r2)}`;
+    ws2['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 22 }, { wch: 24 }, { wch: 20 }, { wch: 45 }];
+    ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "HISTÓRICO DE LIMPEZAS");
+
+    // 3. ABA OUVIDORIA & RECLAMAÇÕES DE TRABALHADORES
+    const ws3 = {};
+    ExcelProGenerator.addCabecalhoObra(
+      ws3,
+      `${obraNome.toUpperCase()} — OUVIDORIA & APONTAMENTOS DE TRABALHADORES`,
+      `Registros Feitos pelos Operários da Obra via QR Code (Sem Senha)`,
+      8
+    );
+    const h3 = ['Protocolo', 'Data', 'Horário', 'Local / Ponto', 'Tipo de Ocorrência', 'Descrição / Reclamação', 'Solicitante', 'Status'];
+    h3.forEach((h, col) => ExcelProGenerator.addCell(ws3, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const ocs = listaOcorrenciasRonda || [];
+    let r3 = 4;
+    ocs.forEach((oc, idx) => {
+      const zebra = idx % 2 === 1;
+      const isAberto = oc.status === 'aberto';
+      const stStyle = isAberto ? ExcelProGenerator.estilos.statusAlerta : ExcelProGenerator.estilos.statusLivre;
+
+      ExcelProGenerator.addCell(ws3, r3, 0, oc.id || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r3, 1, formatarDataLimpezaBR(oc.data), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r3, 2, oc.hora || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r3, 3, `${oc.ponto_nome || '-'} (${oc.setor || '-'})`, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r3, 4, oc.tipo_problema || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r3, 5, oc.descricao || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r3, 6, oc.solicitante || 'Anônimo', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r3, 7, isAberto ? 'PENDENTE / ABERTO' : 'RESOLVIDO', { s: stStyle });
+      r3++;
+    });
+
+    ws3['!ref'] = `A1:H${Math.max(5, r3)}`;
+    ws3['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 30 }, { wch: 25 }, { wch: 38 }, { wch: 24 }, { wch: 20 }];
+    ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws3, "OUVIDORIA & RECLAMAÇÕES");
+
+    XLSX.writeFile(wb, `RELATORIO_EXECUTIVO_RONDA_NR18_${dataHoje}.xlsx`);
+    showToast('Planilha executiva da Ronda exportada com sucesso!', 'success');
   } catch (err) {
     showToast('Erro ao exportar planilha da ronda: ' + err.message, 'error');
   }
@@ -15136,6 +15531,11 @@ window.salvarConfigRonda = salvarConfigRonda;
 window.abrirModalRegistroManualRonda = abrirModalRegistroManualRonda;
 window.salvarRegistroManualRonda = salvarRegistroManualRonda;
 window.abrirModalHistoricoPontoRonda = abrirModalHistoricoPontoRonda;
+window.abrirModalOcorrenciasPontoRonda = abrirModalOcorrenciasPontoRonda;
+window.resolverOcorrenciaRonda = resolverOcorrenciaRonda;
+window.abrirModalRelatorioRondaExecutivo = abrirModalRelatorioRondaExecutivo;
+window.renderizarRelatorioRondaExecutivoUI = renderizarRelatorioRondaExecutivoUI;
+window.imprimirRelatorioRondaA4 = imprimirRelatorioRondaA4;
 window.recarregarRondaManual = recarregarRondaManual;
 window.exportarRondaExcel = exportarRondaExcel;
 window.abrirScannerRondaQR = abrirScannerRondaQR;

@@ -783,11 +783,24 @@ const funcoesRonda = [
   'abrirModalHistoricoPontoRonda',
   'recarregarRondaManual',
   'exportarRondaExcel',
-  'abrirScannerRondaQR'
+  'abrirScannerRondaQR',
+  'abrirModalOcorrenciasPontoRonda',
+  'resolverOcorrenciaRonda',
+  'abrirModalRelatorioRondaExecutivo',
+  'renderizarRelatorioRondaExecutivoUI',
+  'imprimirRelatorioRondaA4'
 ];
 funcoesRonda.forEach(fn => {
   assert(conteudoApp.includes(fn), `Função de Ronda ${fn} implementada em app.js`);
 });
+
+// Verificação de Modais e Elementos de Segurança & Ouvidoria
+assert(conteudoIndex.includes('id="modalOcorrenciasPontoRonda"'), 'Modal de Ouvidoria/Ocorrências do Ponto presente em index.html');
+assert(conteudoIndex.includes('id="modalRelatorioRondaExecutivo"'), 'Modal do Relatório Executivo A4 presente em index.html');
+assert(conteudoIndex.includes('id="configSenhaEquipeRonda"'), 'Campo de Senha da Equipe de Ronda presente em index.html');
+assert(conteudoRondaRaiz.includes('id="containerSenhaLimpeza"'), 'Container de Validação de Senha presente em ronda.html');
+assert(conteudoRondaRaiz.includes('id="formOcorrenciaRonda"'), 'Formulário de Ouvidoria / Ocorrência Operária presente em ronda.html');
+assert(conteudoRondaRaiz.includes('id="btnModoLimpeza"') && conteudoRondaRaiz.includes('id="btnModoProblema"'), 'Alternador de Modos (Equipe / Operário) presente em ronda.html');
 
 // 4. Simulação de Cálculo de Metas e Status
 function simularStatusRonda(ponto, registrosHoje) {
