@@ -59,6 +59,18 @@
   <!-- Container Principal -->
   <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
 
+    <!-- Alternador Rápido: Morador (Sem Senha) vs Equipe de Limpeza (Com Senha) -->
+    <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/90 border border-slate-800 rounded-2xl shadow-md">
+      <button type="button" class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-amber-500 text-slate-950 shadow-sm">
+        <i class="fa-solid fa-bullhorn text-xs"></i>
+        <span>Morador / Alojado</span>
+      </button>
+      <button type="button" onclick="irParaModoEquipeLimpeza()" class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-teal-300 hover:text-white hover:bg-slate-900 border border-teal-500/30">
+        <i class="fa-solid fa-lock text-teal-400 text-xs"></i>
+        <span>Equipe Limpeza (Senha)</span>
+      </button>
+    </div>
+
     <!-- Card de Boas-Vindas & Instruções -->
     <div class="bg-gradient-to-br from-slate-800/90 to-slate-900/90 p-4 rounded-2xl border border-slate-700/60 shadow-lg">
       <div class="flex items-start gap-3">
@@ -66,9 +78,9 @@
           <i class="fa-solid fa-wrench"></i>
         </div>
         <div>
-          <h2 class="text-base font-bold text-white leading-tight">Solicitação de Manutenção</h2>
+          <h2 class="text-base font-bold text-white leading-tight">Relatar Problema ou Observação</h2>
           <p class="text-xs text-slate-300 mt-1 leading-relaxed">
-            Problema com <strong class="text-white">lâmpada, ar-condicionado, chuveiro</strong> ou móvel danificado? Preencha abaixo e avise o Prefeito imediatamente!
+            Problema com <strong class="text-white">lâmpada, ar-condicionado, chuveiro, limpeza</strong> ou quer deixar uma observação? Envie abaixo (sem senha) direto ao Prefeito!
           </p>
         </div>
       </div>
@@ -106,7 +118,7 @@
             id="inputQuarto" 
             name="quarto" 
             required 
-            placeholder="Ex: 105" 
+            placeholder="Ex: 01, 105" 
             class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white font-semibold text-sm outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-amber-500"
           >
         </div>
@@ -119,7 +131,8 @@
             name="bloco" 
             class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white font-medium text-sm outline-none transition"
           >
-            <option value="">Não informado</option>
+            <option value="Bloco 1">Bloco 1</option>
+            <option value="Bloco 2">Bloco 2</option>
             <option value="Bloco A">Bloco A</option>
             <option value="Bloco B">Bloco B</option>
             <option value="Bloco C">Bloco C</option>
@@ -162,17 +175,19 @@
         </div>
       </div>
 
-      <!-- Linha 2: Nome Completo do Funcionário -->
+      <!-- Linha 2: Nome Completo do Funcionário (Opcional para Observação) -->
       <div>
-        <label for="inputNome" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-          <i class="fa-solid fa-user text-emerald-400"></i> Seu Nome Completo *
+        <label for="inputNome" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span class="flex items-center gap-1">
+            <i class="fa-solid fa-user text-emerald-400"></i> Seu Nome
+          </span>
+          <span class="text-[10px] text-slate-400 lowercase font-normal">(opcional / pode enviar anônimo)</span>
         </label>
         <input 
           type="text" 
           id="inputNome" 
           name="nome" 
-          required 
-          placeholder="Digite seu nome completo" 
+          placeholder="Digite seu nome ou deixe em branco" 
           class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white font-medium text-sm outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-amber-500"
         >
       </div>
@@ -421,6 +436,23 @@
       }
     });
 
+    function irParaModoEquipeLimpeza() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tipoLocal = document.getElementById('inputTipoLocal')?.value || 'alojamento';
+      const quarto = document.getElementById('inputQuarto')?.value.trim() || urlParams.get('quarto') || '';
+      const bloco = document.getElementById('inputBloco')?.value.trim() || urlParams.get('bloco') || 'Bloco 1';
+      const casaId = urlParams.get('casa_id') || '';
+
+      if (tipoLocal === 'casa_cidade' && casaId) {
+        window.location.href = `limpeza.html?casa_id=${encodeURIComponent(casaId)}`;
+      } else if (quarto) {
+        const qId = urlParams.get('quarto_id') || `${bloco}_${quarto}`;
+        window.location.href = `limpeza.html?quarto_id=${encodeURIComponent(qId)}&quarto_num=${encodeURIComponent(quarto)}&bloco=${encodeURIComponent(bloco)}`;
+      } else {
+        window.location.href = `limpeza.html`;
+      }
+    }
+
     // Seleção rápida da categoria
     function selectCategory(cat) {
       document.getElementById('inputCategoria').value = cat;
@@ -435,12 +467,13 @@
 
     // Enviar chamado
     async function enviarChamado(destino) {
+      const urlParams = new URLSearchParams(window.location.search);
       const tipoLocal = document.getElementById('inputTipoLocal')?.value || 'alojamento';
       const quarto = document.getElementById('inputQuarto')?.value.trim() || '';
       const bloco = document.getElementById('inputBloco')?.value.trim() || '';
       const casaNome = document.getElementById('inputCasaNome')?.value.trim() || '';
       const casaComodo = document.getElementById('inputCasaComodo')?.value.trim() || '';
-      const nome = document.getElementById('inputNome').value.trim();
+      const nome = document.getElementById('inputNome').value.trim() || 'Morador / Alojado (Via QR Code)';
       const whatsapp = document.getElementById('inputWhatsapp').value.trim();
       const categoria = document.getElementById('inputCategoria').value.trim();
       const descricao = document.getElementById('inputDescricao').value.trim();
@@ -465,11 +498,6 @@
         }
       }
 
-      if (!nome) {
-        alert("Por favor, digite seu nome completo.");
-        document.getElementById('inputNome').focus();
-        return;
-      }
       if (!categoria) {
         alert("Por favor, escolha qual é o problema (Lâmpada, Ar, Chuveiro, etc.).");
         return;
@@ -497,8 +525,11 @@
         : `Quarto ${quarto} ${bloco ? '(' + bloco + ')' : ''}`;
 
       const chamadoData = {
+        id: protocolo,
         protocolo: protocolo,
         tipo_local: tipoLocal, // 'alojamento' ou 'casa_cidade'
+        quarto_id: urlParams.get('quarto_id') || '',
+        casa_id: urlParams.get('casa_id') || '',
         quarto: tipoLocal === 'casa_cidade' ? (casaComodo || 'Casa Urbana') : quarto,
         bloco: tipoLocal === 'casa_cidade' ? casaNome : (bloco || 'Não especificado'),
         casa_nome: tipoLocal === 'casa_cidade' ? casaNome : '',
@@ -523,6 +554,14 @@
           console.warn("[FIREBASE] Falha ao salvar online, continuando:", err);
         }
       }
+
+      // Salvar também em cache local
+      try {
+        const cached = localStorage.getItem('chamados_suporte_cache');
+        const lista = cached ? JSON.parse(cached) : [];
+        lista.unshift(chamadoData);
+        localStorage.setItem('chamados_suporte_cache', JSON.stringify(lista.slice(0, 150)));
+      } catch (e) {}
 
       // 2. Se for destino WhatsApp, redirecionar para a conversa do Prefeito
       if (destino === 'whatsapp') {

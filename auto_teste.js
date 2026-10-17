@@ -863,6 +863,45 @@ const urlGerada = simularGetQRCodeUrlRonda('https://prefeitura-obras.web.app/ind
 assert(urlGerada.includes('ronda.html?ponto_id=ponto_banheiro_02'), 'Geração de URL de QR Code para ronda.html válida');
 
 // -------------------------------------------------------------
+// 13. VERIFICAÇÃO DO QR CODE DUPLO (SENHA + OUVIDORIA) & RELATÓRIO A4 EM CASAS E ALOJAMENTOS
+// -------------------------------------------------------------
+console.log('\n🏠🛏️ 13. Verificação do QR Code Duplo (Senha + Ouvidoria) em Casas e Alojamentos');
+
+const conteudoLimpezaRaiz = fs.readFileSync('limpeza.html', 'utf8');
+const conteudoLimpezaFront = fs.readFileSync('frontend/limpeza.html', 'utf8');
+assert(conteudoLimpezaRaiz === conteudoLimpezaFront, 'Paridade 100% entre limpeza.html e frontend/limpeza.html');
+
+// 1. Elementos de Senha e Ouvidoria em limpeza.html
+assert(conteudoLimpezaRaiz.includes('id="btnModoLimpeza"') && conteudoLimpezaRaiz.includes('id="btnModoProblema"'), 'Alternador Duplo (Equipe Limpeza vs Morador Reclamação) presente em limpeza.html');
+assert(conteudoLimpezaRaiz.includes('id="containerSenhaLimpeza"'), 'Bloqueio por Senha/PIN da Equipe presente em limpeza.html');
+assert(conteudoLimpezaRaiz.includes('function validarSenhaEquipe()'), 'Função validarSenhaEquipe presente em limpeza.html');
+assert(conteudoLimpezaRaiz.includes('id="formOcorrenciaLocal"'), 'Formulário público de reclamação/observação do morador presente em limpeza.html');
+assert(conteudoLimpezaRaiz.includes('function salvarOcorrenciaLocalPublica('), 'Função salvarOcorrenciaLocalPublica presente em limpeza.html');
+assert(conteudoLimpezaRaiz.includes('quarto_id'), 'Suporte híbrido a quarto_id (Alojamentos) e casa_id (Casas) presente em limpeza.html');
+
+// 2. Funções e Modais em index.html e app.js
+const funcoesLimpezaHibrida = [
+  'calcularStatusLimpezaQuarto',
+  'getQRCodeUrlQuarto',
+  'abrirModalPlacaQRQuarto',
+  'abrirModalRegistroLimpezaQuarto',
+  'obterChamadosAbertosQuarto',
+  'obterChamadosAbertosCasa',
+  'abrirModalOcorrenciasUnidade',
+  'resolverOcorrenciaUnidade',
+  'abrirModalRelatorioLimpezaExecutivo',
+  'renderizarRelatorioLimpezaExecutivoUI',
+  'imprimirRelatorioLimpezaA4'
+];
+funcoesLimpezaHibrida.forEach(fn => {
+  assert(conteudoApp.includes(`function ${fn}`), `Função ${fn} implementada em app.js`);
+});
+
+assert(conteudoIndex.includes('id="modalOcorrenciasUnidade"'), 'Modal de Ouvidoria & Reclamações da Unidade (Casa/Quarto) presente em index.html');
+assert(conteudoIndex.includes('id="modalRelatorioLimpezaExecutivo"'), 'Modal do Relatório Executivo A4 de Limpeza (Casas & Alojamentos) presente em index.html');
+assert(conteudoIndex.includes('imprimindo-relatorio-limpeza'), 'Regras CSS @media print para imprimindo-relatorio-limpeza presentes em index.html');
+
+// -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
 console.log('\n============================================================');

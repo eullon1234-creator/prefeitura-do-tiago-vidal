@@ -3845,13 +3845,27 @@ async function carregarQuartos() {
   let url = `${API_BASE}/api/quartos?`;
   if (filtroBlocoAtivo) url += `bloco_id=${filtroBlocoAtivo}&`;
   if (statusOcup) url += `status_ocupacao=${statusOcup}&`;
-  if (alerta) url += `filtro_alerta=true&`;
+  if (alerta === '1') url += `filtro_alerta=true&`;
   if (busca) url += `q=${encodeURIComponent(busca)}&`;
 
   try {
     const res = await fetch(url);
-    const data = await res.json();
+    let data = await res.json();
     globalQuartos = data;
+
+    if (alerta && alerta !== '1') {
+      data = data.filter(q => {
+        if (q.status === 'desativado' || q.ativo === false) return false;
+        const stLimp = typeof calcularStatusLimpezaQuarto === 'function' ? calcularStatusLimpezaQuarto(q) : null;
+        const recs = typeof obterChamadosAbertosQuarto === 'function' ? obterChamadosAbertosQuarto(q) : [];
+        if (alerta === 'limpeza_hoje') return stLimp && stLimp.rotina.status === 'ok';
+        if (alerta === 'limpeza_pendente') return stLimp && stLimp.rotina.status !== 'ok';
+        if (alerta === 'ar_vencido') return stLimp && stLimp.ar.status !== 'ok';
+        if (alerta === 'com_reclamacao') return recs.length > 0;
+        return true;
+      });
+    }
+
     renderQuartosCards(data);
   } catch (err) {
     console.error('Erro quartos:', err);
@@ -4053,8 +4067,15 @@ function renderQuartosCards(quartos) {
       }
     }).join('');
 
+    const stLimpQuarto = (!isDesativado && typeof calcularStatusLimpezaQuarto === 'function')
+      ? calcularStatusLimpezaQuarto(q)
+      : null;
+    const chamadosQuarto = (!isDesativado && typeof obterChamadosAbertosQuarto === 'function')
+      ? obterChamadosAbertosQuarto(q)
+      : [];
+
     return `
-      <div class="rounded-xl border ${borderClass} shadow-sm transition p-4 flex flex-col justify-between space-y-3">
+      <div class="rounded-xl border ${chamadosQuarto.length > 0 ? 'bg-white border-rose-400 ring-1 ring-rose-200' : borderClass} shadow-sm transition p-4 flex flex-col justify-between space-y-3">
         <!-- Topo do Card do Quarto -->
         <div class="flex items-start justify-between">
           <div>
@@ -4079,23 +4100,95 @@ function renderQuartosCards(quartos) {
           </div>
         </div>
 
+        ${chamadosQuarto.length > 0 ? `
+          <!-- Tarja Pulsante de Reclamação / Chamado via QR Code -->
+          <div onclick="abrirModalOcorrenciasUnidade('alojamento', ${q.id})" class="p-2.5 rounded-xl bg-rose-50 border border-rose-300 flex items-center justify-between gap-2 cursor-pointer hover:bg-rose-100 transition shadow-2xs">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping flex-shrink-0"></span>
+              <div class="truncate">
+                <span class="text-[10px] font-black uppercase text-rose-800 block">🚨 ${chamadosQuarto.length} Reclamação(ões) em Aberto</span>
+                <span class="text-[11px] text-rose-700 font-semibold truncate block">${chamadosQuarto[0].categoria}: ${chamadosQuarto[0].descricao}</span>
+              </div>
+            </div>
+            <span class="px-2 py-1 rounded-lg bg-rose-600 text-white font-bold text-[10px] whitespace-nowrap flex-shrink-0">Ver / Resolver</span>
+          </div>
+        ` : ''}
+
         <!-- Grade de Camas -->
         <div class="grid grid-cols-2 gap-2">
           ${camasHtml}
         </div>
 
+        ${(!isDesativado && stLimpQuarto) ? `
+          <!-- Indicadores de Limpeza Diária & Ar Condicionado (30d) do Quarto -->
+          <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+            <div 
+              onclick="abrirModalRegistroLimpezaQuarto(${q.id}, 'rotina')" 
+              class="p-2 rounded-xl border transition cursor-pointer select-none ${stLimpQuarto.rotina.cardBg || 'bg-slate-50 border-slate-200'} hover:shadow-xs" 
+              title="${stLimpQuarto.rotina.tooltip} — Clique para registrar faxina"
+            >
+              <div class="flex items-center justify-between gap-1 mb-0.5">
+                <span class="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1 truncate">
+                  <i class="fa-solid fa-broom ${stLimpQuarto.rotina.cor === 'emerald' ? 'text-emerald-600' : 'text-amber-500'}"></i> Faxina
+                </span>
+                <span class="px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase border ${stLimpQuarto.rotina.badgeClass}">
+                  ${stLimpQuarto.rotina.badgeLabel}
+                </span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full flex-shrink-0 ${stLimpQuarto.rotina.badgeDot}"></span>
+                <span class="font-extrabold text-[10px] truncate block ${stLimpQuarto.rotina.cor === 'emerald' ? 'text-emerald-900' : 'text-amber-900'}">
+                  ${stLimpQuarto.rotina.textoCurto}
+                </span>
+              </div>
+            </div>
+
+            <div 
+              onclick="abrirModalRegistroLimpezaQuarto(${q.id}, 'ar_condicionado')" 
+              class="p-2 rounded-xl border transition cursor-pointer select-none ${stLimpQuarto.ar.cardBg || 'bg-slate-50 border-slate-200'} hover:shadow-xs" 
+              title="${stLimpQuarto.ar.tooltip} — Clique para registrar higienização do ar"
+            >
+              <div class="flex items-center justify-between gap-1 mb-0.5">
+                <span class="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1 truncate">
+                  <i class="fa-solid fa-snowflake ${stLimpQuarto.ar.cor === 'emerald' ? 'text-emerald-600' : 'text-rose-600'}"></i> Ar (30d)
+                </span>
+                <span class="px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase border ${stLimpQuarto.ar.badgeClass}">
+                  ${stLimpQuarto.ar.badgeLabel}
+                </span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full flex-shrink-0 ${stLimpQuarto.ar.badgeDot}"></span>
+                <span class="font-extrabold text-[10px] truncate block ${stLimpQuarto.ar.cor === 'emerald' ? 'text-emerald-900' : 'text-rose-900'}">
+                  ${stLimpQuarto.ar.textoCurto}
+                </span>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
         <!-- Rodapé do Card: Ações do Quarto -->
         <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-          <button onclick="abrirModalQuartoDetalhes(${q.id})" class="text-sky-600 hover:text-sky-800 font-semibold flex items-center gap-1.5">
-            <i class="fa-solid fa-list-check"></i> Detalhes & Móveis
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="abrirModalQuartoDetalhes(${q.id})" class="text-sky-600 hover:text-sky-800 font-semibold flex items-center gap-1">
+              <i class="fa-solid fa-list-check"></i> Detalhes
+            </button>
+            ${!isDesativado ? `
+              <button onclick="abrirModalPlacaQRQuarto(${q.id})" class="px-2 py-1 rounded bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold text-[10px] flex items-center gap-1 transition" title="Imprimir Placa QR Code do Quarto">
+                <i class="fa-solid fa-qrcode"></i> QR Code
+              </button>
+              <button onclick="abrirModalRegistroLimpezaQuarto(${q.id}, 'rotina')" class="p-1.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] transition" title="Registrar Limpeza ou Ar Condicionado">
+                <i class="fa-solid fa-broom"></i>
+              </button>
+            ` : ''}
+          </div>
+          <div class="flex items-center gap-1">
             ${isDesativado ? `
               <button onclick="reativarQuartoBloco(${q.id})" class="btn-prefeito px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition shadow-xs">
                 <i class="fa-solid fa-rotate-left"></i> Reativar
               </button>
             ` : `
-              <button onclick="desativarQuartoBloco(${q.id})" class="btn-prefeito px-2 py-1 rounded bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-800 font-semibold text-xs transition" title="Desativar este quarto para diminuir capacidade">
-                <i class="fa-solid fa-power-off"></i> Desativar
+              <button onclick="desativarQuartoBloco(${q.id})" class="btn-prefeito px-2 py-1 rounded bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-800 font-semibold text-[11px] transition" title="Desativar este quarto para diminuir capacidade">
+                <i class="fa-solid fa-power-off"></i>
               </button>
             `}
             <button onclick="abrirModalEditarQuarto(${q.id}, '${q.numero}', ${q.capacidade}, '${q.observacoes || ''}')" class="btn-prefeito text-slate-400 hover:text-slate-700 p-1" title="Editar Quarto">
@@ -8696,6 +8789,14 @@ function playNotificacaoChamado() {
 
 // Ouvinte em tempo real para os chamados vindos do celular dos trabalhadores
 function iniciarListenerChamados() {
+  try {
+    const cached = localStorage.getItem('chamados_suporte_cache');
+    if (cached && listaChamados.length === 0) {
+      listaChamados = JSON.parse(cached);
+      atualizarContadoresChamadosUI();
+    }
+  } catch (e) {}
+
   if (!firestoreDb || chamadosListenerAtivo) return;
   chamadosListenerAtivo = true;
 
@@ -8712,6 +8813,9 @@ function iniciarListenerChamados() {
           id: doc.id,
           protocolo: d.protocolo || doc.id,
           tipo_local: d.tipo_local || (d.casa_nome || (d.bloco && d.bloco.toLowerCase().includes('casa')) ? 'casa_cidade' : 'alojamento'),
+          unidade_id: d.unidade_id || '',
+          casa_id: d.casa_id || '',
+          quarto_id: d.quarto_id || '',
           casa_nome: d.casa_nome || '',
           comodo: d.comodo || '',
           local_formatado: d.local_formatado || '',
@@ -8739,17 +8843,25 @@ function iniciarListenerChamados() {
             const data = change.doc.data();
             novosPendentes++;
             playNotificacaoChamado();
-            showToast(`🚨 Novo Chamado no Quarto ${data.quarto || ''}: ${data.categoria || 'Manutenção'} (${data.nome_solicitante || 'Alojado'})`, 'warning');
+            showToast(`🚨 Nova Solicitação (${data.local_formatado || ('Quarto ' + (data.quarto || ''))}): ${data.categoria || 'Manutenção'}`, 'warning');
           }
         });
       }
       chamadosPrimeiraCarga = false;
 
       listaChamados = novosChamados;
+      try {
+        localStorage.setItem('chamados_suporte_cache', JSON.stringify(listaChamados.slice(0, 150)));
+      } catch (e) {}
+
       atualizarContadoresChamadosUI();
 
       if (activeTab === 'chamados') {
         filtrarChamadosUI();
+      } else if (activeTab === 'blocos') {
+        carregarQuartos();
+      } else if (activeTab === 'casas_cidade') {
+        filtrarCasasCidadeUI();
       }
     }, (err) => {
       console.warn("Aviso ao escutar chamados_suporte no Firestore:", err);
@@ -9339,6 +9451,8 @@ function iniciarListenerCasasCidade() {
 
       if (activeTab === 'casas_cidade') {
         filtrarCasasCidadeUI();
+      } else if (activeTab === 'blocos') {
+        carregarQuartos();
       }
 
       if (casaSelecionadaId && abaAtivaCasaDetalhes === 'limpezas') {
@@ -9557,6 +9671,12 @@ function filtrarCasasCidadeUI() {
       });
       if (filtroOcup === 'vagas_livres') return camas > ocupadas;
       if (filtroOcup === 'lotadas') return camas > 0 && camas === ocupadas;
+      const stLimp = calcularStatusLimpezasCasa(c.id);
+      const recs = typeof obterChamadosAbertosCasa === 'function' ? obterChamadosAbertosCasa(c) : [];
+      if (filtroOcup === 'limpeza_hoje') return stLimp && stLimp.rotina.status === 'ok';
+      if (filtroOcup === 'limpeza_pendente') return stLimp && stLimp.rotina.status !== 'ok';
+      if (filtroOcup === 'ar_vencido') return stLimp && stLimp.ar.status !== 'ok';
+      if (filtroOcup === 'com_reclamacao') return recs.length > 0;
       return true;
     });
   }
@@ -9633,6 +9753,7 @@ function renderizarCasasCidadeGrid(casas) {
 
     // Status de Limpeza & Manutenção (QR)
     const stLimpeza = calcularStatusLimpezasCasa(c.id);
+    const chamadosCasaAbertos = typeof obterChamadosAbertosCasa === 'function' ? obterChamadosAbertosCasa(c) : [];
 
     // Foto da casa com fallback
     const fotoHtml = c.foto_url 
@@ -9648,7 +9769,7 @@ function renderizarCasasCidadeGrid(casas) {
       : '';
 
     return `
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition flex flex-col justify-between overflow-hidden group">
+      <div class="bg-white rounded-2xl border ${chamadosCasaAbertos.length > 0 ? 'border-rose-400 ring-1 ring-rose-200' : 'border-slate-200'} shadow-sm hover:shadow-lg transition flex flex-col justify-between overflow-hidden group">
         
         <!-- Topo com Imagem da Fachada -->
         <div class="relative h-44 w-full overflow-hidden cursor-pointer" onclick="abrirModalCasaDetalhes('${c.id}')">
@@ -9686,6 +9807,20 @@ function renderizarCasasCidadeGrid(casas) {
         <div class="p-4 space-y-3 flex-1 flex flex-col justify-between">
           
           <div class="space-y-2.5">
+            ${chamadosCasaAbertos.length > 0 ? `
+              <!-- Tarja Pulsante de Reclamação / Observação do Morador via QR Code -->
+              <div onclick="event.stopPropagation(); abrirModalOcorrenciasUnidade('casa', '${c.id}')" class="p-2.5 rounded-xl bg-rose-50 border border-rose-300 flex items-center justify-between gap-2 cursor-pointer hover:bg-rose-100 transition shadow-2xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping flex-shrink-0"></span>
+                  <div class="truncate">
+                    <span class="text-[10px] font-black uppercase text-rose-800 block">🚨 ${chamadosCasaAbertos.length} Reclamação(ões) em Aberto</span>
+                    <span class="text-[11px] text-rose-700 font-semibold truncate block">${chamadosCasaAbertos[0].categoria}: ${chamadosCasaAbertos[0].descricao}</span>
+                  </div>
+                </div>
+                <span class="px-2 py-1 rounded-lg bg-rose-600 text-white font-bold text-[10px] whitespace-nowrap flex-shrink-0">Ver / Resolver</span>
+              </div>
+            ` : ''}
+
             <!-- Barra de Progresso de Ocupação -->
             <div>
               <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
@@ -11919,9 +12054,16 @@ function sanitizarDatasLimpezasCache() {
   }
 }
 
-// Calcular status de limpeza da casa (Rotina Diária e Ar Condicionado 30 dias)
-function calcularStatusLimpezasCasa(casaId) {
-  const limpezasCasa = (listaLimpezasCasas || []).filter(l => l.casa_id === casaId);
+// Calcular status de limpeza da casa ou quarto (Rotina Diária e Ar Condicionado 30 dias)
+function calcularStatusLimpezasCasa(casaId, quartoObj = null) {
+  const limpezasCasa = (listaLimpezasCasas || []).filter(l => {
+    if (l.casa_id === casaId) return true;
+    if (quartoObj) {
+      if (String(l.quarto_id) === String(quartoObj.id)) return true;
+      if (l.tipo_local === 'alojamento' && String(l.quarto_numero) === String(quartoObj.numero) && (!l.bloco_nome || String(l.bloco_nome).toLowerCase() === String(quartoObj.bloco_nome || '').toLowerCase())) return true;
+    }
+    return false;
+  });
 
   // Ordenar por data_hora decrescente
   const rotinas = limpezasCasa
@@ -12058,11 +12200,37 @@ function calcularStatusLimpezasCasa(casaId) {
     }
   }
 
+  const ultGeral = limpezasCasa.length > 0
+    ? [...limpezasCasa].sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))))[0]
+    : null;
+
   return {
     rotina: stRotina,
     ar: stAr,
-    totalRegistros: limpezasCasa.length
+    totalRegistros: limpezasCasa.length,
+    ultResponsavel: ultGeral ? (ultGeral.responsavel || 'Equipe') : '—'
   };
+}
+
+// Calcular status de limpeza para um Quarto do Alojamento
+function calcularStatusLimpezaQuarto(q) {
+  if (!q) return calcularStatusLimpezasCasa('quarto_invalido');
+  return calcularStatusLimpezasCasa('quarto_' + q.id, q);
+}
+
+// Obter link público direto para o QR Code de um Quarto do Alojamento
+function getQRCodeUrlQuarto(q) {
+  const href = window.location.href;
+  let cleanUrl = href.split('?')[0].split('#')[0];
+  if (cleanUrl.includes('index.html')) {
+    cleanUrl = cleanUrl.replace('index.html', 'limpeza.html');
+  } else {
+    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}limpeza.html` : `${cleanUrl}/limpeza.html`;
+  }
+  const qId = q ? q.id : '';
+  const qNum = q ? q.numero : '';
+  const qBloco = q ? (q.bloco_nome || 'Bloco') : 'Bloco';
+  return `${cleanUrl}?quarto_id=${encodeURIComponent(qId)}&quarto_num=${encodeURIComponent(qNum)}&bloco=${encodeURIComponent(qBloco)}`;
 }
 
 // Abrir modal com placa QR Code da Casa (Impressão A4)
@@ -12078,12 +12246,40 @@ function abrirModalPlacaQRCasa(casaId) {
   const txtUrlEl = document.getElementById('textoPlacaQRCasaUrl');
   const titEl = document.getElementById('placaCasaTitulo');
   const endEl = document.getElementById('placaCasaEndereco');
+  const catEl = document.getElementById('placaCasaCategoriaLabel');
 
+  if (catEl) catEl.textContent = 'Prefeitura de Canteiro • Residência Urbana';
   if (titEl) titEl.textContent = (c.nome || 'Casa').toUpperCase();
   if (endEl) endEl.textContent = `Endereço: ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
   // Alta resolução para impressão
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
+  if (imgEl) imgEl.src = qrApiUrl;
+
+  abrirModal('modalPlacaQRCasa');
+}
+
+// Abrir modal com placa QR Code do Quarto do Alojamento (Impressão A4)
+function abrirModalPlacaQRQuarto(quartoId) {
+  const q = (allQuartosData || []).find(x => String(x.id) === String(quartoId));
+  if (!q) {
+    showToast('Quarto não encontrado para gerar placa QR.', 'warning');
+    return;
+  }
+
+  const qrUrl = getQRCodeUrlQuarto(q);
+  const imgEl = document.getElementById('imgPlacaQRCasa');
+  const txtUrlEl = document.getElementById('textoPlacaQRCasaUrl');
+  const titEl = document.getElementById('placaCasaTitulo');
+  const endEl = document.getElementById('placaCasaEndereco');
+  const catEl = document.getElementById('placaCasaCategoriaLabel');
+
+  if (catEl) catEl.textContent = 'Prefeitura de Canteiro • Alojamento da Obra';
+  if (titEl) titEl.textContent = `QUARTO ${q.numero} — ${(q.bloco_nome || 'BLOCO').toUpperCase()}`;
+  if (endEl) endEl.textContent = `Setor: Alojamento do Canteiro • Capacidade: ${q.capacidade || 4} vagas`;
+  if (txtUrlEl) txtUrlEl.textContent = qrUrl;
+
   const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
   if (imgEl) imgEl.src = qrApiUrl;
 
@@ -12102,11 +12298,14 @@ function imprimirPlacaQRCasa() {
 function abrirScannerLimpezaQR() {
   abrirModal('modalScannerLimpezaQR');
 
-  // Preencher seleção manual de casas
+  // Preencher seleção manual de casas e quartos
   const sel = document.getElementById('selectCasaScannerManual');
   if (sel) {
-    sel.innerHTML = '<option value="">Selecione uma casa...</option>' + 
-      (listaCasasCidade || []).map(c => `<option value="${c.id}">${c.nome} - ${c.endereco || ''}</option>`).join('');
+    const opcoesCasas = (listaCasasCidade || []).map(c => `<option value="${c.id}">🏡 ${c.nome} - ${c.endereco || ''}</option>`).join('');
+    const opcoesQuartos = (allQuartosData || []).map(q => `<option value="quarto_${q.id}">🛏️ Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})</option>`).join('');
+    sel.innerHTML = '<option value="">Selecione uma casa ou quarto...</option>' +
+      (opcoesCasas ? `<optgroup label="Casas na Cidade">${opcoesCasas}</optgroup>` : '') +
+      (opcoesQuartos ? `<optgroup label="Quartos do Alojamento">${opcoesQuartos}</optgroup>` : '');
   }
 
   setTimeout(() => {
@@ -12165,7 +12364,7 @@ function iniciarCameraScannerQR() {
           <div class="h-full flex flex-col items-center justify-center p-4 text-center text-slate-400">
             <i class="fa-solid fa-camera-slash text-3xl mb-2 text-rose-400"></i>
             <p class="text-xs font-semibold text-slate-300">Câmera indisponível ou permissão negada</p>
-            <p class="text-[10px] text-slate-500 mt-1">Selecione a casa na lista manual logo abaixo.</p>
+            <p class="text-[10px] text-slate-500 mt-1">Selecione a unidade na lista manual logo abaixo.</p>
           </div>
         `;
       }
@@ -12194,7 +12393,7 @@ function confirmarCasaManualScanner() {
   const sel = document.getElementById('selectCasaScannerManual');
   const casaId = sel ? sel.value : null;
   if (!casaId) {
-    showToast('Selecione uma casa para registrar o serviço', 'warning');
+    showToast('Selecione uma casa ou quarto para registrar o serviço', 'warning');
     return;
   }
   fecharScannerLimpezaQR();
@@ -12209,19 +12408,21 @@ function processarLeituraQRCasa(texto) {
   let casaId = null;
   let tipoPadrao = 'rotina';
 
-  // 1. Formato URL: ?acao=limpeza&casa_id=...
+  // 1. Formato URL: ?acao=limpeza&casa_id=... ou ?quarto_id=...
   try {
     let urlObj = null;
     if (texto.startsWith('http://') || texto.startsWith('https://')) {
       urlObj = new URL(texto);
-    } else if (texto.startsWith('?') || texto.includes('casa_id=')) {
+    } else if (texto.startsWith('?') || texto.includes('casa_id=') || texto.includes('quarto_id=')) {
       urlObj = new URL(`https://dummy.local/${texto.startsWith('?') ? texto : '?' + texto}`);
     }
 
     if (urlObj) {
       const qCasaId = urlObj.searchParams.get('casa_id');
+      const qQuartoId = urlObj.searchParams.get('quarto_id');
       const qTipo = urlObj.searchParams.get('tipo');
       if (qCasaId) casaId = qCasaId;
+      else if (qQuartoId) casaId = 'quarto_' + qQuartoId;
       if (qTipo && (qTipo === 'ar_condicionado' || qTipo === 'rotina')) tipoPadrao = qTipo;
     }
   } catch (e) {}
@@ -12231,13 +12432,16 @@ function processarLeituraQRCasa(texto) {
     try {
       const parsed = JSON.parse(texto);
       if (parsed.casa_id || parsed.id) casaId = parsed.casa_id || parsed.id;
+      else if (parsed.quarto_id) casaId = 'quarto_' + parsed.quarto_id;
       if (parsed.tipo) tipoPadrao = parsed.tipo;
     } catch (e) {}
   }
 
-  // 3. Formato casa:ID
+  // 3. Formato casa:ID ou quarto:ID
   if (!casaId && texto.toLowerCase().startsWith('casa:')) {
     casaId = texto.split(':')[1].trim();
+  } else if (!casaId && texto.toLowerCase().startsWith('quarto:')) {
+    casaId = 'quarto_' + texto.split(':')[1].trim();
   }
 
   // 4. ID direto ou busca por nome
@@ -12250,22 +12454,39 @@ function processarLeituraQRCasa(texto) {
     casaId = texto;
   }
 
-  const casaEncontrada = (listaCasasCidade || []).find(c => c.id === casaId);
-  if (!casaEncontrada) {
-    showToast(`QR Code lido ("${casaId}"), mas a casa não foi localizada no cadastro.`, 'warning');
-    return;
-  }
-
-  showToast(`Casa "${casaEncontrada.nome}" identificada com sucesso!`, 'success');
   abrirModalRegistroLimpeza(casaId, tipoPadrao);
 }
 
-// Abrir formulário para registrar limpeza ou manutenção
+// Atalho direto para abrir modal de limpeza de Quarto do Alojamento
+function abrirModalRegistroLimpezaQuarto(quartoId, tipoPadrao = 'rotina') {
+  abrirModalRegistroLimpeza('quarto_' + quartoId, tipoPadrao);
+}
+
+// Abrir formulário para registrar limpeza ou manutenção (Suporta Casa e Quarto)
 function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
-  const c = (listaCasasCidade || []).find(x => x.id === casaId);
-  if (!c) {
-    showToast('Casa não encontrada para registrar limpeza', 'error');
-    return;
+  let nomeUnidade = '';
+  let enderecoHtml = '';
+  let subTituloTxt = '';
+
+  if (String(casaId).startsWith('quarto_')) {
+    const qId = String(casaId).replace('quarto_', '');
+    const q = (allQuartosData || []).find(x => String(x.id) === String(qId));
+    if (!q) {
+      showToast('Quarto não encontrado para registrar limpeza', 'error');
+      return;
+    }
+    nomeUnidade = `Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})`;
+    enderecoHtml = `<i class="fa-solid fa-bed text-indigo-500"></i> Alojamento do Canteiro • ${q.bloco_nome || 'Bloco'}`;
+    subTituloTxt = `Alojamento: ${nomeUnidade}`;
+  } else {
+    const c = (listaCasasCidade || []).find(x => x.id === casaId);
+    if (!c) {
+      showToast('Casa não encontrada para registrar limpeza', 'error');
+      return;
+    }
+    nomeUnidade = c.nome;
+    enderecoHtml = `<i class="fa-solid fa-location-dot text-rose-500"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+    subTituloTxt = `Casa: ${c.nome}`;
   }
 
   const idInput = document.getElementById('registroLimpezaCasaId');
@@ -12274,9 +12495,9 @@ function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
   const subTit = document.getElementById('modalRegistroLimpezaCasaSubtitulo');
 
   if (idInput) idInput.value = casaId;
-  if (nomeEl) nomeEl.textContent = c.nome;
-  if (endEl) endEl.innerHTML = `<i class="fa-solid fa-location-dot text-rose-500"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
-  if (subTit) subTit.textContent = `Casa: ${c.nome}`;
+  if (nomeEl) nomeEl.textContent = nomeUnidade;
+  if (endEl) endEl.innerHTML = enderecoHtml;
+  if (subTit) subTit.textContent = subTituloTxt;
 
   // Data e hora atuais
   const agora = new Date();
@@ -12321,7 +12542,7 @@ function atualizarEstiloTipoLimpeza() {
   }
 }
 
-// Salvar registro de limpeza no estado local, auditoria e Firestore
+// Salvar registro de limpeza no estado local, auditoria e Firestore (Suporta Casa e Quarto)
 async function salvarRegistroLimpeza(e) {
   if (e && e.preventDefault) e.preventDefault();
 
@@ -12333,7 +12554,7 @@ async function salvarRegistroLimpeza(e) {
   const observacoes = document.getElementById('registroLimpezaObservacoes').value.trim();
 
   if (!casaId) {
-    showToast('Erro: nenhuma casa selecionada para a limpeza.', 'error');
+    showToast('Erro: nenhuma unidade selecionada para a limpeza.', 'error');
     return;
   }
   if (!data || !hora) {
@@ -12346,14 +12567,32 @@ async function salvarRegistroLimpeza(e) {
   }
 
   const dataHoraStr = `${data}T${hora}:00`;
-  const casa = (listaCasasCidade || []).find(x => x.id === casaId);
-  const casaNome = casa ? casa.nome : 'Casa';
+  const isQuarto = String(casaId).startsWith('quarto_');
+  let casaNome = 'Unidade';
+  let extraQuarto = {};
+
+  if (isQuarto) {
+    const qId = String(casaId).replace('quarto_', '');
+    const q = (allQuartosData || []).find(x => String(x.id) === String(qId));
+    casaNome = q ? `Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})` : `Quarto #${qId}`;
+    extraQuarto = {
+      tipo_local: 'alojamento',
+      quarto_id: String(qId),
+      quarto_numero: q ? String(q.numero) : String(qId),
+      bloco_nome: q ? String(q.bloco_nome || 'Bloco') : 'Bloco'
+    };
+  } else {
+    const casa = (listaCasasCidade || []).find(x => x.id === casaId);
+    casaNome = casa ? casa.nome : 'Casa';
+    extraQuarto = { tipo_local: 'casa_cidade' };
+  }
 
   const novoId = 'limpeza_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
   const registro = {
     id: novoId,
     casa_id: casaId,
     casa_nome: casaNome,
+    ...extraQuarto,
     tipo: tipo,
     data: data,
     hora: hora,
@@ -12374,7 +12613,7 @@ async function salvarRegistroLimpeza(e) {
   if (typeof registrarAuditoria === 'function') {
     const descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado (Ciclo 30d)';
     registrarAuditoria(
-      'casas',
+      isQuarto ? 'quartos' : 'casas',
       'LIMPEZA',
       casaNome,
       `${descTipo} registrada para ${casaNome} por ${responsavel}. Obs: ${observacoes || 'Nenhuma'}`,
@@ -12392,11 +12631,13 @@ async function salvarRegistroLimpeza(e) {
   }
 
   fecharModal('modalRegistroLimpezaCasa');
-  showToast(`✅ Limpeza (${tipo === 'rotina' ? 'Rotina Diária' : 'Ar Condicionado'}) registrada com sucesso!`, 'success');
+  showToast(`✅ Limpeza (${tipo === 'rotina' ? 'Rotina Diária' : 'Ar Condicionado'}) registrada em ${casaNome}!`, 'success');
 
   // Atualizar visualizações
   if (activeTab === 'casas_cidade') {
     filtrarCasasCidadeUI();
+  } else if (activeTab === 'blocos') {
+    carregarQuartos();
   }
   if (casaSelecionadaId === casaId) {
     renderizarHistoricoLimpezasCasa(casaId);
@@ -12533,8 +12774,314 @@ async function excluirRegistroLimpeza(id) {
     }
     if (activeTab === 'casas_cidade') {
       filtrarCasasCidadeUI();
+    } else if (activeTab === 'blocos') {
+      carregarQuartos();
     }
   }
+}
+
+// ========================================================
+// OUVIDORIA / RECLAMAÇÕES POR UNIDADE & RELATÓRIO EXECUTIVO A4
+// ========================================================
+
+// Obter chamados/reclamações em aberto de um Quarto do Alojamento
+function obterChamadosAbertosQuarto(q) {
+  if (!q) return [];
+  return (listaChamados || []).filter(c => {
+    if (c.status === 'concluido') return false;
+    if (String(c.quarto_id) === String(q.id) || c.unidade_id === 'quarto_' + q.id) return true;
+    if (c.tipo_local === 'casa_cidade') return false;
+    const numMatch = String(c.quarto || '').trim() === String(q.numero || '').trim();
+    if (!numMatch) return false;
+    const blocoChamado = String(c.bloco || '').trim().toLowerCase();
+    const blocoQuarto = String(q.bloco_nome || '').trim().toLowerCase();
+    if (!blocoChamado || blocoChamado === 'não informado' || blocoChamado === 'não especificado' || blocoChamado === blocoQuarto) {
+      return true;
+    }
+    return false;
+  });
+}
+
+// Obter chamados/reclamações em aberto de uma Casa na Cidade
+function obterChamadosAbertosCasa(casa) {
+  if (!casa) return [];
+  return (listaChamados || []).filter(c => {
+    if (c.status === 'concluido') return false;
+    if (c.casa_id === casa.id || c.unidade_id === casa.id) return true;
+    const nomeCasa = String(casa.nome || '').trim().toLowerCase();
+    if (!nomeCasa) return false;
+    if (c.casa_nome && String(c.casa_nome).trim().toLowerCase() === nomeCasa) return true;
+    if (c.tipo_local === 'casa_cidade' && c.bloco && String(c.bloco).trim().toLowerCase() === nomeCasa) return true;
+    return false;
+  });
+}
+
+// Abrir modal listando as reclamações/observações em aberto de uma Casa ou Quarto
+function abrirModalOcorrenciasUnidade(tipoLocal, unidadeId) {
+  const subEl = document.getElementById('modalOcorrenciasUnidadeSubtitulo');
+  const container = document.getElementById('listaOcorrenciasUnidadeContainer');
+  if (!container) return;
+
+  let nomeUnidade = '';
+  let chamadosUnidade = [];
+
+  if (tipoLocal === 'quarto') {
+    const q = (allQuartosData || []).find(x => String(x.id) === String(unidadeId));
+    nomeUnidade = q ? `Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})` : `Quarto #${unidadeId}`;
+    chamadosUnidade = q ? obterChamadosAbertosQuarto(q) : [];
+  } else {
+    const c = (listaCasasCidade || []).find(x => String(x.id) === String(unidadeId));
+    nomeUnidade = c ? c.nome : `Casa #${unidadeId}`;
+    chamadosUnidade = c ? obterChamadosAbertosCasa(c) : [];
+  }
+
+  if (subEl) subEl.textContent = `Unidade: ${nomeUnidade}`;
+
+  if (chamadosUnidade.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-slate-500 space-y-2">
+        <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-xl">
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <p class="text-sm font-bold text-slate-700">Nenhuma reclamação ou pendência em aberto!</p>
+        <p class="text-xs text-slate-400">Todas as observações desta unidade já foram solucionadas.</p>
+      </div>
+    `;
+  } else {
+    container.innerHTML = chamadosUnidade.map(ch => {
+      const dtStr = ch.data_abertura ? new Date(ch.data_abertura).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Data não informada';
+      return `
+        <div class="bg-white rounded-xl p-4 border-2 border-rose-200 shadow-xs space-y-2.5">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="inline-block px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-black text-[10px] uppercase tracking-wider border border-rose-200">
+                ${ch.categoria || 'Reclamação / Reparo'}
+              </span>
+              <span class="text-[11px] font-mono text-slate-400 ml-1.5">#${ch.protocolo}</span>
+            </div>
+            <span class="text-[11px] font-semibold text-slate-500">${dtStr}</span>
+          </div>
+
+          <p class="text-xs font-semibold text-slate-800 bg-rose-50/60 p-2.5 rounded-lg border border-rose-100 leading-relaxed">
+            "${ch.descricao || 'Sem detalhes adicionais.'}"
+          </p>
+
+          <div class="flex items-center justify-between pt-1 text-[11px] text-slate-600">
+            <div>
+              <i class="fa-solid fa-user text-slate-400 mr-1"></i>
+              <strong>Morador:</strong> ${ch.solicitante || 'Morador (Anônimo)'}
+              ${ch.telefone ? `<span class="ml-2 text-slate-400">• ${ch.telefone}</span>` : ''}
+            </div>
+            <button onclick="resolverOcorrenciaUnidade('${ch.protocolo}', '${tipoLocal}', '${unidadeId}')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition">
+              <i class="fa-solid fa-check"></i> Dar Baixa / Resolver
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  abrirModal('modalOcorrenciasUnidade');
+}
+
+// Dar baixa rápida em uma reclamação diretamente pelo modal da unidade
+async function resolverOcorrenciaUnidade(protocolo, tipoLocal, unidadeId) {
+  const ch = (listaChamados || []).find(c => String(c.protocolo) === String(protocolo));
+  if (!ch) return;
+
+  ch.status = 'concluido';
+  ch.data_conclusao = new Date().toISOString();
+  ch.concluido_por = currentUserName || 'Prefeito da Obra';
+
+  try {
+    localStorage.setItem('chamados_suporte_cache', JSON.stringify(listaChamados));
+  } catch (e) {}
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('chamados_suporte').doc(String(protocolo)).update({
+        status: 'concluido',
+        data_conclusao: ch.data_conclusao,
+        concluido_por: ch.concluido_por
+      });
+    } catch (e) {
+      console.warn('Aviso ao atualizar chamado no Firestore:', e);
+    }
+  }
+
+  showToast(`✅ Reclamação #${protocolo} marcada como resolvida!`, 'success');
+  abrirModalOcorrenciasUnidade(tipoLocal, unidadeId);
+  renderChamados();
+  if (activeTab === 'blocos') carregarQuartos();
+  if (activeTab === 'casas_cidade') filtrarCasasCidadeUI();
+}
+
+// Abrir o Relatório Executivo A4 de Limpeza, Ar-Condicionado e Ouvidoria (Casas & Alojamentos)
+function abrirModalRelatorioLimpezaExecutivo(escopoInicial = 'todos') {
+  const sel = document.getElementById('filtroRelatorioLimpezaEscopo');
+  if (sel && escopoInicial) {
+    sel.value = escopoInicial;
+  }
+  renderizarRelatorioLimpezaExecutivoUI();
+  abrirModal('modalRelatorioLimpezaExecutivo');
+}
+
+// Renderizar os dados do Relatório Executivo A4 de Limpeza
+function renderizarRelatorioLimpezaExecutivoUI() {
+  const escopo = document.getElementById('filtroRelatorioLimpezaEscopo')?.value || 'todos';
+  const dtEmissaoEl = document.getElementById('relatorioLimpezaDataEmissao');
+  const subEscopoEl = document.getElementById('relatorioLimpezaSubEscopo');
+  const kpiTotalEl = document.getElementById('relLimpKpiTotal');
+  const kpiFaxinaEl = document.getElementById('relLimpKpiFaxinaOk');
+  const kpiArEl = document.getElementById('relLimpKpiArOk');
+  const kpiRecEl = document.getElementById('relLimpKpiReclamacoes');
+  const tbodyUnidades = document.getElementById('relatorioLimpezaTabelaUnidadesCorpo');
+  const tbodyOcorrencias = document.getElementById('relatorioLimpezaTabelaOcorrenciasCorpo');
+
+  const agora = new Date();
+  if (dtEmissaoEl) {
+    dtEmissaoEl.textContent = `Emissão: ${agora.toLocaleDateString('pt-BR')} às ${agora.toTimeString().slice(0, 5)}`;
+  }
+  if (subEscopoEl) {
+    subEscopoEl.textContent = escopo === 'casas'
+      ? 'Escopo: Casas na Cidade'
+      : (escopo === 'alojamento' ? 'Escopo: Quartos do Alojamento' : 'Escopo: Consolidado (Casas + Alojamentos)');
+  }
+
+  const linhasUnidades = [];
+  let totalFaxinaOk = 0;
+  let totalArOk = 0;
+  let totalReclamacoesAbertas = 0;
+
+  // 1. Incluir Casas na Cidade se escopo = 'todos' ou 'casas'
+  if (escopo === 'todos' || escopo === 'casas') {
+    (listaCasasCidade || []).forEach(c => {
+      const st = calcularStatusLimpezasCasa(c.id);
+      const chAbertos = obterChamadosAbertosCasa(c);
+      if (st.rotina.status === 'ok') totalFaxinaOk++;
+      if (st.ar.status === 'ok') totalArOk++;
+      totalReclamacoesAbertas += chAbertos.length;
+
+      linhasUnidades.push({
+        nome: c.nome || 'Casa',
+        sub: c.endereco || 'Residência Urbana',
+        tipoLabel: '🏡 Casa Cidade',
+        rotinaOk: st.rotina.status === 'ok',
+        rotinaTexto: st.rotina.textoCurto,
+        arOk: st.ar.status === 'ok',
+        arTexto: st.ar.textoCurto,
+        responsavel: st.ultResponsavel,
+        reclamacoes: chAbertos.length
+      });
+    });
+  }
+
+  // 2. Incluir Quartos do Alojamento se escopo = 'todos' ou 'alojamento'
+  if (escopo === 'todos' || escopo === 'alojamento') {
+    (allQuartosData || []).forEach(q => {
+      const st = calcularStatusLimpezaQuarto(q);
+      const chAbertos = obterChamadosAbertosQuarto(q);
+      if (st.rotina.status === 'ok') totalFaxinaOk++;
+      if (st.ar.status === 'ok') totalArOk++;
+      totalReclamacoesAbertas += chAbertos.length;
+
+      linhasUnidades.push({
+        nome: `Quarto ${q.numero}`,
+        sub: q.bloco_nome || 'Alojamento',
+        tipoLabel: '🏢 Alojamento',
+        rotinaOk: st.rotina.status === 'ok',
+        rotinaTexto: st.rotina.textoCurto,
+        arOk: st.ar.status === 'ok',
+        arTexto: st.ar.textoCurto,
+        responsavel: st.ultResponsavel,
+        reclamacoes: chAbertos.length
+      });
+    });
+  }
+
+  if (kpiTotalEl) kpiTotalEl.textContent = linhasUnidades.length;
+  if (kpiFaxinaEl) kpiFaxinaEl.textContent = `${totalFaxinaOk} / ${linhasUnidades.length}`;
+  if (kpiArEl) kpiArEl.textContent = `${totalArOk} / ${linhasUnidades.length}`;
+  if (kpiRecEl) kpiRecEl.textContent = totalReclamacoesAbertas;
+
+  if (tbodyUnidades) {
+    if (linhasUnidades.length === 0) {
+      tbodyUnidades.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">Nenhuma unidade encontrada para o filtro selecionado.</td></tr>`;
+    } else {
+      tbodyUnidades.innerHTML = linhasUnidades.map(u => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2 px-3">
+            <div class="font-bold text-slate-900">${u.nome}</div>
+            <div class="text-[10px] text-slate-500">${u.sub}</div>
+          </td>
+          <td class="py-2 px-2 font-semibold text-slate-600">${u.tipoLabel}</td>
+          <td class="py-2 px-2">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${u.rotinaOk ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+              <span class="w-1.5 h-1.5 rounded-full ${u.rotinaOk ? 'bg-emerald-600' : 'bg-amber-500'}"></span>
+              ${u.rotinaOk ? 'EM DIA' : 'PENDENTE'} (${u.rotinaTexto})
+            </span>
+          </td>
+          <td class="py-2 px-2">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${u.arOk ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+              <span class="w-1.5 h-1.5 rounded-full ${u.arOk ? 'bg-emerald-600' : 'bg-rose-600'}"></span>
+              ${u.arOk ? 'EM DIA' : 'PASSOU 30D'} (${u.arTexto})
+            </span>
+          </td>
+          <td class="py-2 px-2 font-semibold text-slate-700">${u.responsavel}</td>
+          <td class="py-2 px-2 text-center">
+            ${u.reclamacoes > 0
+              ? `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-black text-[10px]">🚨 ${u.reclamacoes} Aberta(s)</span>`
+              : `<span class="text-[10px] text-emerald-700 font-bold">✓ Sem queixas</span>`}
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  // Tabela 2: Reclamações / Observações registradas pelos moradores
+  if (tbodyOcorrencias) {
+    const chamadosFiltrados = (listaChamados || []).filter(ch => {
+      const isCasa = ch.tipo_local === 'casa_cidade' || Boolean(ch.casa_id);
+      if (escopo === 'casas' && !isCasa) return false;
+      if (escopo === 'alojamento' && isCasa) return false;
+      return true;
+    }).slice(0, 40);
+
+    if (chamadosFiltrados.length === 0) {
+      tbodyOcorrencias.innerHTML = `<tr><td colspan="7" class="py-5 text-center text-slate-400">Nenhuma reclamação ou solicitação registrada para este escopo.</td></tr>`;
+    } else {
+      tbodyOcorrencias.innerHTML = chamadosFiltrados.map(ch => {
+        const isCasa = ch.tipo_local === 'casa_cidade' || Boolean(ch.casa_id);
+        const localTxt = isCasa ? `${ch.casa_nome || ch.bloco || 'Casa'}` : `${ch.bloco || 'Bloco'} • Q.${ch.quarto || '--'}`;
+        const dtStr = ch.data_abertura ? new Date(ch.data_abertura).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--';
+        const conc = ch.status === 'concluido';
+        return `
+          <tr>
+            <td class="py-1.5 px-3 font-mono font-bold text-slate-700">#${ch.protocolo || '--'}</td>
+            <td class="py-1.5 px-2 text-slate-600">${dtStr}</td>
+            <td class="py-1.5 px-2 font-bold text-slate-800">${localTxt}</td>
+            <td class="py-1.5 px-2 font-semibold text-slate-700">${ch.categoria || 'Manutenção'}</td>
+            <td class="py-1.5 px-3 text-slate-600">${ch.descricao || ''}</td>
+            <td class="py-1.5 px-2 text-slate-700">${ch.solicitante || 'Morador'}</td>
+            <td class="py-1.5 px-2 text-center">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${conc ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${conc ? 'RESOLVIDO' : 'EM ABERTO'}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+// Imprimir Relatório Executivo de Limpeza em folha A4
+function imprimirRelatorioLimpezaA4() {
+  document.body.classList.add('imprimindo-relatorio-limpeza');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('imprimindo-relatorio-limpeza');
+  }, 1000);
 }
 
 // Verificar parâmetros de URL (Redirecionar leitura de QR Code da faxineira para página isolada)
@@ -12543,9 +13090,14 @@ function verificarAcaoUrlParametros() {
     const params = new URLSearchParams(window.location.search);
     const acao = params.get('acao');
     const casaId = params.get('casa_id');
+    const quartoId = params.get('quarto_id');
 
     if (acao === 'limpeza' && casaId) {
       window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(casaId)}`);
+      return;
+    }
+    if (acao === 'limpeza' && quartoId) {
+      window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(quartoId)}`);
       return;
     }
   } catch (e) {
@@ -12580,20 +13132,31 @@ window.excluirDespesaCasa = excluirDespesaCasa;
 window.recarregarCasasCidadeManual = recarregarCasasCidadeManual;
 window.filtrarCasasCidadeUI = filtrarCasasCidadeUI;
 
-// Funções de Limpeza & Manutenção via QR Code
+// Funções de Limpeza & Manutenção via QR Code (Casas & Alojamentos)
 window.listaLimpezasCasas = listaLimpezasCasas;
 window.abrirScannerLimpezaQR = abrirScannerLimpezaQR;
 window.fecharScannerLimpezaQR = fecharScannerLimpezaQR;
 window.confirmarCasaManualScanner = confirmarCasaManualScanner;
 window.processarLeituraQRCasa = processarLeituraQRCasa;
 window.abrirModalRegistroLimpeza = abrirModalRegistroLimpeza;
+window.abrirModalRegistroLimpezaQuarto = abrirModalRegistroLimpezaQuarto;
 window.atualizarEstiloTipoLimpeza = atualizarEstiloTipoLimpeza;
 window.salvarRegistroLimpeza = salvarRegistroLimpeza;
 window.excluirRegistroLimpeza = excluirRegistroLimpeza;
 window.abrirModalPlacaQRCasa = abrirModalPlacaQRCasa;
+window.abrirModalPlacaQRQuarto = abrirModalPlacaQRQuarto;
 window.imprimirPlacaQRCasa = imprimirPlacaQRCasa;
 window.renderizarHistoricoLimpezasCasa = renderizarHistoricoLimpezasCasa;
 window.calcularStatusLimpezasCasa = calcularStatusLimpezasCasa;
+window.calcularStatusLimpezaQuarto = calcularStatusLimpezaQuarto;
+window.getQRCodeUrlQuarto = getQRCodeUrlQuarto;
+window.obterChamadosAbertosQuarto = obterChamadosAbertosQuarto;
+window.obterChamadosAbertosCasa = obterChamadosAbertosCasa;
+window.abrirModalOcorrenciasUnidade = abrirModalOcorrenciasUnidade;
+window.resolverOcorrenciaUnidade = resolverOcorrenciaUnidade;
+window.abrirModalRelatorioLimpezaExecutivo = abrirModalRelatorioLimpezaExecutivo;
+window.renderizarRelatorioLimpezaExecutivoUI = renderizarRelatorioLimpezaExecutivoUI;
+window.imprimirRelatorioLimpezaA4 = imprimirRelatorioLimpezaA4;
 window.verificarAcaoUrlParametros = verificarAcaoUrlParametros;
 
 

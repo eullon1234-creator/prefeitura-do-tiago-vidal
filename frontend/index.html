@@ -205,6 +205,34 @@
         border: none !important;
         min-height: auto !important;
       }
+      /* Impressão A4 Oficial do Relatório Executivo de Limpeza & Manutenção (Casas e Alojamentos) */
+      body.imprimindo-relatorio-limpeza > *:not(#modalRelatorioLimpezaExecutivo) { display: none !important; }
+      body.imprimindo-relatorio-limpeza #modalRelatorioLimpezaExecutivo {
+        position: static !important;
+        display: block !important;
+        background: transparent !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+      }
+      body.imprimindo-relatorio-limpeza #modalRelatorioLimpezaExecutivo > div {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: white !important;
+      }
+      body.imprimindo-relatorio-limpeza #areaImpressaoRelatorioLimpeza {
+        background: white !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+        border: none !important;
+        min-height: auto !important;
+      }
     }
   </style>
 </head>
@@ -723,9 +751,15 @@
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 class="text-xl md:text-2xl font-bold text-slate-900">Mapa Visual de Quartos e Camas</h1>
-              <p class="text-sm text-slate-500">Monitore em tempo real cada cama, trabalhador alojado e estado dos móveis por quarto.</p>
+              <p class="text-sm text-slate-500">Monitore em tempo real cada cama, trabalhador alojado, faxina diária, ar-condicionado (30d) e reclamações por QR Code.</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="abrirModalRelatorioLimpezaExecutivo('alojamento')" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-file-pdf"></i> Relatório Limpeza (A4)
+              </button>
+              <button onclick="abrirModalConfigRonda()" class="btn-prefeito px-3 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition" title="Configurar Senha da Equipe de Limpeza no QR Code">
+                <i class="fa-solid fa-lock"></i> Senha Equipe QR
+              </button>
               <button onclick="openModalNovoQuarto()" class="btn-prefeito px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-plus"></i> Novo Quarto
               </button>
@@ -759,11 +793,15 @@
               </select>
             </div>
 
-            <!-- Filtro de Alertas de Móveis -->
+            <!-- Filtro de Limpeza, Ar e Alertas -->
             <div>
               <select id="filtroQuartoAlerta" onchange="aplicarFiltrosQuartos()" class="w-full py-2 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50">
-                <option value="">Todos os estados de móveis</option>
-                <option value="1">Com Alerta de Manutenção/Dano</option>
+                <option value="">Limpeza, Ar & Móveis (Todos)</option>
+                <option value="limpeza_hoje">🟢 Faxina Realizada Hoje</option>
+                <option value="limpeza_pendente">🟡 Faxina de Hoje Pendente</option>
+                <option value="ar_vencido">🔴 Ar-Condicionado Vencido (+30d)</option>
+                <option value="com_reclamacao">🚨 Com Reclamação / Chamado Aberto</option>
+                <option value="1">🔧 Com Alerta de Móveis</option>
               </select>
             </div>
 
@@ -1130,6 +1168,12 @@
 
           <!-- Ações Rápidas -->
           <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="abrirModalRelatorioLimpezaExecutivo('casas')" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-file-pdf text-rose-400"></i> Relatório Limpeza (A4)
+            </button>
+            <button onclick="abrirModalConfigRonda()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition" title="Configurar Senha da Equipe de Limpeza no QR Code">
+              <i class="fa-solid fa-lock text-amber-300"></i> Senha Equipe QR
+            </button>
             <button onclick="abrirScannerLimpezaQR()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition" title="Escanear QR Code da Casa com a câmera">
               <i class="fa-solid fa-qrcode text-amber-300"></i> Escanear QR Limpeza
             </button>
@@ -1238,6 +1282,10 @@
                 <option value="todas">Todas as Casas</option>
                 <option value="vagas_livres">Com Vagas Disponíveis</option>
                 <option value="lotadas">Totalmente Ocupadas</option>
+                <option value="limpeza_hoje">🟢 Faxina Realizada Hoje</option>
+                <option value="limpeza_pendente">🟡 Faxina de Hoje Pendente</option>
+                <option value="ar_vencido">🔴 Ar-Condicionado Vencido (+30d)</option>
+                <option value="com_reclamacao">🚨 Com Reclamação / Chamado Aberto</option>
               </select>
             </div>
           </div>
@@ -5849,48 +5897,44 @@ service cloud.firestore {
               <img src="logo_gel_oficial.png" alt="Logo GEL Oficial" class="h-8 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
             </div>
             <div class="text-right">
-              <span class="text-[10px] font-black uppercase tracking-widest text-slate-500 block">Gestão Urbana • Casas</span>
+              <span id="placaCasaCategoriaLabel" class="text-[10px] font-black uppercase tracking-widest text-slate-500 block">Prefeitura de Canteiro • Casas & Alojamentos</span>
               <span class="text-xs font-black text-teal-700 uppercase">GEL Engenharia</span>
             </div>
           </div>
 
-          <!-- Título e Identificação da Casa -->
+          <!-- Título e Identificação da Unidade -->
           <div class="bg-slate-900 text-white py-2.5 px-3 rounded-xl shadow-xs">
-            <span class="text-[10px] font-bold text-teal-400 uppercase tracking-widest block">CONTROLE DE LIMPEZA & MANUTENÇÃO</span>
-            <h2 id="placaCasaTitulo" class="text-base sm:text-lg font-black tracking-wide uppercase mt-0.5">CASA --</h2>
-            <p id="placaCasaEndereco" class="text-[11px] font-semibold text-slate-300 mt-0.5">Endereço: --</p>
+            <span class="text-[10px] font-bold text-teal-400 uppercase tracking-widest block">CONTROLE DE LIMPEZA, AR & OUVIDORIA</span>
+            <h2 id="placaCasaTitulo" class="text-base sm:text-lg font-black tracking-wide uppercase mt-0.5">UNIDADE --</h2>
+            <p id="placaCasaEndereco" class="text-[11px] font-semibold text-slate-300 mt-0.5">Localização: --</p>
           </div>
 
           <!-- Chamada para Ação -->
           <p class="text-xs sm:text-sm font-semibold text-slate-700 leading-snug">
-            Aponte a câmera do celular para registrar a <span class="text-emerald-700 font-bold underline">Limpeza da Casa</span> ou a <span class="text-sky-700 font-bold underline">Higienização do Ar Condicionado</span>.
+            Escaneie o QR Code para registrar a <span class="text-emerald-700 font-bold underline">Faxina Diária / Ar Condicionado</span> ou <span class="text-amber-600 font-bold underline">Relatar Problemas ao Prefeito</span>.
           </p>
 
           <!-- Imagem do QR Code -->
           <div class="bg-white p-3 rounded-2xl border-2 border-dashed border-slate-400 inline-block mx-auto shadow-inner">
-            <img id="imgPlacaQRCasa" src="" alt="QR Code Limpeza da Casa" class="w-48 h-48 sm:w-56 sm:h-56 mx-auto object-contain">
+            <img id="imgPlacaQRCasa" src="" alt="QR Code Limpeza e Ouvidoria" class="w-48 h-48 sm:w-56 sm:h-56 mx-auto object-contain">
             <p class="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-wider">Aponte a câmera do celular</p>
           </div>
 
-          <!-- Instruções de Uso -->
+          <!-- Instruções de Uso Duplo -->
           <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-left space-y-2 text-xs">
             <div class="flex items-start gap-2">
               <span class="w-5 h-5 rounded-full bg-teal-600 text-white font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-              <p class="text-slate-800 font-medium">Abra a câmera do celular ou o leitor no aplicativo da Prefeitura.</p>
+              <p class="text-slate-800 font-medium"><strong>🧹 Equipe de Limpeza:</strong> Digite a senha da equipe para registrar a Faxina Diária ou Higienização do Ar (30d).</p>
             </div>
             <div class="flex items-start gap-2">
-              <span class="w-5 h-5 rounded-full bg-teal-600 text-white font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-              <p class="text-slate-800 font-medium">Escaneie o QR Code para abrir o formulário desta casa.</p>
-            </div>
-            <div class="flex items-start gap-2">
-              <span class="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-              <p class="text-slate-800 font-medium">Selecione o tipo (Limpeza ou Ar), informe seu nome e confirme!</p>
+              <span class="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-black text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+              <p class="text-slate-800 font-medium"><strong>📢 Morador / Alojado (Sem Senha):</strong> Clique em "Relatar Problema" para solicitar reparo, limpeza ou enviar observação ao Prefeito!</p>
             </div>
           </div>
 
           <!-- Rodapé com Link Alternativo -->
           <div class="pt-2 border-t border-slate-200 text-slate-500 text-[10px] leading-tight space-y-0.5">
-            <p class="font-bold text-slate-700">Prefeitura de Canteiro & Casas na Cidade</p>
+            <p class="font-bold text-slate-700">Prefeitura de Canteiro • Auditoria Digital em Tempo Real</p>
             <p class="font-mono text-[9px] text-slate-500 break-all" id="textoPlacaQRCasaUrl"></p>
           </div>
 
@@ -6598,10 +6642,200 @@ service cloud.firestore {
     </div>
   </div>
 
+  <!-- ================= MODAL RECLAMAÇÕES / OBSERVAÇÕES DE CASA OU QUARTO ================= -->
+  <div id="modalOcorrenciasUnidade" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[85] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-700">
+      <div class="px-5 py-4 bg-gradient-to-r from-rose-700 to-amber-700 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/20 text-white flex items-center justify-center">
+            <i class="fa-solid fa-bullhorn text-lg"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold uppercase tracking-wide">Ouvidoria & Reclamações da Unidade</h3>
+            <p id="modalOcorrenciasUnidadeSubtitulo" class="text-[11px] text-rose-100">Unidade: --</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalOcorrenciasUnidade')" class="text-white/80 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div id="listaOcorrenciasUnidadeContainer" class="p-5 overflow-y-auto flex-1 space-y-3 bg-slate-50">
+        <!-- Populado via JS -->
+      </div>
+
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+        <span class="text-xs text-slate-500">Dê baixa nas reclamações após solucionar o problema.</span>
+        <button type="button" onclick="fecharModal('modalOcorrenciasUnidade')" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL RELATÓRIO EXECUTIVO A4 DE LIMPEZA (CASAS & ALOJAMENTOS) ================= -->
+  <div id="modalRelatorioLimpezaExecutivo" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[85] flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      
+      <!-- Topo de Controles (Não sai na impressão) -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 no-print flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
+            <i class="fa-solid fa-file-shield text-lg"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Relatório Executivo de Limpeza, Ar-Condicionado & Ouvidoria</h3>
+            <p class="text-[11px] text-slate-400">Auditoria de Casas na Cidade e Alojamentos do Canteiro (A4 / PDF / Excel)</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <select id="filtroRelatorioLimpezaEscopo" onchange="renderizarRelatorioLimpezaExecutivoUI()" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-semibold outline-none">
+            <option value="todos">🏢🏡 Todos (Casas + Alojamentos)</option>
+            <option value="casas">🏡 Apenas Casas na Cidade</option>
+            <option value="alojamento">🏢 Apenas Quartos do Alojamento</option>
+          </select>
+          <button onclick="exportarLimpezasExcel()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-file-excel"></i> Excel (.xlsx)
+          </button>
+          <button onclick="imprimirRelatorioLimpezaA4()" class="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-print"></i> Imprimir A4 / PDF
+          </button>
+          <button onclick="fecharModal('modalRelatorioLimpezaExecutivo')" class="text-slate-400 hover:text-white p-1">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Corpo Imprimível A4 -->
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-200">
+        <div id="areaImpressaoRelatorioLimpeza" class="bg-white max-w-[210mm] mx-auto p-6 sm:p-8 rounded-xl shadow-md border border-slate-300 space-y-5 text-slate-900">
+          
+          <!-- Cabeçalho Institucional GEL Engenharia -->
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+            <div class="flex items-center gap-3">
+              <img src="logo_gel_oficial.png" alt="Logo GEL" class="h-12 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+              <div>
+                <h2 class="text-base font-black uppercase tracking-wide text-slate-900">GEL — Goetze Lobato Engenharia S.A.</h2>
+                <p class="text-xs font-bold text-teal-700 uppercase">Prefeitura de Canteiro • Auditoria de Higiene, Climatização e Manutenção</p>
+                <p class="text-[10px] text-slate-500">Conformidade Operacional de Alojamentos e Residências Urbanas (NR-18 / NR-24)</p>
+              </div>
+            </div>
+            <div class="text-right text-xs">
+              <span class="inline-block px-2.5 py-1 rounded bg-slate-900 text-white font-black text-[10px] uppercase tracking-wider">Relatório Oficial</span>
+              <p id="relatorioLimpezaDataEmissao" class="text-[11px] font-bold text-slate-700 mt-1">Data: --/--/----</p>
+              <p id="relatorioLimpezaSubEscopo" class="text-[10px] text-slate-500">Escopo: Consolidado</p>
+            </div>
+          </div>
+
+          <!-- KPIs de Conformidade -->
+          <div class="grid grid-cols-4 gap-3 text-center">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <span class="text-[10px] font-bold uppercase text-slate-500 block">Unidades Auditadas</span>
+              <strong id="relLimpKpiTotal" class="text-xl font-black text-slate-900">0</strong>
+            </div>
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+              <span class="text-[10px] font-bold uppercase text-emerald-700 block">Faxina Hoje Em Dia</span>
+              <strong id="relLimpKpiFaxinaOk" class="text-xl font-black text-emerald-700">0</strong>
+            </div>
+            <div class="p-3 rounded-xl bg-sky-50 border border-sky-200">
+              <span class="text-[10px] font-bold uppercase text-sky-700 block">Ar-Cond. (30d) OK</span>
+              <strong id="relLimpKpiArOk" class="text-xl font-black text-sky-700">0</strong>
+            </div>
+            <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
+              <span class="text-[10px] font-bold uppercase text-rose-700 block">Reclamações Abertas</span>
+              <strong id="relLimpKpiReclamacoes" class="text-xl font-black text-rose-700">0</strong>
+            </div>
+          </div>
+
+          <!-- Tabela 1: Status de Conformidade por Unidade -->
+          <div class="space-y-2">
+            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-broom text-teal-600"></i>
+              <span>Quadro de Conformidade: Faxina Diária & Higienização de Ar-Condicionado (30 Dias)</span>
+            </h4>
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-900 text-white text-[10px] font-bold uppercase">
+                  <tr>
+                    <th class="py-2 px-3">Unidade / Local</th>
+                    <th class="py-2 px-2">Tipo</th>
+                    <th class="py-2 px-2">Faxina Diária (Hoje)</th>
+                    <th class="py-2 px-2">Ar-Condicionado (30d)</th>
+                    <th class="py-2 px-2">Último Responsável</th>
+                    <th class="py-2 px-2 text-center">Ouvidoria</th>
+                  </tr>
+                </thead>
+                <tbody id="relatorioLimpezaTabelaUnidadesCorpo" class="divide-y divide-slate-200 text-[11px]">
+                  <!-- Populado via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tabela 2: Reclamações e Observações dos Moradores -->
+          <div class="space-y-2 pt-2 border-t border-slate-200">
+            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-bullhorn text-amber-500"></i>
+              <span>Ouvidoria dos Moradores & Alojados (Solicitações via QR Code)</span>
+            </h4>
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-800 text-white text-[10px] font-bold uppercase">
+                  <tr>
+                    <th class="py-2 px-3">Protocolo</th>
+                    <th class="py-2 px-2">Data/Hora</th>
+                    <th class="py-2 px-2">Unidade</th>
+                    <th class="py-2 px-2">Assunto</th>
+                    <th class="py-2 px-3">Observação / Reclamação</th>
+                    <th class="py-2 px-2">Morador</th>
+                    <th class="py-2 px-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="relatorioLimpezaTabelaOcorrenciasCorpo" class="divide-y divide-slate-200 text-[11px]">
+                  <!-- Populado via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Assinaturas -->
+          <div class="pt-6 border-t border-slate-300 grid grid-cols-2 gap-8 text-center text-xs">
+            <div class="space-y-1">
+              <div class="border-b border-slate-400 pb-8"></div>
+              <p class="font-bold text-slate-900 mt-1">Responsável Equipe de Conservação & Climatização</p>
+              <p class="text-[10px] text-slate-500">Serviços Gerais • GEL Engenharia</p>
+            </div>
+            <div class="space-y-1">
+              <div class="border-b border-slate-400 pb-8"></div>
+              <p class="font-bold text-slate-900 mt-1">Tiago Vidal • Prefeito de Canteiro</p>
+              <p class="text-[10px] text-slate-500">Gestão de Alojamentos e Casas na Cidade</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Rodapé Modal -->
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between no-print flex-shrink-0">
+        <span class="text-xs text-slate-500">Relatório auditável para controle diário e mensal (30 dias).</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="fecharModal('modalRelatorioLimpezaExecutivo')" class="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+            Fechar
+          </button>
+          <button type="button" onclick="imprimirRelatorioLimpezaA4()" class="px-4 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-print"></i> Imprimir Documento A4
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=3.9"></script>
+  <script src="app.js?v=4.0"></script>
 </body>
 </html>

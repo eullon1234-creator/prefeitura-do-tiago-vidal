@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Registro de Limpeza & Manutenção | GEL Engenharia</title>
+  <title>Controle de Limpeza & Ouvidoria | GEL Engenharia</title>
   
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -34,6 +34,13 @@
       color: #ffffff;
       font-weight: 700;
     }
+    .problema-chip.active {
+      border-color: #f59e0b;
+      background-color: rgba(245, 158, 11, 0.2);
+      color: #fde68a;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-teal-500 selection:text-slate-950 pb-8">
@@ -47,8 +54,8 @@
         </div>
         <div>
           <h1 class="text-sm font-black text-white leading-tight uppercase tracking-wide">GEL Engenharia</h1>
-          <p class="text-[11px] text-teal-400 font-semibold flex items-center gap-1">
-            <i class="fa-solid fa-broom text-[10px]"></i> Controle de Limpeza Urbana
+          <p id="subtituloHeader" class="text-[11px] text-teal-400 font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-broom text-[10px]"></i> Limpeza & Apoio ao Morador
           </p>
         </div>
       </div>
@@ -63,16 +70,16 @@
   <!-- Container Principal -->
   <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
 
-    <!-- Card de Identificação da Casa -->
+    <!-- Card de Identificação da Unidade (Casa na Cidade ou Quarto do Alojamento) -->
     <div class="bg-gradient-to-br from-slate-800 to-slate-850 p-4 rounded-2xl border border-slate-700/80 shadow-lg space-y-2">
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-3">
-          <div class="w-11 h-11 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center flex-shrink-0 text-xl border border-teal-500/30">
-            <i class="fa-solid fa-house"></i>
+          <div id="iconeUnidadeBox" class="w-11 h-11 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center flex-shrink-0 text-xl border border-teal-500/30">
+            <i id="iconeUnidade" class="fa-solid fa-house"></i>
           </div>
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">Residência Identificada</span>
-            <h2 id="displayCasaNome" class="text-base font-black text-white leading-tight">Carregando casa...</h2>
+            <span id="labelTipoUnidade" class="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">Unidade Identificada</span>
+            <h2 id="displayCasaNome" class="text-base font-black text-white leading-tight">Carregando local...</h2>
           </div>
         </div>
         <span id="badgeQrIdentificado" class="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 font-bold border border-emerald-800 whitespace-nowrap">
@@ -84,23 +91,139 @@
         <span>Consultando localização...</span>
       </p>
 
-      <!-- Dropdown alternativo se casa não tiver sido passada na URL -->
-      <div id="containerSelecaoCasa" class="hidden pt-2">
-        <label for="selectCasaManual" class="block text-xs font-bold text-slate-300 mb-1">
-          Selecione a Casa que você está limpando:
-        </label>
-        <select id="selectCasaManual" onchange="selecionarCasaManual(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
-          <option value="">Carregando lista de casas...</option>
-        </select>
+      <!-- Dropdown alternativo se a unidade não tiver sido passada na URL -->
+      <div id="containerSelecaoCasa" class="hidden pt-2 space-y-2">
+        <div class="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+          <button type="button" id="btnFiltroSelCasa" onclick="alternarTipoSelecaoManual('casa')" class="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition">
+            🏡 Casa na Cidade
+          </button>
+          <button type="button" id="btnFiltroSelQuarto" onclick="alternarTipoSelecaoManual('alojamento')" class="py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition">
+            🏢 Quarto Alojamento
+          </button>
+        </div>
+
+        <div id="boxSelectCasaManual">
+          <label for="selectCasaManual" class="block text-xs font-bold text-slate-300 mb-1">
+            Selecione a Casa na Cidade:
+          </label>
+          <select id="selectCasaManual" onchange="selecionarCasaManual(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
+            <option value="">Carregando lista de casas...</option>
+          </select>
+        </div>
+
+        <div id="boxSelectQuartoManual" class="hidden grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Bloco:</label>
+            <select id="selectBlocoManual" onchange="aplicarQuartoManual()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
+              <option value="Bloco 1">Bloco 1</option>
+              <option value="Bloco 2">Bloco 2</option>
+              <option value="Bloco A">Bloco A</option>
+              <option value="Bloco B">Bloco B</option>
+              <option value="Bloco C">Bloco C</option>
+              <option value="Bloco D">Bloco D</option>
+              <option value="Bloco E">Bloco E</option>
+              <option value="Bloco F">Bloco F</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Nº do Quarto:</label>
+            <input type="text" id="inputQuartoManualNum" oninput="aplicarQuartoManual()" placeholder="Ex: 01, 105..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Formulário de Registro (Acessado pela Faxineira) -->
-    <form id="formLimpeza" onsubmit="salvarLimpezaPublica(event)" class="bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-slate-700/80 shadow-xl space-y-4">
+    <!-- SELETOR DE MODO: EQUIPE DE LIMPEZA (COM SENHA) vs MORADOR / ALOJADO (SEM SENHA) -->
+    <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/90 border border-slate-800 rounded-2xl shadow-md">
+      <button 
+        type="button" 
+        id="btnModoLimpeza" 
+        onclick="trocarModoLimpeza('limpeza')" 
+        class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-teal-600 text-white shadow-sm"
+      >
+        <i class="fa-solid fa-broom text-xs"></i>
+        <span>Equipe de Limpeza</span>
+      </button>
+
+      <button 
+        type="button" 
+        id="btnModoProblema" 
+        onclick="trocarModoLimpeza('problema')" 
+        class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900"
+      >
+        <i class="fa-solid fa-bullhorn text-amber-400 text-xs"></i>
+        <span>Relatar Problema</span>
+      </button>
+    </div>
+
+    <!-- BLOQUEIO DE SENHA DA EQUIPE DE LIMPEZA -->
+    <div id="containerSenhaLimpeza" class="bg-slate-800/90 backdrop-blur rounded-2xl p-5 border border-teal-500/40 shadow-xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg border border-teal-500/30 flex-shrink-0">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-black text-white uppercase tracking-wide">Acesso da Equipe de Limpeza</h3>
+          <p class="text-[11px] text-slate-300 leading-snug">
+            Digite a senha da equipe autorizada pelo Prefeito para registrar <strong>Faxina Diária</strong> ou <strong>Ar-Condicionado</strong>.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <label for="inputSenhaEquipe" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+          Senha da Equipe *
+        </label>
+        <div class="flex gap-2">
+          <input 
+            type="password" 
+            id="inputSenhaEquipe" 
+            inputmode="numeric"
+            placeholder="Digite a senha..." 
+            onkeydown="if(event.key==='Enter'){event.preventDefault();validarSenhaEquipe();}"
+            class="flex-1 bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-4 py-2.5 text-white font-black text-center tracking-widest text-base outline-none transition"
+          >
+          <button 
+            type="button" 
+            onclick="validarSenhaEquipe()" 
+            class="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs uppercase tracking-wider shadow-md transition flex items-center gap-1.5"
+          >
+            <i class="fa-solid fa-unlock-keyhole"></i> Liberar
+          </button>
+        </div>
+        <p id="erroSenhaEquipe" class="hidden text-xs text-rose-400 font-bold mt-2 flex items-center gap-1">
+          <i class="fa-solid fa-circle-exclamation"></i> Senha incorreta! Solicite a senha atual ao Prefeito ou use a aba "Relatar Problema".
+        </p>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-700/60 text-xs">
+        <label class="flex items-center gap-2 text-slate-300 cursor-pointer select-none">
+          <input type="checkbox" id="checkLembrarSenhaHoje" checked class="rounded border-slate-600 text-teal-500 focus:ring-teal-500 bg-slate-900">
+          <span>Lembrar senha neste celular hoje</span>
+        </label>
+        <button type="button" onclick="trocarModoLimpeza('problema')" class="text-amber-400 hover:text-amber-300 font-bold underline text-[11px]">
+          Sou morador (Sem senha)
+        </button>
+      </div>
+    </div>
+
+    <!-- MODO 1: Formulário de Registro de Limpeza (Liberado após Senha) -->
+    <form id="formLimpeza" onsubmit="salvarLimpezaPublica(event)" class="hidden bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-slate-700/80 shadow-xl space-y-4">
       <input type="hidden" id="inputCasaId">
       <input type="hidden" id="inputCasaNome">
+      <input type="hidden" id="inputTipoLocal" value="casa">
+      <input type="hidden" id="inputQuartoId" value="">
+      <input type="hidden" id="inputQuartoNumero" value="">
+      <input type="hidden" id="inputBlocoNome" value="">
       <input type="hidden" id="inputTipo" value="rotina">
       <input type="hidden" id="inputAvaliacao" value="Excelente / Tudo Limpo">
+
+      <div class="flex items-center justify-between bg-emerald-950/50 border border-emerald-800/60 rounded-xl px-3 py-2 text-xs">
+        <span class="text-emerald-300 font-bold flex items-center gap-1.5">
+          <i class="fa-solid fa-shield-check text-emerald-400"></i> Equipe Autenticada
+        </span>
+        <span class="text-[10px] text-slate-400">Auditoria Ativa</span>
+      </div>
 
       <!-- Seleção do Tipo de Serviço -->
       <div>
@@ -169,7 +292,7 @@
       <!-- Estado do Imóvel / Avaliação Rápida -->
       <div>
         <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-          <i class="fa-solid fa-star text-amber-400"></i> Como ficou a casa?
+          <i class="fa-solid fa-star text-amber-400"></i> Como ficou o local?
         </label>
         <div class="grid grid-cols-2 gap-2 text-xs">
           <button type="button" onclick="escolherAvaliacao(this, 'Excelente / Tudo Limpo')" class="avaliacao-chip active p-2.5 rounded-xl border border-teal-500 bg-teal-600 text-white font-bold text-left transition text-[11px]">
@@ -190,12 +313,12 @@
       <!-- Observações Opcionais -->
       <div>
         <label for="inputObservacoes" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-          <i class="fa-solid fa-comment-dots text-slate-400"></i> Observações / Recado ao Prefeito (Opcional)
+          <i class="fa-solid fa-comment-dots text-slate-400"></i> Observações da Equipe (Opcional)
         </label>
         <textarea 
           id="inputObservacoes" 
           rows="2" 
-          placeholder="Ex: Quarto 2 limpo, lixeira trocada, ar higienizado com produto bactericida..." 
+          placeholder="Ex: Quarto limpo, banheiro higienizado, filtro do ar lavado..." 
           class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white text-xs outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500 resize-none"
         ></textarea>
       </div>
@@ -214,25 +337,141 @@
 
     </form>
 
-    <!-- Tela de Conclusão / Sucesso (Exibida após o envio) -->
-    <div id="telaSucesso" class="hidden bg-slate-800/90 backdrop-blur rounded-2xl p-6 border border-teal-500/50 shadow-2xl text-center space-y-4 animate-in fade-in duration-300">
+    <!-- MODO 2: Formulário Público de Reclamação / Observação do Morador (Sem Senha) -->
+    <form id="formOcorrenciaLocal" onsubmit="salvarOcorrenciaLocalPublica(event, 'app')" class="hidden bg-slate-800/85 backdrop-blur rounded-2xl p-4 sm:p-5 border border-amber-500/40 shadow-xl space-y-4">
+      <div class="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+        <i class="fa-solid fa-bullhorn text-amber-400 text-lg mt-0.5"></i>
+        <div>
+          <h3 class="text-xs font-black text-amber-300 uppercase tracking-wider">Canal Direto do Morador / Alojado</h3>
+          <p class="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+            Precisa de manutenção, limpeza ou quer deixar uma observação para o Prefeito sobre este local? Envie abaixo (não precisa de senha).
+          </p>
+        </div>
+      </div>
+
+      <input type="hidden" id="inputProblemaCategoria" value="Solicitar Limpeza / Material">
+
+      <!-- Chips Rápidos de Problema / Observação -->
+      <div>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+          Qual é o assunto ou problema? *
+        </label>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button type="button" onclick="selecionarChipProblemaLocal(this, 'Solicitar Limpeza / Material')" class="problema-chip active p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 text-left transition text-[11px] flex items-center gap-1.5">
+            <span>🧹</span> <span>Limpeza / Material</span>
+          </button>
+          <button type="button" onclick="selecionarChipProblemaLocal(this, 'Ar-Condicionado')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 text-left transition text-[11px] flex items-center gap-1.5">
+            <span>❄️</span> <span>Ar-Condicionado</span>
+          </button>
+          <button type="button" onclick="selecionarChipProblemaLocal(this, 'Banheiro / Hidráulica')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 text-left transition text-[11px] flex items-center gap-1.5">
+            <span>🚿</span> <span>Chuveiro / Torneira</span>
+          </button>
+          <button type="button" onclick="selecionarChipProblemaLocal(this, 'Lâmpada / Elétrica')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 text-left transition text-[11px] flex items-center gap-1.5">
+            <span>💡</span> <span>Lâmpada / Tomada</span>
+          </button>
+          <button type="button" onclick="selecionarChipProblemaLocal(this, 'Cama / Móvel / Fechadura')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 text-left transition text-[11px] flex items-center gap-1.5">
+            <span>🛏️</span> <span>Cama / Fechadura</span>
+          </button>
+          <button type="button" onclick="selecionarChipProblemaLocal(this, 'Observação / Reclamação')" class="problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 text-left transition text-[11px] flex items-center gap-1.5">
+            <span>💬</span> <span>Outro / Reclamação</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Cômodo específico (exibido quando for Casa na Cidade) -->
+      <div id="boxComodoOcorrencia">
+        <label for="inputComodoOcorrencia" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+          Cômodo ou Área (Opcional)
+        </label>
+        <input 
+          type="text" 
+          id="inputComodoOcorrencia" 
+          placeholder="Ex: Quarto 1, Banheiro Social, Cozinha..." 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2 text-white text-xs outline-none transition placeholder-slate-500"
+        >
+      </div>
+
+      <!-- Observação / Descrição -->
+      <div>
+        <label for="inputDescricaoOcorrencia" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+          Sua Observação ou Reclamação *
+        </label>
+        <textarea 
+          id="inputDescricaoOcorrencia" 
+          rows="3" 
+          required
+          placeholder="Descreva aqui o problema, o que precisa ser arrumado ou sua reclamação para o Prefeito..." 
+          class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white text-xs outline-none transition placeholder-slate-500 resize-none"
+        ></textarea>
+      </div>
+
+      <!-- Nome e WhatsApp Opcionais -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div>
+          <label for="inputNomeMorador" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+            Seu Nome <span class="text-slate-500 font-normal">(Opcional)</span>
+          </label>
+          <input 
+            type="text" 
+            id="inputNomeMorador" 
+            placeholder="Ou deixe em branco (Anônimo)" 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2 text-white text-xs outline-none transition placeholder-slate-500"
+          >
+        </div>
+        <div>
+          <label for="inputZapMorador" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+            Seu WhatsApp <span class="text-slate-500 font-normal">(Opcional)</span>
+          </label>
+          <input 
+            type="tel" 
+            id="inputZapMorador" 
+            placeholder="(DDD) 99999-9999" 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2 text-white text-xs outline-none transition placeholder-slate-500"
+          >
+        </div>
+      </div>
+
+      <!-- Botões de Envio -->
+      <div class="pt-2 space-y-2">
+        <button 
+          type="submit" 
+          id="btnEnviarOcorrenciaApp" 
+          class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition"
+        >
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Enviar Direto para o Painel do Prefeito</span>
+        </button>
+
+        <button 
+          type="button" 
+          id="btnEnviarOcorrenciaZap" 
+          onclick="salvarOcorrenciaLocalPublica(null, 'whatsapp')" 
+          class="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition"
+        >
+          <i class="fa-brands fa-whatsapp text-base"></i>
+          <span>Registrar e Avisar no WhatsApp do Prefeito</span>
+        </button>
+      </div>
+    </form>
+
+    <!-- Tela de Conclusão / Sucesso Limpeza -->
+    <div id="telaSucesso" class="hidden bg-slate-800/90 backdrop-blur rounded-2xl p-6 border border-teal-500/50 shadow-2xl text-center space-y-4">
       <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-3xl border-2 border-emerald-500 shadow-md">
         <i class="fa-solid fa-check"></i>
       </div>
 
       <div>
         <h3 class="text-lg font-black text-white">Registro Concluído com Sucesso!</h3>
-        <p class="text-xs text-slate-300 mt-1">Muito obrigado pelo seu trabalho e dedicação.</p>
+        <p class="text-xs text-slate-300 mt-1">O painel do Prefeito já foi atualizado para VERDE em tempo real.</p>
       </div>
 
-      <!-- Resumo do Registro -->
       <div class="bg-slate-900/90 rounded-xl p-4 text-left text-xs border border-slate-700/80 space-y-2">
         <div class="flex justify-between items-center pb-2 border-b border-slate-800">
           <span class="text-slate-400">Protocolo:</span>
           <span id="sucessoProtocolo" class="font-mono font-bold text-teal-400">#LIMP-0000</span>
         </div>
         <div class="flex justify-between items-center">
-          <span class="text-slate-400">Casa:</span>
+          <span class="text-slate-400">Local:</span>
           <span id="sucessoCasaNome" class="font-bold text-white">-</span>
         </div>
         <div class="flex justify-between items-center">
@@ -249,25 +488,56 @@
         </div>
       </div>
 
-      <div class="p-3 bg-teal-950/40 border border-teal-800/60 rounded-xl text-teal-300 text-xs">
-        <i class="fa-solid fa-shield-halved mr-1 text-teal-400"></i>
-        <span>Informação arquivada para o Prefeito da Obra. Você já pode fechar esta página no seu celular.</span>
-      </div>
-
-      <!-- Botão para outro registro se necessário (sem acesso ao app) -->
       <div class="pt-2">
         <button onclick="fazerOutroRegistro()" class="w-full py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs transition">
-          <i class="fa-solid fa-rotate-left mr-1.5"></i> Registrar Outro Serviço Nesta Casa
+          <i class="fa-solid fa-rotate-left mr-1.5"></i> Registrar Outro Serviço Neste Local
+        </button>
+      </div>
+    </div>
+
+    <!-- Tela de Conclusão / Sucesso Reclamação / Observação -->
+    <div id="telaSucessoProblema" class="hidden bg-slate-800/90 backdrop-blur rounded-2xl p-6 border border-amber-500/50 shadow-2xl text-center space-y-4">
+      <div class="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-3xl border-2 border-amber-500 shadow-md">
+        <i class="fa-solid fa-bullhorn"></i>
+      </div>
+
+      <div>
+        <h3 class="text-lg font-black text-white">Observação Enviada ao Prefeito!</h3>
+        <p class="text-xs text-slate-300 mt-1">Sua solicitação já está piscando em alerta no painel da Prefeitura de Canteiro.</p>
+      </div>
+
+      <div class="bg-slate-900/90 rounded-xl p-4 text-left text-xs border border-slate-700/80 space-y-2">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+          <span class="text-slate-400">Protocolo:</span>
+          <span id="sucessoProbProtocolo" class="font-mono font-bold text-amber-400">#CH-0000</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Local:</span>
+          <span id="sucessoProbLocal" class="font-bold text-white">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Assunto:</span>
+          <span id="sucessoProbCategoria" class="font-bold text-amber-400">-</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Data e Hora:</span>
+          <span id="sucessoProbData" class="text-slate-300">-</span>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button onclick="novaOcorrenciaReset()" class="w-full py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs transition">
+          <i class="fa-solid fa-plus mr-1.5"></i> Enviar Outra Observação
         </button>
       </div>
     </div>
 
   </main>
 
-  <!-- Rodapé Institucional (Sem links de navegação para a administração) -->
+  <!-- Rodapé Institucional -->
   <footer class="max-w-md mx-auto px-4 text-center text-[11px] text-slate-500 mt-4 space-y-1">
     <p>Prefeitura de Canteiro • GEL (Goetze Lobato Eng. S.A.)</p>
-    <p class="text-slate-600">Sistema Seguro de Auditoria de Serviços Prediais</p>
+    <p class="text-slate-600">Sistema Seguro de Auditoria de Limpeza e Apoio aos Alojados</p>
   </footer>
 
   <!-- Scripts e Lógica Firebase -->
@@ -282,9 +552,13 @@
       measurementId: "G-YYXMDWCM4Q"
     };
 
+    let WHATSAPP_PREFEITO = "5567981877277";
     let firestoreDb = null;
     let listaCasasDisponiveis = [];
     let casaCarregada = null;
+    let senhaEquipeConfigurada = "1234";
+    let modoAtual = "limpeza"; // 'limpeza' ou 'problema'
+    let senhaLiberadaNestaSessao = false;
 
     // Inicialização do Firebase
     try {
@@ -297,7 +571,6 @@
       console.warn("Aviso Firebase:", e);
     }
 
-    // Helper para obter data local (YYYY-MM-DD) sem problemas de fuso horário UTC
     function getDataHojeLocal(dataObj = new Date()) {
       const d = dataObj instanceof Date ? dataObj : new Date(dataObj);
       if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-CA');
@@ -307,24 +580,181 @@
       return `${y}-${m}-${day}`;
     }
 
-    // Inicialização ao carregar a página
+    // Carregar senha configurada pelo Prefeito e WhatsApp
+    async function carregarConfiguracoesSeguranca() {
+      try {
+        const cacheConf = localStorage.getItem('ronda_config_cache');
+        if (cacheConf) {
+          const parsed = JSON.parse(cacheConf);
+          if (parsed && parsed.senha_equipe) {
+            senhaEquipeConfigurada = String(parsed.senha_equipe).trim();
+          }
+        }
+      } catch (e) {}
+
+      if (firestoreDb) {
+        try {
+          const doc = await firestoreDb.collection('ronda_config').doc('geral').get();
+          if (doc.exists && doc.data().senha_equipe) {
+            senhaEquipeConfigurada = String(doc.data().senha_equipe).trim();
+            localStorage.setItem('ronda_config_cache', JSON.stringify(doc.data()));
+          }
+        } catch (e) {}
+
+        try {
+          const docZap = await firestoreDb.collection('configuracoes').doc('prefeitura_contato').get();
+          if (docZap.exists && docZap.data().whatsapp_prefeito) {
+            let numLimpo = docZap.data().whatsapp_prefeito.replace(/\D/g, '');
+            if (numLimpo.length >= 10) {
+              if (!numLimpo.startsWith('55')) numLimpo = '55' + numLimpo;
+              WHATSAPP_PREFEITO = numLimpo;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Verificar se a senha já foi validada hoje neste aparelho
+      try {
+        const salvoHoje = localStorage.getItem('equipe_limpeza_auth_' + getDataHojeLocal());
+        if (salvoHoje && salvoHoje === senhaEquipeConfigurada) {
+          senhaLiberadaNestaSessao = true;
+          atualizarVisibilidadeModo();
+        }
+      } catch (e) {}
+    }
+
+    function trocarModoLimpeza(novoModo) {
+      modoAtual = novoModo;
+      const btnLimp = document.getElementById('btnModoLimpeza');
+      const btnProb = document.getElementById('btnModoProblema');
+
+      document.getElementById('telaSucesso').classList.add('hidden');
+      document.getElementById('telaSucessoProblema').classList.add('hidden');
+
+      if (novoModo === 'limpeza') {
+        btnLimp.className = "py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-teal-600 text-white shadow-sm";
+        btnProb.className = "py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900";
+      } else {
+        btnProb.className = "py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-amber-500 text-slate-950 shadow-sm";
+        btnLimp.className = "py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900";
+      }
+      atualizarVisibilidadeModo();
+    }
+
+    function atualizarVisibilidadeModo() {
+      const boxSenha = document.getElementById('containerSenhaLimpeza');
+      const formLimp = document.getElementById('formLimpeza');
+      const formProb = document.getElementById('formOcorrenciaLocal');
+
+      if (modoAtual === 'problema') {
+        boxSenha.classList.add('hidden');
+        formLimp.classList.add('hidden');
+        formProb.classList.remove('hidden');
+      } else {
+        formProb.classList.add('hidden');
+        if (senhaLiberadaNestaSessao) {
+          boxSenha.classList.add('hidden');
+          formLimp.classList.remove('hidden');
+        } else {
+          boxSenha.classList.remove('hidden');
+          formLimp.classList.add('hidden');
+        }
+      }
+    }
+
+    function validarSenhaEquipe() {
+      const digitada = (document.getElementById('inputSenhaEquipe').value || '').trim();
+      const erroEl = document.getElementById('erroSenhaEquipe');
+
+      if (digitada === senhaEquipeConfigurada) {
+        senhaLiberadaNestaSessao = true;
+        erroEl.classList.add('hidden');
+        if (document.getElementById('checkLembrarSenhaHoje')?.checked) {
+          try {
+            localStorage.setItem('equipe_limpeza_auth_' + getDataHojeLocal(), digitada);
+          } catch (e) {}
+        }
+        atualizarVisibilidadeModo();
+      } else {
+        erroEl.classList.remove('hidden');
+        document.getElementById('inputSenhaEquipe').select();
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
-      // 1. Preencher data e hora atuais no fuso horário local
       const agora = new Date();
       document.getElementById('inputData').value = getDataHojeLocal(agora);
       document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
 
-      // 2. Obter casa_id dos parâmetros da URL
+      carregarConfiguracoesSeguranca();
+
       const urlParams = new URLSearchParams(window.location.search);
       const urlCasaId = urlParams.get('casa_id');
+      const urlQuartoId = urlParams.get('quarto_id');
+      const urlQuartoNum = urlParams.get('quarto_num') || urlParams.get('quarto');
+      const urlBloco = urlParams.get('bloco') || 'Bloco 1';
+      const urlModo = urlParams.get('modo');
 
-      // 3. Carregar dados da casa do Firestore ou cache local
-      carregarCasa(urlCasaId);
+      if (urlModo === 'problema' || urlModo === 'ocorrencia') {
+        trocarModoLimpeza('problema');
+      }
+
+      if (urlQuartoId || urlQuartoNum) {
+        aplicarDadosQuartoAlojamento(urlQuartoId || `q_${urlBloco}_${urlQuartoNum}`, urlQuartoNum || urlQuartoId, urlBloco);
+      } else {
+        carregarCasa(urlCasaId);
+      }
     });
 
-    // Carregar informações da casa identificada
+    function aplicarDadosQuartoAlojamento(quartoId, quartoNum, blocoNome) {
+      const idUnificado = `quarto_${quartoId}`;
+      const nomeFormatado = `Quarto ${quartoNum} • ${blocoNome}`;
+
+      document.getElementById('inputTipoLocal').value = 'alojamento';
+      document.getElementById('inputQuartoId').value = String(quartoId);
+      document.getElementById('inputQuartoNumero').value = String(quartoNum);
+      document.getElementById('inputBlocoNome').value = String(blocoNome);
+      document.getElementById('inputCasaId').value = idUnificado;
+      document.getElementById('inputCasaNome').value = nomeFormatado;
+
+      document.getElementById('labelTipoUnidade').textContent = 'Alojamento do Canteiro';
+      document.getElementById('displayCasaNome').textContent = nomeFormatado;
+      document.getElementById('displayCasaEndereco').innerHTML = `<i class="fa-solid fa-building-user text-sky-400"></i> Setor de Alojamentos • ${blocoNome}`;
+      document.getElementById('iconeUnidade').className = 'fa-solid fa-bed';
+      document.getElementById('boxComodoOcorrencia').classList.add('hidden');
+      document.getElementById('containerSelecaoCasa').classList.add('hidden');
+      document.getElementById('badgeQrIdentificado').classList.remove('hidden');
+    }
+
+    function alternarTipoSelecaoManual(tipo) {
+      const btnCasa = document.getElementById('btnFiltroSelCasa');
+      const btnQuarto = document.getElementById('btnFiltroSelQuarto');
+      const boxCasa = document.getElementById('boxSelectCasaManual');
+      const boxQuarto = document.getElementById('boxSelectQuartoManual');
+
+      if (tipo === 'alojamento') {
+        btnQuarto.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition";
+        btnCasa.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition";
+        boxCasa.classList.add('hidden');
+        boxQuarto.classList.remove('hidden');
+        aplicarQuartoManual();
+      } else {
+        btnCasa.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition";
+        btnQuarto.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition";
+        boxQuarto.classList.add('hidden');
+        boxCasa.classList.remove('hidden');
+      }
+    }
+
+    function aplicarQuartoManual() {
+      const bloco = document.getElementById('selectBlocoManual').value || 'Bloco 1';
+      const num = (document.getElementById('inputQuartoManualNum').value || '').trim();
+      if (!num) return;
+      aplicarDadosQuartoAlojamento(`${bloco}_${num}`, num, bloco);
+      document.getElementById('containerSelecaoCasa').classList.remove('hidden');
+    }
+
     async function carregarCasa(casaId) {
-      // Tentar ler cache de casas do localStorage se existir
       try {
         const cachedCasas = localStorage.getItem('casas_cidade_cache');
         if (cachedCasas) {
@@ -332,7 +762,6 @@
         }
       } catch (e) {}
 
-      // Buscar no Firestore
       if (firestoreDb) {
         try {
           const snap = await firestoreDb.collection('casas_cidade').get();
@@ -346,7 +775,6 @@
         }
       }
 
-      // Preencher select manual
       const selEl = document.getElementById('selectCasaManual');
       if (selEl && listaCasasDisponiveis.length > 0) {
         selEl.innerHTML = '<option value="">Selecione uma casa...</option>' + 
@@ -354,6 +782,11 @@
       }
 
       if (casaId) {
+        if (String(casaId).startsWith('quarto_')) {
+          const partes = String(casaId).replace('quarto_', '').split('_');
+          aplicarDadosQuartoAlojamento(casaId.replace('quarto_', ''), partes[partes.length - 1] || '01', partes[0] || 'Bloco 1');
+          return;
+        }
         casaCarregada = listaCasasDisponiveis.find(c => c.id === casaId);
         if (!casaCarregada && firestoreDb) {
           try {
@@ -368,19 +801,22 @@
       if (casaCarregada) {
         aplicarDadosCasa(casaCarregada);
       } else {
-        // Se não foi identificado pelo ID da URL, abre o dropdown para ela escolher
-        document.getElementById('displayCasaNome').textContent = 'Selecione a Casa Abaixo';
-        document.getElementById('displayCasaEndereco').innerHTML = '<i class="fa-solid fa-circle-info text-amber-400"></i> Escolha na lista qual residência você está atendendo:';
+        document.getElementById('displayCasaNome').textContent = 'Selecione o Local Abaixo';
+        document.getElementById('displayCasaEndereco').innerHTML = '<i class="fa-solid fa-circle-info text-amber-400"></i> Escolha a residência ou quarto que está atendendo:';
         document.getElementById('containerSelecaoCasa').classList.remove('hidden');
         document.getElementById('badgeQrIdentificado').classList.add('hidden');
       }
     }
 
     function aplicarDadosCasa(c) {
+      document.getElementById('inputTipoLocal').value = 'casa';
       document.getElementById('inputCasaId').value = c.id;
       document.getElementById('inputCasaNome').value = c.nome;
+      document.getElementById('labelTipoUnidade').textContent = 'Residência Urbana Identificada';
       document.getElementById('displayCasaNome').textContent = c.nome;
       document.getElementById('displayCasaEndereco').innerHTML = `<i class="fa-solid fa-location-dot text-rose-400"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+      document.getElementById('iconeUnidade').className = 'fa-solid fa-house';
+      document.getElementById('boxComodoOcorrencia').classList.remove('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
       document.getElementById('badgeQrIdentificado').classList.remove('hidden');
 
@@ -396,7 +832,6 @@
       }
     }
 
-    // Alternar tipo de serviço
     function escolherTipoServico(tipo) {
       document.getElementById('inputTipo').value = tipo;
       const cardRotina = document.getElementById('cardTipoRotina');
@@ -411,7 +846,6 @@
       }
     }
 
-    // Alternar avaliação
     function escolherAvaliacao(btn, valor) {
       document.getElementById('inputAvaliacao').value = valor;
       document.querySelectorAll('.avaliacao-chip').forEach(el => {
@@ -420,12 +854,24 @@
       btn.className = 'avaliacao-chip active p-2.5 rounded-xl border border-teal-500 bg-teal-600 text-white font-bold text-left transition text-[11px]';
     }
 
-    // Salvar Registro de Limpeza
+    function selecionarChipProblemaLocal(btn, valor) {
+      document.getElementById('inputProblemaCategoria').value = valor;
+      document.querySelectorAll('.problema-chip').forEach(el => {
+        el.className = 'problema-chip p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 text-left transition text-[11px] flex items-center gap-1.5';
+      });
+      btn.className = 'problema-chip active p-2.5 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-200 font-bold text-left transition text-[11px] flex items-center gap-1.5';
+    }
+
+    // Salvar Registro de Limpeza (Equipe Autenticada)
     async function salvarLimpezaPublica(e) {
       if (e) e.preventDefault();
 
       const casaId = document.getElementById('inputCasaId').value;
       const casaNome = document.getElementById('inputCasaNome').value || document.getElementById('displayCasaNome').textContent;
+      const tipoLocal = document.getElementById('inputTipoLocal').value || 'casa';
+      const quartoId = document.getElementById('inputQuartoId').value || '';
+      const quartoNumero = document.getElementById('inputQuartoNumero').value || '';
+      const blocoNome = document.getElementById('inputBlocoNome').value || '';
       const tipo = document.getElementById('inputTipo').value || 'rotina';
       const responsavel = document.getElementById('inputResponsavel').value.trim();
       const data = document.getElementById('inputData').value;
@@ -434,7 +880,7 @@
       const observacoes = document.getElementById('inputObservacoes').value.trim();
 
       if (!casaId) {
-        alert('Por favor, selecione a casa que você está limpando.');
+        alert('Por favor, selecione a Casa ou o Quarto que você está limpando.');
         return;
       }
       if (!responsavel) {
@@ -460,6 +906,10 @@
         id: protocolo,
         casa_id: casaId,
         casa_nome: casaNome,
+        tipo_local: tipoLocal,
+        quarto_id: quartoId ? String(quartoId) : '',
+        quarto_numero: quartoNumero ? String(quartoNumero) : '',
+        bloco_nome: blocoNome || '',
         tipo: tipo,
         data: data,
         hora: hora,
@@ -467,12 +917,11 @@
         responsavel: responsavel,
         avaliacao: avaliacao || 'Normal',
         observacoes: observacoes || '',
-        origem: 'QR Code (Plaquinha da Residência)',
+        origem: 'QR Code (Equipe Autenticada)',
         criado_em: agora.toISOString(),
         criado_por: responsavel
       };
 
-      // 1. Salvar no Firestore
       if (firestoreDb) {
         try {
           await firestoreDb.collection('casas_limpezas').doc(protocolo).set(registro);
@@ -480,7 +929,6 @@
           console.warn("Aviso ao salvar limpeza:", err);
         }
 
-        // 2. Log de Auditoria seguro (sem campos undefined)
         try {
           const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
           const logObj = {
@@ -488,26 +936,22 @@
             data_hora: `${data.split('-').reverse().join('/')} ${hora}`,
             timestamp: agora.toISOString(),
             usuario: String(responsavel),
-            modulo: 'casas',
+            modulo: tipoLocal === 'alojamento' ? 'alojamentos' : 'casas',
             acao: 'LIMPEZA',
             entidade: String(casaNome),
             detalhes: `${descTipo} realizada por ${responsavel} via QR Code. Estado: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
           };
           await firestoreDb.collection('auditoria_logs').doc(logId).set(logObj);
-        } catch (err) {
-          console.warn("Aviso ao salvar auditoria:", err);
-        }
+        } catch (err) {}
       }
 
-      // 3. Atualizar cache local caso este celular abra o app offline
       try {
         const cached = localStorage.getItem('casas_limpezas_cache');
         const lista = cached ? JSON.parse(cached) : [];
         lista.unshift(registro);
-        localStorage.setItem('casas_limpezas_cache', JSON.stringify(lista.slice(0, 100)));
+        localStorage.setItem('casas_limpezas_cache', JSON.stringify(lista.slice(0, 200)));
       } catch (e) {}
 
-      // 4. Exibir Tela de Sucesso Isolada (Sem menu do app)
       document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
       document.getElementById('sucessoCasaNome').textContent = casaNome;
       document.getElementById('sucessoTipo').textContent = descTipo;
@@ -520,12 +964,121 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // Salvar Reclamação / Observação do Morador (Sem Senha)
+    async function salvarOcorrenciaLocalPublica(e, destino = 'app') {
+      if (e) e.preventDefault();
+
+      const casaId = document.getElementById('inputCasaId').value;
+      const casaNome = document.getElementById('inputCasaNome').value || document.getElementById('displayCasaNome').textContent;
+      const tipoLocal = document.getElementById('inputTipoLocal').value || 'casa';
+      const quartoId = document.getElementById('inputQuartoId').value || '';
+      const quartoNumero = document.getElementById('inputQuartoNumero').value || '';
+      const blocoNome = document.getElementById('inputBlocoNome').value || '';
+
+      const categoria = document.getElementById('inputProblemaCategoria').value || 'Observação / Reclamação';
+      const comodo = (document.getElementById('inputComodoOcorrencia')?.value || '').trim();
+      const descricao = (document.getElementById('inputDescricaoOcorrencia')?.value || '').trim();
+      const nomeMorador = (document.getElementById('inputNomeMorador')?.value || '').trim() || 'Morador / Alojado (Via QR Code)';
+      const zapMorador = (document.getElementById('inputZapMorador')?.value || '').trim();
+
+      if (!casaId) {
+        alert('Por favor, selecione acima qual é a Casa ou o Quarto.');
+        return;
+      }
+      if (!descricao) {
+        alert('Por favor, escreva sua observação ou o que precisa ser reparado.');
+        document.getElementById('inputDescricaoOcorrencia').focus();
+        return;
+      }
+
+      const btnApp = document.getElementById('btnEnviarOcorrenciaApp');
+      const btnZap = document.getElementById('btnEnviarOcorrenciaZap');
+      btnApp.disabled = true;
+      btnZap.disabled = true;
+      btnApp.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando ao Prefeito...';
+
+      const agora = new Date();
+      const protocolo = 'CH-' + Math.floor(100000 + Math.random() * 900000);
+      const dataHoraStr = agora.toLocaleString('pt-BR');
+
+      const localFormatado = tipoLocal === 'alojamento'
+        ? `Quarto ${quartoNumero} (${blocoNome})`
+        : `${casaNome}${comodo ? ' • ' + comodo : ''}`;
+
+      const chamadoData = {
+        id: protocolo,
+        protocolo: protocolo,
+        tipo_local: tipoLocal === 'alojamento' ? 'alojamento' : 'casa_cidade',
+        unidade_id: casaId,
+        casa_id: tipoLocal === 'casa' ? casaId : '',
+        quarto_id: quartoId ? String(quartoId) : '',
+        quarto: tipoLocal === 'alojamento' ? String(quartoNumero) : (comodo || 'Geral'),
+        bloco: tipoLocal === 'alojamento' ? String(blocoNome) : casaNome,
+        casa_nome: tipoLocal === 'casa' ? casaNome : '',
+        comodo: comodo || '',
+        local_formatado: localFormatado,
+        nome_solicitante: nomeMorador,
+        whatsapp_solicitante: zapMorador,
+        categoria: categoria,
+        descricao: descricao,
+        status: 'pendente',
+        origem: 'QR Code (Ouvidoria Morador)',
+        criado_em: agora.toISOString(),
+        data_formatada: dataHoraStr
+      };
+
+      if (firestoreDb) {
+        try {
+          await firestoreDb.collection('chamados_suporte').doc(protocolo).set(chamadoData);
+        } catch (err) {
+          console.warn("Aviso ao salvar chamado no Firestore:", err);
+        }
+      }
+
+      try {
+        const cached = localStorage.getItem('chamados_suporte_cache');
+        const lista = cached ? JSON.parse(cached) : [];
+        lista.unshift(chamadoData);
+        localStorage.setItem('chamados_suporte_cache', JSON.stringify(lista.slice(0, 150)));
+      } catch (e) {}
+
+      if (destino === 'whatsapp') {
+        const zapContato = zapMorador ? `\n📱 *Contato:* ${zapMorador}` : '';
+        const msg = 
+`🚨 *OBSERVAÇÃO / CHAMADO VIA QR CODE* 🚨
+
+📍 *Local:* ${localFormatado}
+👤 *Morador:* ${nomeMorador}
+🔧 *Assunto:* ${categoria}
+📝 *Mensagem:* ${descricao}${zapContato}
+⏰ *Data/Hora:* ${dataHoraStr}
+🎫 *Protocolo:* #${protocolo}`;
+
+        const waUrl = `https://api.whatsapp.com/send?phone=${WHATSAPP_PREFEITO}&text=${encodeURIComponent(msg)}`;
+        window.location.href = waUrl;
+      }
+
+      document.getElementById('sucessoProbProtocolo').textContent = '#' + protocolo;
+      document.getElementById('sucessoProbLocal').textContent = localFormatado;
+      document.getElementById('sucessoProbCategoria').textContent = categoria;
+      document.getElementById('sucessoProbData').textContent = dataHoraStr;
+
+      document.getElementById('formOcorrenciaLocal').classList.add('hidden');
+      document.getElementById('telaSucessoProblema').classList.remove('hidden');
+
+      btnApp.disabled = false;
+      btnZap.disabled = false;
+      btnApp.innerHTML = '<i class="fa-solid fa-paper-plane"></i><span>Enviar Direto para o Painel do Prefeito</span>';
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     function fazerOutroRegistro() {
       const agora = new Date();
       document.getElementById('inputData').value = getDataHojeLocal(agora);
       document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
       document.getElementById('inputObservacoes').value = '';
-      escolherTipoServico('ar_condicionado'); // sugere o outro serviço
+      escolherTipoServico('ar_condicionado');
 
       const btn = document.getElementById('btnConfirmar');
       btn.disabled = false;
@@ -533,6 +1086,13 @@
 
       document.getElementById('telaSucesso').classList.add('hidden');
       document.getElementById('formLimpeza').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function novaOcorrenciaReset() {
+      document.getElementById('inputDescricaoOcorrencia').value = '';
+      document.getElementById('telaSucessoProblema').classList.add('hidden');
+      document.getElementById('formOcorrenciaLocal').classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   </script>
