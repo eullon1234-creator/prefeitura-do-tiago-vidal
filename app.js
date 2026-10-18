@@ -6588,6 +6588,70 @@ const ExcelProGenerator = {
         left: { style: 'thin', color: { rgb: 'FECACA' } },
         right: { style: 'thin', color: { rgb: 'FECACA' } }
       }
+    },
+    corporateHeader: {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12, name: 'Calibri' },
+      fill: { fgColor: { rgb: '0F2A4A' } }, // Azul Marinho GEL
+      alignment: { horizontal: 'left', vertical: 'center', indent: 1 }
+    },
+    corporateSubheader: {
+      font: { italic: true, color: { rgb: 'E2E8F0' }, sz: 9, name: 'Calibri' },
+      fill: { fgColor: { rgb: '1E3A8A' } }, // Royal Blue
+      alignment: { horizontal: 'left', vertical: 'center', indent: 1 }
+    },
+    thNavy: {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10, name: 'Calibri' },
+      fill: { fgColor: { rgb: '1E3A8A' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: {
+        top: { style: 'thin', color: { rgb: '60A5FA' } },
+        bottom: { style: 'medium', color: { rgb: '0F172A' } },
+        left: { style: 'thin', color: { rgb: '60A5FA' } },
+        right: { style: 'thin', color: { rgb: '60A5FA' } }
+      }
+    },
+    thSection: {
+      font: { bold: true, color: { rgb: '1E3A8A' }, sz: 10, name: 'Calibri' },
+      fill: { fgColor: { rgb: 'EFF6FF' } }, // Azul suave 50
+      alignment: { horizontal: 'left', vertical: 'center', indent: 1 },
+      border: {
+        top: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        bottom: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        left: { style: 'thin', color: { rgb: 'BFDBFE' } },
+        right: { style: 'thin', color: { rgb: 'BFDBFE' } }
+      }
+    },
+    badgeAction: (acao, zebra = false) => {
+      const ac = String(acao || '').toUpperCase();
+      let fontColor = '0F172A';
+      let bgColor = zebra ? 'F8FAFC' : 'FFFFFF';
+      if (ac.includes('ALOCAR') || ac.includes('ENTRADA') || ac.includes('CRIAR')) {
+        fontColor = '166534';
+        bgColor = 'DCFCE7';
+      } else if (ac.includes('DESAL') || ac.includes('SAIDA') || ac.includes('EXCLUIR') || ac.includes('DESAT')) {
+        fontColor = '991B1B';
+        bgColor = 'FEE2E2';
+      } else if (ac.includes('TRANSF') || ac.includes('EDIT')) {
+        fontColor = '3730A3';
+        bgColor = 'E0E7FF';
+      } else if (ac.includes('CHAMAD') || ac.includes('REPAR')) {
+        fontColor = '92400E';
+        bgColor = 'FEF3C7';
+      } else if (ac.includes('LIMP') || ac.includes('RONDA')) {
+        fontColor = '075985';
+        bgColor = 'E0F2FE';
+      }
+      return {
+        font: { bold: true, sz: 9, color: { rgb: fontColor }, name: 'Calibri' },
+        fill: { fgColor: { rgb: bgColor } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+          bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+          left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+          right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+        }
+      };
     }
   },
 
@@ -6605,6 +6669,22 @@ const ExcelProGenerator = {
   addCabecalhoObra(ws, titulo, subtitulo, totalCols) {
     this.addCell(ws, 0, 0, titulo, { s: this.estilos.title });
     this.addCell(ws, 1, 0, subtitulo, { s: this.estilos.subtitle });
+    if (!ws['!merges']) ws['!merges'] = [];
+    ws['!merges'].push(
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } }
+    );
+  },
+
+  addCabecalhoCorporativoGEL(ws, titulo, subtitulo, totalCols) {
+    const sTitle = this.estilos.corporateHeader;
+    const sSub = this.estilos.corporateSubheader;
+
+    for (let c = 0; c < totalCols; c++) {
+      this.addCell(ws, 0, c, c === 0 ? titulo : '', { s: sTitle });
+      this.addCell(ws, 1, c, c === 0 ? subtitulo : '', { s: sSub });
+    }
+
     if (!ws['!merges']) ws['!merges'] = [];
     ws['!merges'].push(
       { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
@@ -8637,6 +8717,14 @@ async function confirmarRestaurarPadrao() {
 let listaAuditoriaGeral = [];
 
 function registrarAuditoria(modulo, acao, entidade, detalhes, usuarioCustom = null) {
+  if (typeof modulo === 'object' && modulo !== null) {
+    const obj = modulo;
+    modulo = obj.modulo || obj.tipo || 'geral';
+    acao = acao || obj.acao || obj.action || 'INFO';
+    entidade = entidade || obj.entidade || obj.target || 'Geral';
+    detalhes = detalhes || obj.detalhes || obj.descricao || obj.msg || 'Ação registrada no sistema';
+    usuarioCustom = usuarioCustom || obj.usuario || null;
+  }
   const agora = new Date();
   const dataFormatada = agora.toLocaleDateString('pt-BR');
   const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -8823,13 +8911,18 @@ function getIconModuloAuditoria(modulo) {
 }
 
 function getNomeModuloAuditoria(modulo) {
-  if (modulo === 'casas') return 'Casas na Cidade';
-  if (modulo === 'estoque') return 'Almoxarifado';
-  if (modulo === 'alojamento') return 'Alojamentos';
-  if (modulo === 'chamados') return 'Chamados QR';
-  if (modulo === 'ronda') return 'Ronda Canteiro';
-  if (modulo === 'geral') return 'Sistema';
-  return modulo ? String(modulo).toUpperCase() : 'Sistema';
+  if (!modulo) return 'Sistema';
+  if (typeof modulo === 'object' && modulo !== null) {
+    modulo = modulo.modulo || modulo.nome || modulo.id || 'geral';
+  }
+  const modStr = String(modulo).toLowerCase().trim();
+  if (modStr === '[object object]' || modStr === 'sistema' || modStr === 'geral' || modStr.includes('sist')) return 'Sistema';
+  if (modStr === 'casas' || modStr.includes('casa')) return 'Casas na Cidade';
+  if (modStr === 'estoque' || modStr.includes('almox') || modStr.includes('estoque')) return 'Almoxarifado';
+  if (modStr === 'alojamento' || modStr.includes('aloj') || modStr.includes('quarto') || modStr.includes('bloco')) return 'Alojamentos';
+  if (modStr === 'chamados' || modStr.includes('chamad')) return 'Chamados QR';
+  if (modStr === 'ronda' || modStr.includes('ronda')) return 'Ronda Canteiro';
+  return String(modulo).toUpperCase();
 }
 
 function getBadgeClassAcaoAuditoria(acao) {
@@ -9230,132 +9323,423 @@ function exportarAuditoriaExcel(modo = 'filtrados') {
     }
 
     const dataHoje = typeof getDataHojeLocal === 'function' ? getDataHojeLocal() : '';
+    const partesHoje = (dataHoje || '').split('-');
+    const dataHojeBR = partesHoje.length === 3 ? `${partesHoje[2]}/${partesHoje[1]}/${partesHoje[0]}` : new Date().toLocaleDateString('pt-BR');
     const horaAgora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const nomeUsuario = (typeof currentUserName !== 'undefined' && currentUserName) ? currentUserName : 'Prefeito';
+    const nomeUsuario = (typeof currentUserName !== 'undefined' && currentUserName) ? currentUserName : 'Prefeito da Obra';
+    const totalAcoes = logsExportar.length;
+    const modoTexto = modo === 'todos' ? 'Todo o Histórico do Banco' : 'Registros Filtrados na Tela';
 
     const wb = XLSX.utils.book_new();
 
     // -----------------------------------------------------------------
-    // ABA 1: LOGS DE ATIVIDADES DETALHADOS
+    // ABA 1: LOGS DE ATIVIDADES DETALHADOS (COM ESTILOS CORPORATIVOS)
     // -----------------------------------------------------------------
-    const rowsSheet1 = [
-      ['GEL • GOETZE LOBATO ENGENHARIA S.A. | RELATÓRIO OFICIAL DE AUDITORIA E ATIVIDADES'],
-      [`Canteiro de Obras: Taboca 2 | Emissão: ${dataHoje} às ${horaAgora} | Responsável: ${nomeUsuario} | Modo: ${modo === 'todos' ? 'Todo o Histórico' : 'Registros Filtrados na Tela'} | Total: ${logsExportar.length} ações`],
-      [], // Linha em branco
-      ['Nº', 'ID Registro', 'Data', 'Horário', 'Usuário Responsável', 'Módulo do Canteiro', 'Tipo de Ação', 'Entidade / Alvo', 'Descrição Detalhada da Operação']
-    ];
+    const ws1 = {};
+    const totalColsSheet1 = 9;
 
+    ExcelProGenerator.addCabecalhoCorporativoGEL(
+      ws1,
+      'GEL • GOETZE LOBATO ENGENHARIA S.A. | RELATÓRIO OFICIAL DE AUDITORIA & RASTREABILIDADE OPERACIONAL',
+      `Canteiro: Taboca 2 • Emissão: ${dataHojeBR} às ${horaAgora} • Responsável: ${nomeUsuario} • Modo: ${modoTexto} • Total: ${totalAcoes} ações auditadas`,
+      totalColsSheet1
+    );
+
+    // Linha de cabeçalho das colunas (Linha index 3, Excel row 4)
+    const headersLogs = ['Nº', 'ID Registro', 'Data', 'Horário', 'Usuário Responsável', 'Módulo do Canteiro', 'Tipo de Ação', 'Entidade / Alvo', 'Descrição Detalhada da Operação'];
+    headersLogs.forEach((h, col) => {
+      ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.thNavy });
+    });
+
+    // Inserção dos dados com estilos e zebra striping
     logsExportar.forEach((l, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+
       let dataParte = '';
       let horaParte = '';
       if (l.data_hora) {
-        const partes = l.data_hora.split(' ');
+        const partes = String(l.data_hora).trim().split(' ');
         dataParte = partes[0] || '';
         horaParte = partes[1] || '';
+      } else if (l.timestamp) {
+        const d = new Date(l.timestamp);
+        dataParte = d.toLocaleDateString('pt-BR');
+        horaParte = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       }
 
-      rowsSheet1.push([
-        idx + 1,
-        l.id || '',
-        dataParte,
-        horaParte,
-        l.usuario || 'Prefeito',
-        getNomeModuloAuditoria(l.modulo),
-        l.acao || 'INFO',
-        l.entidade || 'Canteiro',
-        l.detalhes || ''
-      ]);
+      const modFormatado = getNomeModuloAuditoria(l.modulo);
+      const acaoFormatada = (l.acao || 'INFO').toUpperCase();
+      const entidadeFormatada = (typeof l.entidade === 'object' && l.entidade !== null) ? (l.entidade.nome || 'Geral') : (l.entidade || 'Canteiro');
+      const descFormatada = (typeof l.detalhes === 'object' && l.detalhes !== null) ? JSON.stringify(l.detalhes) : (l.detalhes || '');
+
+      ExcelProGenerator.addCell(ws1, r, 0, idx + 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 1, l.id || `LOG-${idx + 1}`, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 2, dataParte, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 3, horaParte, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 4, l.usuario || 'Prefeito', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 5, modFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 6, acaoFormatada, { s: ExcelProGenerator.estilos.badgeAction(acaoFormatada, zebra) });
+      ExcelProGenerator.addCell(ws1, r, 7, entidadeFormatada, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 8, descFormatada, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
     });
 
-    const ws1 = XLSX.utils.aoa_to_sheet(rowsSheet1);
+    // Linha de Totalização com Fórmula do Excel na Aba 1
+    const lastDataRowSheet1 = 4 + totalAcoes; // Última linha de dados no Excel (5 até lastDataRowSheet1)
+    const totRowIndex = 4 + totalAcoes;      // Linha do total (0-indexed)
 
-    // Larguras automáticas de colunas
+    // Preenche colunas 0 a 3 mescladas
+    for (let c = 0; c < 4; c++) {
+      ExcelProGenerator.addCell(ws1, totRowIndex, c, c === 0 ? 'TOTAL DE AÇÕES AUDITADAS NO RELATÓRIO:' : '', {
+        s: ExcelProGenerator.estilos.total(c === 0 ? 'right' : 'center')
+      });
+    }
+    if (!ws1['!merges']) ws1['!merges'] = [];
+    ws1['!merges'].push({ s: { r: totRowIndex, c: 0 }, e: { r: totRowIndex, c: 3 } });
+
+    // Coluna 4 (Usuário): Fórmula de contagem
+    ExcelProGenerator.addCell(ws1, totRowIndex, 4, totalAcoes, {
+      f: `COUNTA(B5:B${lastDataRowSheet1})`,
+      s: ExcelProGenerator.estilos.total('center')
+    });
+
+    // Colunas 5 a 8 completam o estilo de fechamento duplo
+    for (let c = 5; c < totalColsSheet1; c++) {
+      ExcelProGenerator.addCell(ws1, totRowIndex, c, '', { s: ExcelProGenerator.estilos.total('center') });
+    }
+
     ws1['!cols'] = [
       { wch: 6 },  // Nº
-      { wch: 22 }, // ID Registro
-      { wch: 12 }, // Data
+      { wch: 24 }, // ID Registro
+      { wch: 13 }, // Data
       { wch: 10 }, // Horário
-      { wch: 24 }, // Usuário
+      { wch: 25 }, // Usuário Responsável
       { wch: 20 }, // Módulo
-      { wch: 16 }, // Ação
-      { wch: 20 }, // Entidade
-      { wch: 65 }  // Detalhes
+      { wch: 20 }, // Tipo de Ação
+      { wch: 28 }, // Entidade / Alvo
+      { wch: 72 }  // Descrição Detalhada
     ];
+    ws1['!rows'] = [{ hpt: 26 }, { hpt: 18 }, { hpt: 8 }, { hpt: 24 }];
+    ws1['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: totRowIndex, c: totalColsSheet1 - 1 } });
 
     XLSX.utils.book_append_sheet(wb, ws1, 'Logs de Atividades');
 
     // -----------------------------------------------------------------
-    // ABA 2: RESUMO EXECUTIVO & ESTATÍSTICAS
+    // ABA 2: RESUMO EXECUTIVO COM FÓRMULAS VIVAS DO EXCEL
     // -----------------------------------------------------------------
-    const totalAcoes = logsExportar.length;
+    const ws2 = {};
+    const totalColsSheet2 = 4;
 
-    // Estatísticas por Módulo
+    ExcelProGenerator.addCabecalhoCorporativoGEL(
+      ws2,
+      'GEL • GOETZE LOBATO ENGENHARIA S.A. | RESUMO EXECUTIVO & ESTATÍSTICAS DA AUDITORIA',
+      `Canteiro: Taboca 2 • Extração: ${dataHojeBR} às ${horaAgora} • Responsável: ${nomeUsuario} • Total Analisado: ${totalAcoes} ações`,
+      totalColsSheet2
+    );
+
+    // SEÇÃO 1: INDICADORES EXECUTIVOS (KPIS COM FÓRMULAS)
+    let currRow = 3;
+    for (let c = 0; c < totalColsSheet2; c++) {
+      ExcelProGenerator.addCell(ws2, currRow, c, c === 0 ? '1. INDICADORES EXECUTIVOS PRINCIPAIS' : '', {
+        s: ExcelProGenerator.estilos.thSection
+      });
+    }
+    if (!ws2['!merges']) ws2['!merges'] = [];
+    ws2['!merges'].push({ s: { r: currRow, c: 0 }, e: { r: currRow, c: totalColsSheet2 - 1 } });
+
+    currRow++; // Linha index 4 (Excel row 5)
+    const hSec1 = ['Indicador Operacional', 'Total / Métrica (Fórmula)', '% Sobre o Total (Fórmula)', 'Métrica / Status'];
+    hSec1.forEach((h, col) => {
+      ExcelProGenerator.addCell(ws2, currRow, col, h, { s: ExcelProGenerator.estilos.thNavy });
+    });
+
+    // 1. Total Geral Auditado
+    currRow++; // Excel row 6
+    const rowTotGeralExcel = currRow + 1; // 6
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'Total de Ações Registradas no Período', { s: ExcelProGenerator.estilos.td(false, 'left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, totalAcoes, {
+      f: `COUNTA('Logs de Atividades'!B$5:B$${lastDataRowSheet1})`,
+      s: ExcelProGenerator.estilos.td(false, 'right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, 1.0, {
+      f: `B${rowTotGeralExcel}/B${rowTotGeralExcel}`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.td(false, 'center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, '100% REGISTRADO', { s: ExcelProGenerator.estilos.td(false, 'center') });
+
+    // 2. Ações Realizadas Hoje
+    currRow++; // Excel row 7
+    const rHojeExcel = currRow + 1;
+    const qtdHojeReal = logsExportar.filter(l => (l.data_hora && l.data_hora.startsWith(dataHojeBR)) || (l.timestamp && l.timestamp.startsWith(dataHoje))).length;
+    ExcelProGenerator.addCell(ws2, currRow, 0, `Ações Realizadas Hoje (${dataHojeBR})`, { s: ExcelProGenerator.estilos.td(true, 'left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, qtdHojeReal, {
+      f: `COUNTIF('Logs de Atividades'!C$5:C$${lastDataRowSheet1}, "${dataHojeBR}")`,
+      s: ExcelProGenerator.estilos.td(true, 'right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, (totalAcoes > 0 ? qtdHojeReal / totalAcoes : 0), {
+      f: `B${rHojeExcel}/$B$${rowTotGeralExcel}`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.td(true, 'center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, 'RITMO DO DIA', { s: ExcelProGenerator.estilos.td(true, 'center') });
+
+    // 3. Alojamentos
+    currRow++; // Excel row 8
+    const rAlojExcel = currRow + 1;
+    const qtdAlojReal = logsExportar.filter(l => getNomeModuloAuditoria(l.modulo) === 'Alojamentos').length;
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'Ações em Alojamentos & Leitos', { s: ExcelProGenerator.estilos.td(false, 'left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, qtdAlojReal, {
+      f: `COUNTIF('Logs de Atividades'!F$5:F$${lastDataRowSheet1}, "Alojamentos")`,
+      s: ExcelProGenerator.estilos.td(false, 'right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, (totalAcoes > 0 ? qtdAlojReal / totalAcoes : 0), {
+      f: `B${rAlojExcel}/$B$${rowTotGeralExcel}`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.td(false, 'center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, 'ALOJAMENTOS', { s: ExcelProGenerator.estilos.td(false, 'center') });
+
+    // 4. Almoxarifado
+    currRow++; // Excel row 9
+    const rEstExcel = currRow + 1;
+    const qtdEstReal = logsExportar.filter(l => getNomeModuloAuditoria(l.modulo) === 'Almoxarifado').length;
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'Ações em Estoque & Almoxarifado', { s: ExcelProGenerator.estilos.td(true, 'left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, qtdEstReal, {
+      f: `COUNTIF('Logs de Atividades'!F$5:F$${lastDataRowSheet1}, "Almoxarifado")`,
+      s: ExcelProGenerator.estilos.td(true, 'right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, (totalAcoes > 0 ? qtdEstReal / totalAcoes : 0), {
+      f: `B${rEstExcel}/$B$${rowTotGeralExcel}`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.td(true, 'center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, 'ESTOQUE / BENS', { s: ExcelProGenerator.estilos.td(true, 'center') });
+
+    // 5. Casas na Cidade
+    currRow++; // Excel row 10
+    const rCasasExcel = currRow + 1;
+    const qtdCasasReal = logsExportar.filter(l => getNomeModuloAuditoria(l.modulo) === 'Casas na Cidade').length;
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'Ações em Casas na Cidade (Gestão Urbana)', { s: ExcelProGenerator.estilos.td(false, 'left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, qtdCasasReal, {
+      f: `COUNTIF('Logs de Atividades'!F$5:F$${lastDataRowSheet1}, "Casas na Cidade")`,
+      s: ExcelProGenerator.estilos.td(false, 'right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, (totalAcoes > 0 ? qtdCasasReal / totalAcoes : 0), {
+      f: `B${rCasasExcel}/$B$${rowTotGeralExcel}`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.td(false, 'center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, 'URBANO', { s: ExcelProGenerator.estilos.td(false, 'center') });
+
+    // 6. Chamados e Rondas
+    currRow++; // Excel row 11
+    const rChamadExcel = currRow + 1;
+    const qtdChamadReal = logsExportar.filter(l => {
+      const nm = getNomeModuloAuditoria(l.modulo);
+      return nm.includes('Chamad') || nm.includes('Ronda');
+    }).length;
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'Ações em Chamados de Manutenção & Rondas', { s: ExcelProGenerator.estilos.td(true, 'left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, qtdChamadReal, {
+      f: `COUNTIF('Logs de Atividades'!F$5:F$${lastDataRowSheet1}, "Chamados QR") + COUNTIF('Logs de Atividades'!F$5:F$${lastDataRowSheet1}, "Ronda Canteiro")`,
+      s: ExcelProGenerator.estilos.td(true, 'right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, (totalAcoes > 0 ? qtdChamadReal / totalAcoes : 0), {
+      f: `B${rChamadExcel}/$B$${rowTotGeralExcel}`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.td(true, 'center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, 'MANUTENÇÃO / FISCAL', { s: ExcelProGenerator.estilos.td(true, 'center') });
+
+    // SEÇÃO 2: DISTRIBUIÇÃO POR MÓDULO DO CANTEIRO (COM FÓRMULAS)
+    currRow += 2;
+    for (let c = 0; c < totalColsSheet2; c++) {
+      ExcelProGenerator.addCell(ws2, currRow, c, c === 0 ? '2. DISTRIBUIÇÃO CONSOLIDADA POR MÓDULO DO CANTEIRO' : '', {
+        s: ExcelProGenerator.estilos.thSection
+      });
+    }
+    ws2['!merges'].push({ s: { r: currRow, c: 0 }, e: { r: currRow, c: totalColsSheet2 - 1 } });
+
+    currRow++;
+    const hSec2 = ['Módulo Operacional', 'Quantidade de Ações (Fórmula)', '% Participação (Fórmula)', 'Classificação'];
+    hSec2.forEach((h, col) => {
+      ExcelProGenerator.addCell(ws2, currRow, col, h, { s: ExcelProGenerator.estilos.thNavy });
+    });
+
+    // Mapeamento dos módulos reais ordenados
     const contagemModulos = {};
     logsExportar.forEach(l => {
       const modNome = getNomeModuloAuditoria(l.modulo);
       contagemModulos[modNome] = (contagemModulos[modNome] || 0) + 1;
     });
 
-    // Estatísticas por Tipo de Ação
+    const listaModulosOrdenados = Object.keys(contagemModulos).sort((a,b) => contagemModulos[b] - contagemModulos[a]);
+    const firstRowModExcel = currRow + 2;
+
+    listaModulosOrdenados.forEach((mod, idx) => {
+      currRow++;
+      const zebra = idx % 2 === 1;
+      const exRow = currRow + 1;
+      const qtdMod = contagemModulos[mod];
+      const partMod = totalAcoes > 0 ? (qtdMod / totalAcoes) : 0;
+
+      ExcelProGenerator.addCell(ws2, currRow, 0, mod, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, currRow, 1, qtdMod, {
+        f: `COUNTIF('Logs de Atividades'!F$5:F$${lastDataRowSheet1}, "${mod}")`,
+        s: ExcelProGenerator.estilos.td(zebra, 'right')
+      });
+      ExcelProGenerator.addCell(ws2, currRow, 2, partMod, {
+        f: `B${exRow}/$B$${rowTotGeralExcel}`,
+        z: '0.0%',
+        s: ExcelProGenerator.estilos.td(zebra, 'center')
+      });
+      ExcelProGenerator.addCell(ws2, currRow, 3, 'SETOR OPERACIONAL', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const lastRowModExcel = currRow + 1;
+    currRow++; // Subtotal Módulos
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'SUBTOTAL POR MÓDULOS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, totalAcoes, {
+      f: `SUM(B${firstRowModExcel}:B${lastRowModExcel})`,
+      s: ExcelProGenerator.estilos.total('right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, 1.0, {
+      f: `SUM(C${firstRowModExcel}:C${lastRowModExcel})`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.total('center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, '100% AUDITADO', { s: ExcelProGenerator.estilos.total('center') });
+
+    // SEÇÃO 3: DISTRIBUIÇÃO POR TIPO DE AÇÃO (COM FÓRMULAS)
+    currRow += 2;
+    for (let c = 0; c < totalColsSheet2; c++) {
+      ExcelProGenerator.addCell(ws2, currRow, c, c === 0 ? '3. ATIVIDADES POR TIPO DE OPERAÇÃO / AÇÃO' : '', {
+        s: ExcelProGenerator.estilos.thSection
+      });
+    }
+    ws2['!merges'].push({ s: { r: currRow, c: 0 }, e: { r: currRow, c: totalColsSheet2 - 1 } });
+
+    currRow++;
+    const hSec3 = ['Tipo de Operação / Ação', 'Ocorrências (Fórmula)', '% Participação (Fórmula)', 'Natureza da Operação'];
+    hSec3.forEach((h, col) => {
+      ExcelProGenerator.addCell(ws2, currRow, col, h, { s: ExcelProGenerator.estilos.thNavy });
+    });
+
     const contagemAcoes = {};
     logsExportar.forEach(l => {
-      const ac = l.acao || 'OUTROS';
+      const ac = (l.acao || 'INFO').toUpperCase();
       contagemAcoes[ac] = (contagemAcoes[ac] || 0) + 1;
     });
 
-    // Estatísticas por Usuário
+    const listaAcoesOrdenadas = Object.keys(contagemAcoes).sort((a,b) => contagemAcoes[b] - contagemAcoes[a]);
+    const firstRowAcExcel = currRow + 2;
+
+    listaAcoesOrdenadas.forEach((ac, idx) => {
+      currRow++;
+      const zebra = idx % 2 === 1;
+      const exRow = currRow + 1;
+      const qtdAc = contagemAcoes[ac];
+      const partAc = totalAcoes > 0 ? (qtdAc / totalAcoes) : 0;
+
+      ExcelProGenerator.addCell(ws2, currRow, 0, ac, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, currRow, 1, qtdAc, {
+        f: `COUNTIF('Logs de Atividades'!G$5:G$${lastDataRowSheet1}, "${ac}")`,
+        s: ExcelProGenerator.estilos.td(zebra, 'right')
+      });
+      ExcelProGenerator.addCell(ws2, currRow, 2, partAc, {
+        f: `B${exRow}/$B$${rowTotGeralExcel}`,
+        z: '0.0%',
+        s: ExcelProGenerator.estilos.td(zebra, 'center')
+      });
+      ExcelProGenerator.addCell(ws2, currRow, 3, 'REGISTRO DE CAMPO', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    });
+
+    const lastRowAcExcel = currRow + 1;
+    currRow++; // Subtotal Ações
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'SUBTOTAL POR TIPO DE AÇÃO', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, totalAcoes, {
+      f: `SUM(B${firstRowAcExcel}:B${lastRowAcExcel})`,
+      s: ExcelProGenerator.estilos.total('right')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 2, 1.0, {
+      f: `SUM(C${firstRowAcExcel}:C${lastRowAcExcel})`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.total('center')
+    });
+    ExcelProGenerator.addCell(ws2, currRow, 3, '100% REGISTRADO', { s: ExcelProGenerator.estilos.total('center') });
+
+    // SEÇÃO 4: ATIVIDADES POR USUÁRIO RESPONSÁVEL (COM FÓRMULAS)
+    currRow += 2;
+    for (let c = 0; c < totalColsSheet2; c++) {
+      ExcelProGenerator.addCell(ws2, currRow, c, c === 0 ? '4. AUDITORIA POR USUÁRIO RESPONSÁVEL (QUEM FEZ O QUÊ)' : '', {
+        s: ExcelProGenerator.estilos.thSection
+      });
+    }
+    ws2['!merges'].push({ s: { r: currRow, c: 0 }, e: { r: currRow, c: totalColsSheet2 - 1 } });
+
+    currRow++;
+    const hSec4 = ['Usuário Responsável', 'Operações Realizadas (Fórmula)', '% do Total (Fórmula)', 'Perfil no Canteiro'];
+    hSec4.forEach((h, col) => {
+      ExcelProGenerator.addCell(ws2, currRow, col, h, { s: ExcelProGenerator.estilos.thNavy });
+    });
+
     const contagemUsuarios = {};
     logsExportar.forEach(l => {
-      const u = l.usuario || 'Prefeito';
+      const u = l.usuario || 'Prefeito da Obra';
       contagemUsuarios[u] = (contagemUsuarios[u] || 0) + 1;
     });
 
-    const rowsSheet2 = [
-      ['GEL • GOETZE LOBATO ENGENHARIA S.A. | RESUMO EXECUTIVO DA AUDITORIA'],
-      [`Canteiro de Obras: Taboca 2 | Data da Extração: ${dataHoje} | Total Analisado: ${totalAcoes} ações`],
-      [],
-      ['INDICADOR GERAL', 'VALOR'],
-      ['Total de Ações Registradas no Período', totalAcoes],
-      ['Total Geral Histórico no Banco', listaAuditoriaGeral.length],
-      ['Responsável pela Emissão', nomeUsuario],
-      [],
-      ['DISTRIBUIÇÃO POR MÓDULO DO CANTEIRO', 'QUANTIDADE DE AÇÕES', 'PARTICIPAÇÃO (%)']
-    ];
+    const listaUsuariosOrdenados = Object.keys(contagemUsuarios).sort((a,b) => contagemUsuarios[b] - contagemUsuarios[a]);
+    const firstRowUsrExcel = currRow + 2;
 
-    Object.keys(contagemModulos).sort((a,b) => contagemModulos[b] - contagemModulos[a]).forEach(mod => {
-      const qtd = contagemModulos[mod];
-      const pct = totalAcoes > 0 ? ((qtd / totalAcoes) * 100).toFixed(1) + '%' : '0%';
-      rowsSheet2.push([mod, qtd, pct]);
+    listaUsuariosOrdenados.forEach((usr, idx) => {
+      currRow++;
+      const zebra = idx % 2 === 1;
+      const exRow = currRow + 1;
+      const qtdUsr = contagemUsuarios[usr];
+      const partUsr = totalAcoes > 0 ? (qtdUsr / totalAcoes) : 0;
+
+      ExcelProGenerator.addCell(ws2, currRow, 0, usr, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, currRow, 1, qtdUsr, {
+        f: `COUNTIF('Logs de Atividades'!E$5:E$${lastDataRowSheet1}, "${usr}")`,
+        s: ExcelProGenerator.estilos.td(zebra, 'right')
+      });
+      ExcelProGenerator.addCell(ws2, currRow, 2, partUsr, {
+        f: `B${exRow}/$B$${rowTotGeralExcel}`,
+        z: '0.0%',
+        s: ExcelProGenerator.estilos.td(zebra, 'center')
+      });
+      ExcelProGenerator.addCell(ws2, currRow, 3, 'OPERADOR ATIVO', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
     });
 
-    rowsSheet2.push([]);
-    rowsSheet2.push(['DISTRIBUIÇÃO POR TIPO DE AÇÃO', 'QUANTIDADE DE OCORRÊNCIAS', 'PARTICIPAÇÃO (%)']);
-    Object.keys(contagemAcoes).sort((a,b) => contagemAcoes[b] - contagemAcoes[a]).forEach(ac => {
-      const qtd = contagemAcoes[ac];
-      const pct = totalAcoes > 0 ? ((qtd / totalAcoes) * 100).toFixed(1) + '%' : '0%';
-      rowsSheet2.push([ac, qtd, pct]);
+    const lastRowUsrExcel = currRow + 1;
+    currRow++; // Subtotal Usuários
+    ExcelProGenerator.addCell(ws2, currRow, 0, 'TOTAL GERAL DE AÇÕES AUDITADAS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, currRow, 1, totalAcoes, {
+      f: `SUM(B${firstRowUsrExcel}:B${lastRowUsrExcel})`,
+      s: ExcelProGenerator.estilos.total('right')
     });
-
-    rowsSheet2.push([]);
-    rowsSheet2.push(['ATIVIDADES POR USUÁRIO RESPONSÁVEL', 'QUANTIDADE DE OPERAÇÕES', 'PARTICIPAÇÃO (%)']);
-    Object.keys(contagemUsuarios).sort((a,b) => contagemUsuarios[b] - contagemUsuarios[a]).forEach(u => {
-      const qtd = contagemUsuarios[u];
-      const pct = totalAcoes > 0 ? ((qtd / totalAcoes) * 100).toFixed(1) + '%' : '0%';
-      rowsSheet2.push([u, qtd, pct]);
+    ExcelProGenerator.addCell(ws2, currRow, 2, 1.0, {
+      f: `SUM(C${firstRowUsrExcel}:C${lastRowUsrExcel})`,
+      z: '0.0%',
+      s: ExcelProGenerator.estilos.total('center')
     });
+    ExcelProGenerator.addCell(ws2, currRow, 3, '100% REGISTRADO', { s: ExcelProGenerator.estilos.total('center') });
 
-    const ws2 = XLSX.utils.aoa_to_sheet(rowsSheet2);
     ws2['!cols'] = [
-      { wch: 38 },
-      { wch: 26 },
-      { wch: 18 }
+      { wch: 42 }, // Indicador / Nome
+      { wch: 28 }, // Quantidade com Fórmula
+      { wch: 24 }, // % Participação
+      { wch: 22 }  // Status / Perfil
     ];
+    ws2['!rows'] = [{ hpt: 26 }, { hpt: 18 }, { hpt: 8 }];
+    ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: currRow, c: totalColsSheet2 - 1 } });
 
     XLSX.utils.book_append_sheet(wb, ws2, 'Resumo Executivo');
 
     const sufixo = modo === 'todos' ? 'COMPLETO' : 'FILTRADO';
     XLSX.writeFile(wb, `RELATORIO_AUDITORIA_CANTEIRO_TABOCA_2_${sufixo}_${dataHoje}.xlsx`);
-    showToast(`Histórico de auditoria (${logsExportar.length} ações) exportado com sucesso em Excel (.xlsx)!`, 'success');
+    showToast(`Planilha executiva de auditoria (${logsExportar.length} ações) exportada com sucesso em Excel (.xlsx)!`, 'success');
   } catch (e) {
     showToast('Erro ao exportar logs de auditoria: ' + e.message, 'error');
   }

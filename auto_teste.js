@@ -1176,9 +1176,14 @@ assert(appJsAudit.includes('function abrirModalDetalheAuditoria('), 'Função ab
 assert(appJsAudit.includes('function copiarLogAuditoriaWhatsAppModal('), 'Função copiarLogAuditoriaWhatsAppModal implementada em app.js');
 assert(appJsAudit.includes('function exportarAuditoriaExcel('), 'Função exportarAuditoriaExcel implementada em app.js');
 
-// Verificação de lógica e formatação do Excel (2 abas)
+// Verificação de lógica e formatação do Excel (2 abas com fórmulas e estilos corporativos)
 assert(appJsAudit.includes("XLSX.utils.book_append_sheet(wb, ws1, 'Logs de Atividades')"), 'Excel de auditoria gera a aba "Logs de Atividades"');
 assert(appJsAudit.includes("XLSX.utils.book_append_sheet(wb, ws2, 'Resumo Executivo')"), 'Excel de auditoria gera a aba "Resumo Executivo"');
+assert(appJsAudit.includes("ExcelProGenerator.addCabecalhoCorporativoGEL"), 'Excel de auditoria utiliza cabeçalho corporativo institucional GEL');
+assert(appJsAudit.includes("badgeAction(acaoFormatada, zebra)"), 'Excel de auditoria estiliza tipo de ação com badge colorido');
+assert(appJsAudit.includes("COUNTA(B5:B"), 'Excel de auditoria possui fórmula de contagem COUNTA na aba Logs de Atividades');
+assert(appJsAudit.includes("COUNTIF('Logs de Atividades'!"), 'Excel de auditoria possui fórmulas vivas COUNTIF na aba Resumo Executivo');
+assert(appJsAudit.includes("SUM(B"), 'Excel de auditoria possui fórmulas de totalização SUM na aba Resumo Executivo');
 
 // Window exports
 assert(appJsAudit.includes('window.definirFiltroPeriodoAuditoria = definirFiltroPeriodoAuditoria'), 'definirFiltroPeriodoAuditoria exposto no window');
