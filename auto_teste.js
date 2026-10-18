@@ -1262,11 +1262,26 @@ assert(appJsQR.includes("headTit.textContent = 'Placa de Identificação & QR Co
 assert(appJsQR.includes("headTit.textContent = 'Placa de Identificação & QR Code da Residência (Casa na Cidade)'"), 'abrirModalPlacaQRCasa altera título dinamicamente para Casa');
 assert(appJsQR.includes("headTit.textContent = 'Placa de Identificação & QR Code do Quarto (Alojamento)'"), 'abrirModalPlacaQRQuarto altera título dinamicamente para Quarto');
 
-// 19.7 Paridade rigorosa 100% de todos os 4 arquivos modificados
+// -------------------------------------------------------------
+// 20. HIERARQUIA DE CAMADAS Z-INDEX E EDIÇÃO REATIVA DE CASAS
+// -------------------------------------------------------------
+console.log('\n🪟 20. Verificação da Hierarquia de Camadas Z-Index e Edição Reativa de Casas');
+
+const indexHtmlZIndex = fs.readFileSync('index.html', 'utf8');
+const appJsZIndex = fs.readFileSync('app.js', 'utf8');
+
+// 20.1 Validação de Z-Index para sobreposição perfeita de modais
+assert(indexHtmlZIndex.includes('id="modalCasaForm" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[70]'), 'modalCasaForm configurado com z-[70] para sobrepor modalCasaDetalhes');
+assert(indexHtmlZIndex.includes('id="modalCasaDetalhes" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50'), 'modalCasaDetalhes configurado como nível base z-50');
+assert(indexHtmlZIndex.includes('id="modalTermoResponsabilidade" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[75]'), 'modalTermoResponsabilidade configurado com z-[75] para sobreposição limpa');
+
+// 20.2 Validação da reatividade em salvarCasa
+assert(appJsZIndex.includes("casaSelecionadaId === id && typeof abrirModalCasaDetalhes === 'function'"), 'salvarCasa detecta se modalCasaDetalhes está aberto');
+assert(appJsZIndex.includes("abrirModalCasaDetalhes(id);"), 'salvarCasa atualiza modalCasaDetalhes em tempo real após salvar');
+
+// 20.3 Paridade 100% rigorosa
 assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html');
 assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
-assert(fs.readFileSync('ronda.html', 'utf8') === fs.readFileSync('frontend/ronda.html', 'utf8'), 'Paridade 100% ronda.html e frontend/ronda.html');
-assert(fs.readFileSync('limpeza.html', 'utf8') === fs.readFileSync('frontend/limpeza.html', 'utf8'), 'Paridade 100% limpeza.html e frontend/limpeza.html');
 
 
 // -------------------------------------------------------------

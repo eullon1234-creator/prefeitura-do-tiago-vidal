@@ -11705,6 +11705,14 @@ async function salvarCasa(event) {
   fecharModal('modalCasaForm');
   showToast(`Casa "${nome}" salva com sucesso!`, 'success');
 
+  // Se o modal de detalhes desta casa estiver aberto, atualizar a exibição em tempo real
+  if (typeof casaSelecionadaId !== 'undefined' && casaSelecionadaId === id && typeof abrirModalCasaDetalhes === 'function') {
+    const modalDetalhesEl = document.getElementById('modalCasaDetalhes');
+    if (modalDetalhesEl && !modalDetalhesEl.classList.contains('hidden')) {
+      abrirModalCasaDetalhes(id);
+    }
+  }
+
   // 2. Sincronizar com Firestore
   if (firestoreDb) {
     try {
