@@ -4,4 +4,5 @@ __pycache__/
 .~lock.*
 .DS_Store
 Thumbs.db
-.agents/
+.agents/*
+!.agents/skills/
