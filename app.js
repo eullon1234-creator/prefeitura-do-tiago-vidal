@@ -7745,6 +7745,8 @@ function filtrarPainelDespesasCasasUI() {
       if (d.vencimento < hojeStr) avisoVencida = true;
     }
 
+    const dadosConc = (d.categoria && (d.categoria.toLowerCase().includes('energia') || d.categoria.toLowerCase().includes('luz') || d.categoria.toLowerCase().includes('água') || d.categoria.toLowerCase().includes('agua'))) ? obterDadosConcessionariaCasa(casa, d.categoria) : null;
+
     return `
       <tr class="hover:bg-slate-50 transition border-b border-slate-100">
         <td class="py-3 px-4 font-bold text-slate-900 flex items-center gap-2">
@@ -7756,6 +7758,20 @@ function filtrarPainelDespesasCasasUI() {
             <i class="${iconeDespesa(d.categoria)}"></i>
             <span>${d.categoria || 'Despesa'}</span>
           </span>
+          ${dadosConc ? `
+            <div class="mt-1 flex items-center gap-1 flex-wrap">
+              ${dadosConc.url ? `
+                <a href="${dadosConc.url}" target="_blank" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-[10px] font-bold" title="Acessar portal da ${dadosConc.nome}">
+                  <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> ${dadosConc.nome}
+                </a>
+              ` : `<span class="text-[10px] text-slate-500">${dadosConc.nome}</span>`}
+              ${dadosConc.codigo ? `
+                <button type="button" onclick="copiarCodigoConcessionaria('${dadosConc.codigo}', '${dadosConc.rotuloCodigo}')" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-bold" title="Copiar ${dadosConc.rotuloCodigo}">
+                  <i class="fa-solid fa-copy text-[9px]"></i> ${dadosConc.codigo}
+                </button>
+              ` : ''}
+            </div>
+          ` : ''}
         </td>
         <td class="py-3 px-4">
           <div class="text-xs text-slate-700">${d.observacoes || '<span class="text-slate-400 italic">Sem observações</span>'}</div>
@@ -9984,6 +10000,295 @@ function renderizarCasasCidadeGrid(casas) {
   }).join('');
 }
 
+// ==========================================
+// MÓDULO CONCESSIONÁRIAS DE ÁGUA & LUZ (2ª VIA DIRETA)
+// ==========================================
+
+const CATALOGO_CONCESSIONARIAS_ENERGIA = {
+  'energisa': { nome: 'Energisa', url: 'https://servicos.energisa.com.br/', icone: 'fa-bolt text-yellow-500' },
+  'enel': { nome: 'Enel', url: 'https://www.enel.com.br/pt/segunda-via-de-fatura.html', icone: 'fa-bolt text-yellow-500' },
+  'cpfl': { nome: 'CPFL Energia', url: 'https://servicosonline.cpfl.com.br/', icone: 'fa-bolt text-yellow-500' },
+  'cemig': { nome: 'Cemig', url: 'https://atende.cemig.com.br/', icone: 'fa-bolt text-yellow-500' },
+  'neoenergia': { nome: 'Neoenergia', url: 'https://www.neoenergia.com/', icone: 'fa-bolt text-yellow-500' },
+  'equatorial': { nome: 'Equatorial Energia', url: 'https://www.equatorialenergia.com.br/', icone: 'fa-bolt text-yellow-500' },
+  'copel': { nome: 'Copel', url: 'https://www.copel.com/agenciavirtual/', icone: 'fa-bolt text-yellow-500' },
+  'ceee': { nome: 'CEEE Equatorial', url: 'https://ceee.equatorialenergia.com.br/', icone: 'fa-bolt text-yellow-500' },
+  'outra': { nome: 'Outra Concessionária', url: '', icone: 'fa-bolt text-yellow-500' }
+};
+
+const CATALOGO_CONCESSIONARIAS_AGUA = {
+  'sanesul': { nome: 'Sanesul (MS)', url: 'https://agenciavirtual.sanesul.ms.gov.br/', icone: 'fa-droplet text-cyan-500' },
+  'sabesp': { nome: 'Sabesp (SP)', url: 'https://agenciavirtual.sabesp.com.br/', icone: 'fa-droplet text-cyan-500' },
+  'copasa': { nome: 'Copasa (MG)', url: 'https://copasa.com.br/wps/portal/internet/servicos/segunda-via', icone: 'fa-droplet text-cyan-500' },
+  'sanepar': { nome: 'Sanepar (PR)', url: 'https://site.sanepar.com.br/servicos/segunda-via-conta', icone: 'fa-droplet text-cyan-500' },
+  'embasa': { nome: 'Embasa (BA)', url: 'https://atendimentovirtual.embasa.ba.gov.br/', icone: 'fa-droplet text-cyan-500' },
+  'corsan': { nome: 'Corsan (RS)', url: 'https://corsan.com.br/segunda-via-da-fatura', icone: 'fa-droplet text-cyan-500' },
+  'aguas_brasil': { nome: 'Águas do Brasil', url: 'https://www.grupoaguasdobrasil.com.br/', icone: 'fa-droplet text-cyan-500' },
+  'cagece': { nome: 'Cagece (CE)', url: 'https://www.cagece.com.br/', icone: 'fa-droplet text-cyan-500' },
+  'outra': { nome: 'Outra Concessionária', url: '', icone: 'fa-droplet text-cyan-500' }
+};
+
+function obterDadosConcessionariaCasa(casa, tipo) {
+  if (!casa) return null;
+  const isEnergia = tipo === 'energia' || (tipo && (tipo.toLowerCase().includes('energia') || tipo.toLowerCase().includes('luz')));
+  const isAgua = tipo === 'agua' || (tipo && (tipo.toLowerCase().includes('água') || tipo.toLowerCase().includes('agua') || tipo.toLowerCase().includes('saneamento')));
+
+  if (isEnergia) {
+    const key = (casa.energia_concessionaria || '').toLowerCase();
+    const config = CATALOGO_CONCESSIONARIAS_ENERGIA[key] || (key ? { nome: casa.energia_concessionaria, url: '', icone: 'fa-bolt text-yellow-500' } : null);
+    if (!config && !casa.energia_uc && !casa.energia_link_custom && !casa.energia_nome_custom) return null;
+    const nomeFinal = (key === 'outra' && casa.energia_nome_custom) ? casa.energia_nome_custom : (config ? config.nome : (casa.energia_concessionaria || 'Concessionária de Luz'));
+    const urlFinal = casa.energia_link_custom || (config ? config.url : '');
+    return {
+      tipo: 'energia',
+      tipoNome: 'Energia Elétrica',
+      nome: nomeFinal,
+      codigo: casa.energia_uc || '',
+      rotuloCodigo: 'Código UC / Instalação',
+      url: urlFinal,
+      icone: 'fa-bolt text-yellow-500'
+    };
+  }
+
+  if (isAgua) {
+    const key = (casa.agua_concessionaria || '').toLowerCase();
+    const config = CATALOGO_CONCESSIONARIAS_AGUA[key] || (key ? { nome: casa.agua_concessionaria, url: '', icone: 'fa-droplet text-cyan-500' } : null);
+    if (!config && !casa.agua_matricula && !casa.agua_link_custom && !casa.agua_nome_custom) return null;
+    const nomeFinal = (key === 'outra' && casa.agua_nome_custom) ? casa.agua_nome_custom : (config ? config.nome : (casa.agua_concessionaria || 'Concessionária de Água'));
+    const urlFinal = casa.agua_link_custom || (config ? config.url : '');
+    return {
+      tipo: 'agua',
+      tipoNome: 'Água e Saneamento',
+      nome: nomeFinal,
+      codigo: casa.agua_matricula || '',
+      rotuloCodigo: 'Matrícula / Ligação',
+      url: urlFinal,
+      icone: 'fa-droplet text-cyan-500'
+    };
+  }
+
+  return null;
+}
+
+function aoMudarConcessionariaCasa(tipo) {
+  if (tipo === 'energia') {
+    const val = document.getElementById('casaFormEnergiaConcessionaria')?.value || '';
+    const boxCustom = document.getElementById('boxCasaEnergiaCustomUrl');
+    if (boxCustom) {
+      if (val === 'outra') {
+        boxCustom.classList.remove('hidden');
+      } else {
+        boxCustom.classList.add('hidden');
+      }
+    }
+  } else if (tipo === 'agua') {
+    const val = document.getElementById('casaFormAguaConcessionaria')?.value || '';
+    const boxCustom = document.getElementById('boxCasaAguaCustomUrl');
+    if (boxCustom) {
+      if (val === 'outra') {
+        boxCustom.classList.remove('hidden');
+      } else {
+        boxCustom.classList.add('hidden');
+      }
+    }
+  }
+}
+
+function copiarCodigoConcessionaria(codigo, rotulo) {
+  if (!codigo) {
+    showToast('Nenhum código para copiar.', 'warning');
+    return;
+  }
+  const nomeRotulo = rotulo || 'Código';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(codigo).then(() => {
+      showToast(`${nomeRotulo} (${codigo}) copiado com sucesso!`, 'success');
+    }).catch(() => {
+      copiarCodigoFallback(codigo, nomeRotulo);
+    });
+  } else {
+    copiarCodigoFallback(codigo, nomeRotulo);
+  }
+}
+
+function copiarCodigoFallback(codigo, rotulo) {
+  const el = document.createElement('textarea');
+  el.value = codigo;
+  el.setAttribute('readonly', '');
+  el.style.position = 'absolute';
+  el.style.left = '-9999px';
+  document.body.appendChild(el);
+  el.select();
+  try {
+    document.execCommand('copy');
+    showToast(`${rotulo} (${codigo}) copiado!`, 'success');
+  } catch (err) {
+    showToast(`Código: ${codigo}`, 'info');
+  }
+  document.body.removeChild(el);
+}
+
+function atualizarInfoConcessionariaDespesaForm() {
+  const box = document.getElementById('boxInfoConcessionariaDespesa');
+  if (!box) return;
+
+  const casaId = document.getElementById('despesaCasaFormCasaId')?.value;
+  const categoria = document.getElementById('despesaCasaFormCategoria')?.value || '';
+  const casa = listaCasasCidade.find(c => c.id === casaId);
+
+  if (!casa) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+
+  const dados = obterDadosConcessionariaCasa(casa, categoria);
+  if (!dados || (!dados.url && !dados.codigo)) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+
+  const ehEnergia = dados.tipo === 'energia';
+  box.innerHTML = `
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <div class="flex items-start sm:items-center gap-2">
+        <div class="w-8 h-8 rounded-lg ${ehEnergia ? 'bg-amber-500/20 text-amber-700' : 'bg-cyan-500/20 text-cyan-700'} flex items-center justify-center text-sm flex-shrink-0 mt-0.5 sm:mt-0">
+          <i class="${ehEnergia ? 'fa-solid fa-bolt' : 'fa-solid fa-droplet'}"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-800">${dados.nome}</span>
+            <span class="px-2 py-0.2 rounded text-[10px] font-bold ${ehEnergia ? 'bg-amber-100 text-amber-800' : 'bg-cyan-100 text-cyan-800'}">
+              ${dados.tipoNome}
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-600 mt-0.5">
+            ${dados.rotuloCodigo}: <strong class="font-mono text-slate-900 font-bold">${dados.codigo || 'Não informado'}</strong>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap pt-1 sm:pt-0 border-t sm:border-t-0 border-amber-200">
+        ${dados.codigo ? `
+          <button type="button" onclick="copiarCodigoConcessionaria('${dados.codigo}', '${dados.rotuloCodigo}')" class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-300 shadow-2xs transition flex items-center gap-1.5">
+            <i class="fa-solid fa-copy text-amber-600 text-xs"></i>
+            <span>Copiar ${ehEnergia ? 'UC' : 'Matrícula'}</span>
+          </button>
+        ` : ''}
+
+        ${dados.url ? `
+          <a href="${dados.url}" target="_blank" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-2xs transition inline-flex items-center gap-1.5">
+            <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+            <span>Agência Virtual (${dados.nome})</span>
+          </a>
+        ` : ''}
+      </div>
+    </div>
+  `;
+  box.classList.remove('hidden');
+}
+
+function renderizarCardAgenciasCasaAtual(casa) {
+  const card = document.getElementById('casaDetalhesAgenciasCard');
+  if (!card) return;
+
+  if (!casa) {
+    card.classList.add('hidden');
+    return;
+  }
+
+  const dadosEnergia = obterDadosConcessionariaCasa(casa, 'energia');
+  const dadosAgua = obterDadosConcessionariaCasa(casa, 'agua');
+
+  if (!dadosEnergia && !dadosAgua) {
+    card.className = 'p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs';
+    card.innerHTML = `
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-circle-info text-amber-500 text-sm"></i>
+        <span>Nenhuma concessionária de Luz ou Água configurada para esta casa.</span>
+      </div>
+      <button type="button" onclick="editarCasa('${casa.id}')" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 w-fit">
+        <i class="fa-solid fa-gear"></i> Configurar Agora
+      </button>
+    `;
+    card.classList.remove('hidden');
+    return;
+  }
+
+  card.className = 'p-3.5 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-900 to-indigo-950 text-white shadow-xs';
+  card.innerHTML = `
+    <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 rounded-md bg-amber-400/20 text-amber-300 flex items-center justify-center text-xs">
+          <i class="fa-solid fa-bolt"></i>
+        </span>
+        <h5 class="text-xs font-bold text-white uppercase tracking-wider">Agências Virtuais & 2ª Via das Contas</h5>
+      </div>
+      <button type="button" onclick="editarCasa('${casa.id}')" class="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition">
+        <i class="fa-solid fa-pen-to-square"></i> Alterar Concessionárias
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2.5">
+      <!-- Concessionária de Luz -->
+      <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-yellow-500/20 text-yellow-400 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+          <div class="truncate">
+            <p class="text-[10px] text-slate-400 font-bold uppercase">Energia Elétrica</p>
+            <p class="text-xs font-bold text-white truncate">${dadosEnergia ? dadosEnergia.nome : '<span class="text-slate-400 font-normal italic">Não configurada</span>'}</p>
+            ${dadosEnergia && dadosEnergia.codigo ? `<p class="text-[11px] font-mono text-amber-300 font-semibold truncate">UC: ${dadosEnergia.codigo}</p>` : ''}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          ${dadosEnergia && dadosEnergia.codigo ? `
+            <button type="button" onclick="copiarCodigoConcessionaria('${dadosEnergia.codigo}', 'Código UC')" class="p-1.5 px-2 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition" title="Copiar Código UC">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          ` : ''}
+          ${dadosEnergia && dadosEnergia.url ? `
+            <a href="${dadosEnergia.url}" target="_blank" class="px-2.5 py-1.5 rounded-md bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition" title="Acessar Agência Virtual">
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Abrir Agência</span>
+            </a>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Concessionária de Água -->
+      <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-droplet"></i>
+          </div>
+          <div class="truncate">
+            <p class="text-[10px] text-slate-400 font-bold uppercase">Água & Esgoto</p>
+            <p class="text-xs font-bold text-white truncate">${dadosAgua ? dadosAgua.nome : '<span class="text-slate-400 font-normal italic">Não configurada</span>'}</p>
+            ${dadosAgua && dadosAgua.codigo ? `<p class="text-[11px] font-mono text-cyan-300 font-semibold truncate">Matrícula: ${dadosAgua.codigo}</p>` : ''}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          ${dadosAgua && dadosAgua.codigo ? `
+            <button type="button" onclick="copiarCodigoConcessionaria('${dadosAgua.codigo}', 'Matrícula')" class="p-1.5 px-2 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition" title="Copiar Matrícula">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          ` : ''}
+          ${dadosAgua && dadosAgua.url ? `
+            <a href="${dadosAgua.url}" target="_blank" class="px-2.5 py-1.5 rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition" title="Acessar Agência Virtual">
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Abrir Agência</span>
+            </a>
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+  card.classList.remove('hidden');
+}
+
 // Criar / Editar Casa
 function openModalNovaCasa() {
   const form = document.getElementById('formCasa');
@@ -9996,6 +10301,20 @@ function openModalNovaCasa() {
   if (imgEl) { imgEl.src = ''; imgEl.classList.add('hidden'); }
   const iconEl = document.getElementById('casaFormFotoIcon');
   if (iconEl) iconEl.classList.remove('hidden');
+
+  // Concessionárias de Luz e Água
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  setVal('casaFormEnergiaConcessionaria', '');
+  setVal('casaFormEnergiaUC', '');
+  setVal('casaFormEnergiaNomeCustom', '');
+  setVal('casaFormEnergiaLinkCustom', '');
+  setVal('casaFormAguaConcessionaria', '');
+  setVal('casaFormAguaMatricula', '');
+  setVal('casaFormAguaNomeCustom', '');
+  setVal('casaFormAguaLinkCustom', '');
+  aoMudarConcessionariaCasa('energia');
+  aoMudarConcessionariaCasa('agua');
+
   abrirModal('modalCasaForm');
 }
 
@@ -10015,6 +10334,20 @@ function editarCasa(id) {
   setVal('casaFormAluguelValor', c.aluguel_valor || '');
   setVal('casaFormObs', c.observacoes || '');
   setVal('casaFormFotoUrl', c.foto_url || '');
+
+  // Concessionárias
+  setVal('casaFormEnergiaConcessionaria', c.energia_concessionaria || '');
+  setVal('casaFormEnergiaUC', c.energia_uc || '');
+  setVal('casaFormEnergiaNomeCustom', c.energia_nome_custom || '');
+  setVal('casaFormEnergiaLinkCustom', c.energia_link_custom || '');
+
+  setVal('casaFormAguaConcessionaria', c.agua_concessionaria || '');
+  setVal('casaFormAguaMatricula', c.agua_matricula || '');
+  setVal('casaFormAguaNomeCustom', c.agua_nome_custom || '');
+  setVal('casaFormAguaLinkCustom', c.agua_link_custom || '');
+
+  aoMudarConcessionariaCasa('energia');
+  aoMudarConcessionariaCasa('agua');
   
   atualizarPreviewFotoCasaInput(c.foto_url);
   const titEl = document.getElementById('casaFormTitulo') || document.getElementById('modalCasaFormTitulo');
@@ -10092,6 +10425,17 @@ async function salvarCasa(event) {
   const observacoes = document.getElementById('casaFormObs').value.trim();
   const fotoUrl = document.getElementById('casaFormFotoUrl').value.trim();
 
+  // Concessionárias de Luz e Água
+  const energiaConcessionaria = document.getElementById('casaFormEnergiaConcessionaria')?.value || '';
+  const energiaUC = document.getElementById('casaFormEnergiaUC')?.value.trim() || '';
+  const energiaNomeCustom = document.getElementById('casaFormEnergiaNomeCustom')?.value.trim() || '';
+  const energiaLinkCustom = document.getElementById('casaFormEnergiaLinkCustom')?.value.trim() || '';
+
+  const aguaConcessionaria = document.getElementById('casaFormAguaConcessionaria')?.value || '';
+  const aguaMatricula = document.getElementById('casaFormAguaMatricula')?.value.trim() || '';
+  const aguaNomeCustom = document.getElementById('casaFormAguaNomeCustom')?.value.trim() || '';
+  const aguaLinkCustom = document.getElementById('casaFormAguaLinkCustom')?.value.trim() || '';
+
   // Buscar se já existia cômodos para não perder
   const casaExistente = listaCasasCidade.find(x => x.id === id);
   const comodosExistentes = casaExistente ? (casaExistente.comodos || []) : [];
@@ -10105,6 +10449,14 @@ async function salvarCasa(event) {
     aluguel_valor: aluguelValor,
     observacoes: observacoes,
     foto_url: fotoUrl || null,
+    energia_concessionaria: energiaConcessionaria,
+    energia_uc: energiaUC,
+    energia_nome_custom: energiaNomeCustom,
+    energia_link_custom: energiaLinkCustom,
+    agua_concessionaria: aguaConcessionaria,
+    agua_matricula: aguaMatricula,
+    agua_nome_custom: aguaNomeCustom,
+    agua_link_custom: aguaLinkCustom,
     comodos: comodosExistentes,
     atualizado_em: new Date().toISOString(),
     atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
@@ -11656,7 +12008,11 @@ function openModalNovaDespesaCasa(casaId) {
   document.getElementById('despesaCasaFormId').value = '';
   document.getElementById('despesaCasaFormCasaId').value = casaId;
   document.getElementById('despesaCasaFormMes').value = getMesAtualStr();
+  if (document.getElementById('despesaCasaFormLinkFatura')) {
+    document.getElementById('despesaCasaFormLinkFatura').value = '';
+  }
   document.getElementById('statusPendenteRadio').checked = true;
+  atualizarInfoConcessionariaDespesaForm();
   abrirModal('modalDespesaCasaForm');
 }
 
@@ -11689,9 +12045,13 @@ async function salvarDespesaCasa(event) {
   const vencimento = document.getElementById('despesaCasaFormVencimento').value;
   const status = document.getElementById('statusPagoRadio').checked ? 'pago' : 'pendente';
   const obs = document.getElementById('despesaCasaFormObs').value.trim();
+  const linkFatura = document.getElementById('despesaCasaFormLinkFatura')?.value.trim() || '';
 
   const casa = listaCasasCidade.find(c => c.id === casaId);
   const casaNome = casa ? casa.nome : 'Casa';
+
+  const idx = listaDespesasCasas.findIndex(x => x.id === id);
+  const comprovanteExistente = idx >= 0 ? (listaDespesasCasas[idx].comprovante_url || '') : '';
 
   const despesaData = {
     casa_id: casaId,
@@ -11702,11 +12062,11 @@ async function salvarDespesaCasa(event) {
     vencimento: vencimento,
     status: status,
     observacoes: obs,
+    comprovante_url: linkFatura || comprovanteExistente,
     criado_em: new Date().toISOString(),
     atualizado_em: new Date().toISOString()
   };
 
-  const idx = listaDespesasCasas.findIndex(x => x.id === id);
   if (idx >= 0) {
     listaDespesasCasas[idx] = { id: id, ...despesaData };
   } else {
@@ -11734,6 +12094,9 @@ async function salvarDespesaCasa(event) {
 // Carregar e renderizar despesas da casa atual
 function carregarDespesasCasaAtual() {
   if (!casaSelecionadaId) return;
+
+  const casaAtual = listaCasasCidade.find(x => x.id === casaSelecionadaId);
+  renderizarCardAgenciasCasaAtual(casaAtual);
 
   const mesFiltro = document.getElementById('filtroMesDespesaCasaInput')?.value || getMesAtualStr();
   const container = document.getElementById('casaDetalhesDespesasTabela');
@@ -11770,11 +12133,12 @@ function carregarDespesasCasaAtual() {
   container.innerHTML = despesasCasa.map(d => {
     const ehPago = d.status === 'pago';
     const vencFormatado = d.vencimento ? new Date(d.vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '--';
+    const dadosConc = obterDadosConcessionariaCasa(casaAtual, d.categoria);
 
     return `
-      <div class="bg-white p-3.5 rounded-xl border ${ehPago ? 'border-slate-200' : 'border-amber-300 bg-amber-50/20'} flex items-center justify-between gap-3 shadow-xs">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg flex-shrink-0">
+      <div class="bg-white p-3.5 rounded-xl border ${ehPago ? 'border-slate-200' : 'border-amber-300 bg-amber-50/20'} flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-start sm:items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg flex-shrink-0 mt-0.5 sm:mt-0">
             <i class="${iconeDespesa(d.categoria)}"></i>
           </div>
           <div>
@@ -11787,22 +12151,49 @@ function carregarDespesasCasaAtual() {
             <p class="text-[11px] text-slate-500 mt-0.5">
               Vencimento: <strong class="text-slate-700">${vencFormatado}</strong> ${d.observacoes ? '• ' + d.observacoes : ''}
             </p>
+            ${dadosConc ? `
+              <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+                ${dadosConc.url ? `
+                  <a href="${dadosConc.url}" target="_blank" class="px-2 py-0.5 rounded-md bg-yellow-50 hover:bg-yellow-100 text-yellow-900 border border-yellow-300 text-[10px] font-bold inline-flex items-center gap-1 transition">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Agência (${dadosConc.nome})
+                  </a>
+                ` : `<span class="text-[10px] font-semibold text-slate-500">${dadosConc.nome}</span>`}
+                ${dadosConc.codigo ? `
+                  <button type="button" onclick="copiarCodigoConcessionaria('${dadosConc.codigo}', '${dadosConc.rotuloCodigo}')" class="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-bold inline-flex items-center gap-1 transition" title="Copiar ${dadosConc.rotuloCodigo}">
+                    <i class="fa-solid fa-copy text-[9px]"></i> ${dadosConc.codigo}
+                  </button>
+                ` : ''}
+                ${d.comprovante_url ? `
+                  <a href="${d.comprovante_url}" target="_blank" class="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-bold inline-flex items-center gap-1 transition">
+                    <i class="fa-solid fa-file-pdf text-[9px]"></i> 2ª Via / Fatura
+                  </a>
+                ` : ''}
+              </div>
+            ` : (d.comprovante_url ? `
+              <div class="mt-1">
+                <a href="${d.comprovante_url}" target="_blank" class="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-bold inline-flex items-center gap-1 transition">
+                  <i class="fa-solid fa-paperclip text-[9px]"></i> Anexo / Fatura
+                </a>
+              </div>
+            ` : '')}
           </div>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
           <span class="text-sm font-black text-slate-900">
             ${(Number(d.valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </span>
 
-          <button onclick="alternarStatusDespesaCasa('${d.id}')" class="btn-prefeito px-2.5 py-1.5 rounded-lg ${ehPago ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} text-xs font-bold transition flex items-center gap-1">
-            <i class="fa-solid ${ehPago ? 'fa-rotate-left' : 'fa-check'} text-[10px]"></i>
-            <span>${ehPago ? 'Reabrir' : 'Dar Baixa'}</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="alternarStatusDespesaCasa('${d.id}')" class="btn-prefeito px-2.5 py-1.5 rounded-lg ${ehPago ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} text-xs font-bold transition flex items-center gap-1">
+              <i class="fa-solid ${ehPago ? 'fa-rotate-left' : 'fa-check'} text-[10px]"></i>
+              <span>${ehPago ? 'Reabrir' : 'Dar Baixa'}</span>
+            </button>
 
-          <button onclick="excluirDespesaCasa('${d.id}')" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Lançamento">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
+            <button onclick="excluirDespesaCasa('${d.id}')" class="btn-prefeito p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Lançamento">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -16226,6 +16617,11 @@ window.executarRestauracaoBackupConfirmada = executarRestauracaoBackupConfirmada
 window.preencherItensTermoResponsabilidade = preencherItensTermoResponsabilidade;
 window.gerarTermoResponsabilidadeDoModalFoto = gerarTermoResponsabilidadeDoModalFoto;
 
-
-
-
+// Exposição das funções de Concessionárias de Água & Luz (2ª Via Direta)
+window.CATALOGO_CONCESSIONARIAS_ENERGIA = CATALOGO_CONCESSIONARIAS_ENERGIA;
+window.CATALOGO_CONCESSIONARIAS_AGUA = CATALOGO_CONCESSIONARIAS_AGUA;
+window.obterDadosConcessionariaCasa = obterDadosConcessionariaCasa;
+window.aoMudarConcessionariaCasa = aoMudarConcessionariaCasa;
+window.copiarCodigoConcessionaria = copiarCodigoConcessionaria;
+window.atualizarInfoConcessionariaDespesaForm = atualizarInfoConcessionariaDespesaForm;
+window.renderizarCardAgenciasCasaAtual = renderizarCardAgenciasCasaAtual;

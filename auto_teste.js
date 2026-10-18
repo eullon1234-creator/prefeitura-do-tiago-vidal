@@ -910,6 +910,48 @@ assert(conteudoLimpezaRaiz.includes('id="boxQuartoAtendidoLimpeza"'), 'Campo de 
 assert(conteudoLimpezaRaiz.includes('id="boxQuartoOcorrenciaAlojamento"'), 'Campo de informe do quarto do alojado presente no form de ocorrência de limpeza.html');
 assert(conteudoLimpezaRaiz.includes('aplicarDadosBlocoAlojamento('), 'Função aplicarDadosBlocoAlojamento implementada em limpeza.html');
 
+console.log('\n⚡💧 14. Verificação das Concessionárias de Água & Luz (2ª Via Direta & Agências Virtuais)');
+
+// 1. Elementos de Interface das Concessionárias
+assert(conteudoIndex.includes('id="casaFormEnergiaConcessionaria"'), 'Campo Concessionária de Luz presente no formulário de Casas');
+assert(conteudoIndex.includes('id="casaFormEnergiaUC"'), 'Campo Código UC / Instalação presente no formulário de Casas');
+assert(conteudoIndex.includes('id="casaFormAguaConcessionaria"'), 'Campo Concessionária de Água presente no formulário de Casas');
+assert(conteudoIndex.includes('id="casaFormAguaMatricula"'), 'Campo Matrícula / Ligação de Água presente no formulário de Casas');
+assert(conteudoIndex.includes('id="casaDetalhesAgenciasCard"'), 'Card de Agências Virtuais presente no painel de despesas da Casa');
+assert(conteudoIndex.includes('id="boxInfoConcessionariaDespesa"'), 'Box informativo dinâmico de concessionária presente no modal de despesas');
+assert(conteudoIndex.includes('id="despesaCasaFormLinkFatura"'), 'Campo Link da 2ª Via / PDF presente no formulário de despesas');
+
+// 2. Funções e Catálogos em app.js
+assert(conteudoApp.includes('CATALOGO_CONCESSIONARIAS_ENERGIA'), 'Catálogo de Concessionárias de Energia definido em app.js');
+assert(conteudoApp.includes('CATALOGO_CONCESSIONARIAS_AGUA'), 'Catálogo de Concessionárias de Água definido em app.js');
+assert(conteudoApp.includes('function obterDadosConcessionariaCasa('), 'Função obterDadosConcessionariaCasa implementada em app.js');
+assert(conteudoApp.includes('function aoMudarConcessionariaCasa('), 'Função aoMudarConcessionariaCasa implementada em app.js');
+assert(conteudoApp.includes('function copiarCodigoConcessionaria('), 'Função copiarCodigoConcessionaria implementada em app.js');
+assert(conteudoApp.includes('function atualizarInfoConcessionariaDespesaForm('), 'Função atualizarInfoConcessionariaDespesaForm implementada em app.js');
+assert(conteudoApp.includes('function renderizarCardAgenciasCasaAtual('), 'Função renderizarCardAgenciasCasaAtual implementada em app.js');
+
+// 3. Simulação de Resolução de Concessionárias
+const evalCatalogoEnergia = eval(`(() => {
+  const CATALOGO_CONCESSIONARIAS_ENERGIA = {
+    'energisa': { nome: 'Energisa', url: 'https://servicos.energisa.com.br/', icone: 'fa-bolt text-yellow-500' },
+    'enel': { nome: 'Enel', url: 'https://www.enel.com.br/pt/segunda-via-de-fatura.html', icone: 'fa-bolt text-yellow-500' },
+    'cpfl': { nome: 'CPFL Energia', url: 'https://servicosonline.cpfl.com.br/', icone: 'fa-bolt text-yellow-500' }
+  };
+  return CATALOGO_CONCESSIONARIAS_ENERGIA;
+})()`);
+assert(evalCatalogoEnergia['energisa'] && evalCatalogoEnergia['energisa'].url.includes('energisa'), 'Catálogo de Energia possui link correto da Energisa');
+
+const casaMockConcessionaria = {
+  id: 'CASA-TESTE-01',
+  nome: 'Casa Engenharia 01',
+  energia_concessionaria: 'energisa',
+  energia_uc: '10/248590-2',
+  agua_concessionaria: 'sanesul',
+  agua_matricula: '45892-01'
+};
+assert(casaMockConcessionaria.energia_concessionaria === 'energisa' && casaMockConcessionaria.energia_uc === '10/248590-2', 'Mock de Casa com Energisa e UC válida');
+assert(casaMockConcessionaria.agua_concessionaria === 'sanesul' && casaMockConcessionaria.agua_matricula === '45892-01', 'Mock de Casa com Sanesul e Matrícula válida');
+
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------

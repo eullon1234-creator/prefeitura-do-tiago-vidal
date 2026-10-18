@@ -4338,6 +4338,71 @@ service cloud.firestore {
           </div>
         </div>
 
+        <!-- SEÇÃO: CONCESSIONÁRIAS DE ENERGIA & ÁGUA (2ª VIA & DÉBITOS) -->
+        <div class="pt-3 border-t border-slate-200">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-700 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-bolt"></i>
+            </span>
+            <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Concessionárias de Água & Luz (2ª Via Direta)</h4>
+          </div>
+          <p class="text-[11px] text-slate-500 mb-3">Configure as agências e códigos de ligação para acessar a agência virtual e copiar a UC/Matrícula com 1 clique.</p>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+            <!-- Energia Elétrica -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-bolt text-yellow-500"></i> Energia Elétrica (Concessionária & UC)
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select id="casaFormEnergiaConcessionaria" onchange="aoMudarConcessionariaCasa('energia')" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                  <option value="">Selecione a Concessionária de Luz</option>
+                  <option value="energisa">Energisa (MS / MT / outros)</option>
+                  <option value="enel">Enel (SP / RJ / CE)</option>
+                  <option value="cpfl">CPFL Energia</option>
+                  <option value="cemig">Cemig (MG)</option>
+                  <option value="neoenergia">Neoenergia / Elektro / Coelba</option>
+                  <option value="equatorial">Equatorial Energia</option>
+                  <option value="copel">Copel (PR)</option>
+                  <option value="ceee">CEEE Equatorial (RS)</option>
+                  <option value="outra">Outra Concessionária (Personalizada)</option>
+                </select>
+                <input type="text" id="casaFormEnergiaUC" placeholder="Nº da UC / Instalação / Código Cliente" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+              </div>
+              <div id="boxCasaEnergiaCustomUrl" class="mt-2 hidden grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input type="text" id="casaFormEnergiaNomeCustom" placeholder="Nome da Concessionária (Ex: DMED)" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <input type="url" id="casaFormEnergiaLinkCustom" placeholder="https://link-da-agencia-virtual.com.br" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+              </div>
+            </div>
+
+            <!-- Água e Saneamento -->
+            <div class="pt-2 border-t border-slate-200">
+              <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-droplet text-cyan-500"></i> Água & Esgoto (Concessionária & Matrícula)
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select id="casaFormAguaConcessionaria" onchange="aoMudarConcessionariaCasa('agua')" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                  <option value="">Selecione a Concessionária de Água</option>
+                  <option value="sanesul">Sanesul (MS)</option>
+                  <option value="sabesp">Sabesp (SP)</option>
+                  <option value="copasa">Copasa (MG)</option>
+                  <option value="sanepar">Sanepar (PR)</option>
+                  <option value="embasa">Embasa (BA)</option>
+                  <option value="corsan">Corsan (RS)</option>
+                  <option value="aguas_brasil">Águas do Brasil</option>
+                  <option value="cagece">Cagece (CE)</option>
+                  <option value="outra">Outra Concessionária (Personalizada)</option>
+                </select>
+                <input type="text" id="casaFormAguaMatricula" placeholder="Nº da Matrícula / Ligação / RGI" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+              </div>
+              <div id="boxCasaAguaCustomUrl" class="mt-2 hidden grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input type="text" id="casaFormAguaNomeCustom" placeholder="Nome da Concessionária (Ex: DAE)" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <input type="url" id="casaFormAguaLinkCustom" placeholder="https://link-da-agencia-virtual.com.br" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Observações da Casa</label>
           <textarea id="casaFormObs" rows="2" placeholder="Ex: Casa com garagem para 2 carros, área gourmet e portão eletrônico..." class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
@@ -4462,6 +4527,11 @@ service cloud.firestore {
                 <i class="fa-solid fa-plus"></i> Lançar Conta
               </button>
             </div>
+          </div>
+
+          <!-- Card Concessionárias & Agências Virtuais da Casa (2ª Via Direta) -->
+          <div id="casaDetalhesAgenciasCard" class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+            <!-- Populado dinamicamente via renderizarCardAgenciasCasaAtual() -->
           </div>
 
           <!-- Cards de Resumo da Casa no Mês -->
@@ -5066,7 +5136,7 @@ service cloud.firestore {
 
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Casa de Destino *</label>
-          <select id="despesaCasaFormCasaId" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold">
+          <select id="despesaCasaFormCasaId" onchange="atualizarInfoConcessionariaDespesaForm()" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold">
             <!-- Populado via Javascript -->
           </select>
         </div>
@@ -5074,7 +5144,7 @@ service cloud.firestore {
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Tipo de Despesa *</label>
-            <select id="despesaCasaFormCategoria" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold">
+            <select id="despesaCasaFormCategoria" onchange="atualizarInfoConcessionariaDespesaForm()" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold">
               <option value="Energia Elétrica">⚡ Energia Elétrica</option>
               <option value="Água e Saneamento">💧 Água e Saneamento</option>
               <option value="Aluguel do Imóvel">🏠 Aluguel</option>
@@ -5088,6 +5158,11 @@ service cloud.firestore {
             <label class="block text-xs font-semibold text-slate-700 mb-1">Mês de Referência *</label>
             <input type="month" id="despesaCasaFormMes" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium">
           </div>
+        </div>
+
+        <!-- Box Dinâmico da Concessionária (Água / Luz - 2ª Via & UC) -->
+        <div id="boxInfoConcessionariaDespesa" class="hidden p-3 rounded-xl bg-amber-50/70 border border-amber-300 transition-all text-xs">
+          <!-- Populado via atualizarInfoConcessionariaDespesaForm() -->
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -5115,9 +5190,15 @@ service cloud.firestore {
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Código de Barras / Obs</label>
-          <input type="text" id="despesaCasaFormObs" placeholder="Ex: Código de barras ou fatura da Sanesul/Energisa..." class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Código de Barras / Linha Digitável / PIX</label>
+            <input type="text" id="despesaCasaFormObs" placeholder="Ex: Código de barras ou chave Pix..." class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Link da 2ª Via / PDF / Comprovante</label>
+            <input type="url" id="despesaCasaFormLinkFatura" placeholder="https://... link da fatura ou PDF" class="w-full py-2 px-3 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono">
+          </div>
         </div>
 
         <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
