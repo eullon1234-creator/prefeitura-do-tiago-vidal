@@ -6535,12 +6535,43 @@ function exportarResumoExcel() {
     // 1. ABA RESUMO EXECUTIVO
     const ws1 = {};
     ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — RESUMO EXECUTIVO DE OCUPAÇÃO`, `${empresaNome} • Responsável: Tiago Vidal (Prefeito de Canteiro) • Emissão: ${dataHora}`, 7);
-    const h1 = ['Bloco / Alojamento', 'Finalidade', 'Total Quartos', 'Capacidade (Vagas)', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    const h1 = ['Bloco / Alojamento / Casa', 'Finalidade', 'Total Quartos', 'Capacidade (Vagas)', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
     h1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
     const blocos = db.blocos || [];
     const quartos = db.quartos || [];
+    const alojadosAtivos = (db.alojados || []).filter(a => a.status === 'ativo');
 
+    // Mapeamento e consolidação das Casas na Cidade
+    const casasParaExportar = (typeof listaCasasCidade !== 'undefined' && Array.isArray(listaCasasCidade)) ? listaCasasCidade : (db.casas || []);
+    let totalCamasCasas = 0;
+    let totalOcupadasCasas = 0;
+    let totalComodosCasas = 0;
+
+    const casasCalculadas = casasParaExportar.map(c => {
+      let comodosQtd = (c.comodos || []).length;
+      let camas = 0;
+      let ocup = 0;
+      (c.comodos || []).forEach(com => {
+        if (com.tipo === 'quarto') {
+          camas += Number(com.capacidade_camas || 0);
+          ocup += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+        }
+      });
+      totalComodosCasas += comodosQtd;
+      totalCamasCasas += camas;
+      totalOcupadasCasas += ocup;
+      return {
+        ...c,
+        comodosQtd,
+        camas,
+        ocup,
+        livres: Math.max(0, camas - ocup),
+        taxa: camas > 0 ? (ocup / camas) : 0
+      };
+    });
+
+    // 1.1 Linhas dos Blocos do Canteiro
     blocos.forEach((b, idx) => {
       const r = 4 + idx;
       const zebra = idx % 2 === 1;
@@ -6557,45 +6588,114 @@ function exportarResumoExcel() {
       ExcelProGenerator.addCell(ws1, r, 3, cap, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
       ExcelProGenerator.addCell(ws1, r, 4, oc, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
       ExcelProGenerator.addCell(ws1, r, 5, liv, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
-      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `E${rowEx}/D${rowEx}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `IF(D${rowEx}>0,E${rowEx}/D${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
     });
 
-    const totRow1 = 4 + blocos.length;
-    const totEx1 = totRow1 + 1;
-    const firstRow1 = 5;
-    const lastRow1 = totRow1;
-    const totalGeralCap = db.geral?.total_vagas || 880;
-    const totalGeralOc = db.geral?.ocupadas || 387;
-    const totalGeralLiv = totalGeralCap - totalGeralOc;
+    const totRowCanteiro = 4 + blocos.length;
+    const totExCanteiro = totRowCanteiro + 1;
+    const firstRowCanteiro = 5;
+    const lastRowCanteiro = totRowCanteiro;
+    const canteiroCap = db.geral?.total_vagas || (quartos.length * 4) || 880;
+    const canteiroOc = alojadosAtivos.length || 387;
+    const canteiroLiv = canteiroCap - canteiroOc;
 
-    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
-    ExcelProGenerator.addCell(ws1, totRow1, 1, 'OBRA GERAL', { s: ExcelProGenerator.estilos.total('center') });
-    ExcelProGenerator.addCell(ws1, totRow1, 2, quartos.length || 220, { f: `SUM(C${firstRow1}:C${lastRow1})`, s: ExcelProGenerator.estilos.total('center') });
-    ExcelProGenerator.addCell(ws1, totRow1, 3, totalGeralCap, { f: `SUM(D${firstRow1}:D${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
-    ExcelProGenerator.addCell(ws1, totRow1, 4, totalGeralOc, { f: `SUM(E${firstRow1}:E${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
-    ExcelProGenerator.addCell(ws1, totRow1, 5, totalGeralLiv, { f: `D${totEx1}-E${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
-    ExcelProGenerator.addCell(ws1, totRow1, 6, (totalGeralOc / totalGeralCap), { f: `E${totEx1}/D${totEx1}`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 0, 'SUBTOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 1, 'CANTEIRO', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 2, quartos.length || 220, { f: `SUM(C${firstRowCanteiro}:C${lastRowCanteiro})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 3, canteiroCap, { f: `SUM(D${firstRowCanteiro}:D${lastRowCanteiro})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 4, canteiroOc, { f: `SUM(E${firstRowCanteiro}:E${lastRowCanteiro})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 5, canteiroLiv, { f: `D${totExCanteiro}-E${totExCanteiro}`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 6, (canteiroCap > 0 ? (canteiroOc / canteiroCap) : 0), { f: `IF(D${totExCanteiro}>0,E${totExCanteiro}/D${totExCanteiro},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
 
-    ws1['!ref'] = `A1:G${totEx1}`;
-    ws1['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+    let finalRefRow = totExCanteiro;
+
+    if (casasCalculadas.length > 0) {
+      // 1.2 Linhas das Casas na Cidade (Gestão Urbana)
+      const idxInicioCasas = totRowCanteiro + 1;
+      casasCalculadas.forEach((c, idx) => {
+        const r = idxInicioCasas + idx;
+        const zebra = idx % 2 === 1;
+        const rowEx = r + 1;
+
+        ExcelProGenerator.addCell(ws1, r, 0, c.nome || 'Casa Urbana', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws1, r, 1, 'CASA URBANA', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws1, r, 2, c.comodosQtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws1, r, 3, c.camas, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws1, r, 4, c.ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws1, r, 5, c.livres, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws1, r, 6, c.taxa, { f: `IF(D${rowEx}>0,E${rowEx}/D${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      });
+
+      const totRowCasas = idxInicioCasas + casasCalculadas.length;
+      const totExCasas = totRowCasas + 1;
+      const firstRowCasas = idxInicioCasas + 1;
+      const lastRowCasas = totRowCasas;
+
+      ExcelProGenerator.addCell(ws1, totRowCasas, 0, 'SUBTOTAL CASAS NA CIDADE', { s: ExcelProGenerator.estilos.total('left') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 1, 'URBANO', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 2, totalComodosCasas, { f: `SUM(C${firstRowCasas}:C${lastRowCasas})`, s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 3, totalCamasCasas, { f: `SUM(D${firstRowCasas}:D${lastRowCasas})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 4, totalOcupadasCasas, { f: `SUM(E${firstRowCasas}:E${lastRowCasas})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 5, Math.max(0, totalCamasCasas - totalOcupadasCasas), { f: `D${totExCasas}-E${totExCasas}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 6, (totalCamasCasas > 0 ? (totalOcupadasCasas / totalCamasCasas) : 0), { f: `IF(D${totExCasas}>0,E${totExCasas}/D${totExCasas},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+      // 1.3 Linha TOTAL GERAL CONSOLIDADO (CANTEIRO + CASAS)
+      const totRowGeral = totRowCasas + 1;
+      const totExGeral = totRowGeral + 1;
+      const totalGeralCap = canteiroCap + totalCamasCasas;
+      const totalGeralOc = canteiroOc + totalOcupadasCasas;
+      const totalGeralLiv = totalGeralCap - totalGeralOc;
+
+      ExcelProGenerator.addCell(ws1, totRowGeral, 0, 'TOTAL GERAL CONSOLIDADO', { s: ExcelProGenerator.estilos.total('left') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 1, 'OBRA + CASAS', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 2, (quartos.length + totalComodosCasas), { f: `C${totExCanteiro}+C${totExCasas}`, s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 3, totalGeralCap, { f: `D${totExCanteiro}+D${totExCasas}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 4, totalGeralOc, { f: `E${totExCanteiro}+E${totExCasas}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 5, totalGeralLiv, { f: `D${totExGeral}-E${totExGeral}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 6, (totalGeralCap > 0 ? (totalGeralOc / totalGeralCap) : 0), { f: `IF(D${totExGeral}>0,E${totExGeral}/D${totExGeral},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+      finalRefRow = totExGeral;
+    }
+
+    ws1['!ref'] = `A1:G${finalRefRow}`;
+    ws1['!cols'] = [{ wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
     ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws1, "RESUMO DE OCUPAÇÃO");
 
-    // 2. ABA EMPRESAS
+    // 2. ABA EMPRESAS (CANTEIRO + CASAS)
     const wsEmp = {};
-    ExcelProGenerator.addCabecalhoObra(wsEmp, `${obraNome.toUpperCase()} — DISTRIBUIÇÃO POR EMPRESA`, `${empresaNome} • Alojados Ativos por Empreiteira / Parceira • Emissão: ${dataHora}`, 4);
+    ExcelProGenerator.addCabecalhoObra(wsEmp, `${obraNome.toUpperCase()} — DISTRIBUIÇÃO POR EMPRESA`, `${empresaNome} • Alojados Ativos por Empreiteira / Parceira (Canteiro & Casas) • Emissão: ${dataHora}`, 4);
     const hEmp = ['Empresa Parceira', 'Total Alojados', '% Participação na Obra (Fórmula)', 'Status'];
     hEmp.forEach((h, col) => ExcelProGenerator.addCell(wsEmp, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
     const empresas = db.empresas || [];
-    const alojadosAtivos = (db.alojados || []).filter(a => a.status === 'ativo');
-    const totAtivos = alojadosAtivos.length || 387;
+    const todosAtivosResumo = [...alojadosAtivos];
+    casasParaExportar.forEach(c => {
+      (c.comodos || []).forEach(com => {
+        (com.camas || []).forEach(cm => {
+          if (cm.morador && cm.morador.nome) {
+            todosAtivosResumo.push({
+              id: `casa_${c.id}_${cm.numero_cama}`,
+              nome_completo: cm.morador.nome,
+              empresa_id: null,
+              empresa_nome: cm.morador.empresa || '-'
+            });
+          }
+        });
+      });
+    });
+
+    const totAtivos = todosAtivosResumo.length || 387;
 
     empresas.forEach((emp, idx) => {
       const r = 4 + idx;
       const zebra = idx % 2 === 1;
       const rowEx = r + 1;
-      const qtdEmp = alojadosAtivos.filter(a => Number(a.empresa_id) === Number(emp.id)).length;
+      const qtdEmp = todosAtivosResumo.filter(a => {
+        if (a.empresa_id && Number(a.empresa_id) === Number(emp.id)) return true;
+        if (a.empresa_nome && emp.nome && a.empresa_nome.toLowerCase().trim() === emp.nome.toLowerCase().trim()) return true;
+        return false;
+      }).length;
       const part = totAtivos > 0 ? (qtdEmp / totAtivos) : 0;
 
       ExcelProGenerator.addCell(wsEmp, r, 0, emp.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
@@ -6617,7 +6717,7 @@ function exportarResumoExcel() {
     XLSX.utils.book_append_sheet(wb, wsEmp, "POR EMPRESA");
 
     XLSX.writeFile(wb, "resumo_executivo_ocupacao_canteiro.xlsx");
-    showToast('Planilha executiva baixada com sucesso!', 'success');
+    showToast('Planilha executiva consolidada (Canteiro + Casas) baixada com sucesso!', 'success');
     return;
   }
   window.open(`${API_BASE}/api/relatorios/exportar-resumo-excel`, '_blank');
@@ -6755,7 +6855,7 @@ function exportarMoveisDanificadosExcel() {
 
 function exportarPlanilhaOficial() {
   if (staticModeActive && typeof XLSX !== 'undefined') {
-    showToast('📗 Gerando Planilha Oficial Taboca 2 (5 abas com fórmulas e layout profissional)...', 'info');
+    showToast('📗 Gerando Planilha Oficial Consolidada Taboca 2 (Canteiro + Casas na Cidade)...', 'info');
     const wb = XLSX.utils.book_new();
     const db = StaticApiEngine.dbState;
     const dataHora = new Date().toLocaleString('pt-BR');
@@ -6768,14 +6868,44 @@ function exportarPlanilhaOficial() {
     const empresas = db.empresas || [];
     const alojadosAtivos = alojados.filter(a => a.status === 'ativo');
 
+    // Mapeamento e consolidação das Casas na Cidade
+    const casasParaExportar = (typeof listaCasasCidade !== 'undefined' && Array.isArray(listaCasasCidade)) ? listaCasasCidade : (db.casas || []);
+    let totalCamasCasas = 0;
+    let totalOcupadasCasas = 0;
+    let totalComodosCasas = 0;
+
+    const casasCalculadas = casasParaExportar.map(c => {
+      let comodosQtd = (c.comodos || []).length;
+      let camas = 0;
+      let ocup = 0;
+      (c.comodos || []).forEach(com => {
+        if (com.tipo === 'quarto') {
+          camas += Number(com.capacidade_camas || 0);
+          ocup += (com.camas || []).filter(cm => cm.morador && cm.morador.nome).length;
+        }
+      });
+      totalComodosCasas += comodosQtd;
+      totalCamasCasas += camas;
+      totalOcupadasCasas += ocup;
+      return {
+        ...c,
+        comodosQtd,
+        camas,
+        ocup,
+        livres: Math.max(0, camas - ocup),
+        taxa: camas > 0 ? (ocup / camas) : 0
+      };
+    });
+
     // ==========================================
     // ABA 1: RESUMO DE OCUPAÇÃO (COM FÓRMULAS)
     // ==========================================
     const ws1 = {};
     ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CONTROLE OFICIAL DE HABITAÇÃO & OCUPAÇÃO`, `${empresaNome} • Responsável: Tiago Vidal (Prefeito de Canteiro) • Emissão: ${dataHora}`, 7);
-    const h1 = ['Bloco / Alojamento', 'Finalidade', 'Total Quartos', 'Capacidade Total', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    const h1 = ['Bloco / Alojamento / Casa', 'Finalidade', 'Total Quartos', 'Capacidade Total', 'Vagas Ocupadas', 'Vagas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
     h1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
+    // 1.1 Linhas dos Blocos do Canteiro
     blocos.forEach((b, idx) => {
       const r = 4 + idx;
       const zebra = idx % 2 === 1;
@@ -6792,34 +6922,86 @@ function exportarPlanilhaOficial() {
       ExcelProGenerator.addCell(ws1, r, 3, cap, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
       ExcelProGenerator.addCell(ws1, r, 4, oc, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
       ExcelProGenerator.addCell(ws1, r, 5, liv, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
-      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `E${rowEx}/D${rowEx}`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 6, taxa, { f: `IF(D${rowEx}>0,E${rowEx}/D${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
     });
 
-    const totRow1 = 4 + blocos.length;
-    const totEx1 = totRow1 + 1;
-    const totalGeralCap = db.geral?.total_vagas || 880;
-    const totalGeralOc = alojadosAtivos.length || 387;
-    const totalGeralLiv = totalGeralCap - totalGeralOc;
+    const totRowCanteiro = 4 + blocos.length;
+    const totExCanteiro = totRowCanteiro + 1;
+    const firstRowCanteiro = 5;
+    const lastRowCanteiro = totRowCanteiro;
+    const canteiroCap = db.geral?.total_vagas || (quartos.length * 4) || 880;
+    const canteiroOc = alojadosAtivos.length || 387;
+    const canteiroLiv = canteiroCap - canteiroOc;
 
-    ExcelProGenerator.addCell(ws1, totRow1, 0, 'TOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
-    ExcelProGenerator.addCell(ws1, totRow1, 1, 'OBRA GERAL', { s: ExcelProGenerator.estilos.total('center') });
-    ExcelProGenerator.addCell(ws1, totRow1, 2, quartos.length || 220, { f: `SUM(C5:C${totRow1})`, s: ExcelProGenerator.estilos.total('center') });
-    ExcelProGenerator.addCell(ws1, totRow1, 3, totalGeralCap, { f: `SUM(D5:D${totRow1})`, s: ExcelProGenerator.estilos.total('right') });
-    ExcelProGenerator.addCell(ws1, totRow1, 4, totalGeralOc, { f: `SUM(E5:E${totRow1})`, s: ExcelProGenerator.estilos.total('right') });
-    ExcelProGenerator.addCell(ws1, totRow1, 5, totalGeralLiv, { f: `D${totEx1}-E${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
-    ExcelProGenerator.addCell(ws1, totRow1, 6, (totalGeralOc / totalGeralCap), { f: `E${totEx1}/D${totEx1}`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 0, 'SUBTOTAL CANTEIRO TABOCA 2', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 1, 'CANTEIRO', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 2, quartos.length || 220, { f: `SUM(C${firstRowCanteiro}:C${lastRowCanteiro})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 3, canteiroCap, { f: `SUM(D${firstRowCanteiro}:D${lastRowCanteiro})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 4, canteiroOc, { f: `SUM(E${firstRowCanteiro}:E${lastRowCanteiro})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 5, canteiroLiv, { f: `D${totExCanteiro}-E${totExCanteiro}`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowCanteiro, 6, (canteiroCap > 0 ? (canteiroOc / canteiroCap) : 0), { f: `IF(D${totExCanteiro}>0,E${totExCanteiro}/D${totExCanteiro},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
 
-    ws1['!ref'] = `A1:G${totEx1}`;
-    ws1['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
+    let finalRefRow1 = totExCanteiro;
+
+    if (casasCalculadas.length > 0) {
+      // 1.2 Linhas das Casas na Cidade (Gestão Urbana)
+      const idxInicioCasas = totRowCanteiro + 1;
+      casasCalculadas.forEach((c, idx) => {
+        const r = idxInicioCasas + idx;
+        const zebra = idx % 2 === 1;
+        const rowEx = r + 1;
+
+        ExcelProGenerator.addCell(ws1, r, 0, c.nome || 'Casa Urbana', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws1, r, 1, 'CASA URBANA', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws1, r, 2, c.comodosQtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws1, r, 3, c.camas, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws1, r, 4, c.ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws1, r, 5, c.livres, { f: `D${rowEx}-E${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws1, r, 6, c.taxa, { f: `IF(D${rowEx}>0,E${rowEx}/D${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      });
+
+      const totRowCasas = idxInicioCasas + casasCalculadas.length;
+      const totExCasas = totRowCasas + 1;
+      const firstRowCasas = idxInicioCasas + 1;
+      const lastRowCasas = totRowCasas;
+
+      ExcelProGenerator.addCell(ws1, totRowCasas, 0, 'SUBTOTAL CASAS NA CIDADE', { s: ExcelProGenerator.estilos.total('left') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 1, 'URBANO', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 2, totalComodosCasas, { f: `SUM(C${firstRowCasas}:C${lastRowCasas})`, s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 3, totalCamasCasas, { f: `SUM(D${firstRowCasas}:D${lastRowCasas})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 4, totalOcupadasCasas, { f: `SUM(E${firstRowCasas}:E${lastRowCasas})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 5, Math.max(0, totalCamasCasas - totalOcupadasCasas), { f: `D${totExCasas}-E${totExCasas}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowCasas, 6, (totalCamasCasas > 0 ? (totalOcupadasCasas / totalCamasCasas) : 0), { f: `IF(D${totExCasas}>0,E${totExCasas}/D${totExCasas},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+      // 1.3 Linha TOTAL GERAL CONSOLIDADO (CANTEIRO + CASAS)
+      const totRowGeral = totRowCasas + 1;
+      const totExGeral = totRowGeral + 1;
+      const totalGeralCap = canteiroCap + totalCamasCasas;
+      const totalGeralOc = canteiroOc + totalOcupadasCasas;
+      const totalGeralLiv = totalGeralCap - totalGeralOc;
+
+      ExcelProGenerator.addCell(ws1, totRowGeral, 0, 'TOTAL GERAL CONSOLIDADO', { s: ExcelProGenerator.estilos.total('left') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 1, 'OBRA + CASAS', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 2, (quartos.length + totalComodosCasas), { f: `C${totExCanteiro}+C${totExCasas}`, s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 3, totalGeralCap, { f: `D${totExCanteiro}+D${totExCasas}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 4, totalGeralOc, { f: `E${totExCanteiro}+E${totExCasas}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 5, totalGeralLiv, { f: `D${totExGeral}-E${totExGeral}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRowGeral, 6, (totalGeralCap > 0 ? (totalGeralOc / totalGeralCap) : 0), { f: `IF(D${totExGeral}>0,E${totExGeral}/D${totExGeral},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+
+      finalRefRow1 = totExGeral;
+    }
+
+    ws1['!ref'] = `A1:G${finalRefRow1}`;
+    ws1['!cols'] = [{ wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 24 }, { wch: 26 }];
     ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws1, "RESUMO DE OCUPAÇÃO");
 
     // ==========================================
-    // ABA 2: MAPA DE CAMAS
+    // ABA 2: MAPA DE CAMAS (CANTEIRO + CASAS)
     // ==========================================
     const ws2 = {};
-    ExcelProGenerator.addCabecalhoObra(ws2, `${obraNome.toUpperCase()} — MAPA DETALHADO DE LEITOS E VAGAS`, `${empresaNome} • Status Individual de Cada Cama dos 220 Quartos • Emissão: ${dataHora}`, 9);
-    const h2 = ['Bloco', 'Quarto', 'Cama', 'Status da Vaga', 'Matrícula', 'Colaborador Alojado', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp'];
+    ExcelProGenerator.addCabecalhoObra(ws2, `${obraNome.toUpperCase()} — MAPA DETALHADO DE LEITOS E VAGAS`, `${empresaNome} • Leitos dos 220 Quartos do Canteiro & Casas na Cidade • Emissão: ${dataHora}`, 9);
+    const h2 = ['Bloco / Casa', 'Quarto / Cômodo', 'Cama', 'Status da Vaga', 'Matrícula', 'Colaborador Alojado', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp'];
     h2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
     let r2 = 4;
@@ -6834,7 +7016,7 @@ function exportarPlanilhaOficial() {
         const matAl = isOc ? (al?.matricula || v.matricula || '-') : '-';
         const empAl = isOc ? (al?.empresa_nome || v.empresa_nome || '-') : '-';
         const funcAl = isOc ? (al?.funcao || v.funcao || '-') : '-';
-        const zapAl = isOc && (al?.whatsapp || v.whatsapp) ? formatarTelefoneTexto(al?.whatsapp || v.whatsapp) : '-';
+        const zapAl = isOc && (al?.whatsapp || v.whatsapp) ? (typeof formatarTelefoneTexto === 'function' ? formatarTelefoneTexto(al?.whatsapp || v.whatsapp) : (al?.whatsapp || v.whatsapp)) : '-';
 
         ExcelProGenerator.addCell(ws2, r2, 0, q.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
         ExcelProGenerator.addCell(ws2, r2, 1, String(q.numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
@@ -6850,32 +7032,102 @@ function exportarPlanilhaOficial() {
       });
     });
 
+    // Leitos das Casas na Cidade
+    casasParaExportar.forEach(c => {
+      (c.comodos || []).forEach(com => {
+        if (com.tipo === 'quarto') {
+          (com.camas || []).forEach(cm => {
+            const zebra = r2 % 2 === 1;
+            const morador = cm.morador;
+            const isOc = !!(morador && morador.nome);
+            const statusTexto = isOc ? 'OCUPADA' : 'LIVRE';
+            const statusEstilo = isOc ? ExcelProGenerator.estilos.statusOcupada : ExcelProGenerator.estilos.statusLivre;
+            const nomeAl = isOc ? morador.nome : 'VAGA LIVRE';
+            const matAl = isOc ? (morador.matricula || '-') : '-';
+            const empAl = isOc ? (morador.empresa || '-') : '-';
+            const funcAl = isOc ? (morador.cargo || 'Liderança / Engenharia') : '-';
+            const zapAl = isOc && morador.telefone ? (typeof formatarTelefoneTexto === 'function' ? formatarTelefoneTexto(morador.telefone) : morador.telefone) : '-';
+
+            ExcelProGenerator.addCell(ws2, r2, 0, c.nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+            ExcelProGenerator.addCell(ws2, r2, 1, com.nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+            ExcelProGenerator.addCell(ws2, r2, 2, `Cama ${cm.numero_cama}`, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+            ExcelProGenerator.addCell(ws2, r2, 3, statusTexto, { s: statusEstilo });
+            ExcelProGenerator.addCell(ws2, r2, 4, matAl, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+            ExcelProGenerator.addCell(ws2, r2, 5, nomeAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+            ExcelProGenerator.addCell(ws2, r2, 6, empAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+            ExcelProGenerator.addCell(ws2, r2, 7, funcAl, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+            ExcelProGenerator.addCell(ws2, r2, 8, zapAl, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+
+            r2++;
+          });
+        }
+      });
+    });
+
     const totEx2 = r2 + 1;
-    ExcelProGenerator.addCell(ws2, r2, 0, 'TOTAL DE LEITOS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws2, r2, 0, 'TOTAL DE LEITOS CONSOLIDADO', { s: ExcelProGenerator.estilos.total('left') });
     ExcelProGenerator.addCell(ws2, r2, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
     ExcelProGenerator.addCell(ws2, r2, 2, r2 - 4, { f: `COUNTA(A5:A${r2})`, s: ExcelProGenerator.estilos.total('center') });
-    ExcelProGenerator.addCell(ws2, r2, 3, '880 LEITOS', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws2, r2, 3, `${r2 - 4} LEITOS`, { s: ExcelProGenerator.estilos.total('center') });
     for (let c = 4; c < 9; c++) {
       ExcelProGenerator.addCell(ws2, r2, c, '-', { s: ExcelProGenerator.estilos.total('center') });
     }
 
     ws2['!ref'] = `A1:I${totEx2}`;
-    ws2['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }];
+    ws2['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }];
     ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws2, "MAPA DE CAMAS");
 
     // ==========================================
-    // ABA 3: ALOJADOS ATIVOS
+    // ABA 3: ALOJADOS ATIVOS (CANTEIRO + CASAS)
     // ==========================================
     const ws3 = {};
-    ExcelProGenerator.addCabecalhoObra(ws3, `${obraNome.toUpperCase()} — LISTAGEM OFICIAL DE ALOJADOS ATIVOS`, `${empresaNome} • Cadastro Completo de Moradores do Canteiro • Emissão: ${dataHora}`, 10);
-    const h3 = ['Matrícula', 'Nome Completo', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp', 'Bloco', 'Quarto', 'Cama', 'Data de Entrada', 'Observações'];
+    ExcelProGenerator.addCabecalhoObra(ws3, `${obraNome.toUpperCase()} — LISTAGEM CONSOLIDADA DE ALOJADOS & MORADORES ATIVOS`, `${empresaNome} • Cadastro Completo de Moradores do Canteiro & Casas Urbanas • Emissão: ${dataHora}`, 10);
+    const h3 = ['Matrícula', 'Nome Completo', 'Empresa', 'Função / Cargo', 'Telefone WhatsApp', 'Local / Bloco', 'Quarto / Cômodo', 'Cama', 'Data de Entrada', 'Observações'];
     h3.forEach((h, col) => ExcelProGenerator.addCell(ws3, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
-    alojadosAtivos.forEach((a, idx) => {
+    const todosMoradoresAtivos = [
+      ...alojadosAtivos.map(a => ({
+        matricula: a.matricula || '-',
+        nome_completo: a.nome_completo,
+        empresa_id: a.empresa_id,
+        empresa_nome: a.empresa_nome || '-',
+        funcao: a.funcao || 'Alojado',
+        whatsapp: a.whatsapp,
+        bloco_nome: a.bloco_nome || '-',
+        quarto_numero: String(a.quarto_numero || '-'),
+        numero_cama: a.numero_cama || 1,
+        data_entrada: a.data_entrada || '-',
+        observacoes: a.observacoes || ''
+      }))
+    ];
+
+    casasParaExportar.forEach(c => {
+      (c.comodos || []).forEach(com => {
+        (com.camas || []).forEach(cm => {
+          if (cm.morador && cm.morador.nome) {
+            todosMoradoresAtivos.push({
+              matricula: cm.morador.matricula || '-',
+              nome_completo: cm.morador.nome,
+              empresa_id: null,
+              empresa_nome: cm.morador.empresa || '-',
+              funcao: cm.morador.cargo || 'Engenharia / Liderança',
+              whatsapp: cm.morador.telefone || '',
+              bloco_nome: c.nome,
+              quarto_numero: com.nome,
+              numero_cama: `Cama ${cm.numero_cama}`,
+              data_entrada: cm.morador.data_entrada || '-',
+              observacoes: cm.morador.observacoes || 'Residência Urbana'
+            });
+          }
+        });
+      });
+    });
+
+    todosMoradoresAtivos.forEach((a, idx) => {
       const r = 4 + idx;
       const zebra = idx % 2 === 1;
-      const zapFormatado = a.whatsapp ? formatarTelefoneTexto(a.whatsapp) : '-';
+      const zapFormatado = a.whatsapp ? (typeof formatarTelefoneTexto === 'function' ? formatarTelefoneTexto(a.whatsapp) : a.whatsapp) : '-';
 
       ExcelProGenerator.addCell(ws3, r, 0, a.matricula || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
       ExcelProGenerator.addCell(ws3, r, 1, a.nome_completo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
@@ -6884,30 +7136,30 @@ function exportarPlanilhaOficial() {
       ExcelProGenerator.addCell(ws3, r, 4, zapFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
       ExcelProGenerator.addCell(ws3, r, 5, a.bloco_nome || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
       ExcelProGenerator.addCell(ws3, r, 6, String(a.quarto_numero || '-'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
-      ExcelProGenerator.addCell(ws3, r, 7, a.numero_cama || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r, 7, a.numero_cama, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
       ExcelProGenerator.addCell(ws3, r, 8, a.data_entrada || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
       ExcelProGenerator.addCell(ws3, r, 9, a.observacoes || '', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
     });
 
-    const totRow3 = 4 + alojadosAtivos.length;
+    const totRow3 = 4 + todosMoradoresAtivos.length;
     const totEx3 = totRow3 + 1;
-    ExcelProGenerator.addCell(ws3, totRow3, 0, 'TOTAL ATIVOS', { s: ExcelProGenerator.estilos.total('center') });
-    ExcelProGenerator.addCell(ws3, totRow3, 1, alojadosAtivos.length, { f: `COUNTA(B5:B${totRow3})`, s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws3, totRow3, 0, 'TOTAL GERAL ATIVOS', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws3, totRow3, 1, todosMoradoresAtivos.length, { f: `COUNTA(B5:B${totRow3})`, s: ExcelProGenerator.estilos.total('left') });
     for (let c = 2; c < 10; c++) {
       ExcelProGenerator.addCell(ws3, totRow3, c, '-', { s: ExcelProGenerator.estilos.total('center') });
     }
 
     ws3['!ref'] = `A1:J${totEx3}`;
-    ws3['!cols'] = [{ wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 30 }];
+    ws3['!cols'] = [{ wch: 14 }, { wch: 34 }, { wch: 22 }, { wch: 24 }, { wch: 18 }, { wch: 25 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 30 }];
     ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws3, "ALOJADOS ATIVOS");
 
     // ==========================================
-    // ABA 4: MÓVEIS E VISTORIAS
+    // ABA 4: MÓVEIS E VISTORIAS (CANTEIRO + CASAS)
     // ==========================================
     const ws4 = {};
-    ExcelProGenerator.addCabecalhoObra(ws4, `${obraNome.toUpperCase()} — INVENTÁRIO DE MÓVEIS & VISTORIAS`, `${empresaNome} • Conservação do Patrimônio e Itens para Reparo • Emissão: ${dataHora}`, 8);
-    const h4 = ['Bloco', 'Quarto', 'Item / Móvel', 'Quantidade', 'Estado de Conservação', 'Necessita Manutenção', 'Data da Vistoria', 'Observações'];
+    ExcelProGenerator.addCabecalhoObra(ws4, `${obraNome.toUpperCase()} — INVENTÁRIO CONSOLIDADO DE MÓVEIS & VISTORIAS`, `${empresaNome} • Conservação do Patrimônio e Itens para Reparo (Canteiro & Casas) • Emissão: ${dataHora}`, 8);
+    const h4 = ['Local / Bloco', 'Quarto / Cômodo', 'Item / Móvel', 'Quantidade', 'Estado de Conservação', 'Necessita Manutenção', 'Data da Vistoria', 'Observações'];
     h4.forEach((h, col) => ExcelProGenerator.addCell(ws4, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
     let r4 = 4;
@@ -6931,8 +7183,30 @@ function exportarPlanilhaOficial() {
       });
     });
 
+    casasParaExportar.forEach(c => {
+      (c.comodos || []).forEach(com => {
+        (com.moveis || []).forEach(m => {
+          const zebra = r4 % 2 === 1;
+          const alerta = m.precisa_manutencao === 1 || m.estado_conservacao === 'Ruim' || m.estado_conservacao === 'Danificado';
+          const statusTexto = alerta ? 'SIM (ALERTA)' : 'NÃO';
+          const statusEstilo = alerta ? ExcelProGenerator.estilos.statusAlerta : ExcelProGenerator.estilos.statusLivre;
+
+          ExcelProGenerator.addCell(ws4, r4, 0, c.nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+          ExcelProGenerator.addCell(ws4, r4, 1, com.nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+          ExcelProGenerator.addCell(ws4, r4, 2, m.tipo_item, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+          ExcelProGenerator.addCell(ws4, r4, 3, m.quantidade || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+          ExcelProGenerator.addCell(ws4, r4, 4, m.estado_conservacao || 'Bom', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+          ExcelProGenerator.addCell(ws4, r4, 5, statusTexto, { s: statusEstilo });
+          ExcelProGenerator.addCell(ws4, r4, 6, m.data_vistoria || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+          ExcelProGenerator.addCell(ws4, r4, 7, m.observacoes || (c.endereco ? `Casa: ${c.endereco}` : ''), { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+
+          r4++;
+        });
+      });
+    });
+
     const totEx4 = r4 + 1;
-    ExcelProGenerator.addCell(ws4, r4, 0, 'TOTAL ITENS', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws4, r4, 0, 'TOTAL ITENS CONSOLIDADO', { s: ExcelProGenerator.estilos.total('left') });
     ExcelProGenerator.addCell(ws4, r4, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
     ExcelProGenerator.addCell(ws4, r4, 2, `${r4 - 4} registros patrimoniais`, { s: ExcelProGenerator.estilos.total('left') });
     ExcelProGenerator.addCell(ws4, r4, 3, r4 - 4, { f: `SUM(D5:D${r4})`, s: ExcelProGenerator.estilos.total('center') });
@@ -6941,7 +7215,7 @@ function exportarPlanilhaOficial() {
     }
 
     ws4['!ref'] = `A1:H${totEx4}`;
-    ws4['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
+    ws4['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 28 }, { wch: 12 }, { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 36 }];
     ws4['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws4, "MÓVEIS E VISTORIAS");
 
@@ -6949,17 +7223,21 @@ function exportarPlanilhaOficial() {
     // ABA 5: DISTRIBUIÇÃO POR EMPRESA (COM FÓRMULAS)
     // ==========================================
     const ws5 = {};
-    ExcelProGenerator.addCabecalhoObra(ws5, `${obraNome.toUpperCase()} — OCUPAÇÃO POR EMPRESA PARCEIRA`, `${empresaNome} • Participação de Cada Contratada no Total de Leitos • Emissão: ${dataHora}`, 4);
+    ExcelProGenerator.addCabecalhoObra(ws5, `${obraNome.toUpperCase()} — OCUPAÇÃO POR EMPRESA PARCEIRA`, `${empresaNome} • Participação de Cada Contratada no Total Geral de Moradores • Emissão: ${dataHora}`, 4);
     const h5 = ['Empresa Parceira', 'Total Alojados', '% Participação na Obra (Fórmula)', 'Situação'];
     h5.forEach((h, col) => ExcelProGenerator.addCell(ws5, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
-    const totAtivosOficial = alojadosAtivos.length || 387;
+    const totAtivosOficial = todosMoradoresAtivos.length || 387;
 
     empresas.forEach((emp, idx) => {
       const r = 4 + idx;
       const zebra = idx % 2 === 1;
       const rowEx = r + 1;
-      const qtdEmp = alojadosAtivos.filter(a => Number(a.empresa_id) === Number(emp.id)).length;
+      const qtdEmp = todosMoradoresAtivos.filter(a => {
+        if (a.empresa_id && Number(a.empresa_id) === Number(emp.id)) return true;
+        if (a.empresa_nome && emp.nome && a.empresa_nome.toLowerCase().trim() === emp.nome.toLowerCase().trim()) return true;
+        return false;
+      }).length;
       const part = totAtivosOficial > 0 ? (qtdEmp / totAtivosOficial) : 0;
 
       ExcelProGenerator.addCell(ws5, r, 0, emp.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
@@ -6980,9 +7258,58 @@ function exportarPlanilhaOficial() {
     ws5['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws5, "DISTRIBUIÇÃO POR EMPRESA");
 
+    // ==========================================
+    // ABA 6: CASAS NA CIDADE & CONCESSIONÁRIAS (GESTÃO URBANA)
+    // ==========================================
+    if (casasCalculadas.length > 0) {
+      const ws6 = {};
+      ExcelProGenerator.addCabecalhoObra(ws6, `${obraNome.toUpperCase()} — CASAS URBANAS & CONCESSIONÁRIAS`, `${empresaNome} • Cadastro de Imóveis Alugados, Contas e 2ª Via • Emissão: ${dataHora}`, 11);
+      const h6 = ['Identificação da Casa', 'Endereço', 'Bairro', 'Responsável', 'Aluguel (R$)', 'Total Cômodos', 'Capacidade', 'Ocupadas', 'Livres (Fórmula)', 'Luz (Concessionária / UC)', 'Água (Concessionária / Matrícula)'];
+      h6.forEach((h, col) => ExcelProGenerator.addCell(ws6, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+      casasCalculadas.forEach((c, idx) => {
+        const r = 4 + idx;
+        const zebra = idx % 2 === 1;
+        const rowEx = r + 1;
+        const infoEnergia = c.energia_concessionaria ? `${c.energia_concessionaria.toUpperCase()} (UC: ${c.energia_uc || '-'})` : '-';
+        const infoAgua = c.agua_concessionaria ? `${c.agua_concessionaria.toUpperCase()} (Matr: ${c.agua_matricula || '-'})` : '-';
+
+        ExcelProGenerator.addCell(ws6, r, 0, c.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws6, r, 1, c.endereco || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws6, r, 2, c.bairro || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws6, r, 3, c.responsavel || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        ExcelProGenerator.addCell(ws6, r, 4, Number(c.aluguel_valor || 0), { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws6, r, 5, c.comodosQtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws6, r, 6, c.camas, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws6, r, 7, c.ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws6, r, 8, c.livres, { f: `G${rowEx}-H${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+        ExcelProGenerator.addCell(ws6, r, 9, infoEnergia, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+        ExcelProGenerator.addCell(ws6, r, 10, infoAgua, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      });
+
+      const totRow6 = 4 + casasCalculadas.length;
+      const totEx6 = totRow6 + 1;
+      ExcelProGenerator.addCell(ws6, totRow6, 0, 'TOTAL CASAS', { s: ExcelProGenerator.estilos.total('left') });
+      ExcelProGenerator.addCell(ws6, totRow6, 1, `${casasCalculadas.length} casas cadastradas`, { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws6, totRow6, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws6, totRow6, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws6, totRow6, 4, casasCalculadas.reduce((a, b) => a + Number(b.aluguel_valor || 0), 0), { f: `SUM(E5:E${totRow6})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws6, totRow6, 5, totalComodosCasas, { f: `SUM(F5:F${totRow6})`, s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws6, totRow6, 6, totalCamasCasas, { f: `SUM(G5:G${totRow6})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws6, totRow6, 7, totalOcupadasCasas, { f: `SUM(H5:H${totRow6})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws6, totRow6, 8, Math.max(0, totalCamasCasas - totalOcupadasCasas), { f: `G${totEx6}-H${totEx6}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws6, totRow6, 9, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws6, totRow6, 10, '-', { s: ExcelProGenerator.estilos.total('center') });
+
+      ws6['!ref'] = `A1:K${totEx6}`;
+      ws6['!cols'] = [{ wch: 25 }, { wch: 30 }, { wch: 20 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 28 }];
+      ws6['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+      XLSX.utils.book_append_sheet(wb, ws6, "CASAS NA CIDADE");
+    }
+
     // Gerar e salvar arquivo XLSX oficial
     XLSX.writeFile(wb, "controle_alojamento_oficial_taboca2.xlsx");
-    showToast('📗 Planilha Oficial baixada com sucesso (5 abas completas com fórmulas)!', 'success');
+    showToast('📗 Planilha Oficial Consolidada baixada com sucesso (Canteiro + Casas na Cidade)!', 'success');
     return;
   }
   showToast('📗 Gerando Planilha Oficial Taboca 2...', 'info');

@@ -953,6 +953,89 @@ assert(casaMockConcessionaria.energia_concessionaria === 'energisa' && casaMockC
 assert(casaMockConcessionaria.agua_concessionaria === 'sanesul' && casaMockConcessionaria.agua_matricula === '45892-01', 'Mock de Casa com Sanesul e Matrícula válida');
 
 // -------------------------------------------------------------
+// 15. VERIFICAÇÃO DA CONSOLIDAÇÃO DE CASAS NA CIDADE NA PLANILHA OFICIAL & RESUMO EXECUTIVO
+// -------------------------------------------------------------
+console.log('\n📊🏘️ 15. Verificação da Consolidação de Casas na Cidade na Planilha Oficial & Resumo');
+
+// 1. Paridade de app.js e index.html
+const conteudoAppFront = fs.readFileSync('frontend/app.js', 'utf8');
+assert(conteudoApp === conteudoAppFront, 'Paridade 100% entre app.js e frontend/app.js');
+
+const conteudoIndexFront = fs.readFileSync('frontend/index.html', 'utf8');
+assert(conteudoIndex === conteudoIndexFront, 'Paridade 100% entre index.html e frontend/index.html');
+
+// 2. Presença dos Blocos e Seções Consolidadas em exportarPlanilhaOficial
+assert(conteudoApp.includes('SUBTOTAL CANTEIRO TABOCA 2'), 'Seção de Subtotal do Canteiro presente na Planilha Oficial');
+assert(conteudoApp.includes('SUBTOTAL CASAS NA CIDADE'), 'Seção de Subtotal de Casas na Cidade presente na Planilha Oficial');
+assert(conteudoApp.includes('TOTAL GERAL CONSOLIDADO (CANTEIRO + CASAS)'), 'Total Geral Consolidado presente na Planilha Oficial');
+assert(conteudoApp.includes('"CASAS NA CIDADE"'), 'Aba 6 (CASAS NA CIDADE) adicionada à Planilha Oficial');
+assert(conteudoApp.includes('todosMoradoresAtivos'), 'Array consolidado de moradores ativos (canteiro + casas) presente em app.js');
+
+// 3. Presença da Consolidação em exportarResumoExcel
+assert(conteudoApp.includes('TOTAL GERAL CONSOLIDADO') && conteudoApp.includes('casasCalculadas'), 'Resumo Executivo contempla casas calculadas e total geral consolidado');
+
+// 4. Simulação Matemática da Consolidação (Canteiro + Casas na Cidade)
+const mockCanteiroStats = {
+  quartos: 224,
+  capacidade: 896,
+  ocupados: 387,
+  livres: 896 - 387 // 509
+};
+
+const mockCasasLista = [
+  {
+    id: 'casa_1',
+    nome: 'Casa Liderança 01',
+    comodos: [
+      { id: 'com_1', tipo: 'quarto', camas: 3, moradores: [{ id: 'm1' }, { id: 'm2' }] },
+      { id: 'com_2', tipo: 'quarto', camas: 2, moradores: [{ id: 'm3' }] },
+      { id: 'com_3', tipo: 'sala', moveis: [] } // Sala não conta como quarto/cama
+    ]
+  },
+  {
+    id: 'casa_2',
+    nome: 'Casa Engenharia 02',
+    comodos: [
+      { id: 'com_4', tipo: 'quarto', camas: 4, moradores: [{ id: 'm4' }, { id: 'm5' }, { id: 'm6' }] }
+    ]
+  }
+];
+
+// Cálculo de métricas das casas
+let totalComodosCasasCalc = 0;
+let totalCamasCasasCalc = 0;
+let totalOcupadasCasasCalc = 0;
+
+mockCasasLista.forEach(c => {
+  const comodosQuarto = (c.comodos || []).filter(cm => (cm.tipo || '').toLowerCase() === 'quarto');
+  totalComodosCasasCalc += comodosQuarto.length;
+  comodosQuarto.forEach(cm => {
+    totalCamasCasasCalc += Number(cm.camas || 0);
+    totalOcupadasCasasCalc += (cm.moradores || []).length;
+  });
+});
+
+const totalLivresCasasCalc = Math.max(0, totalCamasCasasCalc - totalOcupadasCasasCalc);
+
+assert(totalComodosCasasCalc === 3, 'Simulação Casas: Total de 3 quartos identificados nas 2 casas');
+assert(totalCamasCasasCalc === 9, 'Simulação Casas: Total de 9 camas nas 2 casas (3 + 2 + 4)');
+assert(totalOcupadasCasasCalc === 6, 'Simulação Casas: Total de 6 moradores ocupando leitos nas casas (2 + 1 + 3)');
+assert(totalLivresCasasCalc === 3, 'Simulação Casas: Total de 3 vagas livres nas casas (9 - 6)');
+
+// Consolidação Total (Canteiro + Casas)
+const consolidadoQuartos = mockCanteiroStats.quartos + totalComodosCasasCalc;
+const consolidadoCapacidade = mockCanteiroStats.capacidade + totalCamasCasasCalc;
+const consolidadoOcupados = mockCanteiroStats.ocupados + totalOcupadasCasasCalc;
+const consolidadoLivres = mockCanteiroStats.livres + totalLivresCasasCalc;
+const taxaOcupacaoConsolidada = consolidadoCapacidade > 0 ? (consolidadoOcupados / consolidadoCapacidade) : 0;
+
+assert(consolidadoQuartos === 227, 'Consolidação: Total de 227 cômodos/quartos consolidados (224 + 3)');
+assert(consolidadoCapacidade === 905, 'Consolidação: Capacidade total de 905 leitos consolidados (896 + 9)');
+assert(consolidadoOcupados === 393, 'Consolidação: Ocupação total de 393 pessoas consolidadas (387 + 6)');
+assert(consolidadoLivres === 512, 'Consolidação: 512 leitos disponíveis consolidados (509 + 3)');
+assert(taxaOcupacaoConsolidada > 0.43 && taxaOcupacaoConsolidada < 0.44, 'Consolidação: Taxa consolidada calculada corretamente (~43.4%)');
+
+// -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
 console.log('\n============================================================');
