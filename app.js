@@ -8,6 +8,26 @@ let currentUserRole = 'prefeito'; // 'prefeito' ou 'consulta'
 let currentUserName = 'Prefeito da Obra';
 let activeTab = 'dashboard';
 
+// Utilitários de Segurança e Fuso Horário Local (Brasil / Canteiro Taboca 2)
+function getDataHojeLocal(dataObj = new Date()) {
+  const d = dataObj instanceof Date ? dataObj : new Date(dataObj);
+  if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-CA');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Cache de Dados
 let globalStats = null;
 let globalBlocos = [];
@@ -117,7 +137,7 @@ const StaticApiEngine = {
 
               // Migração: Garantir que todos os quartos possuam 'Fechadura' cadastrada em seus móveis
               let fechadurasAdicionadas = 0;
-              const hojeData = new Date().toISOString().split('T')[0];
+              const hojeData = getDataHojeLocal();
               (this.dbState.quartos || []).forEach(q => {
                 if (!q.moveis) q.moveis = [];
                 const temFechadura = q.moveis.some(m => m.tipo_item === 'Fechadura' || m.tipo_item === 'Trinco / Fechadura');
@@ -136,24 +156,6 @@ const StaticApiEngine = {
               });
               if (fechadurasAdicionadas > 0) {
                 console.log(`[MIGRAÇÃO] Fechadura adicionada em ${fechadurasAdicionadas} quartos no cache local.`);
-                this.saveToStorage();
-              }
-
-              // Reconciliação imediata dos 12 reparos concluídos pelo prefeito na nuvem
-              const reparadosIds = new Set([2650, 2668, 2709, 2728, 2866, 2908, 3057, 3208, 3585, 3598, 3634, 3694]);
-              let reparosLocaisAplicados = 0;
-              (this.dbState.quartos || []).forEach(q => {
-                (q.moveis || []).forEach(m => {
-                  if (reparadosIds.has(Number(m.id)) && (Number(m.precisa_manutencao) === 1 || m.estado_conservacao !== 'Bom')) {
-                    m.precisa_manutencao = 0;
-                    m.estado_conservacao = 'Bom';
-                    m.data_vistoria = '2026-09-26';
-                    reparosLocaisAplicados++;
-                  }
-                });
-              });
-              if (reparosLocaisAplicados > 0) {
-                console.log(`[REPAROS] ${reparosLocaisAplicados} móveis reparados reconciliados com sucesso do cache local.`);
                 this.saveToStorage();
               }
 
@@ -573,10 +575,10 @@ const StaticApiEngine = {
           vagas.push({ id: novoId + i, numero_cama: i, status: isAtivo ? 'livre' : 'desativada', alojado: null });
         }
         const moveis = [
-          { id: novoId + 10, tipo_item: 'Ar-Condicionado', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Funcionando' },
-          { id: novoId + 11, tipo_item: 'Beliche / Camas', quantidade: 2, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' },
-          { id: novoId + 12, tipo_item: 'Guarda-roupa / Armário', quantidade: 4, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Em bom estado' },
-          { id: novoId + 13, tipo_item: 'Fechadura', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: new Date().toISOString().split('T')[0], observacoes: 'Fechadura da porta funcionando' }
+          { id: novoId + 10, tipo_item: 'Ar-Condicionado', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: getDataHojeLocal(), observacoes: 'Funcionando' },
+          { id: novoId + 11, tipo_item: 'Beliche / Camas', quantidade: 2, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: getDataHojeLocal(), observacoes: 'Em bom estado' },
+          { id: novoId + 12, tipo_item: 'Guarda-roupa / Armário', quantidade: 4, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: getDataHojeLocal(), observacoes: 'Em bom estado' },
+          { id: novoId + 13, tipo_item: 'Fechadura', quantidade: 1, estado_conservacao: 'Bom', precisa_manutencao: 0, data_vistoria: getDataHojeLocal(), observacoes: 'Fechadura da porta funcionando' }
         ];
         const novoQ = {
           id: novoId,
@@ -630,7 +632,7 @@ const StaticApiEngine = {
       const alojado = this.dbState.alojados.find(x => x.id === aId);
       if (alojado) {
         alojado.status = 'desligado';
-        alojado.data_saida = body.data_saida || new Date().toISOString().split('T')[0];
+        alojado.data_saida = body.data_saida || getDataHojeLocal();
         const vagaAntigaId = alojado.vaga_id;
         alojado.vaga_id = null;
         alojado.quarto_numero = null;
@@ -789,7 +791,7 @@ const StaticApiEngine = {
 
       alojado.status = 'ativo';
       alojado.data_saida = null;
-      alojado.data_entrada = body.data_entrada || new Date().toISOString().split('T')[0];
+      alojado.data_entrada = body.data_entrada || getDataHojeLocal();
       alojado.vaga_id = novaVagaId;
       alojado.bloco_nome = foundRoom.bloco_nome;
       alojado.quarto_numero = foundRoom.numero;
@@ -953,7 +955,7 @@ const StaticApiEngine = {
         empresa_cor: emp.cor,
         funcao: (body.funcao || '').toUpperCase(),
         whatsapp: body.whatsapp ? body.whatsapp.trim() : '',
-        data_entrada: body.data_entrada || new Date().toISOString().split('T')[0],
+        data_entrada: body.data_entrada || getDataHojeLocal(),
         data_saida: null,
         status: 'ativo',
         observacoes: body.observacoes || '',
@@ -1032,7 +1034,7 @@ const StaticApiEngine = {
       const matchResolver = path.match(/\/api\/moveis\/(\d+)\/resolver-manutencao/);
       if (matchResolver && method === 'POST') {
         const mId = Number(matchResolver[1]);
-        const hoje = new Date().toISOString().split('T')[0];
+        const hoje = getDataHojeLocal();
         const dataFormatada = new Date().toLocaleDateString('pt-BR');
         const user = params.get('usuario') || currentUserName || 'Prefeito';
         let itemNome = 'Item';
@@ -1088,7 +1090,7 @@ const StaticApiEngine = {
             if (m.id === movelId) {
               m.estado_conservacao = body.estado_conservacao;
               m.precisa_manutencao = Number(body.precisa_manutencao);
-              m.data_vistoria = body.data_vistoria || new Date().toISOString().split('T')[0];
+              m.data_vistoria = body.data_vistoria || getDataHojeLocal();
               m.observacoes = body.observacoes || '';
             }
           });
@@ -1112,7 +1114,7 @@ const StaticApiEngine = {
             quantidade: Number(body.quantidade) || 1,
             estado_conservacao: body.estado_conservacao || 'Bom',
             precisa_manutencao: Number(body.precisa_manutencao) || 0,
-            data_vistoria: body.data_vistoria || new Date().toISOString().split('T')[0],
+            data_vistoria: body.data_vistoria || getDataHojeLocal(),
             observacoes: body.observacoes || ''
           });
           this.recomputeStats();
@@ -4629,7 +4631,7 @@ async function openModalNovoAlojado(vagaPreId = null) {
   await preencherSelectVagasLivres('alojadoFormVagaId', vagaPreId);
 
   // Data de entrada default hoje
-  document.getElementById('alojadoFormDataEntrada').value = new Date().toISOString().split('T')[0];
+  document.getElementById('alojadoFormDataEntrada').value = getDataHojeLocal();
 
   abrirModal('modalAlojadoForm');
 }
@@ -5148,7 +5150,7 @@ function abrirModalDesligar(alojadoId, nome) {
   if (!checkPrefeitoAccess()) return;
   document.getElementById('desligarAlojadoId').value = alojadoId;
   document.getElementById('desligarNome').textContent = nome;
-  document.getElementById('desligarData').value = new Date().toISOString().split('T')[0];
+  document.getElementById('desligarData').value = getDataHojeLocal();
   document.getElementById('desligarMotivo').value = 'Conclusão de atividades no canteiro';
   abrirModal('modalDesligar');
 }
@@ -5218,7 +5220,7 @@ async function abrirModalReativar(alojadoId, nome) {
       body: JSON.stringify({
         alojado_id: parseInt(alojadoId),
         nova_vaga_id: parseInt(vagaId),
-        data_entrada: new Date().toISOString().split('T')[0],
+        data_entrada: getDataHojeLocal(),
         usuario: currentUserName
       })
     });
@@ -5347,7 +5349,7 @@ function openModalNovoMovel(quartoPreId = null) {
   document.getElementById('movelFormId').value = '';
 
   preencherSelectQuartosParaMovel('movelFormQuartoId', quartoPreId);
-  document.getElementById('movelFormDataVistoria').value = new Date().toISOString().split('T')[0];
+  document.getElementById('movelFormDataVistoria').value = getDataHojeLocal();
 
   abrirModal('modalMovelForm');
 }
@@ -7496,7 +7498,7 @@ function exportarCasasCidadeExcel() {
     ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws3, "INVENTARIO BENS");
 
-    const dataArquivo = new Date().toISOString().split('T')[0];
+    const dataArquivo = getDataHojeLocal();
     XLSX.writeFile(wb, `casas_urbanas_ocupacao_${dataArquivo}.xlsx`);
     showToast('Planilha de Casas na Cidade baixada com sucesso!', 'success');
     return;
@@ -7604,7 +7606,7 @@ function exportarLimpezasExcel() {
     ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws2, "CICLO AR CONDICIONADO");
 
-    const dataArquivo = new Date().toISOString().split('T')[0];
+    const dataArquivo = getDataHojeLocal();
     XLSX.writeFile(wb, `relatorio_limpezas_casas_${dataArquivo}.xlsx`);
     showToast('Planilha de limpezas baixada com sucesso!', 'success');
     return;
@@ -7719,7 +7721,7 @@ function exportarDespesasCasasExcel() {
     ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws2, "CONSOLIDADO POR CASA");
 
-    const dataArquivo = new Date().toISOString().split('T')[0];
+    const dataArquivo = getDataHojeLocal();
     XLSX.writeFile(wb, `despesas_contas_casas_${dataArquivo}.xlsx`);
     showToast('Planilha de despesas consolidada baixada com sucesso!', 'success');
     return;
@@ -8068,7 +8070,7 @@ function filtrarPainelDespesasCasasUI() {
 
     let avisoVencida = false;
     if (!ehPago && d.vencimento) {
-      const hojeStr = new Date().toISOString().split('T')[0];
+      const hojeStr = getDataHojeLocal();
       if (d.vencimento < hojeStr) avisoVencida = true;
     }
 
@@ -8392,27 +8394,56 @@ async function executarRestauracaoBackupConfirmada() {
 
     if (firestoreDb) {
       try {
-        const batch = firestoreDb.batch();
-        const snapshotRef = firestoreDb.collection('configuracoes').doc('snapshot_canteiro');
-        batch.set(snapshotRef, {
+        // 1. Salvar snapshot oficial consolidado em canteiro_metadata/snapshot_canteiro
+        const snapshotData = {
+          timestamp: new Date().toISOString(),
+          versao: "4.1",
+          autor: (typeof currentUserName !== 'undefined' ? currentUserName : "Prefeito da Obra"),
           dados_consolidados: JSON.stringify(StaticApiEngine.dbState),
-          atualizado_em: new Date().toISOString()
-        }, { merge: true });
+          total_blocos: (StaticApiEngine.dbState.blocos || []).length,
+          total_quartos: (StaticApiEngine.dbState.quartos || []).length,
+          total_alojados: (StaticApiEngine.dbState.alojados || []).length,
+          total_casas: (listaCasasCidade || []).length,
+          casas_cidade: listaCasasCidade || [],
+          casas_despesas: listaDespesasCasas || [],
+          casas_limpezas: listaLimpezasCasas || [],
+          ronda_pontos: listaPontosRonda || [],
+          ronda_registros: listaRegistrosRonda || [],
+          estoque_itens: listaEstoqueItens || [],
+          estoque_movimentacoes: listaEstoqueMovimentacoes || [],
+          chamados: listaChamados || []
+        };
+        await firestoreDb.collection('canteiro_metadata').doc('snapshot_canteiro').set(snapshotData);
 
-        (listaCasasCidade || []).forEach(c => {
-          if (c && c.id) {
-            batch.set(firestoreDb.collection('casas_cidade').doc(String(c.id)), c);
-          }
+        // 2. Sincronizar coleções modulares no Firestore
+        const batch = firestoreDb.batch();
+
+        (listaCasasCidade || []).slice(0, 50).forEach(c => {
+          if (c && c.id) batch.set(firestoreDb.collection('casas_cidade').doc(String(c.id)), c);
         });
 
-        (listaDespesasCasas || []).forEach(d => {
-          if (d && d.id) {
-            batch.set(firestoreDb.collection('casas_despesas').doc(String(d.id)), d);
-          }
+        (listaDespesasCasas || []).slice(0, 50).forEach(d => {
+          if (d && d.id) batch.set(firestoreDb.collection('casas_despesas').doc(String(d.id)), d);
+        });
+
+        (listaLimpezasCasas || []).slice(0, 50).forEach(l => {
+          if (l && l.id) batch.set(firestoreDb.collection('casas_limpezas').doc(String(l.id)), l);
+        });
+
+        (listaPontosRonda || []).slice(0, 50).forEach(p => {
+          if (p && p.id) batch.set(firestoreDb.collection('ronda_pontos').doc(String(p.id)), p);
+        });
+
+        (listaEstoqueItens || []).slice(0, 50).forEach(e => {
+          if (e && e.id) batch.set(firestoreDb.collection('estoque_itens').doc(String(e.id)), e);
+        });
+
+        (listaChamados || []).slice(0, 50).forEach(ch => {
+          if (ch && (ch.protocolo || ch.id)) batch.set(firestoreDb.collection('chamados_suporte').doc(String(ch.protocolo || ch.id)), ch);
         });
 
         await batch.commit();
-        console.log('[FIREBASE] Restauração sincronizada na nuvem com sucesso.');
+        console.log('[FIREBASE] Restauração consolidada sincronizada na nuvem com sucesso (canteiro_metadata/snapshot_canteiro + módulos).');
       } catch (err) {
         console.warn('Aviso ao sincronizar restauração no Firestore:', err);
       }
@@ -8848,7 +8879,7 @@ function exportarAuditoriaExcel() {
     const ws = XLSX.utils.json_to_sheet(dados);
     XLSX.utils.book_append_sheet(wb, ws, 'Histórico de Auditoria');
 
-    const dataHoje = new Date().toISOString().split('T')[0];
+    const dataHoje = getDataHojeLocal();
     XLSX.writeFile(wb, `RELATORIO_AUDITORIA_CANTEIRO_${dataHoje}.xlsx`);
     showToast('Histórico de auditoria exportado com sucesso em Excel (.xlsx)!', 'success');
   } catch (e) {
@@ -9362,6 +9393,13 @@ function renderizarGridChamados(chamados) {
       : '<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-hotel text-[9px]"></i> Alojamento Obra</span>';
 
     const textoLocalMsg = isCasa ? `${tituloLocal} (${c.comodo || 'Geral'})` : `${tituloLocal} ${subtituloLocal}`;
+    const tituloLocalEsc = escapeHTML(tituloLocal);
+    const subtituloLocalEsc = escapeHTML(subtituloLocal);
+    const protocoloEsc = escapeHTML(c.protocolo || c.id || '');
+    const categoriaEsc = escapeHTML(c.categoria || 'Manutenção');
+    const descricaoEsc = c.descricao ? escapeHTML(c.descricao) : '<span class="text-slate-400 italic">Sem descrição informada</span>';
+    const nomeSolicitanteEsc = escapeHTML(c.nome_solicitante || 'Não informado');
+    const whatsappSolicitanteEsc = escapeHTML(c.whatsapp_solicitante || '');
 
     return `
       <div class="bg-white rounded-2xl border ${c.status === 'pendente' ? 'border-amber-300 shadow-md ring-1 ring-amber-100' : 'border-slate-200 shadow-sm'} p-4 flex flex-col justify-between transition hover:shadow-md">
@@ -9376,11 +9414,11 @@ function renderizarGridChamados(chamados) {
               <div>
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <h4 class="text-sm font-extrabold text-slate-900 leading-tight">
-                    ${tituloLocal}<span class="text-xs font-semibold text-slate-500">${subtituloLocal}</span>
+                    ${tituloLocalEsc}<span class="text-xs font-semibold text-slate-500">${subtituloLocalEsc}</span>
                   </h4>
                   ${badgeTipo}
                 </div>
-                <p class="text-[10px] font-mono text-slate-400 mt-0.5">#${c.protocolo}</p>
+                <p class="text-[10px] font-mono text-slate-400 mt-0.5">#${protocoloEsc}</p>
               </div>
             </div>
             <div>
@@ -9393,26 +9431,26 @@ function renderizarGridChamados(chamados) {
             
             <div class="flex items-center gap-2">
               <i class="${iconePorCategoria(c.categoria)} text-sm"></i>
-              <span class="text-xs font-bold text-slate-800">${c.categoria}</span>
+              <span class="text-xs font-bold text-slate-800">${categoriaEsc}</span>
             </div>
 
             <div class="bg-slate-50 rounded-xl p-2.5 text-xs text-slate-700 leading-relaxed border border-slate-100">
-              ${c.descricao || '<span class="text-slate-400 italic">Sem descrição informada</span>'}
+              ${descricaoEsc}
             </div>
 
             <!-- Dados do Solicitante -->
             <div class="pt-1 flex flex-col gap-1 text-[11px] text-slate-500">
               <div class="flex items-center justify-between">
                 <span class="flex items-center gap-1 font-medium text-slate-700">
-                  <i class="fa-solid fa-user text-slate-400"></i> ${c.nome_solicitante}
+                  <i class="fa-solid fa-user text-slate-400"></i> ${nomeSolicitanteEsc}
                 </span>
                 <span class="text-[10px] text-slate-400">${dataDisplay}</span>
               </div>
 
               ${c.whatsapp_solicitante ? `
                 <div class="flex items-center justify-between pt-0.5">
-                  <span class="text-slate-500">Contato: ${c.whatsapp_solicitante}</span>
-                  <a href="https://wa.me/55${c.whatsapp_solicitante.replace(/\D/g, '')}?text=${encodeURIComponent('Olá ' + c.nome_solicitante + ', sobre seu chamado de manutenção no ' + textoLocalMsg + ':')}" target="_blank" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  <span class="text-slate-500">Contato: ${whatsappSolicitanteEsc}</span>
+                  <a href="https://wa.me/55${c.whatsapp_solicitante.replace(/\D/g, '')}?text=${encodeURIComponent('Olá ' + (c.nome_solicitante || '') + ', sobre seu chamado de manutenção no ' + textoLocalMsg + ':')}" target="_blank" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                     <i class="fa-brands fa-whatsapp"></i> Responder
                   </a>
                 </div>
@@ -9424,7 +9462,7 @@ function renderizarGridChamados(chamados) {
 
         <!-- Botões de Ação do Prefeito -->
         <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-1.5 mt-3">
-          <button onclick="excluirChamado('${c.protocolo}')" class="btn-prefeito p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Chamado">
+          <button onclick="excluirChamado('${protocoloEsc}')" class="btn-prefeito p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Chamado">
             <i class="fa-solid fa-trash-can"></i>
           </button>
 
@@ -11282,7 +11320,7 @@ function openModalNovoMoradorCasa(casaId, comodoId, camaNum) {
   const comNome = com ? com.nome : 'Quarto';
 
   document.getElementById('modalMoradorCasaSubtitulo').textContent = `${comNome} • Cama Nº ${camaNum}`;
-  document.getElementById('moradorCasaFormDataEntrada').value = new Date().toISOString().split('T')[0];
+  document.getElementById('moradorCasaFormDataEntrada').value = getDataHojeLocal();
   abrirModal('modalMoradorCasaForm');
 }
 
@@ -11309,7 +11347,7 @@ function openModalEditarMoradorCasa(casaId, comodoId, camaNum) {
     document.getElementById('moradorCasaFormFuncao').value = morador.funcao || '';
     document.getElementById('moradorCasaFormEmpresa').value = morador.empresa || 'GEL';
     document.getElementById('moradorCasaFormWhatsapp').value = morador.whatsapp || '';
-    document.getElementById('moradorCasaFormDataEntrada').value = morador.data_entrada || new Date().toISOString().split('T')[0];
+    document.getElementById('moradorCasaFormDataEntrada').value = morador.data_entrada || getDataHojeLocal();
 
     if (morador.foto_url) {
       document.getElementById('moradorCasaFormFotoUrl').value = morador.foto_url;
@@ -12070,7 +12108,7 @@ async function confirmarDevolucaoMovelEstoque(event) {
     quantidade: qtdDevolver,
     saldo_anterior: saldoAnterior,
     novo_saldo: novoSaldo,
-    data: new Date().toISOString().split('T')[0],
+    data: getDataHojeLocal(),
     motivo: `Devolução da Casa: ${c.nome} (${com.nome})${motivo ? ` - ${motivo}` : ''}`,
     responsavel: responsavel,
     local: localDestino,
@@ -12246,7 +12284,7 @@ async function salvarMovelComodo(event) {
         quantidade: qtd,
         saldo_anterior: saldoAnterior,
         novo_saldo: novoSaldo,
-        data: new Date().toISOString().split('T')[0],
+        data: getDataHojeLocal(),
         motivo: `Alocado na Casa: ${casa.nome} (${comodo.nome})`,
         responsavel: 'Almoxarifado / Casas',
         local: itemEstoque.local || 'Almoxarifado',
@@ -13838,12 +13876,12 @@ function renderizarRelatorioLimpezaExecutivoUI() {
         const conc = ch.status === 'concluido';
         return `
           <tr>
-            <td class="py-1.5 px-3 font-mono font-bold text-slate-700">#${ch.protocolo || '--'}</td>
+            <td class="py-1.5 px-3 font-mono font-bold text-slate-700">#${escapeHTML(ch.protocolo || '--')}</td>
             <td class="py-1.5 px-2 text-slate-600">${dtStr}</td>
-            <td class="py-1.5 px-2 font-bold text-slate-800">${localTxt}</td>
-            <td class="py-1.5 px-2 font-semibold text-slate-700">${ch.categoria || 'Manutenção'}</td>
-            <td class="py-1.5 px-3 text-slate-600">${ch.descricao || ''}</td>
-            <td class="py-1.5 px-2 text-slate-700">${ch.solicitante || 'Morador'}</td>
+            <td class="py-1.5 px-2 font-bold text-slate-800">${escapeHTML(localTxt)}</td>
+            <td class="py-1.5 px-2 font-semibold text-slate-700">${escapeHTML(ch.categoria || 'Manutenção')}</td>
+            <td class="py-1.5 px-3 text-slate-600">${escapeHTML(ch.descricao || '')}</td>
+            <td class="py-1.5 px-2 text-slate-700">${escapeHTML(ch.solicitante || 'Morador')}</td>
             <td class="py-1.5 px-2 text-center">
               <span class="px-2 py-0.5 rounded text-[10px] font-bold ${conc ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
                 ${conc ? 'RESOLVIDO' : 'EM ABERTO'}
@@ -14536,7 +14574,7 @@ function openModalMovimentacaoEstoque(tipo = 'entrada') {
   popularSelectItensMovimentacao();
 
   document.getElementById('movimentacaoTipo').value = tipo;
-  document.getElementById('movimentacaoData').value = new Date().toISOString().split('T')[0];
+  document.getElementById('movimentacaoData').value = getDataHojeLocal();
   document.getElementById('movimentacaoQtd').value = 1;
 
   const topo = document.getElementById('movimentacaoEstoqueTopo');
@@ -14930,7 +14968,7 @@ async function confirmarConclusaoChamadoComEstoque(event) {
         quantidade: qtd,
         saldo_anterior: saldoAnterior,
         novo_saldo: novoSaldo,
-        data: new Date().toISOString().split('T')[0],
+        data: getDataHojeLocal(),
         motivo: `Reparo Chamado #${protocolo} (${ch.quarto || ''}): ${ch.descricao || 'Manutenção'}`,
         responsavel: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito'),
         local: local || item.local,
@@ -15408,7 +15446,7 @@ function exportarRelatorioEstoqueExcel() {
     const wsResumo = XLSX.utils.json_to_sheet(dadosResumo);
     XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo Executivo');
 
-    const dataHoje = new Date().toISOString().split('T')[0];
+    const dataHoje = getDataHojeLocal();
     XLSX.writeFile(wb, `RELATORIO_ALMOXARIFADO_PATRIMONIO_${dataHoje}.xlsx`);
     showToast('Relatório geral de estoque exportado com sucesso em Excel (.xlsx)!', 'success');
   } catch (err) {
@@ -16532,13 +16570,13 @@ function abrirModalOcorrenciasPontoRonda(pontoId) {
 
           <div class="flex items-center justify-between font-semibold text-slate-800">
             <span class="text-sm font-bold text-rose-950 flex items-center gap-1.5">
-              <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> ${o.tipo_problema}
+              <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> ${escapeHTML(o.tipo_problema || 'Problema')}
             </span>
-            <span class="text-[11px] text-slate-500 font-normal">Por: <b>${o.solicitante || 'Anônimo'}</b></span>
+            <span class="text-[11px] text-slate-500 font-normal">Por: <b>${escapeHTML(o.solicitante || 'Anônimo')}</b></span>
           </div>
 
           <p class="text-xs text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
-            "${o.descricao}"
+            "${escapeHTML(o.descricao || '')}"
           </p>
 
           <div class="flex items-center justify-between pt-1 border-t border-slate-200/60">

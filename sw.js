@@ -1,12 +1,13 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v4.0';
+const CACHE_NAME = 'prefeitura-pwa-v4.1';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
   'chamado.html',
   'limpeza.html',
+  'ronda.html',
   'app.js',
   'xlsx.bundle.js',
   'manifest.json',
@@ -98,7 +99,7 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
       return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') return response;
+        if (!response || (response.status !== 200 && response.type !== 'opaque')) return response;
         const responseToCache = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         return response;

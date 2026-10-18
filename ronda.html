@@ -450,8 +450,11 @@
       </div>
 
       <div>
-        <h3 class="text-lg font-black text-white">Ronda Registrada com Sucesso!</h3>
-        <p class="text-xs text-slate-300 mt-1">Obrigado! O Prefeito da Obra já recebeu a confirmação em tempo real.</p>
+        <h3 id="sucessoTituloRonda" class="text-lg font-black text-white">Ronda Registrada com Sucesso!</h3>
+        <p id="sucessoDescricaoRonda" class="text-xs text-slate-300 mt-1">Obrigado! O Prefeito da Obra já recebeu a confirmação em tempo real.</p>
+        <div id="sucessoBadgeStatusRonda" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+          <i class="fa-solid fa-cloud-arrow-up"></i> <span>Transmitido para a Nuvem da Obra</span>
+        </div>
       </div>
 
       <!-- Resumo do Registro -->
@@ -1082,9 +1085,11 @@
       };
 
       // 1. Salvar no Firestore
-      if (firestoreDb) {
+      let salvoOnline = false;
+      if (firestoreDb && navigator.onLine) {
         try {
           await firestoreDb.collection('ronda_registros').doc(protocolo).set(registro);
+          salvoOnline = true;
 
           // Salvar log na auditoria central para o Prefeito ver
           const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
@@ -1104,6 +1109,8 @@
         }
       }
 
+      registro.sync_pendente = !salvoOnline;
+
       // 2. Atualizar cache local
       try {
         const cached = localStorage.getItem('ronda_registros_cache');
@@ -1112,7 +1119,7 @@
         localStorage.setItem('ronda_registros_cache', JSON.stringify(lista.slice(0, 200)));
       } catch (e) {}
 
-      // 3. Exibir Tela de Sucesso
+      // 3. Exibir Tela de Sucesso com status transparente
       document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
       document.getElementById('sucessoPontoNome').textContent = pontoNome;
       document.getElementById('sucessoSetor').textContent = pontoSetor;
@@ -1120,11 +1127,59 @@
       document.getElementById('sucessoResponsavel').textContent = responsavel;
       document.getElementById('sucessoDataHora').textContent = `${data.split('-').reverse().join('/')} às ${hora}`;
 
+      const titEl = document.getElementById('sucessoTituloRonda');
+      const descEl = document.getElementById('sucessoDescricaoRonda');
+      const badgeEl = document.getElementById('sucessoBadgeStatusRonda');
+
+      if (salvoOnline) {
+        if (titEl) titEl.textContent = 'Ronda Registrada com Sucesso!';
+        if (descEl) descEl.textContent = 'A confirmação foi transmitida para a nuvem da obra em tempo real.';
+        if (badgeEl) {
+          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+          badgeEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> <span>Transmitido para a Nuvem da Obra</span>';
+        }
+      } else {
+        if (titEl) titEl.textContent = 'Ronda Gravada no Aparelho!';
+        if (descEl) descEl.textContent = 'A vistoria foi registrada localmente (offline). O envio está em fila e será transmitido automaticamente assim que a conexão retornar.';
+        if (badgeEl) {
+          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+          badgeEl.innerHTML = '<i class="fa-solid fa-clock text-amber-400"></i> <span>Salvo no Dispositivo (Envio Pendente de Internet)</span>';
+        }
+      }
+
       document.getElementById('formRonda').classList.add('hidden');
       document.getElementById('telaSucessoRonda').classList.remove('hidden');
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    // Auto-sincronização de rondas pendentes ao reconectar
+    async function sincronizarRondasPendentesOffline() {
+      if (!navigator.onLine || !firestoreDb) return;
+      try {
+        const cached = localStorage.getItem('ronda_registros_cache');
+        if (!cached) return;
+        const lista = JSON.parse(cached);
+        let alterado = false;
+        for (const r of lista) {
+          if (r.sync_pendente) {
+            try {
+              const rClone = { ...r };
+              delete rClone.sync_pendente;
+              await firestoreDb.collection('ronda_registros').doc(r.id || r.protocolo).set(rClone);
+              r.sync_pendente = false;
+              alterado = true;
+            } catch (e) {}
+          }
+        }
+        if (alterado) {
+          localStorage.setItem('ronda_registros_cache', JSON.stringify(lista));
+          console.log('[SYNC] Registros de ronda pendentes sincronizados com a nuvem.');
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('online', sincronizarRondasPendentesOffline);
+    setTimeout(sincronizarRondasPendentesOffline, 3500);
 
     function fazerOutroRegistroRonda() {
       const agora = new Date();

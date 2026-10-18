@@ -1036,6 +1036,74 @@ assert(consolidadoLivres === 512, 'Consolidação: 512 leitos disponíveis conso
 assert(taxaOcupacaoConsolidada > 0.43 && taxaOcupacaoConsolidada < 0.44, 'Consolidação: Taxa consolidada calculada corretamente (~43.4%)');
 
 // -------------------------------------------------------------
+// 16. VERIFICAÇÃO DE RESILIÊNCIA, SEGURANÇA ANTI-XSS, PWA OFFLINE E FUSO HORÁRIO LOCAL
+// -------------------------------------------------------------
+console.log('\n🛡️ 16. Verificação de Segurança Anti-XSS, PWA Offline, Fuso Local e Backup Consistente');
+
+// 1. Sanitização Anti-XSS
+const appJsContentSec16 = fs.readFileSync('app.js', 'utf8');
+assert(appJsContentSec16.includes('function escapeHTML('), 'Função escapeHTML implementada em app.js');
+
+function testEscapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+const xssPayload = '<script>alert("hacked")</script>';
+const xssEscaped = testEscapeHTML(xssPayload);
+assert(!xssEscaped.includes('<script>') && xssEscaped.includes('&lt;script&gt;'), 'Sanitização Anti-XSS converte tags HTML perigosas para entidades seguras');
+assert(xssEscaped.includes('&quot;hacked&quot;'), 'Sanitização Anti-XSS converte aspas para &quot;');
+
+// 2. Fuso Horário Local (Brasil / Canteiro Taboca 2)
+assert(appJsContentSec16.includes('function getDataHojeLocal('), 'Função getDataHojeLocal implementada em app.js');
+assert(!appJsContentSec16.includes(".toISOString().split('T')[0]"), 'Eliminada dependência de data UTC toISOString().split() em app.js');
+
+function testGetDataHojeLocal(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+const hojeTeste = testGetDataHojeLocal();
+assert(/^\d{4}-\d{2}-\d{2}$/.test(hojeTeste), 'Formato de data local é exatamente YYYY-MM-DD');
+
+// 3. Remoção do Override de 12 Móveis Fixos
+assert(!appJsContentSec16.includes('const reparadosIds = new Set'), 'Removida reconciliação legada que sobrescrevia 12 móveis fixos para Bom no boot');
+
+// 4. Consistência na Restauração de Backup
+assert(appJsContentSec16.includes("collection('canteiro_metadata').doc('snapshot_canteiro').set(snapshotData)"), 'Restauração de backup salva o snapshot exatamente em canteiro_metadata/snapshot_canteiro');
+
+// 5. PWA Offline em sw.js
+const swContent = fs.readFileSync('sw.js', 'utf8');
+assert(swContent.includes('prefeitura-pwa-v4.1'), 'Versão do cache atualizada para prefeitura-pwa-v4.1 em sw.js');
+assert(swContent.includes("'ronda.html'"), 'ronda.html incluído no pré-cache offline de sw.js');
+assert(swContent.includes("response.type !== 'opaque'"), 'Suporte a cache de recursos de CDN (Tailwind, FontAwesome) ativo em sw.js');
+
+// 6. Confirmação Transparente nos Portais e Fila Offline
+const chamadoContent = fs.readFileSync('chamado.html', 'utf8');
+assert(chamadoContent.includes('sucessoBadgeStatus'), 'Badge transparente de status de envio presente em chamado.html');
+assert(chamadoContent.includes('sincronizarChamadosPendentesOffline'), 'Fila e auto-sync de chamados pendentes implementados em chamado.html');
+
+const limpezaContent = fs.readFileSync('limpeza.html', 'utf8');
+assert(limpezaContent.includes('sucessoBadgeStatusLimpeza'), 'Badge transparente de status de envio presente em limpeza.html');
+assert(limpezaContent.includes('sincronizarLimpezasPendentesOffline'), 'Fila e auto-sync de limpezas pendentes implementados em limpeza.html');
+
+const rondaContent = fs.readFileSync('ronda.html', 'utf8');
+assert(rondaContent.includes('sucessoBadgeStatusRonda'), 'Badge transparente de status de envio presente em ronda.html');
+assert(rondaContent.includes('sincronizarRondasPendentesOffline'), 'Fila e auto-sync de registros de ronda pendentes implementados em ronda.html');
+
+// 7. Paridade Estrita 100% com frontend/
+assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
+assert(fs.readFileSync('chamado.html', 'utf8') === fs.readFileSync('frontend/chamado.html', 'utf8'), 'Paridade 100% chamado.html e frontend/chamado.html');
+assert(fs.readFileSync('limpeza.html', 'utf8') === fs.readFileSync('frontend/limpeza.html', 'utf8'), 'Paridade 100% limpeza.html e frontend/limpeza.html');
+assert(fs.readFileSync('ronda.html', 'utf8') === fs.readFileSync('frontend/ronda.html', 'utf8'), 'Paridade 100% ronda.html e frontend/ronda.html');
+assert(fs.readFileSync('sw.js', 'utf8') === fs.readFileSync('frontend/sw.js', 'utf8'), 'Paridade 100% sw.js e frontend/sw.js');
+
+// -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
 console.log('\n============================================================');

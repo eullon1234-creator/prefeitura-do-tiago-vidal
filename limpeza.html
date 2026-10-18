@@ -499,8 +499,11 @@
       </div>
 
       <div>
-        <h3 class="text-lg font-black text-white">Registro Concluído com Sucesso!</h3>
-        <p class="text-xs text-slate-300 mt-1">O painel do Prefeito já foi atualizado para VERDE em tempo real.</p>
+        <h3 id="sucessoTituloLimpeza" class="text-lg font-black text-white">Registro Concluído com Sucesso!</h3>
+        <p id="sucessoDescricaoLimpeza" class="text-xs text-slate-300 mt-1">O painel do Prefeito já foi atualizado para VERDE em tempo real.</p>
+        <div id="sucessoBadgeStatusLimpeza" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+          <i class="fa-solid fa-cloud-arrow-up"></i> <span>Transmitido para a Nuvem da Obra</span>
+        </div>
       </div>
 
       <div class="bg-slate-900/90 rounded-xl p-4 text-left text-xs border border-slate-700/80 space-y-2">
@@ -999,9 +1002,11 @@
         criado_por: responsavel
       };
 
-      if (firestoreDb) {
+      let salvoOnline = false;
+      if (firestoreDb && navigator.onLine) {
         try {
           await firestoreDb.collection('casas_limpezas').doc(protocolo).set(registro);
+          salvoOnline = true;
         } catch (err) {
           console.warn("Aviso ao salvar limpeza:", err);
         }
@@ -1022,6 +1027,8 @@
         } catch (err) {}
       }
 
+      registro.sync_pendente = !salvoOnline;
+
       try {
         const cached = localStorage.getItem('casas_limpezas_cache');
         const lista = cached ? JSON.parse(cached) : [];
@@ -1035,11 +1042,59 @@
       document.getElementById('sucessoResponsavel').textContent = responsavel;
       document.getElementById('sucessoDataHora').textContent = `${data.split('-').reverse().join('/')} às ${hora}`;
 
+      const titEl = document.getElementById('sucessoTituloLimpeza');
+      const descEl = document.getElementById('sucessoDescricaoLimpeza');
+      const badgeEl = document.getElementById('sucessoBadgeStatusLimpeza');
+
+      if (salvoOnline) {
+        if (titEl) titEl.textContent = 'Registro Concluído com Sucesso!';
+        if (descEl) descEl.textContent = 'O painel do Prefeito foi atualizado na nuvem em tempo real.';
+        if (badgeEl) {
+          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+          badgeEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> <span>Transmitido para a Nuvem da Obra</span>';
+        }
+      } else {
+        if (titEl) titEl.textContent = 'Registro Gravado no Aparelho!';
+        if (descEl) descEl.textContent = 'A limpeza foi registrada localmente (offline). O envio está em fila e será sincronizado assim que a conexão retornar.';
+        if (badgeEl) {
+          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+          badgeEl.innerHTML = '<i class="fa-solid fa-clock text-amber-400"></i> <span>Salvo no Dispositivo (Envio Pendente de Internet)</span>';
+        }
+      }
+
       document.getElementById('formLimpeza').classList.add('hidden');
       document.getElementById('telaSucesso').classList.remove('hidden');
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    // Auto-sincronização de limpezas pendentes ao reconectar
+    async function sincronizarLimpezasPendentesOffline() {
+      if (!navigator.onLine || !firestoreDb) return;
+      try {
+        const cached = localStorage.getItem('casas_limpezas_cache');
+        if (!cached) return;
+        const lista = JSON.parse(cached);
+        let alterado = false;
+        for (const l of lista) {
+          if (l.sync_pendente) {
+            try {
+              const lClone = { ...l };
+              delete lClone.sync_pendente;
+              await firestoreDb.collection('casas_limpezas').doc(l.id || l.protocolo).set(lClone);
+              l.sync_pendente = false;
+              alterado = true;
+            } catch (e) {}
+          }
+        }
+        if (alterado) {
+          localStorage.setItem('casas_limpezas_cache', JSON.stringify(lista));
+          console.log('[SYNC] Limpezas pendentes sincronizadas com a nuvem.');
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('online', sincronizarLimpezasPendentesOffline);
+    setTimeout(sincronizarLimpezasPendentesOffline, 3500);
 
     // Salvar Reclamação / Observação do Morador (Sem Senha)
     async function salvarOcorrenciaLocalPublica(e, destino = 'app') {

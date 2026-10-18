@@ -301,10 +301,13 @@
         <i class="fa-solid fa-circle-check"></i>
       </div>
       <div>
-        <h3 class="text-lg font-black text-white">Chamado Enviado com Sucesso!</h3>
-        <p class="text-xs text-slate-300 mt-1">
+        <h3 id="sucessoTitulo" class="text-lg font-black text-white">Chamado Enviado com Sucesso!</h3>
+        <p id="sucessoDescricao" class="text-xs text-slate-300 mt-1">
           A Prefeitura de Canteiro e o Prefeito Tiago Vidal já receberam o seu chamado.
         </p>
+        <div id="sucessoBadgeStatus" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+          <i class="fa-solid fa-cloud-arrow-up"></i> <span>Enviado para a Nuvem da Obra</span>
+        </div>
       </div>
 
       <div class="bg-slate-900/90 rounded-xl p-3 border border-slate-700/60 text-left text-xs space-y-1.5">
@@ -546,16 +549,20 @@
       };
 
       // 1. Salvar no Firebase Firestore
-      if (firestoreDb) {
+      let salvoOnline = false;
+      if (firestoreDb && navigator.onLine) {
         try {
           await firestoreDb.collection('chamados_suporte').doc(protocolo).set(chamadoData);
           console.log("[FIREBASE] Chamado salvo com sucesso:", protocolo);
+          salvoOnline = true;
         } catch (err) {
-          console.warn("[FIREBASE] Falha ao salvar online, continuando:", err);
+          console.warn("[FIREBASE] Falha ao salvar online, enfileirando localmente:", err);
         }
       }
 
-      // Salvar também em cache local
+      chamadoData.sync_pendente = !salvoOnline;
+
+      // Salvar também em cache local (com tag de sincronização pendente se offline)
       try {
         const cached = localStorage.getItem('chamados_suporte_cache');
         const lista = cached ? JSON.parse(cached) : [];
@@ -593,16 +600,34 @@
         }
 
         const waUrl = `https://api.whatsapp.com/send?phone=${WHATSAPP_PREFEITO}&text=${encodeURIComponent(mensagemFormatada)}`;
-        
-        // Abre o WhatsApp
         window.location.href = waUrl;
       }
 
-      // 3. Exibe tela de confirmação
+      // 3. Exibe tela de confirmação com status de entrega transparente
       document.getElementById('sucessoProtocolo').innerText = protocolo;
       document.getElementById('sucessoQuarto').innerText = localExibicao;
       document.getElementById('sucessoProblema').innerText = categoria;
       document.getElementById('sucessoData').innerText = dataHoraStr;
+
+      const badgeStatusEl = document.getElementById('sucessoBadgeStatus');
+      const descEl = document.getElementById('sucessoDescricao');
+      const titEl = document.getElementById('sucessoTitulo');
+
+      if (salvoOnline) {
+        if (titEl) titEl.textContent = 'Chamado Enviado com Sucesso!';
+        if (descEl) descEl.textContent = 'A Prefeitura de Canteiro e a equipe de manutenção já receberam o seu chamado na nuvem.';
+        if (badgeStatusEl) {
+          badgeStatusEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+          badgeStatusEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> <span>Enviado para a Nuvem da Obra</span>';
+        }
+      } else {
+        if (titEl) titEl.textContent = 'Chamado Gravado no Aparelho!';
+        if (descEl) descEl.textContent = 'Seu chamado foi gravado no dispositivo (offline). O envio está em fila e será transmitido automaticamente assim que a conexão for restabelecida.';
+        if (badgeStatusEl) {
+          badgeStatusEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+          badgeStatusEl.innerHTML = '<i class="fa-solid fa-clock text-amber-400"></i> <span>Salvo no Dispositivo (Envio Pendente de Internet)</span>';
+        }
+      }
 
       document.getElementById('formChamado').classList.add('hidden');
       document.getElementById('telaSucesso').classList.remove('hidden');
@@ -610,6 +635,34 @@
       // Scroll para o topo suavemente
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    // Auto-sincronização de chamados pendentes ao reconectar
+    async function sincronizarChamadosPendentesOffline() {
+      if (!navigator.onLine || !firestoreDb) return;
+      try {
+        const cached = localStorage.getItem('chamados_suporte_cache');
+        if (!cached) return;
+        const lista = JSON.parse(cached);
+        let alterado = false;
+        for (const ch of lista) {
+          if (ch.sync_pendente) {
+            try {
+              const chClone = { ...ch };
+              delete chClone.sync_pendente;
+              await firestoreDb.collection('chamados_suporte').doc(ch.protocolo || ch.id).set(chClone);
+              ch.sync_pendente = false;
+              alterado = true;
+            } catch (e) {}
+          }
+        }
+        if (alterado) {
+          localStorage.setItem('chamados_suporte_cache', JSON.stringify(lista));
+          console.log('[SYNC] Chamados pendentes sincronizados com a nuvem.');
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('online', sincronizarChamadosPendentesOffline);
+    setTimeout(sincronizarChamadosPendentesOffline, 3500);
 
     function novoChamadoReset() {
       document.getElementById('formChamado').reset();
