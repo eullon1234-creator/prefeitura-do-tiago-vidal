@@ -1130,6 +1130,66 @@ assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index
 assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
 
 // -------------------------------------------------------------
+// 18. VERIFICAÇÃO DA CENTRAL DE AUDITORIA, FILTROS, MODAL E EXCEL
+// -------------------------------------------------------------
+console.log('\n📜 18. Verificação da Central de Auditoria, Filtros Avançados, Modal WhatsApp e Excel');
+
+const indexHtmlAudit = fs.readFileSync('index.html', 'utf8');
+const appJsAudit = fs.readFileSync('app.js', 'utf8');
+
+// Elementos da UI em index.html
+assert(indexHtmlAudit.includes('id="kpiAuditTotal"'), 'KPI Total de Ações Auditadas presente em index.html');
+assert(indexHtmlAudit.includes('id="kpiAuditHoje"'), 'KPI Ações Hoje presente em index.html');
+assert(indexHtmlAudit.includes('id="kpiAuditAloj"'), 'KPI Alojamentos presente em index.html');
+assert(indexHtmlAudit.includes('id="kpiAuditCasas"'), 'KPI Casas na Cidade presente em index.html');
+assert(indexHtmlAudit.includes('id="kpiAuditEstoque"'), 'KPI Almoxarifado presente em index.html');
+assert(indexHtmlAudit.includes('id="kpiAuditChamados"'), 'KPI Chamados & Rondas presente em index.html');
+assert(indexHtmlAudit.includes('id="auditProgressBar"'), 'Barra de distribuição visual de atividades (#auditProgressBar) presente em index.html');
+
+// Filtros rápidos e por data
+assert(indexHtmlAudit.includes('id="pillAudit_hoje"'), 'Pílula de filtro rápido "Hoje" presente em index.html');
+assert(indexHtmlAudit.includes('id="pillAudit_7dias"'), 'Pílula de filtro rápido "7 dias" presente em index.html');
+assert(indexHtmlAudit.includes('id="filtroAuditDataInicio"'), 'Campo de data inicial (#filtroAuditDataInicio) presente em index.html');
+assert(indexHtmlAudit.includes('id="filtroAuditDataFim"'), 'Campo de data final (#filtroAuditDataFim) presente em index.html');
+assert(indexHtmlAudit.includes('id="filtroAuditModulo"'), 'Seletor de módulo (#filtroAuditModulo) presente em index.html');
+assert(indexHtmlAudit.includes('id="filtroAuditAcao"'), 'Seletor de ação (#filtroAuditAcao) presente em index.html');
+assert(indexHtmlAudit.includes('id="filtroAuditUsuario"'), 'Seletor de usuário (#filtroAuditUsuario) presente em index.html');
+assert(indexHtmlAudit.includes('id="filtroAuditBusca"'), 'Campo de busca textual (#filtroAuditBusca) presente em index.html');
+assert(indexHtmlAudit.includes('id="filtroAuditOrdem"'), 'Seletor de ordenação cronológica (#filtroAuditOrdem) presente em index.html');
+assert(indexHtmlAudit.includes('id="btnLimparFiltrosAuditoria"'), 'Botão Limpar Filtros (#btnLimparFiltrosAuditoria) presente em index.html');
+assert(indexHtmlAudit.includes('id="auditCountFiltrados"'), 'Contador dinâmico de logs (#auditCountFiltrados) presente em index.html');
+
+// Modal de Detalhe e WhatsApp
+assert(indexHtmlAudit.includes('id="modalDetalheAuditoria"'), 'Modal de detalhes de auditoria (#modalDetalheAuditoria) presente em index.html');
+assert(indexHtmlAudit.includes('copiarLogAuditoriaWhatsAppModal()'), 'Botão Copiar para WhatsApp presente no modal de auditoria');
+assert(indexHtmlAudit.includes("exportarAuditoriaExcel('filtrados')"), 'Botão Exportar Excel Filtrado presente em index.html');
+assert(indexHtmlAudit.includes("exportarAuditoriaExcel('todos')"), 'Botão Exportar Excel Completo presente em index.html');
+
+// Funções em app.js
+assert(appJsAudit.includes('function carregarAuditoria('), 'Função carregarAuditoria implementada em app.js');
+assert(appJsAudit.includes('function definirFiltroPeriodoAuditoria('), 'Função definirFiltroPeriodoAuditoria implementada em app.js');
+assert(appJsAudit.includes('function aoMudarDataManualAuditoria('), 'Função aoMudarDataManualAuditoria implementada em app.js');
+assert(appJsAudit.includes('function limparFiltrosAuditoria('), 'Função limparFiltrosAuditoria implementada em app.js');
+assert(appJsAudit.includes('function filtrarAuditoriaUI('), 'Função filtrarAuditoriaUI implementada em app.js');
+assert(appJsAudit.includes('function renderTabelaAuditoria('), 'Função renderTabelaAuditoria implementada em app.js');
+assert(appJsAudit.includes('function abrirModalDetalheAuditoria('), 'Função abrirModalDetalheAuditoria implementada em app.js');
+assert(appJsAudit.includes('function copiarLogAuditoriaWhatsAppModal('), 'Função copiarLogAuditoriaWhatsAppModal implementada em app.js');
+assert(appJsAudit.includes('function exportarAuditoriaExcel('), 'Função exportarAuditoriaExcel implementada em app.js');
+
+// Verificação de lógica e formatação do Excel (2 abas)
+assert(appJsAudit.includes("XLSX.utils.book_append_sheet(wb, ws1, 'Logs de Atividades')"), 'Excel de auditoria gera a aba "Logs de Atividades"');
+assert(appJsAudit.includes("XLSX.utils.book_append_sheet(wb, ws2, 'Resumo Executivo')"), 'Excel de auditoria gera a aba "Resumo Executivo"');
+
+// Window exports
+assert(appJsAudit.includes('window.definirFiltroPeriodoAuditoria = definirFiltroPeriodoAuditoria'), 'definirFiltroPeriodoAuditoria exposto no window');
+assert(appJsAudit.includes('window.abrirModalDetalheAuditoria = abrirModalDetalheAuditoria'), 'abrirModalDetalheAuditoria exposto no window');
+assert(appJsAudit.includes('window.copiarLogAuditoriaWhatsAppModal = copiarLogAuditoriaWhatsAppModal'), 'copiarLogAuditoriaWhatsAppModal exposto no window');
+
+// Paridade 100% rigorosa
+assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html');
+assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
+
+// -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
 console.log('\n============================================================');

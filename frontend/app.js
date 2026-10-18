@@ -8800,6 +8800,52 @@ function renderizarFeedAuditoriaDashboard() {
   }).join('');
 }
 
+let filtroAuditPeriodoAtivo = 'todos';
+let listaAuditoriaFiltradaCache = [];
+let logAtualModal = null;
+
+function getBadgeClassModuloAuditoria(modulo) {
+  if (modulo === 'casas') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+  if (modulo === 'estoque') return 'bg-teal-50 text-teal-700 border-teal-200';
+  if (modulo === 'alojamento') return 'bg-sky-50 text-sky-700 border-sky-200';
+  if (modulo === 'chamados') return 'bg-amber-50 text-amber-700 border-amber-200';
+  if (modulo === 'ronda') return 'bg-purple-50 text-purple-700 border-purple-200';
+  return 'bg-slate-100 text-slate-700 border-slate-200';
+}
+
+function getIconModuloAuditoria(modulo) {
+  if (modulo === 'casas') return '<i class="fa-solid fa-house-chimney-user text-[10px]"></i>';
+  if (modulo === 'estoque') return '<i class="fa-solid fa-boxes-stacked text-[10px]"></i>';
+  if (modulo === 'alojamento') return '<i class="fa-solid fa-hotel text-[10px]"></i>';
+  if (modulo === 'chamados') return '<i class="fa-solid fa-wrench text-[10px]"></i>';
+  if (modulo === 'ronda') return '<i class="fa-solid fa-clipboard-check text-[10px]"></i>';
+  return '<i class="fa-solid fa-clock-rotate-left text-[10px]"></i>';
+}
+
+function getNomeModuloAuditoria(modulo) {
+  if (modulo === 'casas') return 'Casas na Cidade';
+  if (modulo === 'estoque') return 'Almoxarifado';
+  if (modulo === 'alojamento') return 'Alojamentos';
+  if (modulo === 'chamados') return 'Chamados QR';
+  if (modulo === 'ronda') return 'Ronda Canteiro';
+  if (modulo === 'geral') return 'Sistema';
+  return modulo ? String(modulo).toUpperCase() : 'Sistema';
+}
+
+function getBadgeClassAcaoAuditoria(acao) {
+  const ac = (acao || '').toUpperCase();
+  if (ac.includes('ALOCAR') || ac.includes('CRIAR') || ac.includes('ENTRADA') || ac.includes('CHECK-IN')) {
+    return 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+  } else if (ac.includes('TRANSF') || ac.includes('EDITAR')) {
+    return 'bg-indigo-100 text-indigo-800 border border-indigo-300';
+  } else if (ac.includes('DESAL') || ac.includes('SAIDA') || ac.includes('EXCLUIR') || ac.includes('CHECK-OUT')) {
+    return 'bg-rose-100 text-rose-800 border border-rose-300';
+  } else if (ac.includes('CHAMADO') || ac.includes('CONTA') || ac.includes('REPARO')) {
+    return 'bg-amber-100 text-amber-800 border border-amber-300';
+  }
+  return 'bg-slate-100 text-slate-700 border border-slate-300';
+}
+
 async function carregarAuditoria() {
   const icone = document.getElementById('iconeReloadAuditoria');
   if (icone) icone.classList.add('fa-spin');
@@ -8808,29 +8854,158 @@ async function carregarAuditoria() {
   const selectUser = document.getElementById('filtroAuditUsuario');
   if (selectUser) {
     const curVal = selectUser.value;
-    const users = Array.from(new Set(listaAuditoriaGeral.map(l => l.usuario).filter(Boolean)));
-    selectUser.innerHTML = '<option value="todos">👥 Todos os Usuários</option>' + users.map(u => `<option value="${u}">${u}</option>`).join('');
+    const users = Array.from(new Set(listaAuditoriaGeral.map(l => l.usuario).filter(Boolean))).sort();
+    selectUser.innerHTML = '<option value="todos">👥 Todos os Usuários</option>' + users.map(u => `<option value="${escapeHTML(u)}">${escapeHTML(u)}</option>`).join('');
     if (curVal) selectUser.value = curVal;
   }
 
+  // Data hoje no padrão local YYYY-MM-DD
+  const hojeStr = typeof getDataHojeLocal === 'function' ? getDataHojeLocal() : '';
+
   // Atualiza KPIs
   const totGeral = listaAuditoriaGeral.length;
+  const totHoje = listaAuditoriaGeral.filter(l => {
+    if (!l.timestamp && !l.data_hora) return false;
+    if (l.timestamp && l.timestamp.startsWith(hojeStr)) return true;
+    if (l.data_hora) {
+      const partes = l.data_hora.split(' ')[0].split('/');
+      if (partes.length === 3) {
+        const dStr = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+        return dStr === hojeStr;
+      }
+    }
+    return false;
+  }).length;
+
   const totCasas = listaAuditoriaGeral.filter(l => l.modulo === 'casas').length;
   const totEstoque = listaAuditoriaGeral.filter(l => l.modulo === 'estoque').length;
   const totAloj = listaAuditoriaGeral.filter(l => l.modulo === 'alojamento').length;
+  const totChamados = listaAuditoriaGeral.filter(l => l.modulo === 'chamados' || l.modulo === 'ronda').length;
+  const totOutros = Math.max(0, totGeral - (totCasas + totEstoque + totAloj + totChamados));
 
   const kTot = document.getElementById('kpiAuditTotal');
+  const kHoje = document.getElementById('kpiAuditHoje');
   const kCasas = document.getElementById('kpiAuditCasas');
   const kEstoque = document.getElementById('kpiAuditEstoque');
   const kAloj = document.getElementById('kpiAuditAloj');
+  const kChamados = document.getElementById('kpiAuditChamados');
 
   if (kTot) kTot.textContent = totGeral;
+  if (kHoje) kHoje.textContent = totHoje;
   if (kCasas) kCasas.textContent = totCasas;
   if (kEstoque) kEstoque.textContent = totEstoque;
   if (kAloj) kAloj.textContent = totAloj;
+  if (kChamados) kChamados.textContent = totChamados;
+
+  // Atualiza a Barra Proporcional de Distribuição das Ações
+  if (totGeral > 0) {
+    const pAloj = ((totAloj / totGeral) * 100).toFixed(1);
+    const pCasas = ((totCasas / totGeral) * 100).toFixed(1);
+    const pEstoque = ((totEstoque / totGeral) * 100).toFixed(1);
+    const pChamados = ((totChamados / totGeral) * 100).toFixed(1);
+    const pOutros = ((totOutros / totGeral) * 100).toFixed(1);
+
+    const barA = document.getElementById('barAloj');
+    const barC = document.getElementById('barCasas');
+    const barE = document.getElementById('barEstoque');
+    const barCh = document.getElementById('barChamados');
+    const barO = document.getElementById('barOutros');
+    const txtDist = document.getElementById('auditDistribuicaoTexto');
+
+    if (barA) barA.style.width = pAloj + '%';
+    if (barC) barC.style.width = pCasas + '%';
+    if (barE) barE.style.width = pEstoque + '%';
+    if (barCh) barCh.style.width = pChamados + '%';
+    if (barO) barO.style.width = pOutros + '%';
+    if (txtDist) {
+      txtDist.textContent = `Aloj: ${pAloj}% | Casas: ${pCasas}% | Estoque: ${pEstoque}% | Chamados: ${pChamados}%`;
+    }
+  }
 
   filtrarAuditoriaUI();
   if (icone) setTimeout(() => icone.classList.remove('fa-spin'), 350);
+}
+
+function definirFiltroPeriodoAuditoria(periodo) {
+  filtroAuditPeriodoAtivo = periodo;
+  document.querySelectorAll('.pill-audit').forEach(el => {
+    el.className = 'pill-audit px-3 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700';
+  });
+  const activePill = document.getElementById(`pillAudit_${periodo}`);
+  if (activePill) {
+    activePill.className = 'pill-audit px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow-xs';
+  }
+
+  const dInpInicio = document.getElementById('filtroAuditDataInicio');
+  const dInpFim = document.getElementById('filtroAuditDataFim');
+
+  const hoje = new Date();
+  const formatYMD = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  if (periodo === 'todos') {
+    if (dInpInicio) dInpInicio.value = '';
+    if (dInpFim) dInpFim.value = '';
+  } else if (periodo === 'hoje') {
+    const hStr = formatYMD(hoje);
+    if (dInpInicio) dInpInicio.value = hStr;
+    if (dInpFim) dInpFim.value = hStr;
+  } else if (periodo === 'ontem') {
+    const ontem = new Date(hoje);
+    ontem.setDate(hoje.getDate() - 1);
+    const oStr = formatYMD(ontem);
+    if (dInpInicio) dInpInicio.value = oStr;
+    if (dInpFim) dInpFim.value = oStr;
+  } else if (periodo === '7dias') {
+    const d7 = new Date(hoje);
+    d7.setDate(hoje.getDate() - 7);
+    if (dInpInicio) dInpInicio.value = formatYMD(d7);
+    if (dInpFim) dInpFim.value = formatYMD(hoje);
+  } else if (periodo === '30dias') {
+    const d30 = new Date(hoje);
+    d30.setDate(hoje.getDate() - 30);
+    if (dInpInicio) dInpInicio.value = formatYMD(d30);
+    if (dInpFim) dInpFim.value = formatYMD(hoje);
+  } else if (periodo === 'mes_atual') {
+    const primDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const ultDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    if (dInpInicio) dInpInicio.value = formatYMD(primDia);
+    if (dInpFim) dInpFim.value = formatYMD(ultDia);
+  }
+
+  filtrarAuditoriaUI();
+}
+
+function aoMudarDataManualAuditoria() {
+  document.querySelectorAll('.pill-audit').forEach(el => {
+    el.className = 'pill-audit px-3 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700';
+  });
+  filtroAuditPeriodoAtivo = 'custom';
+  filtrarAuditoriaUI();
+}
+
+function limparFiltrosAuditoria() {
+  const busca = document.getElementById('filtroAuditBusca');
+  const mod = document.getElementById('filtroAuditModulo');
+  const acao = document.getElementById('filtroAuditAcao');
+  const user = document.getElementById('filtroAuditUsuario');
+  const dInicio = document.getElementById('filtroAuditDataInicio');
+  const dFim = document.getElementById('filtroAuditDataFim');
+  const ordem = document.getElementById('filtroAuditOrdem');
+
+  if (busca) busca.value = '';
+  if (mod) mod.value = 'todos';
+  if (acao) acao.value = 'todas';
+  if (user) user.value = 'todos';
+  if (dInicio) dInicio.value = '';
+  if (dFim) dFim.value = '';
+  if (ordem) ordem.value = 'desc';
+
+  definirFiltroPeriodoAuditoria('todos');
 }
 
 function filtrarAuditoriaUI() {
@@ -8838,33 +9013,90 @@ function filtrarAuditoriaUI() {
   const filtroModulo = document.getElementById('filtroAuditModulo')?.value || 'todos';
   const filtroAcao = document.getElementById('filtroAuditAcao')?.value || 'todas';
   const filtroUsuario = document.getElementById('filtroAuditUsuario')?.value || 'todos';
+  const dtInicio = document.getElementById('filtroAuditDataInicio')?.value || '';
+  const dtFim = document.getElementById('filtroAuditDataFim')?.value || '';
+  const ordem = document.getElementById('filtroAuditOrdem')?.value || 'desc';
 
   let filtrados = listaAuditoriaGeral.filter(l => {
+    // 1. Filtro Textual Global
     if (termo) {
       const matchDet = (l.detalhes || '').toLowerCase().includes(termo);
       const matchUser = (l.usuario || '').toLowerCase().includes(termo);
       const matchAcao = (l.acao || '').toLowerCase().includes(termo);
       const matchEnt = (l.entidade || '').toLowerCase().includes(termo);
-      if (!matchDet && !matchUser && !matchAcao && !matchEnt) return false;
+      const matchMod = (l.modulo || '').toLowerCase().includes(termo);
+      if (!matchDet && !matchUser && !matchAcao && !matchEnt && !matchMod) return false;
     }
 
-    if (filtroModulo !== 'todos' && l.modulo !== filtroModulo) return false;
+    // 2. Filtro de Módulo
+    if (filtroModulo !== 'todos') {
+      if (filtroModulo === 'chamados') {
+        if (l.modulo !== 'chamados' && l.modulo !== 'ronda') return false;
+      } else if (l.modulo !== filtroModulo) {
+        return false;
+      }
+    }
 
+    // 3. Filtro de Tipo de Ação
     if (filtroAcao !== 'todas') {
       const ac = (l.acao || '').toUpperCase();
-      if (filtroAcao === 'ALOCAR' && !ac.includes('ALOCAR')) return false;
-      if (filtroAcao === 'TRANSFERIR' && !ac.includes('TRANSF')) return false;
-      if (filtroAcao === 'DESALOJAR' && !ac.includes('DESAL') && !ac.includes('SAIDA')) return false;
+      if (filtroAcao === 'ALOCAR' && !ac.includes('ALOCAR') && !ac.includes('CHECK-IN')) return false;
+      if (filtroAcao === 'TRANSFERIR' && !ac.includes('TRANSF') && !ac.includes('EDITAR')) return false;
+      if (filtroAcao === 'DESALOJAR' && !ac.includes('DESAL') && !ac.includes('SAIDA') && !ac.includes('CHECK-OUT')) return false;
       if (filtroAcao === 'ENTRADA' && !ac.includes('ENTRADA')) return false;
-      if (filtroAcao === 'SAIDA' && !ac.includes('SAIDA')) return false;
-      if (filtroAcao === 'MOVEL' && !ac.includes('MOVEL')) return false;
-      if (filtroAcao === 'CHAMADO' && !ac.includes('CHAMADO') && !ac.includes('MANUT')) return false;
+      if (filtroAcao === 'SAIDA' && !ac.includes('SAIDA') && !ac.includes('BAIXA')) return false;
+      if (filtroAcao === 'CHAMADO' && !ac.includes('CHAMADO') && !ac.includes('MANUT') && !ac.includes('REPARO')) return false;
+      if (filtroAcao === 'MOVEL' && !ac.includes('MOVEL') && !ac.includes('BEM')) return false;
+      if (filtroAcao === 'EXCLUIR' && !ac.includes('EXCLUIR') && !ac.includes('CANCEL')) return false;
     }
 
+    // 4. Filtro de Usuário
     if (filtroUsuario !== 'todos' && l.usuario !== filtroUsuario) return false;
+
+    // 5. Filtro de Intervalo de Datas
+    if (dtInicio || dtFim) {
+      let dataLogYMD = '';
+      if (l.timestamp) {
+        dataLogYMD = l.timestamp.split('T')[0];
+      } else if (l.data_hora) {
+        const partes = l.data_hora.split(' ')[0].split('/');
+        if (partes.length === 3) {
+          dataLogYMD = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
+        }
+      }
+
+      if (dataLogYMD) {
+        if (dtInicio && dataLogYMD < dtInicio) return false;
+        if (dtFim && dataLogYMD > dtFim) return false;
+      }
+    }
 
     return true;
   });
+
+  // Ordenação
+  filtrados.sort((a, b) => {
+    const timeA = a.timestamp || a.data_hora || '';
+    const timeB = b.timestamp || b.data_hora || '';
+    return ordem === 'asc' ? timeA.localeCompare(timeB) : timeB.localeCompare(timeA);
+  });
+
+  listaAuditoriaFiltradaCache = filtrados;
+
+  // Atualiza indicadores de contagem
+  const totGeral = listaAuditoriaGeral.length;
+  const totFiltrados = filtrados.length;
+  const pct = totGeral > 0 ? ((totFiltrados / totGeral) * 100).toFixed(0) : '100';
+
+  const elCountFiltrados = document.getElementById('auditCountFiltrados');
+  const elCountTotal = document.getElementById('auditCountTotal');
+  const elPercent = document.getElementById('auditPercentFiltrados');
+  const elBadgeExport = document.getElementById('badgeExportFiltradosCount');
+
+  if (elCountFiltrados) elCountFiltrados.textContent = totFiltrados;
+  if (elCountTotal) elCountTotal.textContent = totGeral;
+  if (elPercent) elPercent.textContent = pct + '%';
+  if (elBadgeExport) elBadgeExport.textContent = totFiltrados;
 
   renderTabelaAuditoria(filtrados);
 }
@@ -8883,93 +9115,247 @@ function renderTabelaAuditoria(logs) {
   if (vazio) vazio.classList.add('hidden');
 
   tbody.innerHTML = logs.map(l => {
-    let modBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
-    let modIcon = 'fa-clock';
-    let modNome = 'Sistema';
-
-    if (l.modulo === 'casas') {
-      modBadgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      modIcon = 'fa-house';
-      modNome = 'Casas na Cidade';
-    } else if (l.modulo === 'estoque') {
-      modBadgeClass = 'bg-teal-50 text-teal-700 border-teal-200';
-      modIcon = 'fa-boxes-stacked';
-      modNome = 'Almoxarifado';
-    } else if (l.modulo === 'alojamento') {
-      modBadgeClass = 'bg-sky-50 text-sky-700 border-sky-200';
-      modIcon = 'fa-hotel';
-      modNome = 'Alojamento';
-    } else if (l.modulo === 'chamados') {
-      modBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-      modIcon = 'fa-wrench';
-      modNome = 'Chamados QR';
-    }
-
-    let acaoBadgeClass = 'bg-slate-100 text-slate-700';
-    const ac = (l.acao || '').toUpperCase();
-    if (ac.includes('ALOCAR') || ac.includes('CRIAR') || ac.includes('ENTRADA')) {
-      acaoBadgeClass = 'bg-emerald-100 text-emerald-800';
-    } else if (ac.includes('TRANSF') || ac.includes('EDITAR')) {
-      acaoBadgeClass = 'bg-indigo-100 text-indigo-800';
-    } else if (ac.includes('DESAL') || ac.includes('SAIDA') || ac.includes('EXCLUIR')) {
-      acaoBadgeClass = 'bg-rose-100 text-rose-800';
-    } else if (ac.includes('CHAMADO') || ac.includes('CONTA')) {
-      acaoBadgeClass = 'bg-amber-100 text-amber-800';
-    }
+    const modBadgeClass = getBadgeClassModuloAuditoria(l.modulo);
+    const modIcon = getIconModuloAuditoria(l.modulo);
+    const modNome = getNomeModuloAuditoria(l.modulo);
+    const acaoBadgeClass = getBadgeClassAcaoAuditoria(l.acao);
 
     return `
-      <tr class="hover:bg-slate-50/80 transition">
+      <tr class="hover:bg-slate-50/80 transition group cursor-pointer" onclick="abrirModalDetalheAuditoria('${escapeHTML(l.id)}')">
         <td class="py-3 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-          ${l.data_hora}
+          <i class="fa-regular fa-clock text-slate-400 mr-1"></i>${escapeHTML(l.data_hora)}
         </td>
         <td class="py-3 px-4 whitespace-nowrap">
           <span class="inline-flex items-center gap-1.5 font-bold text-slate-800">
-            <i class="fa-solid fa-user-check text-[10px] text-slate-400"></i>
-            ${l.usuario || 'Prefeito'}
+            <i class="fa-solid fa-user-shield text-[10px] text-amber-500"></i>
+            ${escapeHTML(l.usuario || 'Prefeito')}
           </span>
         </td>
         <td class="py-3 px-4 whitespace-nowrap">
           <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${modBadgeClass}">
-            <i class="fa-solid ${modIcon} text-[9px]"></i> ${modNome}
+            ${modIcon} <span>${escapeHTML(modNome)}</span>
           </span>
         </td>
         <td class="py-3 px-4 whitespace-nowrap">
           <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${acaoBadgeClass}">
-            ${l.acao}
+            ${escapeHTML(l.acao)}
           </span>
         </td>
-        <td class="py-3 px-4 text-slate-800 font-medium leading-relaxed">
-          ${l.detalhes}
+        <td class="py-3 px-4 whitespace-nowrap font-bold text-slate-700">
+          ${escapeHTML(l.entidade || 'Canteiro')}
+        </td>
+        <td class="py-3 px-4 text-slate-800 font-medium leading-relaxed max-w-md truncate group-hover:whitespace-normal">
+          ${escapeHTML(l.detalhes)}
+        </td>
+        <td class="py-3 px-4 text-center whitespace-nowrap" onclick="event.stopPropagation()">
+          <button type="button" onclick="abrirModalDetalheAuditoria('${escapeHTML(l.id)}')" class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition" title="Ver Detalhes Completos">
+            <i class="fa-solid fa-eye text-xs"></i>
+          </button>
         </td>
       </tr>
     `;
   }).join('');
 }
 
-function exportarAuditoriaExcel() {
+function abrirModalDetalheAuditoria(logId) {
+  const log = listaAuditoriaGeral.find(l => l.id === logId);
+  if (!log) return;
+  logAtualModal = log;
+
+  const modal = document.getElementById('modalDetalheAuditoria');
+  if (!modal) return;
+
+  const idEl = document.getElementById('modalAuditId');
+  const dtEl = document.getElementById('modalAuditDataHora');
+  const userEl = document.getElementById('modalAuditUsuario');
+  const modEl = document.getElementById('modalAuditModuloBadge');
+  const acaoEl = document.getElementById('modalAuditAcaoBadge');
+  const entEl = document.getElementById('modalAuditEntidade');
+  const detEl = document.getElementById('modalAuditDetalhes');
+
+  if (idEl) idEl.textContent = log.id || '-';
+  if (dtEl) dtEl.textContent = log.data_hora || '-';
+  if (userEl) userEl.innerHTML = `<i class="fa-solid fa-user-shield text-amber-500 text-xs mr-1"></i> ${escapeHTML(log.usuario || 'Prefeito')}`;
+  if (entEl) entEl.textContent = log.entidade || 'Canteiro / Geral';
+  if (detEl) detEl.textContent = log.detalhes || '-';
+
+  if (modEl) {
+    modEl.innerHTML = `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getBadgeClassModuloAuditoria(log.modulo)}">${getIconModuloAuditoria(log.modulo)} ${getNomeModuloAuditoria(log.modulo)}</span>`;
+  }
+  if (acaoEl) {
+    acaoEl.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${getBadgeClassAcaoAuditoria(log.acao)}">${escapeHTML(log.acao)}</span>`;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function copiarLogAuditoriaWhatsAppModal() {
+  if (!logAtualModal) return;
+  const texto = [
+    `📋 *AUDITORIA - PREFEITURA DE CANTEIRO (GEL)*`,
+    `🏢 *Obra:* Taboca 2`,
+    `📅 *Data/Hora:* ${logAtualModal.data_hora || '-'}`,
+    `👤 *Responsável:* ${logAtualModal.usuario || 'Prefeito'}`,
+    `🏬 *Módulo:* ${getNomeModuloAuditoria(logAtualModal.modulo)}`,
+    `⚡ *Ação:* ${logAtualModal.acao}`,
+    `🎯 *Alvo:* ${logAtualModal.entidade || 'Geral'}`,
+    `📝 *Detalhes:* ${logAtualModal.detalhes || '-'}`
+  ].join('\n');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(() => {
+      showToast('Resumo da auditoria copiado para o WhatsApp com sucesso!', 'success');
+    }).catch(() => {
+      showToast('Copiado para a área de transferência!', 'success');
+    });
+  } else {
+    showToast('Resumo gerado com sucesso!', 'info');
+  }
+}
+
+function exportarAuditoriaExcel(modo = 'filtrados') {
   if (typeof XLSX === 'undefined') {
     showToast('Biblioteca SheetJS ainda carregando...', 'error');
     return;
   }
 
   try {
+    const logsExportar = (modo === 'todos' || !listaAuditoriaFiltradaCache.length) 
+      ? listaAuditoriaGeral 
+      : listaAuditoriaFiltradaCache;
+
+    if (!logsExportar.length) {
+      showToast('Nenhum registro de auditoria disponível para exportação.', 'warning');
+      return;
+    }
+
+    const dataHoje = typeof getDataHojeLocal === 'function' ? getDataHojeLocal() : '';
+    const horaAgora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const nomeUsuario = (typeof currentUserName !== 'undefined' && currentUserName) ? currentUserName : 'Prefeito';
+
     const wb = XLSX.utils.book_new();
-    const dados = listaAuditoriaGeral.map(l => ({
-      'ID Registro': l.id || '',
-      'Data & Hora': l.data_hora || '',
-      'Usuário Responsável': l.usuario || '',
-      'Módulo': l.modulo || '',
-      'Ação': l.acao || '',
-      'Entidade': l.entidade || '',
-      'Detalhes da Alteração': l.detalhes || ''
-    }));
 
-    const ws = XLSX.utils.json_to_sheet(dados);
-    XLSX.utils.book_append_sheet(wb, ws, 'Histórico de Auditoria');
+    // -----------------------------------------------------------------
+    // ABA 1: LOGS DE ATIVIDADES DETALHADOS
+    // -----------------------------------------------------------------
+    const rowsSheet1 = [
+      ['GEL • GOETZE LOBATO ENGENHARIA S.A. | RELATÓRIO OFICIAL DE AUDITORIA E ATIVIDADES'],
+      [`Canteiro de Obras: Taboca 2 | Emissão: ${dataHoje} às ${horaAgora} | Responsável: ${nomeUsuario} | Modo: ${modo === 'todos' ? 'Todo o Histórico' : 'Registros Filtrados na Tela'} | Total: ${logsExportar.length} ações`],
+      [], // Linha em branco
+      ['Nº', 'ID Registro', 'Data', 'Horário', 'Usuário Responsável', 'Módulo do Canteiro', 'Tipo de Ação', 'Entidade / Alvo', 'Descrição Detalhada da Operação']
+    ];
 
-    const dataHoje = getDataHojeLocal();
-    XLSX.writeFile(wb, `RELATORIO_AUDITORIA_CANTEIRO_${dataHoje}.xlsx`);
-    showToast('Histórico de auditoria exportado com sucesso em Excel (.xlsx)!', 'success');
+    logsExportar.forEach((l, idx) => {
+      let dataParte = '';
+      let horaParte = '';
+      if (l.data_hora) {
+        const partes = l.data_hora.split(' ');
+        dataParte = partes[0] || '';
+        horaParte = partes[1] || '';
+      }
+
+      rowsSheet1.push([
+        idx + 1,
+        l.id || '',
+        dataParte,
+        horaParte,
+        l.usuario || 'Prefeito',
+        getNomeModuloAuditoria(l.modulo),
+        l.acao || 'INFO',
+        l.entidade || 'Canteiro',
+        l.detalhes || ''
+      ]);
+    });
+
+    const ws1 = XLSX.utils.aoa_to_sheet(rowsSheet1);
+
+    // Larguras automáticas de colunas
+    ws1['!cols'] = [
+      { wch: 6 },  // Nº
+      { wch: 22 }, // ID Registro
+      { wch: 12 }, // Data
+      { wch: 10 }, // Horário
+      { wch: 24 }, // Usuário
+      { wch: 20 }, // Módulo
+      { wch: 16 }, // Ação
+      { wch: 20 }, // Entidade
+      { wch: 65 }  // Detalhes
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws1, 'Logs de Atividades');
+
+    // -----------------------------------------------------------------
+    // ABA 2: RESUMO EXECUTIVO & ESTATÍSTICAS
+    // -----------------------------------------------------------------
+    const totalAcoes = logsExportar.length;
+
+    // Estatísticas por Módulo
+    const contagemModulos = {};
+    logsExportar.forEach(l => {
+      const modNome = getNomeModuloAuditoria(l.modulo);
+      contagemModulos[modNome] = (contagemModulos[modNome] || 0) + 1;
+    });
+
+    // Estatísticas por Tipo de Ação
+    const contagemAcoes = {};
+    logsExportar.forEach(l => {
+      const ac = l.acao || 'OUTROS';
+      contagemAcoes[ac] = (contagemAcoes[ac] || 0) + 1;
+    });
+
+    // Estatísticas por Usuário
+    const contagemUsuarios = {};
+    logsExportar.forEach(l => {
+      const u = l.usuario || 'Prefeito';
+      contagemUsuarios[u] = (contagemUsuarios[u] || 0) + 1;
+    });
+
+    const rowsSheet2 = [
+      ['GEL • GOETZE LOBATO ENGENHARIA S.A. | RESUMO EXECUTIVO DA AUDITORIA'],
+      [`Canteiro de Obras: Taboca 2 | Data da Extração: ${dataHoje} | Total Analisado: ${totalAcoes} ações`],
+      [],
+      ['INDICADOR GERAL', 'VALOR'],
+      ['Total de Ações Registradas no Período', totalAcoes],
+      ['Total Geral Histórico no Banco', listaAuditoriaGeral.length],
+      ['Responsável pela Emissão', nomeUsuario],
+      [],
+      ['DISTRIBUIÇÃO POR MÓDULO DO CANTEIRO', 'QUANTIDADE DE AÇÕES', 'PARTICIPAÇÃO (%)']
+    ];
+
+    Object.keys(contagemModulos).sort((a,b) => contagemModulos[b] - contagemModulos[a]).forEach(mod => {
+      const qtd = contagemModulos[mod];
+      const pct = totalAcoes > 0 ? ((qtd / totalAcoes) * 100).toFixed(1) + '%' : '0%';
+      rowsSheet2.push([mod, qtd, pct]);
+    });
+
+    rowsSheet2.push([]);
+    rowsSheet2.push(['DISTRIBUIÇÃO POR TIPO DE AÇÃO', 'QUANTIDADE DE OCORRÊNCIAS', 'PARTICIPAÇÃO (%)']);
+    Object.keys(contagemAcoes).sort((a,b) => contagemAcoes[b] - contagemAcoes[a]).forEach(ac => {
+      const qtd = contagemAcoes[ac];
+      const pct = totalAcoes > 0 ? ((qtd / totalAcoes) * 100).toFixed(1) + '%' : '0%';
+      rowsSheet2.push([ac, qtd, pct]);
+    });
+
+    rowsSheet2.push([]);
+    rowsSheet2.push(['ATIVIDADES POR USUÁRIO RESPONSÁVEL', 'QUANTIDADE DE OPERAÇÕES', 'PARTICIPAÇÃO (%)']);
+    Object.keys(contagemUsuarios).sort((a,b) => contagemUsuarios[b] - contagemUsuarios[a]).forEach(u => {
+      const qtd = contagemUsuarios[u];
+      const pct = totalAcoes > 0 ? ((qtd / totalAcoes) * 100).toFixed(1) + '%' : '0%';
+      rowsSheet2.push([u, qtd, pct]);
+    });
+
+    const ws2 = XLSX.utils.aoa_to_sheet(rowsSheet2);
+    ws2['!cols'] = [
+      { wch: 38 },
+      { wch: 26 },
+      { wch: 18 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws2, 'Resumo Executivo');
+
+    const sufixo = modo === 'todos' ? 'COMPLETO' : 'FILTRADO';
+    XLSX.writeFile(wb, `RELATORIO_AUDITORIA_CANTEIRO_TABOCA_2_${sufixo}_${dataHoje}.xlsx`);
+    showToast(`Histórico de auditoria (${logsExportar.length} ações) exportado com sucesso em Excel (.xlsx)!`, 'success');
   } catch (e) {
     showToast('Erro ao exportar logs de auditoria: ' + e.message, 'error');
   }
@@ -17045,6 +17431,11 @@ window.renderizarFeedAuditoriaDashboard = renderizarFeedAuditoriaDashboard;
 window.carregarAuditoria = carregarAuditoria;
 window.filtrarAuditoriaUI = filtrarAuditoriaUI;
 window.exportarAuditoriaExcel = exportarAuditoriaExcel;
+window.definirFiltroPeriodoAuditoria = definirFiltroPeriodoAuditoria;
+window.aoMudarDataManualAuditoria = aoMudarDataManualAuditoria;
+window.limparFiltrosAuditoria = limparFiltrosAuditoria;
+window.abrirModalDetalheAuditoria = abrirModalDetalheAuditoria;
+window.copiarLogAuditoriaWhatsAppModal = copiarLogAuditoriaWhatsAppModal;
 
 // Exposição das funções de Gráficos de Ocupação e Casas
 window.alternarModoGraficoBlocos = alternarModoGraficoBlocos;
