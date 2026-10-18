@@ -10398,15 +10398,21 @@ async function excluirChamado(protocolo) {
   }
 }
 
+// Helper universal para obter URLs de páginas do sistema preservando domínio e caminhos limpos
+function getCleanSystemUrl(targetPage = 'chamado.html') {
+  const href = window.location.href;
+  let cleanUrl = href.split('?')[0].split('#')[0];
+  // Remove qualquer arquivo HTML no final (index.html, limpeza.html, ronda.html, chamado.html, etc.)
+  cleanUrl = cleanUrl.replace(/\/[^/]+\.html$/i, '');
+  if (!cleanUrl.endsWith('/')) {
+    cleanUrl += '/';
+  }
+  return `${cleanUrl}${targetPage}`;
+}
+
 // Obter link público do chamado para o QR Code
 function getQRCodeUrl() {
-  const href = window.location.href;
-  // Se estiver rodando localmente ou em domínio com barra
-  if (href.includes('index.html')) {
-    return href.replace('index.html', 'chamado.html');
-  }
-  const cleanUrl = href.split('?')[0].split('#')[0];
-  return cleanUrl.endsWith('/') ? `${cleanUrl}chamado.html` : `${cleanUrl}/chamado.html`;
+  return getCleanSystemUrl('chamado.html');
 }
 
 // Plaquinha QR Code
@@ -13540,14 +13546,7 @@ function formatarDataLimpezaBR(dataStr) {
 
 // Obter link público direto para o QR Code da Casa (Acesso exclusivo e isolado para a equipe de limpeza)
 function getQRCodeUrlCasa(casaId) {
-  const href = window.location.href;
-  let cleanUrl = href.split('?')[0].split('#')[0];
-  if (cleanUrl.includes('index.html')) {
-    cleanUrl = cleanUrl.replace('index.html', 'limpeza.html');
-  } else {
-    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}limpeza.html` : `${cleanUrl}/limpeza.html`;
-  }
-  return `${cleanUrl}?casa_id=${encodeURIComponent(casaId)}`;
+  return `${getCleanSystemUrl('limpeza.html')}?casa_id=${encodeURIComponent(casaId)}`;
 }
 
 // Helper universal para obter data no fuso local (YYYY-MM-DD) sem problemas de fuso horário UTC
@@ -13831,29 +13830,15 @@ function calcularStatusLimpezaQuarto(q) {
 
 // Obter link público direto para o QR Code de um Bloco do Alojamento (1 QR Code por Bloco!)
 function getQRCodeUrlBloco(blocoNome) {
-  const href = window.location.href;
-  let cleanUrl = href.split('?')[0].split('#')[0];
-  if (cleanUrl.includes('index.html')) {
-    cleanUrl = cleanUrl.replace('index.html', 'limpeza.html');
-  } else {
-    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}limpeza.html` : `${cleanUrl}/limpeza.html`;
-  }
-  return `${cleanUrl}?bloco=${encodeURIComponent(blocoNome || 'Bloco 1')}`;
+  return `${getCleanSystemUrl('limpeza.html')}?bloco=${encodeURIComponent(blocoNome || 'Bloco 1')}`;
 }
 
 // Obter link público direto para o QR Code de um Quarto do Alojamento
 function getQRCodeUrlQuarto(q) {
-  const href = window.location.href;
-  let cleanUrl = href.split('?')[0].split('#')[0];
-  if (cleanUrl.includes('index.html')) {
-    cleanUrl = cleanUrl.replace('index.html', 'limpeza.html');
-  } else {
-    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}limpeza.html` : `${cleanUrl}/limpeza.html`;
-  }
   const qId = q ? q.id : '';
   const qNum = q ? q.numero : '';
   const qBloco = q ? (q.bloco_nome || 'Bloco') : 'Bloco';
-  return `${cleanUrl}?quarto_id=${encodeURIComponent(qId)}&quarto_num=${encodeURIComponent(qNum)}&bloco=${encodeURIComponent(qBloco)}`;
+  return `${getCleanSystemUrl('limpeza.html')}?quarto_id=${encodeURIComponent(qId)}&quarto_num=${encodeURIComponent(qNum)}&bloco=${encodeURIComponent(qBloco)}`;
 }
 
 // Abrir modal com placa QR Code da Casa (Impressão A4)
@@ -13866,6 +13851,14 @@ function abrirModalPlacaQRCasa(casaId) {
 
   const selBloco = document.getElementById('selectBlocoPlacaQR');
   if (selBloco) selBloco.classList.add('hidden');
+
+  // Ajustar cabeçalho e rodapé do modal para Casa na Cidade
+  const headTit = document.getElementById('modalPlacaQRCasaHeaderTitulo');
+  const headSub = document.getElementById('modalPlacaQRCasaHeaderSubtitulo');
+  const footAvi = document.getElementById('modalPlacaQRCasaFooterAviso');
+  if (headTit) headTit.textContent = 'Placa de Identificação & QR Code da Residência (Casa na Cidade)';
+  if (headSub) headSub.textContent = 'Pronta para imprimir em A4 e fixar na porta ou parede da casa';
+  if (footAvi) footAvi.textContent = 'Fixar na entrada ou área de serviço da residência urbana.';
 
   const qrUrl = getQRCodeUrlCasa(casaId);
   const imgEl = document.getElementById('imgPlacaQRCasa');
@@ -13899,6 +13892,14 @@ function abrirModalPlacaQRBloco(blocoIdOuNome = null) {
   } else if (globalBlocos && globalBlocos.length > 0) {
     nomeBloco = globalBlocos[0].nome;
   }
+
+  // Ajustar cabeçalho e rodapé do modal para Bloco de Alojamento
+  const headTit = document.getElementById('modalPlacaQRCasaHeaderTitulo');
+  const headSub = document.getElementById('modalPlacaQRCasaHeaderSubtitulo');
+  const footAvi = document.getElementById('modalPlacaQRCasaFooterAviso');
+  if (headTit) headTit.textContent = 'Placa de Identificação & QR Code do Bloco (Alojamento)';
+  if (headSub) headSub.textContent = 'Pronta para imprimir em A4 e fixar na entrada do bloco de alojamento';
+  if (footAvi) footAvi.textContent = 'Fixar na entrada principal ou área comum do bloco de alojamento.';
 
   // Preencher seletor de bloco no topo do modal
   const selBloco = document.getElementById('selectBlocoPlacaQR');
@@ -13944,6 +13945,14 @@ function abrirModalPlacaQRQuarto(quartoId) {
 
   const selBloco = document.getElementById('selectBlocoPlacaQR');
   if (selBloco) selBloco.classList.add('hidden');
+
+  // Ajustar cabeçalho e rodapé do modal para Quarto de Alojamento
+  const headTit = document.getElementById('modalPlacaQRCasaHeaderTitulo');
+  const headSub = document.getElementById('modalPlacaQRCasaHeaderSubtitulo');
+  const footAvi = document.getElementById('modalPlacaQRCasaFooterAviso');
+  if (headTit) headTit.textContent = 'Placa de Identificação & QR Code do Quarto (Alojamento)';
+  if (headSub) headSub.textContent = 'Pronta para imprimir em A4 e fixar na porta do quarto';
+  if (footAvi) footAvi.textContent = 'Fixar na porta do quarto do alojamento.';
 
   const qrUrl = getQRCodeUrlQuarto(q);
   const imgEl = document.getElementById('imgPlacaQRCasa');
@@ -14082,24 +14091,41 @@ function processarLeituraQRCasa(texto) {
   if (!texto) return;
   texto = String(texto).trim();
 
+  // 0. Detecção inteligente de desvio: Se for QR Code de Ronda / Sanitário / Bebedouro
+  if (texto.includes('ponto_id=') || texto.includes('ronda.html') || texto.startsWith('ponto_') || (typeof listaPontosRonda !== 'undefined' && listaPontosRonda.some(p => p.id === texto))) {
+    fecharScannerLimpezaQR();
+    showToast('QR Code de Sanitário/Bebedouro detectado! Abrindo ficha de ronda...', 'info');
+    if (typeof processarLeituraQRRonda === 'function') {
+      processarLeituraQRRonda(texto);
+    }
+    return;
+  }
+
   let casaId = null;
   let tipoPadrao = 'rotina';
 
-  // 1. Formato URL: ?acao=limpeza&casa_id=... ou ?quarto_id=...
+  // 1. Formato URL: ?acao=limpeza&casa_id=... ou ?quarto_id=... ou ?bloco=...
   try {
     let urlObj = null;
     if (texto.startsWith('http://') || texto.startsWith('https://')) {
       urlObj = new URL(texto);
-    } else if (texto.startsWith('?') || texto.includes('casa_id=') || texto.includes('quarto_id=')) {
+    } else if (texto.startsWith('?') || texto.includes('casa_id=') || texto.includes('quarto_id=') || texto.includes('bloco=')) {
       urlObj = new URL(`https://dummy.local/${texto.startsWith('?') ? texto : '?' + texto}`);
     }
 
     if (urlObj) {
       const qCasaId = urlObj.searchParams.get('casa_id');
       const qQuartoId = urlObj.searchParams.get('quarto_id');
+      const qBloco = urlObj.searchParams.get('bloco');
       const qTipo = urlObj.searchParams.get('tipo');
-      if (qCasaId) casaId = qCasaId;
-      else if (qQuartoId) casaId = 'quarto_' + qQuartoId;
+
+      if (qCasaId) {
+        casaId = qCasaId;
+      } else if (qQuartoId) {
+        casaId = 'quarto_' + qQuartoId;
+      } else if (qBloco) {
+        casaId = 'bloco_' + qBloco;
+      }
       if (qTipo && (qTipo === 'ar_condicionado' || qTipo === 'rotina')) tipoPadrao = qTipo;
     }
   } catch (e) {}
@@ -14110,27 +14136,37 @@ function processarLeituraQRCasa(texto) {
       const parsed = JSON.parse(texto);
       if (parsed.casa_id || parsed.id) casaId = parsed.casa_id || parsed.id;
       else if (parsed.quarto_id) casaId = 'quarto_' + parsed.quarto_id;
+      else if (parsed.bloco) casaId = 'bloco_' + parsed.bloco;
       if (parsed.tipo) tipoPadrao = parsed.tipo;
     } catch (e) {}
   }
 
-  // 3. Formato casa:ID ou quarto:ID
+  // 3. Formato casa:ID ou quarto:ID ou bloco:NOME
   if (!casaId && texto.toLowerCase().startsWith('casa:')) {
     casaId = texto.split(':')[1].trim();
   } else if (!casaId && texto.toLowerCase().startsWith('quarto:')) {
     casaId = 'quarto_' + texto.split(':')[1].trim();
+  } else if (!casaId && texto.toLowerCase().startsWith('bloco:')) {
+    casaId = 'bloco_' + texto.split(':')[1].trim();
   }
 
-  // 4. ID direto ou busca por nome
+  // 4. ID direto ou busca por nome de casa
   if (!casaId) {
     const achou = (listaCasasCidade || []).find(c => c.id === texto || (c.nome && c.nome.toLowerCase() === texto.toLowerCase()));
     if (achou) casaId = achou.id;
+  }
+
+  // 5. Busca por nome de bloco de alojamento
+  if (!casaId && typeof globalBlocos !== 'undefined' && Array.isArray(globalBlocos)) {
+    const achouBloco = globalBlocos.find(b => b.nome && b.nome.toLowerCase() === texto.toLowerCase());
+    if (achouBloco) casaId = 'bloco_' + achouBloco.nome;
   }
 
   if (!casaId) {
     casaId = texto;
   }
 
+  fecharScannerLimpezaQR();
   abrirModalRegistroLimpeza(casaId, tipoPadrao);
 }
 
@@ -14139,13 +14175,18 @@ function abrirModalRegistroLimpezaQuarto(quartoId, tipoPadrao = 'rotina') {
   abrirModalRegistroLimpeza('quarto_' + quartoId, tipoPadrao);
 }
 
-// Abrir formulário para registrar limpeza ou manutenção (Suporta Casa e Quarto)
+// Abrir formulário para registrar limpeza ou manutenção (Suporta Bloco, Quarto e Casa)
 function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
   let nomeUnidade = '';
   let enderecoHtml = '';
   let subTituloTxt = '';
 
-  if (String(casaId).startsWith('quarto_')) {
+  if (String(casaId).startsWith('bloco_')) {
+    const blocoNome = decodeURIComponent(String(casaId).replace('bloco_', ''));
+    nomeUnidade = `${blocoNome} (Alojamento do Canteiro)`;
+    enderecoHtml = `<i class="fa-solid fa-hotel text-teal-600"></i> Canteiro de Obras Taboca 2 • ${blocoNome}`;
+    subTituloTxt = `Alojamento: ${blocoNome}`;
+  } else if (String(casaId).startsWith('quarto_')) {
     const qId = String(casaId).replace('quarto_', '');
     const q = (allQuartosData || []).find(x => String(x.id) === String(qId));
     if (!q) {
@@ -14156,10 +14197,11 @@ function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
     enderecoHtml = `<i class="fa-solid fa-bed text-indigo-500"></i> Alojamento do Canteiro • ${q.bloco_nome || 'Bloco'}`;
     subTituloTxt = `Alojamento: ${nomeUnidade}`;
   } else {
-    const c = (listaCasasCidade || []).find(x => x.id === casaId);
+    let c = (listaCasasCidade || []).find(x => x.id === casaId);
     if (!c) {
-      showToast('Casa não encontrada para registrar limpeza', 'error');
-      return;
+      let nomeAuto = String(casaId).replace(/^casa_/, '').replace(/_/g, ' ');
+      nomeAuto = nomeAuto.charAt(0).toUpperCase() + nomeAuto.slice(1);
+      c = { id: casaId, nome: nomeAuto.toLowerCase().startsWith('casa') ? nomeAuto : `Casa ${nomeAuto}`, endereco: 'Residência Urbana' };
     }
     nomeUnidade = c.nome;
     enderecoHtml = `<i class="fa-solid fa-location-dot text-rose-500"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
@@ -14245,6 +14287,7 @@ async function salvarRegistroLimpeza(e) {
 
   const dataHoraStr = `${data}T${hora}:00`;
   const isQuarto = String(casaId).startsWith('quarto_');
+  const isBloco = String(casaId).startsWith('bloco_');
   let casaNome = 'Unidade';
   let extraQuarto = {};
 
@@ -14257,6 +14300,13 @@ async function salvarRegistroLimpeza(e) {
       quarto_id: String(qId),
       quarto_numero: q ? String(q.numero) : String(qId),
       bloco_nome: q ? String(q.bloco_nome || 'Bloco') : 'Bloco'
+    };
+  } else if (isBloco) {
+    const bNome = decodeURIComponent(String(casaId).replace('bloco_', ''));
+    casaNome = `${bNome} (Alojamento)`;
+    extraQuarto = {
+      tipo_local: 'alojamento_bloco',
+      bloco_nome: bNome
     };
   } else {
     const casa = (listaCasasCidade || []).find(x => x.id === casaId);
@@ -14761,24 +14811,42 @@ function imprimirRelatorioLimpezaA4() {
   }, 1000);
 }
 
-// Verificar parâmetros de URL (Redirecionar leitura de QR Code da faxineira para página isolada)
+// Verificar parâmetros de URL (Redirecionar leitura de QR Code para páginas isoladas adequadas)
 function verificarAcaoUrlParametros() {
   try {
     const params = new URLSearchParams(window.location.search);
     const acao = params.get('acao');
+    const pontoId = params.get('ponto_id') || params.get('id');
     const casaId = params.get('casa_id');
     const quartoId = params.get('quarto_id');
+    const bloco = params.get('bloco');
 
-    if (acao === 'limpeza' && casaId) {
+    // 1. Redirecionamento de Ronda / Banheiro / Bebedouro
+    if (pontoId && (pontoId.startsWith('ponto_') || acao === 'ronda' || window.location.search.includes('ponto_id='))) {
+      window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(pontoId)}`);
+      return;
+    }
+
+    // 2. Redirecionamento de Chamado
+    if (acao === 'chamado') {
+      window.location.replace('chamado.html');
+      return;
+    }
+
+    // 3. Redirecionamento de Limpeza (Casa, Quarto, Bloco)
+    if (casaId) {
+      if (casaId.startsWith('ponto_') || casaId.includes('banheiro') || casaId.includes('bebedouro')) {
+        window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(casaId)}`);
+        return;
+      }
       window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(casaId)}`);
       return;
     }
-    if (acao === 'limpeza' && quartoId) {
-      window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(quartoId)}`);
+    if (quartoId) {
+      window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(quartoId)}${bloco ? '&bloco=' + encodeURIComponent(bloco) : ''}`);
       return;
     }
-    const bloco = params.get('bloco');
-    if (acao === 'limpeza' && bloco) {
+    if (bloco) {
       window.location.replace(`limpeza.html?bloco=${encodeURIComponent(bloco)}`);
       return;
     }
@@ -17013,14 +17081,7 @@ async function excluirPontoRonda(pontoId) {
 
 // Obter URL pública para o QR Code da Ronda
 function getQRCodeUrlRonda(pontoId) {
-  const href = window.location.href;
-  let cleanUrl = href.split('?')[0].split('#')[0];
-  if (cleanUrl.includes('index.html')) {
-    cleanUrl = cleanUrl.replace('index.html', 'ronda.html');
-  } else {
-    cleanUrl = cleanUrl.endsWith('/') ? `${cleanUrl}ronda.html` : `${cleanUrl}/ronda.html`;
-  }
-  return `${cleanUrl}?ponto_id=${encodeURIComponent(pontoId)}`;
+  return `${getCleanSystemUrl('ronda.html')}?ponto_id=${encodeURIComponent(pontoId)}`;
 }
 
 // Abrir modal com placa QR Code da Ronda (Impressão A4)
@@ -17365,6 +17426,16 @@ function processarLeituraQRRonda(texto) {
   if (!texto) return;
   texto = String(texto).trim();
 
+  // 0. Detecção inteligente de desvio: Se for QR Code de Casa ou Bloco/Quarto de Alojamento
+  if (texto.includes('casa_id=') || texto.includes('quarto_id=') || texto.includes('bloco=') || texto.includes('limpeza.html') || texto.startsWith('casa:') || texto.startsWith('quarto:') || texto.startsWith('bloco:') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(c => c.id === texto))) {
+    fecharScannerRondaQR();
+    showToast('QR Code de Residência/Alojamento detectado! Abrindo ficha de limpeza...', 'info');
+    if (typeof processarLeituraQRCasa === 'function') {
+      processarLeituraQRCasa(texto);
+    }
+    return;
+  }
+
   let pontoId = null;
   try {
     if (texto.includes('ponto_id=')) {
@@ -17380,13 +17451,23 @@ function processarLeituraQRRonda(texto) {
 
   if (!pontoId) pontoId = texto;
 
-  const pontoEncontrado = (listaPontosRonda || []).find(p => p.id === pontoId);
+  let pontoEncontrado = (listaPontosRonda || []).find(p => p.id === pontoId);
+
+  // Fallback nos seeds caso lista ainda não tenha sincronizado
+  if (!pontoEncontrado && typeof PONTOS_RONDA_PADRAO_SEED !== 'undefined') {
+    pontoEncontrado = PONTOS_RONDA_PADRAO_SEED.find(p => p.id === pontoId);
+    if (pontoEncontrado && !listaPontosRonda.some(p => p.id === pontoEncontrado.id)) {
+      listaPontosRonda.push(pontoEncontrado);
+    }
+  }
+
   if (!pontoEncontrado) {
     showToast(`QR Code lido ("${pontoId}"), mas o ponto não foi localizado.`, 'warning');
     return;
   }
 
   showToast(`Ponto "${pontoEncontrado.nome}" identificado!`, 'success');
+  fecharScannerRondaQR();
   abrirModalRegistroManualRonda(pontoId);
 }
 

@@ -562,8 +562,81 @@
       measurementId: "G-YYXMDWCM4Q"
     };
 
+    const PONTOS_RONDA_PADRAO_SEED = [
+      {
+        id: 'ponto_banheiro_01',
+        nome: 'Banheiro Químico 01',
+        tipo: 'banheiro',
+        setor: 'Frente KM 12',
+        frequencia_diaria: 2,
+        horarios_sugeridos: '08:30 e 14:00',
+        observacoes: 'Frente de terraplenagem, reposição de papel reforçada',
+        ativo: true
+      },
+      {
+        id: 'ponto_banheiro_02',
+        nome: 'Banheiro Químico 02',
+        tipo: 'banheiro',
+        setor: 'Frente KM 14',
+        frequencia_diaria: 2,
+        horarios_sugeridos: '09:00 e 14:30',
+        observacoes: 'Frente de drenagem e britagem',
+        ativo: true
+      },
+      {
+        id: 'ponto_banheiro_central',
+        nome: 'Banheiro Contêiner 01',
+        tipo: 'banheiro',
+        setor: 'Canteiro Central',
+        frequencia_diaria: 2,
+        horarios_sugeridos: '08:00 e 13:30',
+        observacoes: 'Sanitário principal próximo aos refeitórios',
+        ativo: true
+      },
+      {
+        id: 'ponto_banheiro_oficina',
+        nome: 'Banheiro Oficina Mecânica',
+        tipo: 'banheiro',
+        setor: 'Oficina Mecânica',
+        frequencia_diaria: 2,
+        horarios_sugeridos: '08:00 e 15:00',
+        observacoes: 'Área industrial dos mecânicos',
+        ativo: true
+      },
+      {
+        id: 'ponto_bebedouro_refeitorio',
+        nome: 'Bebedouro Industrial 01',
+        tipo: 'bebedouro',
+        setor: 'Refeitório',
+        frequencia_diaria: 1,
+        horarios_sugeridos: '07:30',
+        observacoes: 'Bebedouro 100L em inox, água gelada para refeições',
+        ativo: true
+      },
+      {
+        id: 'ponto_bebedouro_km14',
+        nome: 'Bebedouro de Coluna 02',
+        tipo: 'bebedouro',
+        setor: 'Frente KM 14',
+        frequencia_diaria: 1,
+        horarios_sugeridos: '08:30',
+        observacoes: 'Abastecimento diário com garrafão de 20L',
+        ativo: true
+      },
+      {
+        id: 'ponto_bebedouro_oficina',
+        nome: 'Bebedouro Purificador 03',
+        tipo: 'bebedouro',
+        setor: 'Oficina Mecânica',
+        frequencia_diaria: 1,
+        horarios_sugeridos: '08:00',
+        observacoes: 'Higienização de bicas diária',
+        ativo: true
+      }
+    ];
+
     let firestoreDb = null;
-    let listaPontosDisponiveis = [];
+    let listaPontosDisponiveis = [...PONTOS_RONDA_PADRAO_SEED];
     let pontoCarregado = null;
     let registrosPontoHoje = [];
     let configRonda = {
@@ -844,9 +917,27 @@
         }
       } catch (e) {}
 
-      // 4. Obter ponto_id dos parâmetros da URL
+      // 4. Obter parâmetros da URL
       const urlParams = new URLSearchParams(window.location.search);
       const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id');
+
+      // Se por engano o leitor abriu ronda.html com parâmetros de Casa ou Quarto/Bloco, redirecionar para limpeza.html
+      const urlCasaId = urlParams.get('casa_id');
+      const urlQuartoId = urlParams.get('quarto_id');
+      const urlBloco = urlParams.get('bloco');
+      const urlBlocoId = urlParams.get('bloco_id');
+      if (urlCasaId) {
+        window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(urlCasaId)}`);
+        return;
+      }
+      if (urlQuartoId) {
+        window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(urlQuartoId)}${urlBloco ? '&bloco=' + encodeURIComponent(urlBloco) : ''}`);
+        return;
+      }
+      if (urlBloco || urlBlocoId) {
+        window.location.replace(`limpeza.html?bloco=${encodeURIComponent(urlBloco || urlBlocoId)}`);
+        return;
+      }
 
       // 5. Carregar ponto
       carregarPontoRonda(urlPontoId);
@@ -854,22 +945,38 @@
 
     // Carregar informações do ponto
     async function carregarPontoRonda(pontoId) {
-      // Tentar ler cache de pontos do localStorage
+      // 1. Tentar ler cache de pontos do localStorage
       try {
         const cachedPontos = localStorage.getItem('ronda_pontos_cache');
         if (cachedPontos) {
-          listaPontosDisponiveis = JSON.parse(cachedPontos);
+          const parsed = JSON.parse(cachedPontos);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            listaPontosDisponiveis = parsed;
+          }
         }
       } catch (e) {}
 
-      // Buscar no Firestore
+      // 2. Garantir que os pontos padrão da seed existam sempre na lista
+      if (typeof PONTOS_RONDA_PADRAO_SEED !== 'undefined' && Array.isArray(PONTOS_RONDA_PADRAO_SEED)) {
+        PONTOS_RONDA_PADRAO_SEED.forEach(seed => {
+          if (!listaPontosDisponiveis.some(p => p.id === seed.id)) {
+            listaPontosDisponiveis.push(seed);
+          }
+        });
+      }
+
+      // 3. Buscar no Firestore
       if (firestoreDb) {
         try {
           const snap = await firestoreDb.collection('ronda_pontos').get();
           const remotas = [];
           snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
           if (remotas.length > 0) {
-            listaPontosDisponiveis = remotas;
+            remotas.forEach(rem => {
+              const idx = listaPontosDisponiveis.findIndex(p => p.id === rem.id);
+              if (idx >= 0) listaPontosDisponiveis[idx] = rem;
+              else listaPontosDisponiveis.push(rem);
+            });
           }
         } catch (err) {
           console.warn("Aviso ao buscar pontos de ronda no Firestore:", err);
@@ -890,8 +997,35 @@
             const doc = await firestoreDb.collection('ronda_pontos').doc(pontoId).get();
             if (doc.exists) {
               pontoCarregado = { id: doc.id, ...doc.data() };
+              listaPontosDisponiveis.push(pontoCarregado);
             }
           } catch (e) {}
+        }
+
+        // Fallback resiliente imediato: se pontoId informado não estiver na lista (ex: offline ou recém criado), sintetizar para nunca travar
+        if (!pontoCarregado) {
+          const idStr = String(pontoId).toLowerCase();
+          const isBebedouro = idStr.includes('bebedouro') || idStr.includes('purificador') || idStr.includes('coluna');
+          const isBanheiro = idStr.includes('banheiro') || idStr.includes('sanitario') || idStr.includes('conteiner');
+          const tipoAuto = isBebedouro ? 'bebedouro' : 'banheiro';
+          
+          let nomeAuto = pontoId.replace(/^ponto_/, '').replace(/_/g, ' ');
+          nomeAuto = nomeAuto.charAt(0).toUpperCase() + nomeAuto.slice(1);
+          if (!isBanheiro && !isBebedouro) {
+            nomeAuto = `Ponto Sanitário (${nomeAuto})`;
+          }
+
+          pontoCarregado = {
+            id: pontoId,
+            nome: nomeAuto,
+            tipo: tipoAuto,
+            setor: 'Canteiro Geral',
+            frequencia_diaria: tipoAuto === 'banheiro' ? 2 : 1,
+            horarios_sugeridos: tipoAuto === 'banheiro' ? '08:00 e 14:00' : '08:00',
+            observacoes: 'Ponto identificado via QR Code',
+            ativo: true
+          };
+          listaPontosDisponiveis.push(pontoCarregado);
         }
       }
 

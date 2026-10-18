@@ -1195,6 +1195,81 @@ assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index
 assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
 
 // -------------------------------------------------------------
+// 19. INTEGRIDADE DOS QR CODES, ROTEAMENTO INTELIGENTE E OFFLINE SEEDS
+// -------------------------------------------------------------
+console.log('\n📱 19. Verificação de Integridade dos QR Codes, Roteamento Inteligente e Suporte Offline a Sanitários e Casas');
+
+const appJsQR = fs.readFileSync('app.js', 'utf8');
+const indexHtmlQR = fs.readFileSync('index.html', 'utf8');
+const rondaHtmlQR = fs.readFileSync('ronda.html', 'utf8');
+const limpezaHtmlQR = fs.readFileSync('limpeza.html', 'utf8');
+
+// 19.1 Helper universal getCleanSystemUrl
+assert(appJsQR.includes('function getCleanSystemUrl('), 'Função universal getCleanSystemUrl implementada em app.js');
+assert(appJsQR.includes("cleanUrl.replace(/\\/[^/]+\\.html$/i, '')"), 'getCleanSystemUrl utiliza Regex para expurgar arquivos HTML da URL');
+
+// Simulação de limpeza de URL em diversos cenários operacionais
+function simularGetCleanSystemUrl(mockHref, targetPage) {
+  let cleanUrl = mockHref.split('?')[0].split('#')[0];
+  cleanUrl = cleanUrl.replace(/\/[^/]+\.html$/i, '');
+  if (!cleanUrl.endsWith('/')) cleanUrl += '/';
+  return `${cleanUrl}${targetPage}`;
+}
+
+const urlSimulada1 = simularGetCleanSystemUrl('https://obra.gel.com.br/prefeitura/index.html', 'ronda.html');
+assert(urlSimulada1 === 'https://obra.gel.com.br/prefeitura/ronda.html', 'Simulação getCleanSystemUrl remove index.html e aponta para ronda.html');
+
+const urlSimulada2 = simularGetCleanSystemUrl('https://obra.gel.com.br/prefeitura/limpeza.html?casa_id=casa_1', 'ronda.html');
+assert(urlSimulada2 === 'https://obra.gel.com.br/prefeitura/ronda.html', 'Simulação getCleanSystemUrl remove limpeza.html e query params corretamente');
+
+const urlSimulada3 = simularGetCleanSystemUrl('https://eullon1234-creator.github.io/prefeitura-do-tiago-vidal/', 'limpeza.html');
+assert(urlSimulada3 === 'https://eullon1234-creator.github.io/prefeitura-do-tiago-vidal/limpeza.html', 'Simulação getCleanSystemUrl preserva URLs raiz com barra final');
+
+// 19.2 Geradores de URL com targetPage padronizada
+assert(appJsQR.includes("getCleanSystemUrl('chamado.html')"), 'getQRCodeUrl utiliza getCleanSystemUrl para chamado.html');
+assert(appJsQR.includes("getCleanSystemUrl('limpeza.html')}?casa_id="), 'getQRCodeUrlCasa utiliza getCleanSystemUrl para limpeza.html');
+assert(appJsQR.includes("getCleanSystemUrl('limpeza.html')}?bloco="), 'getQRCodeUrlBloco utiliza getCleanSystemUrl para limpeza.html');
+assert(appJsQR.includes("getCleanSystemUrl('limpeza.html')}?quarto_id="), 'getQRCodeUrlQuarto utiliza getCleanSystemUrl para limpeza.html');
+assert(appJsQR.includes("getCleanSystemUrl('ronda.html')}?ponto_id="), 'getQRCodeUrlRonda utiliza getCleanSystemUrl para ronda.html');
+
+// 19.3 Suporte Offline e Seeds em ronda.html
+assert(rondaHtmlQR.includes('const PONTOS_RONDA_PADRAO_SEED = ['), 'ronda.html embute PONTOS_RONDA_PADRAO_SEED diretamente no código');
+assert(rondaHtmlQR.includes("id: 'ponto_banheiro_01'"), 'Ponto Banheiro Químico 01 presente nos seeds de ronda.html');
+assert(rondaHtmlQR.includes("id: 'ponto_bebedouro_refeitorio'"), 'Ponto Bebedouro Refeitório presente nos seeds de ronda.html');
+assert(rondaHtmlQR.includes('listaPontosDisponiveis = [...PONTOS_RONDA_PADRAO_SEED]'), 'listaPontosDisponiveis inicializada com seeds padrão em ronda.html');
+assert(rondaHtmlQR.includes('PONTOS_RONDA_PADRAO_SEED.forEach(seed => {'), 'ronda.html mescla seeds com cache local/Firestore');
+assert(rondaHtmlQR.includes('// Fallback resiliente imediato: se pontoId informado não estiver na lista'), 'Fallback resiliente de pontoId implementado em ronda.html');
+
+// 19.4 Roteamento cruzado em ronda.html e limpeza.html
+assert(rondaHtmlQR.includes("window.location.replace(`limpeza.html?casa_id="), 'ronda.html redireciona automaticamente se aberto com casa_id');
+assert(rondaHtmlQR.includes("window.location.replace(`limpeza.html?bloco="), 'ronda.html redireciona automaticamente se aberto com bloco');
+assert(limpezaHtmlQR.includes("window.location.replace(`ronda.html?ponto_id="), 'limpeza.html redireciona automaticamente se aberto com ponto_id ou banheiro');
+assert(limpezaHtmlQR.includes("urlCasaId.startsWith('bloco_')"), 'limpeza.html reconhece bloco_ no parâmetro casa_id');
+assert(limpezaHtmlQR.includes("String(casaId).startsWith('bloco_')"), 'carregarCasa em limpeza.html direciona bloco_ para aplicarDadosBlocoAlojamento');
+
+// 19.5 Roteamento inteligente nos scanners da aplicação em app.js
+assert(appJsQR.includes("// 0. Detecção inteligente de desvio: Se for QR Code de Ronda / Sanitário / Bebedouro"), 'processarLeituraQRCasa detecta desvio de ronda/banheiro');
+assert(appJsQR.includes("// 0. Detecção inteligente de desvio: Se for QR Code de Casa ou Bloco/Quarto de Alojamento"), 'processarLeituraQRRonda detecta desvio de casa/alojamento');
+assert(appJsQR.includes("casaId = 'bloco_' + qBloco"), 'processarLeituraQRCasa processa QR Code de Bloco de Alojamento');
+assert(appJsQR.includes("if (pontoId && (pontoId.startsWith('ponto_') || acao === 'ronda'"), 'verificarAcaoUrlParametros redireciona ponto_id para ronda.html');
+assert(appJsQR.includes("tipo_local: 'alojamento_bloco'"), 'salvarRegistroLimpeza suporta registros em blocos de alojamento');
+
+// 19.6 Títulos dinâmicos dos modais para distinguir Bloco vs Casa
+assert(indexHtmlQR.includes('id="modalPlacaQRCasaHeaderTitulo"'), 'ID modalPlacaQRCasaHeaderTitulo presente em index.html');
+assert(indexHtmlQR.includes('id="modalPlacaQRCasaHeaderSubtitulo"'), 'ID modalPlacaQRCasaHeaderSubtitulo presente em index.html');
+assert(indexHtmlQR.includes('id="modalPlacaQRCasaFooterAviso"'), 'ID modalPlacaQRCasaFooterAviso presente em index.html');
+assert(appJsQR.includes("headTit.textContent = 'Placa de Identificação & QR Code do Bloco (Alojamento)'"), 'abrirModalPlacaQRBloco altera título dinamicamente para Bloco');
+assert(appJsQR.includes("headTit.textContent = 'Placa de Identificação & QR Code da Residência (Casa na Cidade)'"), 'abrirModalPlacaQRCasa altera título dinamicamente para Casa');
+assert(appJsQR.includes("headTit.textContent = 'Placa de Identificação & QR Code do Quarto (Alojamento)'"), 'abrirModalPlacaQRQuarto altera título dinamicamente para Quarto');
+
+// 19.7 Paridade rigorosa 100% de todos os 4 arquivos modificados
+assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html');
+assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
+assert(fs.readFileSync('ronda.html', 'utf8') === fs.readFileSync('frontend/ronda.html', 'utf8'), 'Paridade 100% ronda.html e frontend/ronda.html');
+assert(fs.readFileSync('limpeza.html', 'utf8') === fs.readFileSync('frontend/limpeza.html', 'utf8'), 'Paridade 100% limpeza.html e frontend/limpeza.html');
+
+
+// -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
 console.log('\n============================================================');

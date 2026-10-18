@@ -730,7 +730,28 @@
       carregarConfiguracoesSeguranca();
 
       const urlParams = new URLSearchParams(window.location.search);
+      const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id');
+      const urlAcao = urlParams.get('acao');
+
+      // Se por engano o leitor abriu limpeza.html com QR Code de Ronda / Sanitário / Bebedouro, redirecionar imediatamente
+      if (urlPontoId && (urlPontoId.startsWith('ponto_') || urlAcao === 'ronda' || window.location.search.includes('ponto_id='))) {
+        window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(urlPontoId)}`);
+        return;
+      }
+
       const urlCasaId = urlParams.get('casa_id');
+      if (urlCasaId && (urlCasaId.startsWith('ponto_') || urlCasaId.includes('banheiro') || urlCasaId.includes('bebedouro') || urlCasaId.includes('ronda.html'))) {
+        let extractedId = urlCasaId;
+        if (urlCasaId.includes('ponto_id=')) {
+          try {
+            const u = new URL(urlCasaId.startsWith('http') ? urlCasaId : `https://dummy.local/${urlCasaId}`);
+            extractedId = u.searchParams.get('ponto_id') || urlCasaId;
+          } catch(e) {}
+        }
+        window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(extractedId)}`);
+        return;
+      }
+
       const urlQuartoId = urlParams.get('quarto_id');
       const urlQuartoNum = urlParams.get('quarto_num') || urlParams.get('quarto');
       const urlBloco = urlParams.get('bloco');
@@ -741,7 +762,9 @@
         trocarModoLimpeza('problema');
       }
 
-      if (urlQuartoId || urlQuartoNum) {
+      if (urlCasaId && urlCasaId.startsWith('bloco_')) {
+        aplicarDadosBlocoAlojamento(decodeURIComponent(urlCasaId.replace('bloco_', '')));
+      } else if (urlQuartoId || urlQuartoNum) {
         aplicarDadosQuartoAlojamento(urlQuartoId || `q_${urlBloco || 'Bloco'}_${urlQuartoNum}`, urlQuartoNum || urlQuartoId, urlBloco || 'Bloco 1');
       } else if (urlBloco || urlBlocoId) {
         aplicarDadosBlocoAlojamento(urlBloco || `Bloco ${urlBlocoId}`);
@@ -852,6 +875,10 @@
       }
 
       if (casaId) {
+        if (String(casaId).startsWith('bloco_')) {
+          aplicarDadosBlocoAlojamento(decodeURIComponent(String(casaId).replace('bloco_', '')));
+          return;
+        }
         if (String(casaId).startsWith('quarto_')) {
           const partes = String(casaId).replace('quarto_', '').split('_');
           aplicarDadosQuartoAlojamento(casaId.replace('quarto_', ''), partes[partes.length - 1] || '01', partes[0] || 'Bloco 1');
@@ -865,6 +892,19 @@
               casaCarregada = { id: doc.id, ...doc.data() };
             }
           } catch (e) {}
+        }
+
+        // Fallback resiliente caso o ID da casa não esteja no cache local (ex: primeiro acesso no celular)
+        if (!casaCarregada) {
+          let nomeAuto = String(casaId).replace(/^casa_/, '').replace(/_/g, ' ');
+          nomeAuto = nomeAuto.charAt(0).toUpperCase() + nomeAuto.slice(1);
+          casaCarregada = {
+            id: casaId,
+            nome: nomeAuto.toLowerCase().startsWith('casa') ? nomeAuto : `Casa ${nomeAuto}`,
+            endereco: 'Residência Urbana • Canteiro Taboca 2',
+            bairro: 'Cidade'
+          };
+          listaCasasDisponiveis.push(casaCarregada);
         }
       }
 

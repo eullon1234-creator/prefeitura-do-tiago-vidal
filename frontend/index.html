@@ -6159,8 +6159,8 @@ service cloud.firestore {
             <i class="fa-solid fa-qrcode text-base"></i>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-white">Placa de Identificação & QR Code da Residência</h3>
-            <p class="text-[11px] text-slate-400">Pronta para imprimir em A4 e fixar na porta ou parede da casa</p>
+            <h3 id="modalPlacaQRCasaHeaderTitulo" class="text-sm font-bold text-white">Placa de Identificação & QR Code da Residência</h3>
+            <p id="modalPlacaQRCasaHeaderSubtitulo" class="text-[11px] text-slate-400">Pronta para imprimir em A4 e fixar na porta ou parede da casa</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -6235,7 +6235,7 @@ service cloud.firestore {
 
       <!-- Rodapé Modal -->
       <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between no-print flex-shrink-0">
-        <span class="text-xs text-slate-500">Fixar na entrada ou área de serviço da residência.</span>
+        <span id="modalPlacaQRCasaFooterAviso" class="text-xs text-slate-500">Fixar na entrada ou área de serviço da residência.</span>
         <div class="flex items-center gap-2">
           <button type="button" onclick="fecharModal('modalPlacaQRCasa')" class="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
             Fechar
