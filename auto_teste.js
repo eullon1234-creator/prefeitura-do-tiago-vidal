@@ -1102,6 +1102,32 @@ assert(fs.readFileSync('chamado.html', 'utf8') === fs.readFileSync('frontend/cha
 assert(fs.readFileSync('limpeza.html', 'utf8') === fs.readFileSync('frontend/limpeza.html', 'utf8'), 'Paridade 100% limpeza.html e frontend/limpeza.html');
 assert(fs.readFileSync('ronda.html', 'utf8') === fs.readFileSync('frontend/ronda.html', 'utf8'), 'Paridade 100% ronda.html e frontend/ronda.html');
 assert(fs.readFileSync('sw.js', 'utf8') === fs.readFileSync('frontend/sw.js', 'utf8'), 'Paridade 100% sw.js e frontend/sw.js');
+// -------------------------------------------------------------
+// 17. VERIFICAÇÃO DA SIDEBAR FIXA, MODO TELA CHEIA E ERGONOMIA
+// -------------------------------------------------------------
+console.log('\n🖥️ 17. Verificação da Sidebar Fixa, Modo Tela Cheia e Ergonomia de Navegação');
+
+const indexHtmlFinal = fs.readFileSync('index.html', 'utf8');
+const appJsFinal = fs.readFileSync('app.js', 'utf8');
+
+assert(indexHtmlFinal.includes('h-screen flex flex-col antialiased overflow-hidden'), 'Layout App Shell com h-screen overflow-hidden presente no body de index.html');
+assert(indexHtmlFinal.includes('flex-1 flex min-h-0 overflow-hidden'), 'Container flex com min-h-0 e overflow-hidden presente em index.html');
+assert(indexHtmlFinal.includes('id="sidebarToggleBtn"'), 'Botão universal de alternância da barra lateral (#sidebarToggleBtn) presente em index.html');
+assert(indexHtmlFinal.includes('#sidebar.collapsed-desktop'), 'Regra CSS de recolhimento suave (.collapsed-desktop) presente em index.html');
+assert(indexHtmlFinal.includes('id="mainContent"'), 'Área de conteúdo principal identificada (#mainContent) com scroll suave');
+assert(indexHtmlFinal.includes('id="btnVoltarAoTopo"'), 'Botão flutuante de retorno ao topo (#btnVoltarAoTopo) presente em index.html');
+assert(indexHtmlFinal.includes('toggleSidebarDesktop(true)'), 'Botão de atalho rápido para ocultar presente no topo da sidebar desktop');
+
+assert(appJsFinal.includes('function toggleSidebar('), 'Função universal toggleSidebar implementada em app.js');
+assert(appJsFinal.includes('function toggleSidebarDesktop('), 'Função toggleSidebarDesktop implementada em app.js');
+assert(appJsFinal.includes('function restaurarPreferenciaSidebar('), 'Função restaurarPreferenciaSidebar implementada em app.js');
+assert(appJsFinal.includes('function voltarAoTopo('), 'Função voltarAoTopo implementada em app.js');
+assert(appJsFinal.includes('function initScrollToTopListener('), 'Função initScrollToTopListener implementada em app.js');
+assert(appJsFinal.includes('canteiro_sidebar_collapsed'), 'Persistência de preferência de tela cheia via localStorage presente em app.js');
+assert(appJsFinal.includes('mainEl.scrollTop = 0'), 'Reset automático da rolagem para o topo ao alternar de aba presente em app.js');
+assert(appJsFinal.includes("e.ctrlKey && (e.key === 'b' || e.key === 'B')"), 'Atalho de teclado Ctrl+B para alternar menu presente em app.js');
+assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html');
+assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

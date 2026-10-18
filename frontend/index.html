@@ -80,10 +80,19 @@
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
     }
+    /* Transição fluida e estado recolhido da Sidebar Desktop (Modo Tela Cheia) */
+    #sidebar {
+      transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, transform 0.3s ease;
+    }
+    #sidebar.collapsed-desktop {
+      margin-left: -16rem !important; /* -256px recolhido */
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
-      body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; }
+      html, body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
       body.imprimindo-plaquinha > *:not(#modalPlaquinhaQR) { display: none !important; }
       body.imprimindo-plaquinha #modalPlaquinhaQR {
         position: static !important;
@@ -236,15 +245,16 @@
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased overflow-x-hidden w-full">
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col antialiased overflow-hidden w-full select-none-safe">
 
   <!-- Top Navbar -->
-  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md no-print w-full">
+  <header class="bg-slate-900 text-white border-b border-slate-800 flex-shrink-0 z-30 shadow-md no-print w-full">
     <div class="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2 max-w-full">
       <!-- Left: Brand & Mobile Toggle -->
       <div class="flex items-center gap-2 sm:gap-3 min-w-0">
-        <button id="mobileMenuBtn" onclick="toggleSidebarMobile()" class="md:hidden text-slate-300 hover:text-white p-1.5 -ml-1 rounded-lg hover:bg-slate-800 flex-shrink-0" aria-label="Abrir Menu">
-          <i class="fa-solid fa-bars text-lg"></i>
+        <!-- Botão Universal para Ocultar / Mostrar Barra Lateral (Mais Espaço na Tela) -->
+        <button id="sidebarToggleBtn" onclick="toggleSidebar()" class="text-slate-300 hover:text-white p-1.5 sm:p-2 -ml-1 rounded-xl hover:bg-slate-800 transition flex items-center justify-center flex-shrink-0 active:scale-95 border border-transparent hover:border-slate-700" title="Ocultar / Expandir Menu Lateral (Mais Espaço na Tela) [Ctrl+B]" aria-label="Alternar Menu Lateral">
+          <i id="sidebarToggleIcon" class="fa-solid fa-bars text-base sm:text-lg"></i>
         </button>
         <div class="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" onclick="switchTab('dashboard')">
           <div class="h-9 sm:h-10 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-700/50 flex-shrink-0">
@@ -326,13 +336,13 @@
   </header>
 
   <!-- Main Container -->
-  <div class="flex-1 flex overflow-hidden relative">
+  <div class="flex-1 flex min-h-0 overflow-hidden relative">
 
     <!-- Backdrop Overlay para Fechar Sidebar no Celular ao Clicar Fora -->
     <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 hidden md:hidden transition-opacity duration-300 no-print" onclick="toggleSidebarMobile(false)"></div>
 
     <!-- Sidebar Navigation -->
-    <aside id="sidebar" class="w-72 sm:w-80 md:w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between transition-transform duration-300 ease-in-out z-50 md:z-20 fixed md:static inset-y-0 left-0 -translate-x-full md:translate-x-0 shadow-2xl md:shadow-none h-full no-print">
+    <aside id="sidebar" class="w-72 sm:w-80 md:w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between z-50 md:z-20 fixed md:static inset-y-0 left-0 -translate-x-full md:translate-x-0 shadow-2xl md:shadow-none h-full no-print">
       
       <!-- Topo da Sidebar no Mobile (com Logo Oficial & Botão Fechar X) -->
       <div class="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/90 flex-shrink-0">
@@ -347,6 +357,18 @@
         </div>
         <button onclick="toggleSidebarMobile(false)" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" aria-label="Fechar menu lateral">
           <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Topo da Sidebar no Desktop: Atalho Rápido de Ocultar / Recolher -->
+      <div class="hidden md:flex items-center justify-between px-3.5 py-2 border-b border-slate-800/80 bg-slate-950/40 flex-shrink-0">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <i class="fa-solid fa-compass text-amber-500 text-xs"></i>
+          <span>Navegação</span>
+        </span>
+        <button type="button" onclick="toggleSidebarDesktop(true)" class="px-2 py-1 text-[11px] rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition flex items-center gap-1 font-medium" title="Ocultar Menu Lateral (Ganhar Mais Tela) [Ctrl+B]">
+          <i class="fa-solid fa-angles-left text-xs"></i>
+          <span>Ocultar</span>
         </button>
       </div>
 
@@ -463,7 +485,7 @@
     </aside>
 
     <!-- Content Area -->
-    <main class="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 md:p-6 pb-28 md:pb-6 bg-slate-100">
+    <main id="mainContent" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 sm:p-4 md:p-6 pb-28 md:pb-6 bg-slate-100 scroll-smooth">
 
       <!-- ================= TAB 1: DASHBOARD ================= -->
       <div id="tab-dashboard" class="tab-content space-y-6">
@@ -3054,6 +3076,14 @@ service cloud.firestore {
           </div>
         </div>
       </div>
+
+      <!-- Botão Flutuante Voltar ao Topo da Página -->
+      <button id="btnVoltarAoTopo" onclick="voltarAoTopo()" 
+              class="fixed bottom-6 right-6 z-30 p-2.5 sm:p-3 rounded-full bg-slate-900/90 hover:bg-slate-900 text-amber-400 hover:text-amber-300 shadow-xl border border-slate-700/80 transition-all duration-300 opacity-0 pointer-events-none translate-y-3 flex items-center justify-center gap-1.5 text-xs font-bold no-print"
+              title="Voltar ao topo da página">
+        <i class="fa-solid fa-arrow-up text-sm"></i>
+        <span class="hidden sm:inline">Topo</span>
+      </button>
 
     </main>
   </div>

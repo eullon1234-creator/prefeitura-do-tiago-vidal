@@ -3002,6 +3002,8 @@ document.addEventListener('DOMContentLoaded', () => {
   inicializarTamanhoFonte();
   initFirebase();
   initMobileMenu();
+  restaurarPreferenciaSidebar();
+  initScrollToTopListener();
   loadInitialData();
   updateUserRoleUI();
   inicializarAuditoria();
@@ -3097,6 +3099,10 @@ function switchTab(tabId) {
     activeEl.classList.remove('hidden');
   }
 
+  // Reseta rolagem da área principal de conteúdo para o topo
+  const mainEl = document.getElementById('mainContent') || document.querySelector('main');
+  if (mainEl) mainEl.scrollTop = 0;
+
   // Fecha menu mobile se aberto
   toggleSidebarMobile(false);
 
@@ -3144,6 +3150,57 @@ function switchTab(tabId) {
   updateUserRoleUI();
 }
 
+function toggleSidebar(forceState) {
+  if (window.innerWidth < 768) {
+    toggleSidebarMobile(forceState);
+  } else {
+    toggleSidebarDesktop(forceState);
+  }
+}
+
+function toggleSidebarDesktop(forceCollapse) {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebarToggleBtn');
+  const toggleIcon = document.getElementById('sidebarToggleIcon');
+  if (!sidebar) return;
+
+  const isCurrentlyCollapsed = sidebar.classList.contains('collapsed-desktop');
+  const shouldCollapse = forceCollapse !== undefined ? forceCollapse : !isCurrentlyCollapsed;
+
+  if (shouldCollapse) {
+    sidebar.classList.add('collapsed-desktop');
+    try { localStorage.setItem('canteiro_sidebar_collapsed', 'true'); } catch (e) {}
+    if (toggleBtn) {
+      toggleBtn.classList.add('bg-amber-500/20', 'text-amber-400', 'border-amber-500/40');
+      toggleBtn.title = "Expandir Menu Lateral (Mais Espaço na Tela) [Ctrl+B]";
+    }
+    if (toggleIcon) {
+      toggleIcon.className = "fa-solid fa-bars-staggered text-base sm:text-lg";
+    }
+  } else {
+    sidebar.classList.remove('collapsed-desktop');
+    try { localStorage.setItem('canteiro_sidebar_collapsed', 'false'); } catch (e) {}
+    if (toggleBtn) {
+      toggleBtn.classList.remove('bg-amber-500/20', 'text-amber-400', 'border-amber-500/40');
+      toggleBtn.title = "Ocultar Menu Lateral (Mais Espaço na Tela) [Ctrl+B]";
+    }
+    if (toggleIcon) {
+      toggleIcon.className = "fa-solid fa-bars text-base sm:text-lg";
+    }
+  }
+}
+
+function restaurarPreferenciaSidebar() {
+  if (window.innerWidth >= 768) {
+    try {
+      const saved = localStorage.getItem('canteiro_sidebar_collapsed');
+      if (saved === 'true') {
+        toggleSidebarDesktop(true);
+      }
+    } catch (e) {}
+  }
+}
+
 function toggleSidebarMobile(forceState) {
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
@@ -3164,14 +3221,45 @@ function toggleSidebarMobile(forceState) {
 }
 
 function initMobileMenu() {
-  const btn = document.getElementById('mobileMenuBtn');
+  const btn = document.getElementById('sidebarToggleBtn') || document.getElementById('mobileMenuBtn');
   if (btn) {
     btn.onclick = (e) => {
       e.stopPropagation();
-      toggleSidebarMobile();
+      toggleSidebar();
     };
   }
 }
+
+function voltarAoTopo() {
+  const mainEl = document.getElementById('mainContent') || document.querySelector('main');
+  if (mainEl) {
+    mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function initScrollToTopListener() {
+  const mainEl = document.getElementById('mainContent') || document.querySelector('main');
+  const btn = document.getElementById('btnVoltarAoTopo');
+  if (!mainEl || !btn) return;
+
+  mainEl.addEventListener('scroll', () => {
+    if (mainEl.scrollTop > 280) {
+      btn.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-3');
+      btn.classList.add('opacity-100', 'pointer-events-auto', 'translate-y-0');
+    } else {
+      btn.classList.add('opacity-0', 'pointer-events-none', 'translate-y-3');
+      btn.classList.remove('opacity-100', 'pointer-events-auto', 'translate-y-0');
+    }
+  }, { passive: true });
+}
+
+// Atalho global de teclado: Ctrl + B ou Alt + M para alternar barra lateral
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey && (e.key === 'b' || e.key === 'B')) || (e.altKey && (e.key === 'm' || e.key === 'M'))) {
+    e.preventDefault();
+    toggleSidebar();
+  }
+});
 
 // Carregamento de dados para Modo GitHub Pages / Offline
 async function carregarDadosSnapshotEstatico() {
