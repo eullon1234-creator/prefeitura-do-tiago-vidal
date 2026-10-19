@@ -2247,6 +2247,209 @@
           </div>
         </div>
 
+        
+        <!-- SEÇÃO: CENTRAL DE NOTIFICAÇÕES & TOQUES SONOROS DO PREFEITO -->
+        <div id="secaoConfigNotificacoes" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-lg font-bold flex-shrink-0">
+                <i class="fa-solid fa-bell"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">Central de Notificações & Alertas Sonoros</h3>
+                <p class="text-xs text-slate-500">Escolha os toques sonoros, regule o volume e selecione quais ocorrências do canteiro devem notificar o Prefeito.</p>
+              </div>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 inline-flex items-center gap-1.5 self-start sm:self-center">
+              <i class="fa-solid fa-sliders text-indigo-600"></i> Painel do Prefeito
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- BLOCO 1: PERSONALIZAÇÃO DE SOM E TOQUES (5 Colunas) -->
+            <div class="lg:col-span-5 bg-gradient-to-br from-slate-50 to-indigo-50/40 p-5 rounded-2xl border border-indigo-100/80 space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-indigo-100">
+                <span class="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-2">
+                  <i class="fa-solid fa-music text-indigo-600"></i> Som & Toque do Alerta
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="configNotifSomAtivo" checked class="sr-only peer" onchange="alternarSomNotificacoes(this.checked)">
+                  <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  <span id="labelSomAtivo" class="ml-2 text-xs font-bold text-slate-700">Som Ativo</span>
+                </label>
+              </div>
+
+              <!-- Seleção do Toque -->
+              <div class="space-y-1.5">
+                <label for="configNotifToque" class="block text-xs font-bold text-slate-700">
+                  Toque Sonoro Personalizado
+                </label>
+                <div class="flex items-center gap-2">
+                  <select id="configNotifToque" onchange="aoMudarToqueNotificacao()" class="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                    <option value="chime_gel">🔔 Chime Suave GEL (Harmônico Padrão)</option>
+                    <option value="radio_canteiro">📻 Rádio Canteiro (Bip Duplo Walkie-Talkie)</option>
+                    <option value="alerta_industrial">🚨 Alerta Industrial (Atenção Máxima)</option>
+                    <option value="corneta_campo">📢 Corneta de Campo (Fanfarra Operacional)</option>
+                    <option value="ding_dong">🛎️ Campainha Executiva (Ding-Dong Suave)</option>
+                    <option value="bip_moderno">⚡ Bip Digital Moderno (Três Pulsos Rápidos)</option>
+                  </select>
+                  <button type="button" id="btnTestarToqueNotificacao" onclick="testarToqueAtual()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition" title="Ouvir toque selecionado">
+                    <i class="fa-solid fa-play text-[11px]"></i>
+                    <span>Testar</span>
+                  </button>
+                </div>
+                <p class="text-[11px] text-slate-500">Toques sintetizados via Web Audio API. 100% autônomos, sem arquivos externos e funcionam offline.</p>
+              </div>
+
+              <!-- Volume -->
+              <div class="space-y-1.5 pt-1">
+                <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-volume-high text-indigo-500"></i> Volume do Toque
+                  </span>
+                  <span id="configNotifVolumeLabel" class="text-indigo-600 font-extrabold">80%</span>
+                </div>
+                <input type="range" id="configNotifVolume" min="0" max="100" value="80" step="5" oninput="aoAjustarVolumeNotificacao(this.value)" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold px-0.5">
+                  <span>0% (Mudo)</span>
+                  <span>50%</span>
+                  <span>100% (Máx)</span>
+                </div>
+              </div>
+
+              <!-- Canais de Notificação -->
+              <div class="pt-3 border-t border-indigo-100 space-y-2.5">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Canais de Exibição</span>
+                
+                <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-xs">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">
+                      <i class="fa-solid fa-message"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-slate-800">Banners Visuais (Toasts)</div>
+                      <div class="text-[10px] text-slate-400">Avisos flutuantes na tela do sistema</div>
+                    </div>
+                  </div>
+                  <input type="checkbox" id="configNotifToast" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
+                </div>
+
+                <div class="flex flex-col gap-2 p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-xs">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-desktop"></i>
+                      </div>
+                      <div>
+                        <div class="text-xs font-bold text-slate-800">Notificações no Navegador / Push</div>
+                        <div class="text-[10px] text-slate-400">Alertas na área de trabalho e celular</div>
+                      </div>
+                    </div>
+                    <input type="checkbox" id="configNotifPush" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500" onchange="aoAlternarCanalPush(this.checked)">
+                  </div>
+                  <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+                    <span id="badgeStatusPushNotif" class="px-2 py-0.5 rounded font-bold text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
+                      Verificando permissão...
+                    </span>
+                    <button type="button" onclick="pedirPermissaoPushNotificacao()" class="text-xs font-bold text-sky-600 hover:text-sky-800 flex items-center gap-1">
+                      <i class="fa-solid fa-key"></i> Solicitar Permissão
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOCO 2: SOBRE O QUE NOTIFICAR (7 Colunas) -->
+            <div class="lg:col-span-7 space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div>
+                  <span class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-indigo-600"></i> Sobre o Que Notificar (Categorias & Gatilhos)
+                  </span>
+                  <p class="text-xs text-slate-500">Marque apenas os eventos que você deseja que acionem som e alerta para o Prefeito.</p>
+                </div>
+                <button type="button" onclick="marcarTodasCategoriasNotificacao(true)" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">
+                  Marcar Todos
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Gatilho 1: Novos Chamados de Manutenção -->
+                <label class="p-3.5 rounded-xl border border-slate-200 hover:border-amber-400 bg-white hover:bg-amber-50/20 transition cursor-pointer flex items-start gap-3 shadow-xs">
+                  <input type="checkbox" id="configNotifChamados" checked class="w-4 h-4 mt-0.5 rounded text-amber-600 focus:ring-amber-500">
+                  <div class="space-y-0.5 flex-1">
+                    <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <i class="fa-solid fa-wrench text-amber-500 text-[11px]"></i> Novos Chamados
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-snug">Solicitações de manutenção abertas via QR Code nos alojamentos e casas.</p>
+                  </div>
+                </label>
+
+                <!-- Gatilho 2: Banheiros & Rondas -->
+                <label class="p-3.5 rounded-xl border border-slate-200 hover:border-purple-400 bg-white hover:bg-purple-50/20 transition cursor-pointer flex items-start gap-3 shadow-xs">
+                  <input type="checkbox" id="configNotifRondas" checked class="w-4 h-4 mt-0.5 rounded text-purple-600 focus:ring-purple-500">
+                  <div class="space-y-0.5 flex-1">
+                    <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <i class="fa-solid fa-restroom text-purple-500 text-[11px]"></i> Rondas & Banheiros
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-snug">Ocorrências de falta de água, papel, limpeza ou não conformidades nas rondas.</p>
+                  </div>
+                </label>
+
+                <!-- Gatilho 3: Faturas & Despesas a Vencer -->
+                <label class="p-3.5 rounded-xl border border-slate-200 hover:border-emerald-400 bg-white hover:bg-emerald-50/20 transition cursor-pointer flex items-start gap-3 shadow-xs">
+                  <input type="checkbox" id="configNotifDespesas" checked class="w-4 h-4 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+                  <div class="space-y-0.5 flex-1">
+                    <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <i class="fa-solid fa-file-invoice-dollar text-emerald-500 text-[11px]"></i> Faturas a Vencer / Vencidas
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-snug">Contas de energia, água e aluguel das casas urbanas próximas do vencimento.</p>
+                  </div>
+                </label>
+
+                <!-- Gatilho 4: Estoque Crítico -->
+                <label class="p-3.5 rounded-xl border border-slate-200 hover:border-rose-400 bg-white hover:bg-rose-50/20 transition cursor-pointer flex items-start gap-3 shadow-xs">
+                  <input type="checkbox" id="configNotifEstoque" checked class="w-4 h-4 mt-0.5 rounded text-rose-600 focus:ring-rose-500">
+                  <div class="space-y-0.5 flex-1">
+                    <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <i class="fa-solid fa-boxes-stacked text-rose-500 text-[11px]"></i> Estoque Crítico
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-snug">Itens e insumos operacionais que atingiram ou caíram abaixo da quantidade mínima.</p>
+                  </div>
+                </label>
+
+                <!-- Gatilho 5: Vistorias com Danos -->
+                <label class="p-3.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/20 transition cursor-pointer flex items-start gap-3 shadow-xs sm:col-span-2">
+                  <input type="checkbox" id="configNotifDanos" checked class="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500">
+                  <div class="space-y-0.5 flex-1">
+                    <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <i class="fa-solid fa-triangle-exclamation text-indigo-500 text-[11px]"></i> Danos em Vistorias & Acomodações
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-snug">Detecção ou cadastro de camas, colchões, armários ou fechaduras marcados como danificados ou necessitando reparo imediato.</p>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Botão Salvar Preferências -->
+              <div class="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="text-[11px] text-slate-500 flex items-center gap-1.5">
+                  <i class="fa-solid fa-cloud-arrow-up text-emerald-600"></i>
+                  <span>Suas preferências são salvas neste aparelho e sincronizadas com o Firebase.</span>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                  <button type="button" onclick="restaurarConfigNotificacoesPadrao()" class="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+                    Padrão
+                  </button>
+                  <button type="button" onclick="salvarConfigNotificacoes()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Salvar Preferências</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- SEÇÃO: IDENTIDADE VISUAL & EMPRESA -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">

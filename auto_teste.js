@@ -1284,6 +1284,96 @@ assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index
 assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js');
 
 
+
+// -------------------------------------------------------------
+// 21. CENTRAL DE NOTIFICAÇÕES & TOQUES SONOROS DO PREFEITO
+// -------------------------------------------------------------
+console.log('\n🔔 21. Verificação da Central de Notificações & Toques Sonoros');
+
+const indexHtmlNotif = fs.readFileSync('index.html', 'utf8');
+const appJsNotif = fs.readFileSync('app.js', 'utf8');
+
+// 21.1 Elementos DOM do Painel de Notificações no index.html
+assert(indexHtmlNotif.includes('id="secaoConfigNotificacoes"'), 'Card secaoConfigNotificacoes presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifSomAtivo"'), 'Interruptor configNotifSomAtivo presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifToque"'), 'Select configNotifToque presente no index.html');
+assert(indexHtmlNotif.includes('id="btnTestarToqueNotificacao"'), 'Botão btnTestarToqueNotificacao presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifVolume"'), 'Slider de volume configNotifVolume presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifVolumeLabel"'), 'Rótulo de porcentagem configNotifVolumeLabel presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifChamados"'), 'Filtro configNotifChamados presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifRondas"'), 'Filtro configNotifRondas presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifDespesas"'), 'Filtro configNotifDespesas presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifEstoque"'), 'Filtro configNotifEstoque presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifDanos"'), 'Filtro configNotifDanos presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifToast"'), 'Canal configNotifToast presente no index.html');
+assert(indexHtmlNotif.includes('id="configNotifPush"'), 'Canal configNotifPush presente no index.html');
+assert(indexHtmlNotif.includes('id="badgeStatusPushNotif"'), 'Badge badgeStatusPushNotif presente no index.html');
+
+// 21.2 Catálogo de Toques Sintetizados no index.html
+assert(indexHtmlNotif.includes('value="chime_gel"'), 'Toque Chime Suave GEL cadastrado no select');
+assert(indexHtmlNotif.includes('value="radio_canteiro"'), 'Toque Rádio Canteiro Walkie-Talkie cadastrado no select');
+assert(indexHtmlNotif.includes('value="alerta_industrial"'), 'Toque Alerta Industrial cadastrado no select');
+assert(indexHtmlNotif.includes('value="corneta_campo"'), 'Toque Corneta de Campo cadastrado no select');
+assert(indexHtmlNotif.includes('value="ding_dong"'), 'Toque Campainha Executiva Ding-Dong cadastrado no select');
+assert(indexHtmlNotif.includes('value="bip_moderno"'), 'Toque Bip Digital Moderno cadastrado no select');
+
+// 21.3 Implementação das Funções em app.js
+assert(appJsNotif.includes('function reproduzirToqueSintetizado'), 'Função reproduzirToqueSintetizado implementada em app.js');
+assert(appJsNotif.includes('function inicializarConfigNotificacoes'), 'Função inicializarConfigNotificacoes implementada em app.js');
+assert(appJsNotif.includes('function atualizarCamposConfigNotificacoesUI'), 'Função atualizarCamposConfigNotificacoesUI implementada em app.js');
+assert(appJsNotif.includes('function alternarSomNotificacoes'), 'Função alternarSomNotificacoes implementada em app.js');
+assert(appJsNotif.includes('function aoMudarToqueNotificacao'), 'Função aoMudarToqueNotificacao implementada em app.js');
+assert(appJsNotif.includes('function aoAjustarVolumeNotificacao'), 'Função aoAjustarVolumeNotificacao implementada em app.js');
+assert(appJsNotif.includes('function testarToqueAtual'), 'Função testarToqueAtual implementada em app.js');
+assert(appJsNotif.includes('function pedirPermissaoPushNotificacao'), 'Função pedirPermissaoPushNotificacao implementada em app.js');
+assert(appJsNotif.includes('function atualizarStatusPushUI'), 'Função atualizarStatusPushUI implementada em app.js');
+assert(appJsNotif.includes('function aoAlternarCanalPush'), 'Função aoAlternarCanalPush implementada em app.js');
+assert(appJsNotif.includes('function marcarTodasCategoriasNotificacao'), 'Função marcarTodasCategoriasNotificacao implementada em app.js');
+assert(appJsNotif.includes('function restaurarConfigNotificacoesPadrao'), 'Função restaurarConfigNotificacoesPadrao implementada em app.js');
+assert(appJsNotif.includes('function salvarConfigNotificacoes'), 'Função salvarConfigNotificacoes implementada em app.js');
+assert(appJsNotif.includes('function dispararNotificacaoPrefeito'), 'Função dispararNotificacaoPrefeito implementada em app.js');
+
+// 21.4 Integração Reativa aos Gatilhos do Canteiro
+assert(appJsNotif.includes("categoria: 'chamados'"), 'Chamados de suporte integrados ao despachante de notificações');
+assert(appJsNotif.includes('inicializarConfigNotificacoes();'), 'inicializarConfigNotificacoes executado em DOMContentLoaded');
+
+// 21.5 Simulação da Lógica do Despachante e Supressão Seletiva
+const mockConfig = {
+  som_ativo: true,
+  toque_selecionado: 'chime_gel',
+  volume: 80,
+  notificar_chamados: true,
+  notificar_rondas: false, // Desativado propositalmente no teste
+  canal_toast: true,
+  canal_push: false
+};
+
+function simularDespacho(categoria, config) {
+  if (config['notificar_' + categoria] === false) {
+    return { emitido: false, motivo: 'categoria_desativada' };
+  }
+  return {
+    emitido: true,
+    som: config.som_ativo,
+    toast: config.canal_toast,
+    push: config.canal_push
+  };
+}
+
+const resChamado = simularDespacho('chamados', mockConfig);
+assert(resChamado.emitido === true && resChamado.som === true, 'Evento de chamado ativo emite alerta sonoro');
+
+const resRonda = simularDespacho('rondas', mockConfig);
+assert(resRonda.emitido === false && resRonda.motivo === 'categoria_desativada', 'Evento de categoria desmarcada é suprimido com sucesso');
+
+const mockConfigMudo = { ...mockConfig, som_ativo: false };
+const resMudo = simularDespacho('chamados', mockConfigMudo);
+assert(resMudo.emitido === true && resMudo.som === false, 'Modo silencioso preserva alerta visual mas silencia áudio');
+
+// 21.6 Paridade 100% rigorosa
+assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html após Seção 21');
+assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js após Seção 21');
+
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------

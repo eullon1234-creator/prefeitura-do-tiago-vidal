@@ -3008,6 +3008,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateUserRoleUI();
   inicializarAuditoria();
   inicializarRondaCanteiro();
+  inicializarConfigNotificacoes();
   verificarAcaoUrlParametros();
 });
 
@@ -9991,28 +9992,499 @@ let chamadosListenerAtivo = false;
 let chamadosPrimeiraCarga = true;
 
 // Som sutil de notificação para novo chamado (Web Audio API nativa sem arquivo externo)
-function playNotificacaoChamado() {
+
+// ========================================================
+// CENTRAL DE NOTIFICAÇÕES & TOQUES SONOROS DO PREFEITO
+// ========================================================
+const CONFIG_NOTIFICACOES_PADRAO = {
+  som_ativo: true,
+  toque_selecionado: 'chime_gel', // chime_gel | radio_canteiro | alerta_industrial | corneta_campo | ding_dong | bip_moderno
+  volume: 80, // 0 a 100
+  notificar_chamados: true,
+  notificar_rondas: true,
+  notificar_despesas: true,
+  notificar_estoque: true,
+  notificar_danos: true,
+  canal_toast: true,
+  canal_push: false
+};
+
+let configNotificacoes = { ...CONFIG_NOTIFICACOES_PADRAO };
+
+/**
+ * Sintetizador sonoro com Web Audio API nativo.
+ * Produz toques profissionais sem necessidade de arquivos .mp3 externos ou rede.
+ */
+function reproduzirToqueSintetizado(tipoToque = 'chime_gel', volumePercent = 80) {
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    
-    // Tom 1
-    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-    // Tom 2
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtxClass) return;
+    const ctx = new AudioCtxClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
-    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.38);
+    const vol = typeof volumePercent === 'number' ? volumePercent : 80;
+    const gainVal = Math.max(0, Math.min(1, vol / 100)) * 0.35;
+    if (gainVal <= 0) return;
 
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(gainVal, ctx.currentTime);
+    masterGain.connect(ctx.destination);
 
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.38);
+    const now = ctx.currentTime;
+
+    if (tipoToque === 'chime_gel') {
+      // Acorde harmônico cristalino e corporativo (Dó5 - Mi5 - Sol5 - Dó6)
+      const notas = [523.25, 659.25, 783.99, 1046.50];
+      notas.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const noteGain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+        noteGain.gain.setValueAtTime(0.0001, now + idx * 0.08);
+        noteGain.gain.exponentialRampToValueAtTime(0.3, now + idx * 0.08 + 0.02);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.4);
+        osc.connect(noteGain);
+        noteGain.connect(masterGain);
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.42);
+      });
+    } else if (tipoToque === 'radio_canteiro') {
+      // Bip duplo típico de rádio comunicador HT em canteiro de obras
+      const osc1 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(880, now);
+      g1.gain.setValueAtTime(0.2, now);
+      g1.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+      osc1.connect(g1);
+      g1.connect(masterGain);
+      osc1.start(now);
+      osc1.stop(now + 0.08);
+
+      const osc2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(1200, now + 0.1);
+      g2.gain.setValueAtTime(0.25, now + 0.1);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.1 + 0.09);
+      osc2.connect(g2);
+      g2.connect(masterGain);
+      osc2.start(now + 0.1);
+      osc2.stop(now + 0.1 + 0.1);
+    } else if (tipoToque === 'alerta_industrial') {
+      // Dois pulsos de onda quadrada enfáticos para atenção operacional máxima
+      const osc1 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      osc1.type = 'square';
+      osc1.frequency.setValueAtTime(740, now);
+      g1.gain.setValueAtTime(0.16, now);
+      g1.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+      osc1.connect(g1);
+      g1.connect(masterGain);
+      osc1.start(now);
+      osc1.stop(now + 0.12);
+
+      const osc2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      osc2.type = 'square';
+      osc2.frequency.setValueAtTime(940, now + 0.14);
+      g2.gain.setValueAtTime(0.2, now + 0.14);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.14 + 0.14);
+      osc2.connect(g2);
+      g2.connect(masterGain);
+      osc2.start(now + 0.14);
+      osc2.stop(now + 0.14 + 0.15);
+    } else if (tipoToque === 'corneta_campo') {
+      // Três notas de fanfarra viva em triângulo
+      const notas = [392.00, 523.25, 783.99];
+      notas.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const noteGain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+        noteGain.gain.setValueAtTime(0.25, now + idx * 0.1);
+        noteGain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.22);
+        osc.connect(noteGain);
+        noteGain.connect(masterGain);
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 0.24);
+      });
+    } else if (tipoToque === 'ding_dong') {
+      // Campainha executiva de recepção
+      const osc1 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(659.25, now);
+      g1.gain.setValueAtTime(0.28, now);
+      g1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(g1);
+      g1.connect(masterGain);
+      osc1.start(now);
+      osc1.stop(now + 0.36);
+
+      const osc2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(523.25, now + 0.2);
+      g2.gain.setValueAtTime(0.32, now + 0.2);
+      g2.gain.exponentialRampToValueAtTime(0.0005, now + 0.2 + 0.6);
+      osc2.connect(g2);
+      g2.connect(masterGain);
+      osc2.start(now + 0.2);
+      osc2.stop(now + 0.2 + 0.62);
+    } else if (tipoToque === 'bip_moderno') {
+      // Três pulsos rápidos de alta tecnologia
+      [0, 0.08, 0.16].forEach(timeOffset => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1046.50, now + timeOffset);
+        g.gain.setValueAtTime(0.2, now + timeOffset);
+        g.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + 0.05);
+        osc.connect(g);
+        g.connect(masterGain);
+        osc.start(now + timeOffset);
+        osc.stop(now + timeOffset + 0.06);
+      });
+    }
+  } catch (err) {
+    console.warn('[Audio] Erro ao sintetizar toque sonoro:', err);
+  }
+}
+
+/**
+ * Inicialização e carregamento das preferências de notificação do Prefeito.
+ */
+function inicializarConfigNotificacoes() {
+  try {
+    const salvo = localStorage.getItem('prefeitura_notificacoes_config');
+    if (salvo) {
+      configNotificacoes = Object.assign({}, CONFIG_NOTIFICACOES_PADRAO, JSON.parse(salvo));
+    } else {
+      configNotificacoes = Object.assign({}, CONFIG_NOTIFICACOES_PADRAO);
+    }
   } catch (e) {
-    console.log("Notificação sonora não suportada ou não permitida pelo navegador:", e);
+    configNotificacoes = Object.assign({}, CONFIG_NOTIFICACOES_PADRAO);
+  }
+
+  atualizarCamposConfigNotificacoesUI();
+
+  // Se houver Firestore conectado, sincronizar com collection 'configuracoes', doc 'notificacoes'
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      firestoreDb.collection('configuracoes').doc('notificacoes').onSnapshot((doc) => {
+        if (doc && doc.exists) {
+          const data = doc.data();
+          if (data) {
+            configNotificacoes = Object.assign({}, CONFIG_NOTIFICACOES_PADRAO, data);
+            try {
+              localStorage.setItem('prefeitura_notificacoes_config', JSON.stringify(configNotificacoes));
+            } catch (e) {}
+            atualizarCamposConfigNotificacoesUI();
+          }
+        }
+      }, (err) => {
+        console.warn('Aviso ao sincronizar notificações do Firestore:', err);
+      });
+    } catch (err) {
+      console.warn('Erro ao escutar config de notificações:', err);
+    }
+  }
+}
+
+/**
+ * Atualiza os controles visuais no formulário de configurações com base no estado atual.
+ */
+function atualizarCamposConfigNotificacoesUI() {
+  const elSomAtivo = document.getElementById('configNotifSomAtivo');
+  const elLabelSom = document.getElementById('labelSomAtivo');
+  const elToque = document.getElementById('configNotifToque');
+  const elVolume = document.getElementById('configNotifVolume');
+  const elVolumeLabel = document.getElementById('configNotifVolumeLabel');
+  const elChamados = document.getElementById('configNotifChamados');
+  const elRondas = document.getElementById('configNotifRondas');
+  const elDespesas = document.getElementById('configNotifDespesas');
+  const elEstoque = document.getElementById('configNotifEstoque');
+  const elDanos = document.getElementById('configNotifDanos');
+  const elToast = document.getElementById('configNotifToast');
+  const elPush = document.getElementById('configNotifPush');
+
+  if (elSomAtivo) {
+    elSomAtivo.checked = configNotificacoes.som_ativo !== false;
+    if (elLabelSom) elLabelSom.textContent = elSomAtivo.checked ? 'Som Ativo' : 'Mudo (Silencioso)';
+  }
+  if (elToque && configNotificacoes.toque_selecionado) {
+    elToque.value = configNotificacoes.toque_selecionado;
+  }
+  if (elVolume) {
+    elVolume.value = typeof configNotificacoes.volume === 'number' ? configNotificacoes.volume : 80;
+    if (elVolumeLabel) elVolumeLabel.textContent = `${elVolume.value}%`;
+  }
+  if (elChamados) elChamados.checked = configNotificacoes.notificar_chamados !== false;
+  if (elRondas) elRondas.checked = configNotificacoes.notificar_rondas !== false;
+  if (elDespesas) elDespesas.checked = configNotificacoes.notificar_despesas !== false;
+  if (elEstoque) elEstoque.checked = configNotificacoes.notificar_estoque !== false;
+  if (elDanos) elDanos.checked = configNotificacoes.notificar_danos !== false;
+  if (elToast) elToast.checked = configNotificacoes.canal_toast !== false;
+  if (elPush) elPush.checked = configNotificacoes.canal_push === true;
+
+  atualizarStatusPushUI();
+}
+
+/**
+ * Alterna entre som ativado e mudo.
+ */
+function alternarSomNotificacoes(ativo) {
+  configNotificacoes.som_ativo = !!ativo;
+  const elLabelSom = document.getElementById('labelSomAtivo');
+  if (elLabelSom) {
+    elLabelSom.textContent = ativo ? 'Som Ativo' : 'Mudo (Silencioso)';
+  }
+}
+
+/**
+ * Disparado ao selecionar um novo toque na lista suspensa.
+ */
+function aoMudarToqueNotificacao() {
+  const el = document.getElementById('configNotifToque');
+  if (el) {
+    configNotificacoes.toque_selecionado = el.value;
+  }
+}
+
+/**
+ * Disparado ao ajustar a barra deslizante de volume.
+ */
+function aoAjustarVolumeNotificacao(val) {
+  const v = parseInt(val, 10);
+  configNotificacoes.volume = isNaN(v) ? 80 : Math.max(0, Math.min(100, v));
+  const elVolumeLabel = document.getElementById('configNotifVolumeLabel');
+  if (elVolumeLabel) {
+    elVolumeLabel.textContent = `${configNotificacoes.volume}%`;
+  }
+}
+
+/**
+ * Testa o som configurado imediatamente.
+ */
+function testarToqueAtual() {
+  const elToque = document.getElementById('configNotifToque');
+  const elVolume = document.getElementById('configNotifVolume');
+  const toque = elToque ? elToque.value : configNotificacoes.toque_selecionado;
+  const vol = elVolume ? parseInt(elVolume.value, 10) : configNotificacoes.volume;
+
+  const btn = document.getElementById('btnTestarToqueNotificacao');
+  if (btn) {
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-volume-high text-[11px] animate-pulse"></i><span>Tocando...</span>';
+    btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+    btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+      btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+      btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+    }, 700);
+  }
+
+  reproduzirToqueSintetizado(toque, isNaN(vol) ? 80 : vol);
+}
+
+/**
+ * Solicita autorização para Notificações do Navegador (Push Desktop / Mobile).
+ */
+function pedirPermissaoPushNotificacao() {
+  if (!('Notification' in window)) {
+    showToast('Notificações nativas não são suportadas neste navegador.', 'warning');
+    atualizarStatusPushUI();
+    return;
+  }
+
+  Notification.requestPermission().then((permission) => {
+    if (permission === 'granted') {
+      configNotificacoes.canal_push = true;
+      const elPush = document.getElementById('configNotifPush');
+      if (elPush) elPush.checked = true;
+      showToast('✅ Notificações do navegador ativadas com sucesso!', 'success');
+      try {
+        new Notification('Prefeitura de Canteiro', {
+          body: 'Notificações do canteiro ativadas para o Prefeito.',
+          icon: 'logo_gel_cropped.png'
+        });
+      } catch (e) {}
+    } else if (permission === 'denied') {
+      configNotificacoes.canal_push = false;
+      const elPush = document.getElementById('configNotifPush');
+      if (elPush) elPush.checked = false;
+      showToast('⚠️ Permissão de notificações negada nas configurações do navegador.', 'warning');
+    }
+    atualizarStatusPushUI();
+  });
+}
+
+/**
+ * Atualiza o badge informativo sobre o status de permissão do navegador.
+ */
+function atualizarStatusPushUI() {
+  const badge = document.getElementById('badgeStatusPushNotif');
+  if (!badge) return;
+
+  if (!('Notification' in window)) {
+    badge.className = 'px-2 py-0.5 rounded font-bold text-[10px] bg-slate-100 text-slate-500 border border-slate-200';
+    badge.innerHTML = '<i class="fa-solid fa-ban text-[9px]"></i> Não Suportado';
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    badge.className = 'px-2 py-0.5 rounded font-bold text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200';
+    badge.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600 text-[9px]"></i> Permitido no Navegador';
+  } else if (Notification.permission === 'denied') {
+    badge.className = 'px-2 py-0.5 rounded font-bold text-[10px] bg-rose-50 text-rose-800 border border-rose-200';
+    badge.innerHTML = '<i class="fa-solid fa-circle-xmark text-rose-600 text-[9px]"></i> Bloqueado no Navegador';
+  } else {
+    badge.className = 'px-2 py-0.5 rounded font-bold text-[10px] bg-amber-50 text-amber-800 border border-amber-200';
+    badge.innerHTML = '<i class="fa-solid fa-circle-exclamation text-amber-600 text-[9px]"></i> Não Solicitado';
+  }
+}
+
+/**
+ * Disparado ao marcar ou desmarcar o canal push no formulário.
+ */
+function aoAlternarCanalPush(ativo) {
+  if (ativo) {
+    if (!('Notification' in window)) {
+      showToast('Notificações no navegador não são suportadas.', 'warning');
+      const elPush = document.getElementById('configNotifPush');
+      if (elPush) elPush.checked = false;
+      configNotificacoes.canal_push = false;
+      return;
+    }
+    if (Notification.permission !== 'granted') {
+      pedirPermissaoPushNotificacao();
+    } else {
+      configNotificacoes.canal_push = true;
+    }
+  } else {
+    configNotificacoes.canal_push = false;
+  }
+}
+
+/**
+ * Marca ou desmarca todas as categorias de eventos de uma só vez.
+ */
+function marcarTodasCategoriasNotificacao(marcar = true) {
+  ['configNotifChamados', 'configNotifRondas', 'configNotifDespesas', 'configNotifEstoque', 'configNotifDanos'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!marcar;
+  });
+}
+
+/**
+ * Restaura todas as opções de notificação para os valores padrão de fábrica.
+ */
+function restaurarConfigNotificacoesPadrao() {
+  configNotificacoes = Object.assign({}, CONFIG_NOTIFICACOES_PADRAO);
+  atualizarCamposConfigNotificacoesUI();
+  showToast('Configurações de notificação restauradas para o padrão.', 'info');
+}
+
+/**
+ * Salva as configurações de notificações no cache do dispositivo e na nuvem Firestore.
+ */
+async function salvarConfigNotificacoes(silencioso = false) {
+  const elSomAtivo = document.getElementById('configNotifSomAtivo');
+  const elToque = document.getElementById('configNotifToque');
+  const elVolume = document.getElementById('configNotifVolume');
+  const elChamados = document.getElementById('configNotifChamados');
+  const elRondas = document.getElementById('configNotifRondas');
+  const elDespesas = document.getElementById('configNotifDespesas');
+  const elEstoque = document.getElementById('configNotifEstoque');
+  const elDanos = document.getElementById('configNotifDanos');
+  const elToast = document.getElementById('configNotifToast');
+  const elPush = document.getElementById('configNotifPush');
+
+  configNotificacoes.som_ativo = elSomAtivo ? elSomAtivo.checked : true;
+  configNotificacoes.toque_selecionado = elToque ? elToque.value : 'chime_gel';
+  configNotificacoes.volume = elVolume ? parseInt(elVolume.value, 10) : 80;
+  configNotificacoes.notificar_chamados = elChamados ? elChamados.checked : true;
+  configNotificacoes.notificar_rondas = elRondas ? elRondas.checked : true;
+  configNotificacoes.notificar_despesas = elDespesas ? elDespesas.checked : true;
+  configNotificacoes.notificar_estoque = elEstoque ? elEstoque.checked : true;
+  configNotificacoes.notificar_danos = elDanos ? elDanos.checked : true;
+  configNotificacoes.canal_toast = elToast ? elToast.checked : true;
+  configNotificacoes.canal_push = elPush ? elPush.checked : false;
+
+  try {
+    localStorage.setItem('prefeitura_notificacoes_config', JSON.stringify(configNotificacoes));
+  } catch (e) {
+    console.warn('Erro ao salvar config no localStorage:', e);
+  }
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      await firestoreDb.collection('configuracoes').doc('notificacoes').set({
+        ...configNotificacoes,
+        atualizado_em: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Aviso ao sincronizar notificações no Firestore:', err);
+    }
+  }
+
+  if (typeof registrarAuditoria === 'function') {
+    registrarAuditoria(
+      'configuracao',
+      'Configurações de Notificações',
+      `Prefeito atualizou preferências: Toque=${configNotificacoes.toque_selecionado}, Volume=${configNotificacoes.volume}%, Som=${configNotificacoes.som_ativo ? 'Ligado' : 'Mudo'}`
+    );
+  }
+
+  if (!silencioso) {
+    showToast('✅ Preferências de notificação e toques salvas com sucesso!', 'success');
+  }
+}
+
+/**
+ * Despachante inteligente centralizado de notificações para o Prefeito.
+ * Verifica filtros de categoria e emite som, toast e push conforme configurado.
+ */
+function dispararNotificacaoPrefeito({ categoria = 'chamados', titulo = 'Alerta da Prefeitura', mensagem = '', icone = 'warning' }) {
+  // 1. Verificar se a categoria está ativada nas preferências
+  const chaveCategoria = 'notificar_' + categoria;
+  if (configNotificacoes[chaveCategoria] === false) {
+    return; // O Prefeito desativou notificações para essa categoria
+  }
+
+  // 2. Tocar som se som_ativo estiver habilitado
+  if (configNotificacoes.som_ativo) {
+    reproduzirToqueSintetizado(configNotificacoes.toque_selecionado, configNotificacoes.volume);
+  }
+
+  // 3. Exibir banner visual no sistema (Toast)
+  if (configNotificacoes.canal_toast !== false) {
+    showToast(mensagem, icone);
+  }
+
+  // 4. Disparar notificação nativa do sistema operacional (Push / Desktop)
+  if (configNotificacoes.canal_push && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try {
+      new Notification(titulo, {
+        body: mensagem.replace(/^[^\w\s]+/, '').trim(),
+        icon: 'logo_gel_cropped.png',
+        badge: 'icons/icon-192x192.png'
+      });
+    } catch (e) {
+      console.warn('Erro ao disparar notificação push nativa:', e);
+    }
+  }
+}
+
+
+// Compatibilidade com chamadas diretas de playNotificacaoChamado
+function playNotificacaoChamado() {
+  if (configNotificacoes && configNotificacoes.som_ativo && configNotificacoes.notificar_chamados) {
+    reproduzirToqueSintetizado(configNotificacoes.toque_selecionado, configNotificacoes.volume);
   }
 }
 
@@ -10071,8 +10543,12 @@ function iniciarListenerChamados() {
           if (change.type === 'added') {
             const data = change.doc.data();
             novosPendentes++;
-            playNotificacaoChamado();
-            showToast(`🚨 Nova Solicitação (${data.local_formatado || ('Quarto ' + (data.quarto || ''))}): ${data.categoria || 'Manutenção'}`, 'warning');
+            dispararNotificacaoPrefeito({
+              categoria: 'chamados',
+              titulo: '🚨 Novo Chamado de Manutenção',
+              mensagem: `🚨 Nova Solicitação (${data.local_formatado || ('Quarto ' + (data.quarto || ''))}): ${data.categoria || 'Manutenção'}`,
+              icone: 'warning'
+            });
           }
         });
       }
@@ -17942,3 +18418,20 @@ window.aoMudarConcessionariaCasa = aoMudarConcessionariaCasa;
 window.copiarCodigoConcessionaria = copiarCodigoConcessionaria;
 window.atualizarInfoConcessionariaDespesaForm = atualizarInfoConcessionariaDespesaForm;
 window.renderizarCardAgenciasCasaAtual = renderizarCardAgenciasCasaAtual;
+
+
+window.alternarSomNotificacoes = alternarSomNotificacoes;
+window.aoMudarToqueNotificacao = aoMudarToqueNotificacao;
+window.testarToqueAtual = testarToqueAtual;
+window.aoAjustarVolumeNotificacao = aoAjustarVolumeNotificacao;
+window.aoAlternarCanalPush = aoAlternarCanalPush;
+window.pedirPermissaoPushNotificacao = pedirPermissaoPushNotificacao;
+window.marcarTodasCategoriasNotificacao = marcarTodasCategoriasNotificacao;
+window.restaurarConfigNotificacoesPadrao = restaurarConfigNotificacoesPadrao;
+window.salvarConfigNotificacoes = salvarConfigNotificacoes;
+window.reproduzirToqueSintetizado = reproduzirToqueSintetizado;
+window.dispararNotificacaoPrefeito = dispararNotificacaoPrefeito;
+window.inicializarConfigNotificacoes = inicializarConfigNotificacoes;
+window.atualizarCamposConfigNotificacoesUI = atualizarCamposConfigNotificacoesUI;
+window.configNotificacoes = configNotificacoes;
+window.CONFIG_NOTIFICACOES_PADRAO = CONFIG_NOTIFICACOES_PADRAO;
