@@ -501,7 +501,12 @@
           <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
           <span>Sistema Integrado Ativo</span>
         </div>
-        <p class="text-[10px] text-slate-500 mt-1">Prefeitura de Canteiro • <span class="app-obra-tag">Taboca 2</span></p>
+        <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1.5 select-none">
+          <span>Prefeitura • <span class="app-obra-tag">Taboca 2</span></span>
+          <span class="text-[9px] text-slate-600/80 hover:text-slate-400 transition flex items-center gap-1" title="Desenvolvedor do Sistema">
+            <i class="fa-solid fa-code text-[8px] opacity-60"></i> Criado por Eullon
+          </span>
+        </div>
       </div>
     </aside>
 
@@ -3434,6 +3439,18 @@ service cloud.firestore {
         <span class="hidden sm:inline">Topo</span>
       </button>
 
+          <!-- Rodapé Discreto do Sistema (Marca d'água) -->
+      <footer class="mt-8 pt-4 pb-2 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2 select-none no-print">
+        <div class="flex items-center gap-1.5">
+          <span>Prefeitura de Canteiro • GEL Construtora</span>
+          <span class="text-slate-300">•</span>
+          <span>Canteiro Taboca 2</span>
+        </div>
+        <div class="flex items-center gap-1.5 text-[10px] text-slate-400/80 hover:text-slate-600 transition">
+          <i class="fa-solid fa-code text-[9px] opacity-60"></i>
+          <span>Criado por Eullon</span>
+        </div>
+      </footer>
     </main>
   </div>
 

@@ -1426,6 +1426,13 @@ assert(fs.readFileSync('ronda.html', 'utf8') === fs.readFileSync('frontend/ronda
 assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html após Seção 22');
 assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js após Seção 22');
 
+// 22.6 Validação de Marca d'água Discreta "Criado por Eullon"
+assert(fs.readFileSync('index.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no index.html');
+assert(fs.readFileSync('limpeza.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no limpeza.html');
+assert(fs.readFileSync('ronda.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no ronda.html');
+assert(fs.readFileSync('chamado.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no chamado.html');
+assert(fs.readFileSync('frontend/chamado.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no frontend/chamado.html');
+
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
