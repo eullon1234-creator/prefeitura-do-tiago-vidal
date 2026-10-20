@@ -9901,7 +9901,7 @@ let deferredInstallPrompt = null;
 // Registro do Service Worker para suporte PWA offline e instalação
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3.9')
+    navigator.serviceWorker.register('./sw.js?v=4.2')
       .then(reg => {
         console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
         // Garante que o novo service worker seja verificado imediatamente

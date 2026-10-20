@@ -1097,7 +1097,7 @@ assert(appJsContentSec16.includes("collection('canteiro_metadata').doc('snapshot
 
 // 5. PWA Offline em sw.js
 const swContent = fs.readFileSync('sw.js', 'utf8');
-assert(swContent.includes('prefeitura-pwa-v4.1'), 'Versão do cache atualizada para prefeitura-pwa-v4.1 em sw.js');
+assert(/prefeitura-pwa-v4\.[12]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
 assert(swContent.includes("'ronda.html'"), 'ronda.html incluído no pré-cache offline de sw.js');
 assert(swContent.includes("response.type !== 'opaque'"), 'Suporte a cache de recursos de CDN (Tailwind, FontAwesome) ativo em sw.js');
 
@@ -1455,6 +1455,7 @@ assert(fs.readFileSync('frontend/chamado.html', 'utf8').includes('Criado por Eul
 assert(rondaHtmlContent.includes('carregarRegistrosPontoHoje(p.id, meta);'), 'carregarRegistrosPontoHoje executado de forma não-bloqueante');
 assert(rondaHtmlContent.includes('carregarHistoricoPlaquinhaRonda(p.id, p.tipo, p.nome, p.setor);'), 'carregarHistoricoPlaquinhaRonda executado imediatamente');
 assert(!rondaHtmlContent.includes("descServico = 'Troca de Refil / Filtro d'Água';"), 'Ausência de SyntaxError de aspas em descServico de ronda.html');
+assert(rondaHtmlContent.includes('function verificarAutenticacaoEquipeHoje()'), 'Função verificarAutenticacaoEquipeHoje definida em ronda.html');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

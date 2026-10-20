@@ -84,7 +84,7 @@
           </div>
           <div>
             <span id="displayPontoTipoBadge" class="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">Banheiro Identificado</span>
-            <h2 id="displayPontoNome" class="text-base font-black text-white leading-tight">Carregando ponto...</h2>
+            <h2 id="displayPontoNome" class="text-base font-black text-white leading-tight">Identificando Ponto...</h2>
           </div>
         </div>
         <span id="displayMetaFrequencia" class="text-[10px] px-2 py-1 rounded-md bg-slate-900 text-amber-300 font-bold border border-slate-700 whitespace-nowrap">
@@ -94,7 +94,7 @@
 
       <p id="displayPontoSetor" class="text-xs text-slate-300 flex items-center gap-1.5 pt-1 border-t border-slate-700/50">
         <i class="fa-solid fa-location-dot text-rose-400"></i>
-        <span>Consultando localização...</span>
+        <span id="displayPontoSetorTexto">Canteiro de Obras • GEL Engenharia</span>
       </p>
 
       <!-- Resumo das limpezas de hoje -->
@@ -114,7 +114,7 @@
           Selecione o Ponto que você está atendendo:
         </label>
         <select id="selectPontoManual" onchange="selecionarPontoManual(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
-          <option value="">Carregando pontos de ronda...</option>
+          <option value="">Selecione o ponto de ronda...</option>
         </select>
       </div>
     </div>
@@ -176,10 +176,13 @@
             </tr>
           </thead>
           <tbody id="plaquinhaTbodyHistoricoRonda">
-            <tr>
-              <td colspan="6" class="p-4 text-center text-slate-400 italic">
-                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Carregando ficha de manutenção...
-              </td>
+            <tr class="text-slate-400 bg-white">
+              <td class="border border-blue-900 px-1.5 py-1 text-center font-mono text-[10px] bg-slate-50 text-slate-400">01</td>
+              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">--/--/----</td>
+              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">--:--</td>
+              <td class="border border-blue-900 px-2.5 py-1 text-slate-300 text-[10px] italic">Aguardando registro de ronda...</td>
+              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">------</td>
+              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">----------------</td>
             </tr>
           </tbody>
         </table>
@@ -864,6 +867,22 @@
       trocarModoRonda('limpeza');
     }
 
+    function verificarAutenticacaoEquipeHoje() {
+      try {
+        const hojeLocal = getDataHojeLocal();
+        const authSessao = sessionStorage.getItem('ronda_equipe_autenticada') === 'true';
+        const authLocalData = localStorage.getItem('ronda_lembrar_senha_data');
+        const authLocal = localStorage.getItem('ronda_equipe_autenticada_local') === 'true' && authLocalData === hojeLocal;
+        if (authSessao || authLocal) {
+          equipeAutenticada = true;
+          const containerSenha = document.getElementById('containerSenhaLimpeza');
+          const formRonda = document.getElementById('formRonda');
+          if (containerSenha) containerSenha.classList.add('hidden');
+          if (formRonda) formRonda.classList.remove('hidden');
+        }
+      } catch (e) {}
+    }
+
     // Alternar tipo de problema relatado
     function escolherTipoProblema(btn, tipo) {
       const input = document.getElementById('inputTipoProblema');
@@ -1467,17 +1486,17 @@
 
     function irParaFormularioNovaManutencaoRonda() {
       const containerSenha = document.getElementById('containerSenhaLimpeza');
-      const formChecklist = document.getElementById('formChecklistRonda');
+      const formRonda = document.getElementById('formRonda');
 
       trocarModoRonda('limpeza');
 
-      if (formChecklist && !formChecklist.classList.contains('hidden')) {
-        formChecklist.scrollIntoView({ behavior: 'smooth' });
-        const inputNome = document.getElementById('inputNomeResponsavel');
+      if (formRonda && !formRonda.classList.contains('hidden')) {
+        formRonda.scrollIntoView({ behavior: 'smooth' });
+        const inputNome = document.getElementById('inputResponsavel');
         if (inputNome) inputNome.focus();
       } else if (containerSenha) {
         containerSenha.scrollIntoView({ behavior: 'smooth' });
-        const inputSenha = document.getElementById('inputSenhaEquipe');
+        const inputSenha = document.getElementById('inputSenhaEquipeRonda');
         if (inputSenha) inputSenha.focus();
       }
     }
