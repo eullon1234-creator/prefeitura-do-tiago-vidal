@@ -1097,7 +1097,7 @@ assert(appJsContentSec16.includes("collection('canteiro_metadata').doc('snapshot
 
 // 5. PWA Offline em sw.js
 const swContent = fs.readFileSync('sw.js', 'utf8');
-assert(/prefeitura-pwa-v4\.[123]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
+assert(/prefeitura-pwa-v4\.[1234]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
 assert(swContent.includes("'ronda.html'"), 'ronda.html incluído no pré-cache offline de sw.js');
 assert(swContent.includes("response.type !== 'opaque'"), 'Suporte a cache de recursos de CDN (Tailwind, FontAwesome) ativo em sw.js');
 
@@ -1448,6 +1448,40 @@ assert(appJsContentPlaquinha.includes('function salvarConfigManutencaoUI'), 'Fun
 assert(appJsContentPlaquinha.includes('function restaurarConfigManutencaoPadraoUI'), 'Função restaurarConfigManutencaoPadraoUI implementada');
 assert(appJsContentPlaquinha.includes('function inicializarConfigManutencaoUI'), 'Função inicializarConfigManutencaoUI implementada');
 assert(appJsContentPlaquinha.includes('function calcularTempoProximaLimpeza'), 'Função calcularTempoProximaLimpeza implementada');
+
+// Validação em tempo de execução: calcularTempoProximaLimpeza não lança ReferenceError
+try {
+  const vm = require('vm');
+  const mockLocalStorage = {
+    getItem: (key) => {
+      if (key === 'config_manutencao_cache') return JSON.stringify({ dias_limpeza_ar: 30, dias_limpeza_bebedouro: 15, dias_filtro_bebedouro: 90 });
+      if (key === 'casas_limpezas_cache') return JSON.stringify([{ id: '1', quarto_id: '1', tipo: 'ar_condicionado', data: '2026-10-01' }]);
+      if (key === 'ronda_registros_cache') return JSON.stringify([{ id: 'reg1', ponto_id: 'ponto_1', tipo: 'bebedouro', data: '2026-10-05' }]);
+      return null;
+    }
+  };
+  const sandbox = {
+    localStorage: mockLocalStorage,
+    CONFIG_MANUTENCAO_PADRAO: { dias_limpeza_ar: 30, dias_limpeza_bebedouro: 15, dias_filtro_bebedouro: 90 },
+    console: console,
+    Date: Date,
+    Math: Math,
+    JSON: JSON
+  };
+  vm.createContext(sandbox);
+  // Extrai declaração de obterConfigManutencao e calcularTempoProximaLimpeza
+  const regexFuncs = /function obterConfigManutencao[\s\S]*?function calcularTempoProximaLimpeza[\s\S]*?\n\}/;
+  const matchCode = appJsContentPlaquinha.match(regexFuncs);
+  if (matchCode) {
+    vm.runInContext(matchCode[0], sandbox);
+    const resAr = sandbox.calcularTempoProximaLimpeza('ar', '1');
+    assert(resAr && resAr.dataUltimaFormatada, 'calcularTempoProximaLimpeza para ar retorna dataUltimaFormatada sem erros');
+    const resBeb = sandbox.calcularTempoProximaLimpeza('bebedouro', 'ponto_1');
+    assert(resBeb && resBeb.dataUltimaFormatada, 'calcularTempoProximaLimpeza para bebedouro retorna dataUltimaFormatada sem erros');
+  }
+} catch (err) {
+  assert(false, 'Execução de calcularTempoProximaLimpeza falhou: ' + err.message);
+}
 assert(appJsContentPlaquinha.includes('function abrirModalPlaquinhaManutencao'), 'Função abrirModalPlaquinhaManutencao implementada');
 assert(appJsContentPlaquinha.includes('function aoMudarModeloPlaquinhaManutencao'), 'Função aoMudarModeloPlaquinhaManutencao implementada');
 assert(appJsContentPlaquinha.includes('function renderizarConteudoModalPlaquinha'), 'Função renderizarConteudoModalPlaquinha implementada');

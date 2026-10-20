@@ -18662,7 +18662,7 @@ function calcularTempoProximaLimpeza(tipo, id) {
       badgeClass,
       textoContagem,
       subtexto: `Última limpeza em: ${dataUltFormatada} • Ciclo: ${cicloDias} dias`,
-      dataUltimaFormatada,
+      dataUltimaFormatada: dataUltFormatada,
       dataProximaFormatada: dataProxFormatada
     };
   } else if (tipo === 'bebedouro') {
@@ -18729,7 +18729,7 @@ function calcularTempoProximaLimpeza(tipo, id) {
       badgeClass,
       textoContagem,
       subtexto,
-      dataUltimaFormatada,
+      dataUltimaFormatada: dataUltFormatada,
       dataProximaFormatada: dataProxFormatada
     };
   }
