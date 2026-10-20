@@ -757,7 +757,7 @@
     }
 
     // Carregar configurações de Ronda (incluindo senha do Prefeito)
-    async function carregarConfigRonda() {
+    function carregarConfigRonda() {
       try {
         const cached = localStorage.getItem('ronda_config_cache');
         if (cached) {
@@ -765,14 +765,13 @@
         }
       } catch (e) {}
 
-      if (firestoreDb) {
-        try {
-          const doc = await firestoreDb.collection('ronda_config').doc('geral').get();
-          if (doc.exists) {
+      if (firestoreDb && navigator.onLine) {
+        firestoreDb.collection('ronda_config').doc('geral').get().then(doc => {
+          if (doc && doc.exists) {
             configRonda = Object.assign(configRonda, doc.data());
             localStorage.setItem('ronda_config_cache', JSON.stringify(configRonda));
           }
-        } catch (e) {}
+        }).catch(() => {});
       }
     }
 
@@ -978,36 +977,39 @@
     }
 
     // Inicialização ao carregar a página
-    window.addEventListener('DOMContentLoaded', async () => {
-      await carregarConfigRonda();
+    window.addEventListener('DOMContentLoaded', () => {
+      carregarConfigRonda();
 
       // 1. Preencher data e hora atuais no fuso local
       const agora = new Date();
       const hojeLocal = getDataHojeLocal(agora);
-      document.getElementById('inputData').value = hojeLocal;
-      document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
+      const elData = document.getElementById('inputData');
+      const elHora = document.getElementById('inputHora');
+      if (elData) elData.value = hojeLocal;
+      if (elHora) elHora.value = agora.toTimeString().slice(0, 5);
 
       // 2. Preencher nome do responsável se já salvo anteriormente
       try {
         const salvoNome = localStorage.getItem('ronda_responsavel_nome');
-        if (salvoNome) document.getElementById('inputResponsavel').value = salvoNome;
-      } catch (e) {}
-
-      // 3. Checar se a equipe já autenticou com a senha hoje
-      try {
-        const authSessao = sessionStorage.getItem('ronda_equipe_autenticada') === 'true';
-        const authLocalData = localStorage.getItem('ronda_lembrar_senha_data');
-        const authLocal = localStorage.getItem('ronda_equipe_autenticada_local') === 'true' && authLocalData === hojeLocal;
-        if (authSessao || authLocal) {
-          equipeAutenticada = true;
-          document.getElementById('containerSenhaLimpeza').classList.add('hidden');
-          document.getElementById('formRonda').classList.remove('hidden');
+        if (salvoNome) {
+          const elResp = document.getElementById('inputResponsavel');
+          if (elResp) elResp.value = salvoNome;
         }
       } catch (e) {}
 
-      // 4. Obter parâmetros da URL
+      // 3. Checar se a equipe já autenticou com a senha hoje
+      verificarAutenticacaoEquipeHoje();
+
+      // 4. Capturar parâmetros da URL de forma tolerante e sem travar
       const urlParams = new URLSearchParams(window.location.search);
-      const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id');
+      
+      // Busca case-insensitive para todos os nomes possíveis
+      let urlPontoId = urlParams.get('ponto_id') || urlParams.get('PONTO_ID') || 
+                       urlParams.get('id') || urlParams.get('ID') || 
+                       urlParams.get('ponto') || urlParams.get('PONTO') || 
+                       urlParams.get('p') || urlParams.get('pontoId');
+                       
+      let urlTipo = urlParams.get('tipo') || urlParams.get('TIPO') || urlParams.get('type');
 
       // Se por engano o leitor abriu ronda.html com parâmetros de Casa ou Quarto/Bloco, redirecionar para limpeza.html
       const urlCasaId = urlParams.get('casa_id');
@@ -1027,13 +1029,13 @@
         return;
       }
 
-      // 5. Carregar ponto
-      carregarPontoRonda(urlPontoId);
+      // 5. Carregar ponto de forma imediata e síncrona
+      carregarPontoRonda(urlPontoId, urlTipo);
     });
 
     // Carregar informações do ponto
-    async function carregarPontoRonda(pontoId) {
-      // 1. Tentar ler cache de pontos do localStorage
+    function carregarPontoRonda(pontoId, tipoParam) {
+      // 1. Ler cache local de pontos imediatamente (Síncrono)
       try {
         const cachedPontos = localStorage.getItem('ronda_pontos_cache');
         if (cachedPontos) {
@@ -1053,57 +1055,42 @@
         });
       }
 
-      // 3. Buscar no Firestore
-      if (firestoreDb) {
-        try {
-          const snap = await firestoreDb.collection('ronda_pontos').get();
-          const remotas = [];
-          snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
-          if (remotas.length > 0) {
-            remotas.forEach(rem => {
-              const idx = listaPontosDisponiveis.findIndex(p => p.id === rem.id);
-              if (idx >= 0) listaPontosDisponiveis[idx] = rem;
-              else listaPontosDisponiveis.push(rem);
-            });
-          }
-        } catch (err) {
-          console.warn("Aviso ao buscar pontos de ronda no Firestore:", err);
-        }
-      }
+      // 3. Preencher select manual imediatamente
+      popularSelectPontosManual();
 
-      // Preencher select manual
-      const selEl = document.getElementById('selectPontoManual');
-      if (selEl && listaPontosDisponiveis.length > 0) {
-        selEl.innerHTML = '<option value="">Selecione o ponto de ronda...</option>' + 
-          listaPontosDisponiveis.map(p => `<option value="${p.id}">${p.tipo === 'banheiro' ? '🚻' : '🚰'} ${p.nome} (${p.setor || 'Canteiro'})</option>`).join('');
-      }
-
+      // 4. IDENTIFICAÇÃO IMEDIATA DO PONTO (SEM ESPERAR FIRESTORE!)
+      let pontoEncontrado = null;
       if (pontoId) {
-        pontoCarregado = listaPontosDisponiveis.find(p => p.id === pontoId);
-        if (!pontoCarregado && firestoreDb) {
-          try {
-            const doc = await firestoreDb.collection('ronda_pontos').doc(pontoId).get();
-            if (doc.exists) {
-              pontoCarregado = { id: doc.id, ...doc.data() };
-              listaPontosDisponiveis.push(pontoCarregado);
-            }
-          } catch (e) {}
+        const idBuscado = String(pontoId).toLowerCase().trim();
+
+        // Tentativa 1: ID Exato ou prefixado
+        pontoEncontrado = listaPontosDisponiveis.find(p => 
+          String(p.id).toLowerCase() === idBuscado || 
+          String(p.id).toLowerCase() === 'ponto_' + idBuscado ||
+          idBuscado === 'ponto_' + String(p.id).toLowerCase() ||
+          idBuscado.includes(String(p.id).toLowerCase())
+        );
+
+        // Tentativa 2: Busca por parte do nome
+        if (!pontoEncontrado) {
+          pontoEncontrado = listaPontosDisponiveis.find(p => 
+            String(p.nome).toLowerCase().includes(idBuscado)
+          );
         }
 
         // Fallback resiliente imediato: se pontoId informado não estiver na lista (ex: offline ou recém criado), sintetizar para nunca travar
-        if (!pontoCarregado) {
-          const idStr = String(pontoId).toLowerCase();
-          const isBebedouro = idStr.includes('bebedouro') || idStr.includes('purificador') || idStr.includes('coluna');
-          const isBanheiro = idStr.includes('banheiro') || idStr.includes('sanitario') || idStr.includes('conteiner');
-          const tipoAuto = isBebedouro ? 'bebedouro' : 'banheiro';
+        if (!pontoEncontrado) {
+          const isBebedouro = idBuscado.includes('bebedouro') || idBuscado.includes('purificador') || (tipoParam === 'bebedouro');
+          const isBanheiro = idBuscado.includes('banheiro') || idBuscado.includes('sanitario') || (tipoParam === 'banheiro');
+          const tipoAuto = isBebedouro ? 'bebedouro' : (isBanheiro ? 'banheiro' : (tipoParam || 'banheiro'));
           
           let nomeAuto = pontoId.replace(/^ponto_/, '').replace(/_/g, ' ');
           nomeAuto = nomeAuto.charAt(0).toUpperCase() + nomeAuto.slice(1);
-          if (!isBanheiro && !isBebedouro) {
+          if (!isBanheiro && !isBebedouro && !tipoParam) {
             nomeAuto = `Ponto Sanitário (${nomeAuto})`;
           }
 
-          pontoCarregado = {
+          pontoEncontrado = {
             id: pontoId,
             nome: nomeAuto,
             tipo: tipoAuto,
@@ -1113,17 +1100,53 @@
             observacoes: 'Ponto identificado via QR Code',
             ativo: true
           };
-          listaPontosDisponiveis.push(pontoCarregado);
+          listaPontosDisponiveis.push(pontoEncontrado);
         }
+      } else if (tipoParam) {
+        // Se a URL passou apenas ?tipo=banheiro ou ?tipo=bebedouro
+        pontoEncontrado = listaPontosDisponiveis.find(p => p.tipo === tipoParam) || listaPontosDisponiveis[0];
       }
 
-      if (pontoCarregado) {
+      // 5. RENDERIZAR NA HORA!
+      if (pontoEncontrado) {
+        pontoCarregado = pontoEncontrado;
         aplicarDadosPonto(pontoCarregado);
       } else {
-        // Se não identificado na URL, exibe o seletor manual
         document.getElementById('displayPontoNome').textContent = 'Selecione o Ponto Abaixo';
         document.getElementById('displayPontoSetor').innerHTML = '<i class="fa-solid fa-circle-info text-amber-400"></i> Escolha na lista qual banheiro ou bebedouro você está atendendo:';
         document.getElementById('containerSelecaoPonto').classList.remove('hidden');
+      }
+
+      // 6. EM SEGUNDO PLANO (SEM TRAVAR A TELA): Sincronizar lista remota do Firestore
+      if (firestoreDb && navigator.onLine) {
+        firestoreDb.collection('ronda_pontos').get().then(snap => {
+          if (!snap.empty) {
+            snap.forEach(doc => {
+              const rem = { id: doc.id, ...doc.data() };
+              const idx = listaPontosDisponiveis.findIndex(p => p.id === rem.id);
+              if (idx >= 0) listaPontosDisponiveis[idx] = rem;
+              else listaPontosDisponiveis.push(rem);
+            });
+            try {
+              localStorage.setItem('ronda_pontos_cache', JSON.stringify(listaPontosDisponiveis));
+            } catch (e) {}
+            popularSelectPontosManual();
+
+            // Se o ponto carregado foi enriquecido da nuvem, atualizar UI suavemente
+            if (pontoCarregado) {
+              const atual = listaPontosDisponiveis.find(p => p.id === pontoCarregado.id);
+              if (atual) aplicarDadosPonto(atual);
+            }
+          }
+        }).catch(err => console.warn("Aviso busca segundo plano Firestore:", err));
+      }
+    }
+
+    function popularSelectPontosManual() {
+      const selEl = document.getElementById('selectPontoManual');
+      if (selEl && listaPontosDisponiveis.length > 0) {
+        selEl.innerHTML = '<option value="">Selecione o ponto de ronda...</option>' + 
+          listaPontosDisponiveis.map(p => `<option value="${p.id}">${p.tipo === 'banheiro' ? '🚻' : '🚰'} ${p.nome} (${p.setor || 'Canteiro'})` + '</option>').join('');
       }
     }
 
