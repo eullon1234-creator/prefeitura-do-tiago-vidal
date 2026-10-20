@@ -120,90 +120,23 @@
     </div>
 
     
-    <!-- PLAQUINHA DIGITAL OFICIAL: CONTROLE DE HIGIENIZAÇÃO & MANUTENÇÃO (GEL) -->
-    <div id="cardPlaquinhaControleRonda" class="bg-white text-slate-900 rounded-2xl border-2 border-blue-600 shadow-2xl overflow-hidden space-y-0 transition">
-      
-      <!-- Cabeçalho Oficial GEL (Estilo Etiqueta Adesiva Industrial) -->
-      <div class="p-3.5 bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white flex items-center justify-between border-b-2 border-blue-600">
-        <div class="flex items-center gap-2.5">
-          <div class="h-10 px-2 py-0.5 rounded-lg bg-white flex items-center justify-center shadow-xs flex-shrink-0">
-            <img src="logo_gel_oficial.png" alt="GEL Logo" class="h-7 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
-          </div>
-          <div>
-            <h2 id="plaquinhaTituloRonda" class="text-xs sm:text-sm font-black tracking-wider uppercase leading-tight text-white drop-shadow-xs">
-              CONTROLE DE HIGIENIZAÇÃO DE SANITÁRIOS
-            </h2>
-            <div class="flex items-center gap-2 text-[10px] text-blue-200 font-semibold">
-              <span>EMPRESA: <strong>GEL ENGENHARIA</strong></span>
-              <span>•</span>
-              <span id="plaquinhaSubtituloRonda">CANTEIRO TABOCA 2</span>
-            </div>
-          </div>
+    <!-- IDENTIFICAÇÃO DO PONTO ESCANEADO (DIRETO E SEM TABELAS) -->
+    <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-2 shadow-lg">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg flex-shrink-0 border border-teal-500/30">
+          <i class="fa-solid fa-location-dot"></i>
         </div>
-        <div class="text-right hidden sm:block">
-          <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-blue-950/80 border border-blue-400 text-blue-200">
-            NR-18 • NR-24
-          </span>
-        </div>
-      </div>
-
-      <!-- Barra de Identificação do Ponto & Status -->
-      <div class="bg-blue-50 px-3.5 py-2.5 border-b border-blue-200 flex flex-wrap items-center justify-between gap-2">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
-          <span class="text-xs font-black text-blue-950 uppercase" id="plaquinhaIdentificacaoPonto">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ponto Escaneado</span>
+          <h2 id="plaquinhaIdentificacaoPonto" class="text-sm sm:text-base font-black text-white uppercase leading-tight">
             Ponto de Ronda
-          </span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span id="badgeStatusCicloRonda" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-            <i class="fa-solid fa-circle-check text-emerald-600"></i> <span id="textoStatusCicloRonda">Higienização em Dia</span>
-          </span>
+          </h2>
         </div>
       </div>
-
-      <!-- TABELA OFICIAL DE HISTÓRICO DE MANUTENÇÕES (RÉPLICA DA ETIQUETA FÍSICA) -->
-      <div class="p-2 sm:p-3 overflow-x-auto bg-white">
-        <table class="w-full border-collapse border border-blue-900 text-[11px] text-slate-900">
-          <thead>
-            <tr class="bg-blue-900 text-white font-black text-center text-[10px] uppercase tracking-wider">
-              <th class="border border-blue-900 px-1.5 py-1.5 w-7">Nº</th>
-              <th class="border border-blue-900 px-2 py-1.5 w-20">DATA</th>
-              <th class="border border-blue-900 px-1.5 py-1.5 w-14">HORA</th>
-              <th class="border border-blue-900 px-2.5 py-1.5 text-left">TIPO DE LIMPEZA / MANUTENÇÃO</th>
-              <th class="border border-blue-900 px-1.5 py-1.5 w-16">TURNO</th>
-              <th class="border border-blue-900 px-2 py-1.5 w-24">ASSINATURA</th>
-            </tr>
-          </thead>
-          <tbody id="plaquinhaTbodyHistoricoRonda">
-            <tr class="text-slate-400 bg-white">
-              <td class="border border-blue-900 px-1.5 py-1 text-center font-mono text-[10px] bg-slate-50 text-slate-400">01</td>
-              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">--/--/----</td>
-              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">--:--</td>
-              <td class="border border-blue-900 px-2.5 py-1 text-slate-300 text-[10px] italic">Aguardando registro de ronda...</td>
-              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">------</td>
-              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">----------------</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Rodapé da Plaquinha com Ações Diretas -->
-      <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-        <div class="text-[10px] text-slate-500 flex items-center gap-1 text-center sm:text-left">
-          <i class="fa-solid fa-shield-halved text-blue-600"></i>
-          <span>Registro digital de conformidade com NR-18 e NR-24</span>
-        </div>
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <button type="button" onclick="irParaFormularioNovaManutencaoRonda()" class="flex-1 sm:flex-initial py-2 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition">
-            <i class="fa-solid fa-pen-nib"></i>
-            <span>+ Assinar Limpeza</span>
-          </button>
-          <button type="button" onclick="trocarModoRonda('problema')" class="flex-1 sm:flex-initial py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs flex items-center justify-center gap-1 shadow-md transition">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span>Relatar Problema</span>
-          </button>
-        </div>
+      <div>
+        <span id="badgeStatusCicloRonda" class="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-check text-emerald-400"></i> <span id="textoStatusCicloRonda">Higienização em Dia</span>
+        </span>
       </div>
     </div>
 

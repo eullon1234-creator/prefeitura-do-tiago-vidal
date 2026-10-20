@@ -4267,6 +4267,9 @@ function renderQuartosCards(quartos) {
               <button onclick="abrirModalRegistroLimpezaQuarto(${q.id}, 'rotina')" class="px-2.5 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[10px] flex items-center gap-1 transition" title="Registrar Limpeza ou Ar Condicionado deste Quarto">
                 <i class="fa-solid fa-broom"></i> Limpeza
               </button>
+              <button onclick="abrirModalPlaquinhaManutencao('ar', ${q.id})" class="px-2.5 py-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 font-bold text-[10px] flex items-center gap-1 transition" title="Ver Plaquinha Oficial do Ar-Condicionado deste Quarto">
+                <i class="fa-solid fa-snowflake text-sky-600"></i> Plaquinha Ar
+              </button>
             ` : ''}
           </div>
           <div class="flex items-center gap-1">
@@ -7343,7 +7346,9 @@ function exportarPlanilhaOficial() {
 
         ExcelProGenerator.addCell(ws4, r4, 0, q.bloco_nome, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
         ExcelProGenerator.addCell(ws4, r4, 1, String(q.numero), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
-        ExcelProGenerator.addCell(ws4, r4, 2, m.tipo_item, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+        const isItemAr = (m.tipo_item || '').toLowerCase().includes('ar') || (m.tipo_item || '').toLowerCase().includes('condicionado');
+        const descItemOficial = isItemAr ? `Ar-condicionado do quarto ${q.numero}` : m.tipo_item;
+        ExcelProGenerator.addCell(ws4, r4, 2, descItemOficial, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
         ExcelProGenerator.addCell(ws4, r4, 3, m.quantidade || 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
         ExcelProGenerator.addCell(ws4, r4, 4, m.estado_conservacao || 'Bom', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
         ExcelProGenerator.addCell(ws4, r4, 5, statusTexto, { s: statusEstilo });
@@ -7695,7 +7700,11 @@ function exportarLimpezasExcel() {
       const zebra = idx % 2 === 1;
       const casa = listaCasasCidade.find(c => c.id === l.casa_id);
       const casaNome = l.casa_nome || (casa ? casa.nome : 'Casa Urbana');
-      const tipoLabel = l.tipo === 'rotina' ? 'Rotina Diária' : l.tipo === 'ar_condicionado' ? 'Limpeza de Ar-Condicionado' : (l.tipo || 'Limpeza Geral');
+      const isLimpAr = l.tipo === 'ar_condicionado' || l.tipo_servico === 'ar_condicionado';
+      const numQuartoLimp = l.quarto_numero || (l.quarto_id ? l.quarto_id : '');
+      const tipoLabel = isLimpAr 
+        ? (numQuartoLimp ? `Ar-condicionado do quarto ${numQuartoLimp}` : 'Limpeza de Ar-Condicionado')
+        : (l.tipo === 'rotina' ? 'Rotina Diária' : (l.tipo || 'Limpeza Geral'));
       const dataFormatada = l.data ? (l.data.includes('-') ? l.data.split('-').reverse().join('/') : l.data) : '--/--/----';
 
       ExcelProGenerator.addCell(ws1, r, 0, dataFormatada, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
@@ -17387,6 +17396,12 @@ function renderizarGridRonda(pontos) {
             <button onclick="abrirModalHistoricoPontoRonda('${p.id}')" class="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Ver Histórico Completo de Limpezas">
               <i class="fa-solid fa-clock-rotate-left"></i>
             </button>
+            ${p.tipo === 'bebedouro' ? `
+              <button onclick="abrirModalPlaquinhaManutencao('bebedouro', '${p.id}')" class="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-xs flex items-center gap-1.5 transition" title="Ver Plaquinha Oficial do Bebedouro">
+                <i class="fa-solid fa-faucet-drip text-blue-600"></i>
+                <span class="hidden sm:inline">Plaquinha</span>
+              </button>
+            ` : ''}
 
             <button onclick="abrirModalOcorrenciasPontoRonda('${p.id}')" class="px-2 py-1.5 rounded-lg ${st.ocsAberta && st.ocsAberta.length > 0 ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} text-xs transition" title="Ocorrências & Reclamações de Trabalhadores">
               <i class="fa-solid fa-bullhorn text-xs"></i>
@@ -18447,6 +18462,261 @@ window.CONFIG_NOTIFICACOES_PADRAO = CONFIG_NOTIFICACOES_PADRAO;
 
 
 // ========================================================
+
+// ========================================================
+// CONFIGURAÇÃO DAS PLAQUINHAS DE MANUTENÇÃO (NR-18 & NR-24)
+// ========================================================
+const CONFIG_MANUTENCAO_PADRAO = {
+  dias_limpeza_ar: 30,
+  dias_limpeza_bebedouro: 15,
+  dias_filtro_bebedouro: 90,
+  titulo_plaquinha_ar: 'CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO',
+  modelo_padrao_ar: 'AGRATTO ECO PLUS SPLIT',
+  titulo_plaquinha_bebedouro: 'CONTROLE DE HIGIENIZAÇÃO E TROCA DE FILTRO - BEBEDOURO',
+  modelo_padrao_bebedouro: 'BEBEDOURO INDUSTRIAL DE COLUNA INOX',
+  mensagem_rodape_plaquinha: 'Registro digital de conformidade com as normas regulamentadoras NR-18 e NR-24. GEL Engenharia - Taboca 2.'
+};
+
+function obterConfigManutencao() {
+  try {
+    const salvo = localStorage.getItem('prefeitura_config_manutencao');
+    if (salvo) {
+      return Object.assign({}, CONFIG_MANUTENCAO_PADRAO, JSON.parse(salvo));
+    }
+  } catch (e) {}
+  return Object.assign({}, CONFIG_MANUTENCAO_PADRAO);
+}
+
+function salvarConfigManutencaoUI() {
+  try {
+    const config = {
+      dias_limpeza_ar: parseInt(document.getElementById('cfgDiasLimpezaAr')?.value || '30', 10) || 30,
+      dias_limpeza_bebedouro: parseInt(document.getElementById('cfgDiasLimpezaBebedouro')?.value || '15', 10) || 15,
+      dias_filtro_bebedouro: parseInt(document.getElementById('cfgDiasFiltroBebedouro')?.value || '90', 10) || 90,
+      titulo_plaquinha_ar: (document.getElementById('cfgTituloPlaquinhaAr')?.value || '').trim() || CONFIG_MANUTENCAO_PADRAO.titulo_plaquinha_ar,
+      modelo_padrao_ar: (document.getElementById('cfgModeloPadraoAr')?.value || '').trim() || CONFIG_MANUTENCAO_PADRAO.modelo_padrao_ar,
+      titulo_plaquinha_bebedouro: (document.getElementById('cfgTituloPlaquinhaBebedouro')?.value || '').trim() || CONFIG_MANUTENCAO_PADRAO.titulo_plaquinha_bebedouro,
+      modelo_padrao_bebedouro: (document.getElementById('cfgModeloPadraoBebedouro')?.value || '').trim() || CONFIG_MANUTENCAO_PADRAO.modelo_padrao_bebedouro,
+      mensagem_rodape_plaquinha: (document.getElementById('cfgMensagemRodapePlaquinha')?.value || '').trim() || CONFIG_MANUTENCAO_PADRAO.mensagem_rodape_plaquinha
+    };
+
+    localStorage.setItem('prefeitura_config_manutencao', JSON.stringify(config));
+
+    if (typeof db !== 'undefined' && db && typeof doc === 'function' && typeof setDoc === 'function') {
+      try {
+        setDoc(doc(db, 'configuracoes', 'manutencao_plaquinhas'), config, { merge: true }).catch(err => {
+          console.warn('Aviso sincronizacao nuvem config manutencao:', err);
+        });
+      } catch (errDb) {}
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('Configurações das plaquinhas salvas com sucesso!', 'success');
+    }
+
+    if (typeof renderizarQuartos === 'function' && typeof activeTab !== 'undefined' && activeTab === 'blocos') {
+      renderizarQuartos();
+    }
+    if (typeof renderizarConteudoModalPlaquinha === 'function') {
+      renderizarConteudoModalPlaquinha();
+    }
+  } catch (err) {
+    console.error('Erro ao salvar config manutencao:', err);
+    if (typeof showToast === 'function') showToast('Erro ao salvar parâmetros: ' + err.message, 'error');
+  }
+}
+
+function restaurarConfigManutencaoPadraoUI() {
+  localStorage.removeItem('prefeitura_config_manutencao');
+  inicializarConfigManutencaoUI();
+  if (typeof showToast === 'function') {
+    showToast('Parâmetros restaurados para o padrão!', 'info');
+  }
+}
+
+function inicializarConfigManutencaoUI() {
+  const cfg = obterConfigManutencao();
+  const elDAr = document.getElementById('cfgDiasLimpezaAr');
+  const elDBeb = document.getElementById('cfgDiasLimpezaBebedouro');
+  const elDFiltro = document.getElementById('cfgDiasFiltroBebedouro');
+  const elTitAr = document.getElementById('cfgTituloPlaquinhaAr');
+  const elModAr = document.getElementById('cfgModeloPadraoAr');
+  const elTitBeb = document.getElementById('cfgTituloPlaquinhaBebedouro');
+  const elModBeb = document.getElementById('cfgModeloPadraoBebedouro');
+  const elMsgRodape = document.getElementById('cfgMensagemRodapePlaquinha');
+
+  if (elDAr) elDAr.value = cfg.dias_limpeza_ar;
+  if (elDBeb) elDBeb.value = cfg.dias_limpeza_bebedouro;
+  if (elDFiltro) elDFiltro.value = cfg.dias_filtro_bebedouro;
+  if (elTitAr) elTitAr.value = cfg.titulo_plaquinha_ar;
+  if (elModAr) elModAr.value = cfg.modelo_padrao_ar;
+  if (elTitBeb) elTitBeb.value = cfg.titulo_plaquinha_bebedouro;
+  if (elModBeb) elModBeb.value = cfg.modelo_padrao_bebedouro;
+  if (elMsgRodape) elMsgRodape.value = cfg.mensagem_rodape_plaquinha;
+}
+
+function calcularTempoProximaLimpeza(tipo, id) {
+  const cfg = obterConfigManutencao();
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  if (tipo.includes('ar') || tipo === 'quarto') {
+    const cicloDias = cfg.dias_limpeza_ar || 30;
+    let limpezas = [];
+    try {
+      const cached = localStorage.getItem('casas_limpezas_cache');
+      if (cached) limpezas = JSON.parse(cached);
+    } catch (e) {}
+
+    const arRegs = limpezas.filter(r => {
+      const matchId = id ? (String(r.casa_id) === String(id) || String(r.quarto_id) === String(id) || String(r.id) === String(id)) : true;
+      return matchId && (r.tipo === 'ar_condicionado' || r.tipo_servico === 'ar_condicionado');
+    });
+
+    arRegs.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+    const ultReg = arRegs[0];
+
+    if (!ultReg || !ultReg.data) {
+      return {
+        tipo: 'ar',
+        temHistorico: false,
+        diasRestantes: cicloDias,
+        diasPassados: 0,
+        status: 'pendente',
+        badgeLabel: 'Sem Histórico',
+        badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        textoContagem: 'Aguardando 1ª higienização',
+        subtexto: `Ciclo preventivo de ${cicloDias} dias • Conforme NR-18 e NR-24`,
+        dataUltimaFormatada: '--/--/----',
+        dataProximaFormatada: '--/--/----'
+      };
+    }
+
+    const dataUlt = new Date(ultReg.data + (ultReg.data.includes('T') ? '' : 'T12:00:00'));
+    dataUlt.setHours(0, 0, 0, 0);
+    const diffMs = hoje.getTime() - dataUlt.getTime();
+    const diasPassados = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    const diasRestantes = cicloDias - diasPassados;
+
+    const dataProx = new Date(dataUlt.getTime() + cicloDias * 24 * 60 * 60 * 1000);
+    const dataProxFormatada = dataProx.toLocaleDateString('pt-BR');
+    const dataUltFormatada = dataUlt.toLocaleDateString('pt-BR');
+
+    let status = 'em_dia';
+    let badgeLabel = `Em Dia (${diasRestantes}d)`;
+    let badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+    let textoContagem = `⏳ Faltam ${diasRestantes} dia(s) para a próxima limpeza`;
+
+    if (diasRestantes < 0) {
+      status = 'vencido';
+      const atraso = Math.abs(diasRestantes);
+      badgeLabel = `Vencido (${atraso}d)`;
+      badgeClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+      textoContagem = `🚨 Higienização vencida há ${atraso} dia(s)!`;
+    } else if (diasRestantes <= 5) {
+      status = 'atencao';
+      badgeLabel = `Atenção (${diasRestantes}d)`;
+      badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      textoContagem = `⚠️ Vence em ${diasRestantes} dia(s) - Programe a limpeza`;
+    }
+
+    return {
+      tipo: 'ar',
+      temHistorico: true,
+      diasRestantes,
+      diasPassados,
+      status,
+      badgeLabel,
+      badgeClass,
+      textoContagem,
+      subtexto: `Última limpeza em: ${dataUltFormatada} • Ciclo: ${cicloDias} dias`,
+      dataUltimaFormatada,
+      dataProximaFormatada: dataProxFormatada
+    };
+  } else if (tipo === 'bebedouro') {
+    const cicloLimpeza = cfg.dias_limpeza_bebedouro || 15;
+    const cicloFiltro = cfg.dias_filtro_bebedouro || 90;
+
+    let registros = [];
+    try {
+      const cached = localStorage.getItem('ronda_registros_cache');
+      if (cached) registros = JSON.parse(cached);
+    } catch (e) {}
+
+    const bebRegs = registros.filter(r => {
+      const matchId = id ? String(r.ponto_id) === String(id) : true;
+      return matchId && (r.tipo === 'bebedouro' || (r.observacoes && r.observacoes.toLowerCase().includes('bebedouro')));
+    });
+
+    bebRegs.sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0));
+    const ultReg = bebRegs[0];
+
+    let diasPassados = 0;
+    let diasRestantes = cicloLimpeza;
+    let dataUltFormatada = '--/--/----';
+    let dataProxFormatada = '--/--/----';
+
+    if (ultReg && ultReg.data) {
+      const dataUlt = new Date(ultReg.data + (ultReg.data.includes('T') ? '' : 'T12:00:00'));
+      dataUlt.setHours(0, 0, 0, 0);
+      const diffMs = hoje.getTime() - dataUlt.getTime();
+      diasPassados = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      diasRestantes = cicloLimpeza - diasPassados;
+      dataUltFormatada = dataUlt.toLocaleDateString('pt-BR');
+      const dataProx = new Date(dataUlt.getTime() + cicloLimpeza * 24 * 60 * 60 * 1000);
+      dataProxFormatada = dataProx.toLocaleDateString('pt-BR');
+    }
+
+    let status = 'em_dia';
+    let badgeLabel = `Bicas: ${diasRestantes}d`;
+    let badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+    let textoContagem = `⏳ Faltam ${diasRestantes} dia(s) para higienização das bicas`;
+
+    if (diasRestantes < 0) {
+      status = 'vencido';
+      const atraso = Math.abs(diasRestantes);
+      badgeLabel = `Bicas Vencidas (${atraso}d)`;
+      badgeClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+      textoContagem = `🚨 Higienização das bicas vencida há ${atraso} dia(s)!`;
+    } else if (diasRestantes <= 3) {
+      status = 'atencao';
+      badgeLabel = `Bicas: Atenção (${diasRestantes}d)`;
+      badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      textoContagem = `⚠️ Higienização das bicas vence em ${diasRestantes} dia(s)`;
+    }
+
+    const subtexto = `Última limpeza: ${dataUltFormatada} • Refil estimado: ${cicloFiltro} dias`;
+
+    return {
+      tipo: 'bebedouro',
+      temHistorico: !!ultReg,
+      diasRestantes,
+      diasPassados,
+      status,
+      badgeLabel,
+      badgeClass,
+      textoContagem,
+      subtexto,
+      dataUltimaFormatada,
+      dataProximaFormatada: dataProxFormatada
+    };
+  }
+
+  return {
+    tipo: 'geral',
+    temHistorico: true,
+    diasRestantes: 30,
+    diasPassados: 0,
+    status: 'em_dia',
+    badgeLabel: 'Em Dia',
+    badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    textoContagem: 'Ciclo operacional regular',
+    subtexto: 'NR-18 & NR-24',
+    dataUltimaFormatada: '--/--/----',
+    dataProximaFormatada: '--/--/----'
+  };
+}
+
 // PLAQUINHA OFICIAL DE CONTROLE DE MANUTENÇÃO (NR-18 & NR-24)
 // ========================================================
 let plaquinhaModalEstado = {
@@ -18492,28 +18762,44 @@ function aoMudarModeloPlaquinhaManutencao(novoTipo) {
 function renderizarConteudoModalPlaquinha() {
   const tipo = plaquinhaModalEstado.tipo;
   const id = plaquinhaModalEstado.id;
+  const cfg = typeof obterConfigManutencao === 'function' ? obterConfigManutencao() : {
+    titulo_plaquinha_ar: 'CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO',
+    modelo_padrao_ar: 'AGRATTO ECO PLUS SPLIT',
+    titulo_plaquinha_bebedouro: 'CONTROLE DE HIGIENIZAÇÃO E TROCA DE FILTRO - BEBEDOURO',
+    modelo_padrao_bebedouro: 'BEBEDOURO INDUSTRIAL DE COLUNA INOX',
+    dias_limpeza_ar: 30,
+    dias_limpeza_bebedouro: 15,
+    dias_filtro_bebedouro: 90,
+    mensagem_rodape_plaquinha: 'Registro digital de conformidade com as normas regulamentadoras NR-18 e NR-24. GEL Engenharia - Taboca 2.'
+  };
 
   const titEl = document.getElementById('modalPlaquinhaHeaderTitulo');
   const localEl = document.getElementById('modalPlaquinhaLocalNome');
   const qrContainer = document.getElementById('modalPlaquinhaQRCodeContainer');
   const tbody = document.getElementById('modalPlaquinhaTbodyHistorico');
+  const rodapeMsgEl = document.getElementById('modalPlaquinhaRodapeMsg');
+  const cicloPrevEl = document.getElementById('modalPlaquinhaCicloPreventivo');
 
-  let titulo = 'CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO';
+  let titulo = cfg.titulo_plaquinha_ar;
   let localTexto = 'QUARTO 14 • BLOCO 2';
   let qrUrl = '';
 
   if (tipo === 'ar' || tipo === 'ar_casa' || tipo === 'ar_quarto') {
-    titulo = 'CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO';
-    if (id && typeof listaCasasCidade !== 'undefined') {
+    titulo = cfg.titulo_plaquinha_ar;
+    if (id && typeof listaCasasCidade !== 'undefined' && String(id).startsWith('casa_')) {
       const c = listaCasasCidade.find(x => x.id === id);
       if (c) localTexto = `${(c.nome || 'Casa').toUpperCase()} • GESTÃO URBANA`;
+    } else if (id && typeof StaticApiEngine !== 'undefined' && StaticApiEngine.dbState && StaticApiEngine.dbState.quartos) {
+      const q = StaticApiEngine.dbState.quartos.find(x => x.id === Number(id) || String(x.id) === String(id) || String(x.numero) === String(id));
+      if (q) localTexto = `QUARTO ${q.numero} • ${(q.bloco_nome || 'CANTEIRO TABOCA 2').toUpperCase()}`;
+      else localTexto = `QUARTO ${id} • CANTEIRO TABOCA 2`;
     } else {
       localTexto = 'ALOJAMENTO • BLOCOS DO CANTEIRO';
     }
     const cleanLimpeza = getCleanSystemUrl('limpeza.html');
-    qrUrl = id ? `${cleanLimpeza}?casa_id=${encodeURIComponent(id)}` : cleanLimpeza;
+    qrUrl = id ? `${cleanLimpeza}?quarto_id=${encodeURIComponent(id)}` : cleanLimpeza;
   } else if (tipo === 'bebedouro') {
-    titulo = 'CONTROLE DE MANUTENÇÃO & HIGIENIZAÇÃO DE BEBEDOUROS';
+    titulo = cfg.titulo_plaquinha_bebedouro;
     let pObj = null;
     if (id && typeof listaPontosRonda !== 'undefined') {
       pObj = listaPontosRonda.find(x => x.id === id);
@@ -18521,7 +18807,7 @@ function renderizarConteudoModalPlaquinha() {
     if (!pObj && typeof PONTOS_RONDA_PADRAO_SEED !== 'undefined') {
       pObj = PONTOS_RONDA_PADRAO_SEED.find(x => x.id === id || x.tipo === 'bebedouro');
     }
-    localTexto = pObj ? `${pObj.nome.toUpperCase()} • ${pObj.setor || 'CANTEIRO'}` : 'BEBEDOURO / PURIFICADOR • REFEITÓRIO / CANTEIRO';
+    localTexto = pObj ? `${pObj.nome.toUpperCase()} • ${(pObj.setor || 'CANTEIRO').toUpperCase()}` : 'BEBEDOURO / PURIFICADOR • REFEITÓRIO / CANTEIRO';
     const pId = pObj ? pObj.id : (id || 'ponto_bebedouro_refeitorio');
     qrUrl = `${getCleanSystemUrl('ronda.html')}?ponto_id=${encodeURIComponent(pId)}&tipo=bebedouro`;
   } else if (tipo === 'banheiro') {
@@ -18533,7 +18819,7 @@ function renderizarConteudoModalPlaquinha() {
     if (!pObj && typeof PONTOS_RONDA_PADRAO_SEED !== 'undefined') {
       pObj = PONTOS_RONDA_PADRAO_SEED.find(x => x.id === id || x.tipo === 'banheiro');
     }
-    localTexto = pObj ? `${pObj.nome.toUpperCase()} • ${pObj.setor || 'CANTEIRO'}` : 'SANITÁRIOS / BANHEIROS QUÍMICOS • FRENTE DE OBRA';
+    localTexto = pObj ? `${pObj.nome.toUpperCase()} • ${(pObj.setor || 'CANTEIRO').toUpperCase()}` : 'SANITÁRIOS / BANHEIROS QUÍMICOS • FRENTE DE OBRA';
     const pId = pObj ? pObj.id : (id || 'ponto_banheiro_01');
     qrUrl = `${getCleanSystemUrl('ronda.html')}?ponto_id=${encodeURIComponent(pId)}&tipo=banheiro`;
   } else {
@@ -18544,6 +18830,46 @@ function renderizarConteudoModalPlaquinha() {
 
   if (titEl) titEl.textContent = titulo;
   if (localEl) localEl.textContent = localTexto;
+  if (rodapeMsgEl) rodapeMsgEl.textContent = cfg.mensagem_rodape_plaquinha;
+  if (cicloPrevEl) {
+    cicloPrevEl.textContent = tipo === 'bebedouro' 
+      ? `HIGIENE ${cfg.dias_limpeza_bebedouro}D • REFIL ${cfg.dias_filtro_bebedouro}D`
+      : `NR-18 & NR-24 (${cfg.dias_limpeza_ar} DIAS)`;
+  }
+
+  // Preencher bloco de contagem regressiva ("Tempozinho")
+  if (typeof calcularTempoProximaLimpeza === 'function') {
+    const tempo = calcularTempoProximaLimpeza(tipo, id);
+    const txtEl = document.getElementById('modalPlaquinhaTextoContagem');
+    const subEl = document.getElementById('modalPlaquinhaSubtextoContagem');
+    const badgeEl = document.getElementById('modalPlaquinhaBadgeStatusPrazo');
+    const proxEl = document.getElementById('modalPlaquinhaDataProxima');
+    const iconeEl = document.getElementById('modalPlaquinhaIconePrazo');
+
+    if (txtEl) txtEl.textContent = tempo.textoContagem;
+    if (subEl) subEl.textContent = tempo.subtexto;
+    if (badgeEl) {
+      badgeEl.textContent = tempo.badgeLabel;
+      badgeEl.className = `px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide border ${tempo.badgeClass}`;
+    }
+    if (proxEl) {
+      proxEl.textContent = tempo.dataProximaFormatada !== '--/--/----' 
+        ? `Próxima prevista: ${tempo.dataProximaFormatada}` 
+        : 'Próxima prevista: A definir após 1ª limpeza';
+    }
+    if (iconeEl) {
+      if (tempo.status === 'vencido') {
+        iconeEl.className = 'w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-xl flex-shrink-0 border border-rose-500/30';
+        iconeEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation animate-pulse"></i>';
+      } else if (tempo.status === 'atencao') {
+        iconeEl.className = 'w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl flex-shrink-0 border border-amber-500/30';
+        iconeEl.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i>';
+      } else {
+        iconeEl.className = 'w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl flex-shrink-0 border border-emerald-500/30';
+        iconeEl.innerHTML = '<i class="fa-solid fa-hourglass-half"></i>';
+      }
+    }
+  }
 
   // Gerar QR Code no canto da plaquinha
   if (qrContainer) {
@@ -18573,14 +18899,26 @@ function renderizarConteudoModalPlaquinha() {
       const cached = localStorage.getItem('casas_limpezas_cache');
       if (cached) {
         historico = JSON.parse(cached);
-        if (id) historico = historico.filter(r => r.casa_id === id || r.quarto_id === String(id));
+        if (id) {
+          historico = historico.filter(r => 
+            String(r.casa_id) === String(id) || 
+            String(r.quarto_id) === String(id) ||
+            String(r.id) === String(id)
+          );
+        }
       }
     } else {
       const cached = localStorage.getItem('ronda_registros_cache');
       if (cached) {
         historico = JSON.parse(cached);
-        if (tipo === 'bebedouro') historico = historico.filter(r => r.tipo === 'bebedouro');
-        else historico = historico.filter(r => r.tipo !== 'bebedouro');
+        if (tipo === 'bebedouro') {
+          historico = historico.filter(r => r.tipo === 'bebedouro');
+        } else {
+          historico = historico.filter(r => r.tipo !== 'bebedouro');
+        }
+        if (id) {
+          historico = historico.filter(r => String(r.ponto_id) === String(id));
+        }
       }
     }
   } catch (e) {}
@@ -18640,3 +18978,10 @@ window.abrirModalPlaquinhaManutencao = abrirModalPlaquinhaManutencao;
 window.aoMudarModeloPlaquinhaManutencao = aoMudarModeloPlaquinhaManutencao;
 window.renderizarConteudoModalPlaquinha = renderizarConteudoModalPlaquinha;
 window.imprimirPlaquinhaManutencao = imprimirPlaquinhaManutencao;
+
+
+window.obterConfigManutencao = obterConfigManutencao;
+window.salvarConfigManutencaoUI = salvarConfigManutencaoUI;
+window.restaurarConfigManutencaoPadraoUI = restaurarConfigManutencaoPadraoUI;
+window.inicializarConfigManutencaoUI = inicializarConfigManutencaoUI;
+window.calcularTempoProximaLimpeza = calcularTempoProximaLimpeza;
