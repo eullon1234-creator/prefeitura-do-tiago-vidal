@@ -1011,22 +1011,25 @@
                        
       let urlTipo = urlParams.get('tipo') || urlParams.get('TIPO') || urlParams.get('type');
 
-      // Se por engano o leitor abriu ronda.html com parâmetros de Casa ou Quarto/Bloco, redirecionar para limpeza.html
+      // Se por engano o leitor abriu ronda.html com parâmetros de Casa ou Quarto/Bloco, redirecionar para limpeza.html (apenas se NÃO for ponto de ronda)
       const urlCasaId = urlParams.get('casa_id');
       const urlQuartoId = urlParams.get('quarto_id');
       const urlBloco = urlParams.get('bloco');
       const urlBlocoId = urlParams.get('bloco_id');
-      if (urlCasaId) {
-        window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(urlCasaId)}`);
-        return;
-      }
-      if (urlQuartoId) {
-        window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(urlQuartoId)}${urlBloco ? '&bloco=' + encodeURIComponent(urlBloco) : ''}`);
-        return;
-      }
-      if (urlBloco || urlBlocoId) {
-        window.location.replace(`limpeza.html?bloco=${encodeURIComponent(urlBloco || urlBlocoId)}`);
-        return;
+      const isRondaAlvo = urlPontoId || urlTipo || window.location.search.includes('ponto_') || window.location.search.includes('banheiro') || window.location.search.includes('bebedouro');
+      if (!isRondaAlvo) {
+        if (urlCasaId) {
+          window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(urlCasaId)}`);
+          return;
+        }
+        if (urlQuartoId) {
+          window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(urlQuartoId)}${urlBloco ? '&bloco=' + encodeURIComponent(urlBloco) : ''}`);
+          return;
+        }
+        if (urlBloco || urlBlocoId) {
+          window.location.replace(`limpeza.html?bloco=${encodeURIComponent(urlBloco || urlBlocoId)}`);
+          return;
+        }
       }
 
       // 5. Carregar ponto de forma imediata e síncrona

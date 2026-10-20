@@ -862,25 +862,32 @@
       carregarConfiguracoesSeguranca();
 
       const urlParams = new URLSearchParams(window.location.search);
-      const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id');
+      const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id') || urlParams.get('ponto') || urlParams.get('p');
+      const urlTipo = urlParams.get('tipo');
       const urlAcao = urlParams.get('acao');
+      const urlCasaId = urlParams.get('casa_id');
 
       // Se por engano o leitor abriu limpeza.html com QR Code de Ronda / Sanitário / Bebedouro, redirecionar imediatamente
-      if (urlPontoId && (urlPontoId.startsWith('ponto_') || urlAcao === 'ronda' || window.location.search.includes('ponto_id='))) {
-        window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(urlPontoId)}`);
-        return;
-      }
+      const isRondaDetectada = (urlPontoId && (urlPontoId.startsWith('ponto_') || urlPontoId.includes('banheiro') || urlPontoId.includes('bebedouro'))) ||
+                               (urlTipo === 'banheiro' || urlTipo === 'bebedouro') ||
+                               urlAcao === 'ronda' ||
+                               (urlCasaId && (urlCasaId.startsWith('ponto_') || urlCasaId.includes('banheiro') || urlCasaId.includes('bebedouro') || urlCasaId.includes('ronda.html'))) ||
+                               window.location.search.includes('ponto_id=') ||
+                               window.location.search.includes('banheiro') ||
+                               window.location.search.includes('bebedouro');
 
-      const urlCasaId = urlParams.get('casa_id');
-      if (urlCasaId && (urlCasaId.startsWith('ponto_') || urlCasaId.includes('banheiro') || urlCasaId.includes('bebedouro') || urlCasaId.includes('ronda.html'))) {
-        let extractedId = urlCasaId;
-        if (urlCasaId.includes('ponto_id=')) {
-          try {
-            const u = new URL(urlCasaId.startsWith('http') ? urlCasaId : `https://dummy.local/${urlCasaId}`);
-            extractedId = u.searchParams.get('ponto_id') || urlCasaId;
-          } catch(e) {}
+      if (isRondaDetectada) {
+        let extractedId = urlPontoId || (urlTipo === 'bebedouro' ? 'ponto_bebedouro_refeitorio' : 'ponto_banheiro_01');
+        if (urlCasaId && (urlCasaId.startsWith('ponto_') || urlCasaId.includes('banheiro') || urlCasaId.includes('bebedouro'))) {
+          extractedId = urlCasaId;
+          if (urlCasaId.includes('ponto_id=')) {
+            try {
+              const u = new URL(urlCasaId.startsWith('http') ? urlCasaId : `https://dummy.local/${urlCasaId}`);
+              extractedId = u.searchParams.get('ponto_id') || urlCasaId;
+            } catch(e) {}
+          }
         }
-        window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(extractedId)}`);
+        window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(extractedId)}${urlTipo ? '&tipo=' + encodeURIComponent(urlTipo) : ''}`);
         return;
       }
 

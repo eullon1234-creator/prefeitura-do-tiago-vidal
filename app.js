@@ -14576,7 +14576,7 @@ function processarLeituraQRCasa(texto) {
   texto = String(texto).trim();
 
   // 0. Detecção inteligente de desvio: Se for QR Code de Ronda / Sanitário / Bebedouro
-  if (texto.includes('ponto_id=') || texto.includes('ronda.html') || texto.startsWith('ponto_') || (typeof listaPontosRonda !== 'undefined' && listaPontosRonda.some(p => p.id === texto))) {
+  if (texto.includes('ponto_id=') || texto.includes('ronda.html') || texto.startsWith('ponto_') || texto.includes('banheiro') || texto.includes('bebedouro') || texto.includes('sanitario') || texto.includes('purificador') || texto.includes('tipo=banheiro') || texto.includes('tipo=bebedouro') || (typeof listaPontosRonda !== 'undefined' && listaPontosRonda.some(p => p.id === texto))) {
     fecharScannerLimpezaQR();
     showToast('QR Code de Sanitário/Bebedouro detectado! Abrindo ficha de ronda...', 'info');
     if (typeof processarLeituraQRRonda === 'function') {
@@ -15306,8 +15306,16 @@ function verificarAcaoUrlParametros() {
     const bloco = params.get('bloco');
 
     // 1. Redirecionamento de Ronda / Banheiro / Bebedouro
-    if (pontoId && (pontoId.startsWith('ponto_') || acao === 'ronda' || window.location.search.includes('ponto_id='))) {
-      window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(pontoId)}`);
+    const tipoParam = params.get('tipo');
+    const isRondaParam = (pontoId && (pontoId.startsWith('ponto_') || acao === 'ronda' || window.location.search.includes('ponto_id='))) ||
+                         (tipoParam === 'banheiro' || tipoParam === 'bebedouro') ||
+                         (casaId && (casaId.startsWith('ponto_') || casaId.includes('banheiro') || casaId.includes('bebedouro'))) ||
+                         window.location.search.includes('banheiro') ||
+                         window.location.search.includes('bebedouro');
+
+    if (pontoId && (pontoId.startsWith('ponto_') || acao === 'ronda' || window.location.search.includes('ponto_id=') || isRondaParam)) {
+      const targetPonto = pontoId || (tipoParam === 'bebedouro' ? 'ponto_bebedouro_refeitorio' : 'ponto_banheiro_01');
+      window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(targetPonto)}${tipoParam ? '&tipo=' + encodeURIComponent(tipoParam) : ''}`);
       return;
     }
 
@@ -17911,7 +17919,8 @@ function processarLeituraQRRonda(texto) {
   texto = String(texto).trim();
 
   // 0. Detecção inteligente de desvio: Se for QR Code de Casa ou Bloco/Quarto de Alojamento
-  if (texto.includes('casa_id=') || texto.includes('quarto_id=') || texto.includes('bloco=') || texto.includes('limpeza.html') || texto.startsWith('casa:') || texto.startsWith('quarto:') || texto.startsWith('bloco:') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(c => c.id === texto))) {
+  const isRondaPropria = texto.includes('ponto_') || texto.includes('banheiro') || texto.includes('bebedouro') || texto.includes('sanitario') || texto.includes('purificador') || texto.includes('ronda.html');
+  if (!isRondaPropria && (texto.includes('casa_id=') || texto.includes('quarto_id=') || texto.includes('bloco=') || texto.includes('limpeza.html') || texto.startsWith('casa:') || texto.startsWith('quarto:') || texto.startsWith('bloco:') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(c => c.id === texto)))) {
     fecharScannerRondaQR();
     showToast('QR Code de Residência/Alojamento detectado! Abrindo ficha de limpeza...', 'info');
     if (typeof processarLeituraQRCasa === 'function') {
@@ -18447,6 +18456,10 @@ let plaquinhaModalEstado = {
 };
 
 function abrirModalPlaquinhaManutencao(tipo = 'ar', id = null) {
+  if (tipo === 'ronda') tipo = 'banheiro';
+  if ((tipo === 'banheiro' || tipo === 'bebedouro') && String(id).startsWith('casa_')) {
+    id = null;
+  }
   plaquinhaModalEstado.tipo = tipo;
   plaquinhaModalEstado.id = id;
 
@@ -18456,8 +18469,6 @@ function abrirModalPlaquinhaManutencao(tipo = 'ar', id = null) {
   } else if (tipo.includes('bebedouro')) {
     if (select) select.value = 'bebedouro';
   } else if (tipo.includes('banheiro')) {
-    if (select) select.value = 'banheiro';
-  } else if (tipo.includes('ronda')) {
     if (select) select.value = 'banheiro';
   } else {
     if (select) select.value = 'quarto';
@@ -18469,6 +18480,12 @@ function abrirModalPlaquinhaManutencao(tipo = 'ar', id = null) {
 
 function aoMudarModeloPlaquinhaManutencao(novoTipo) {
   plaquinhaModalEstado.tipo = novoTipo;
+  if ((novoTipo === 'banheiro' || novoTipo === 'bebedouro') && String(plaquinhaModalEstado.id).startsWith('casa_')) {
+    plaquinhaModalEstado.id = null;
+  }
+  if ((novoTipo === 'ar' || novoTipo === 'quarto') && String(plaquinhaModalEstado.id).startsWith('ponto_')) {
+    plaquinhaModalEstado.id = null;
+  }
   renderizarConteudoModalPlaquinha();
 }
 
@@ -18493,19 +18510,36 @@ function renderizarConteudoModalPlaquinha() {
     } else {
       localTexto = 'ALOJAMENTO • BLOCOS DO CANTEIRO';
     }
-    qrUrl = getCleanSystemUrl() + 'limpeza.html' + (id ? `?casa_id=${id}` : '');
+    const cleanLimpeza = getCleanSystemUrl('limpeza.html');
+    qrUrl = id ? `${cleanLimpeza}?casa_id=${encodeURIComponent(id)}` : cleanLimpeza;
   } else if (tipo === 'bebedouro') {
     titulo = 'CONTROLE DE MANUTENÇÃO & HIGIENIZAÇÃO DE BEBEDOUROS';
-    localTexto = 'BEBEDOURO / PURIFICADOR • REFEITÓRIO / CANTEIRO';
-    qrUrl = getCleanSystemUrl() + 'ronda.html?tipo=bebedouro';
+    let pObj = null;
+    if (id && typeof listaPontosRonda !== 'undefined') {
+      pObj = listaPontosRonda.find(x => x.id === id);
+    }
+    if (!pObj && typeof PONTOS_RONDA_PADRAO_SEED !== 'undefined') {
+      pObj = PONTOS_RONDA_PADRAO_SEED.find(x => x.id === id || x.tipo === 'bebedouro');
+    }
+    localTexto = pObj ? `${pObj.nome.toUpperCase()} • ${pObj.setor || 'CANTEIRO'}` : 'BEBEDOURO / PURIFICADOR • REFEITÓRIO / CANTEIRO';
+    const pId = pObj ? pObj.id : (id || 'ponto_bebedouro_refeitorio');
+    qrUrl = `${getCleanSystemUrl('ronda.html')}?ponto_id=${encodeURIComponent(pId)}&tipo=bebedouro`;
   } else if (tipo === 'banheiro') {
     titulo = 'CONTROLE DE HIGIENIZAÇÃO & RONDA DE SANITÁRIOS';
-    localTexto = 'SANITÁRIOS / BANHEIROS QUÍMICOS • FRENTE DE OBRA';
-    qrUrl = getCleanSystemUrl() + 'ronda.html?tipo=banheiro';
+    let pObj = null;
+    if (id && typeof listaPontosRonda !== 'undefined') {
+      pObj = listaPontosRonda.find(x => x.id === id);
+    }
+    if (!pObj && typeof PONTOS_RONDA_PADRAO_SEED !== 'undefined') {
+      pObj = PONTOS_RONDA_PADRAO_SEED.find(x => x.id === id || x.tipo === 'banheiro');
+    }
+    localTexto = pObj ? `${pObj.nome.toUpperCase()} • ${pObj.setor || 'CANTEIRO'}` : 'SANITÁRIOS / BANHEIROS QUÍMICOS • FRENTE DE OBRA';
+    const pId = pObj ? pObj.id : (id || 'ponto_banheiro_01');
+    qrUrl = `${getCleanSystemUrl('ronda.html')}?ponto_id=${encodeURIComponent(pId)}&tipo=banheiro`;
   } else {
     titulo = 'CONTROLE DE LIMPEZA & HIGIENIZAÇÃO DE ALOJAMENTO';
     localTexto = 'ALOJAMENTO DO CANTEIRO • NR-18 & NR-24';
-    qrUrl = getCleanSystemUrl() + 'limpeza.html';
+    qrUrl = getCleanSystemUrl('limpeza.html');
   }
 
   if (titEl) titEl.textContent = titulo;
