@@ -52,6 +52,24 @@ jsFiles.forEach(file => {
   }
 });
 
+// Verificação de Sintaxe em Scripts Inline dos Arquivos HTML
+const htmlScriptFiles = ['ronda.html', 'frontend/ronda.html', 'limpeza.html', 'frontend/limpeza.html', 'chamado.html', 'frontend/chamado.html', 'index.html', 'frontend/index.html'];
+htmlScriptFiles.forEach(file => {
+  if (fs.existsSync(file)) {
+    try {
+      const html = fs.readFileSync(file, 'utf8');
+      const matches = html.match(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/gi) || [];
+      matches.forEach(tag => {
+        const code = tag.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '');
+        new Function(code);
+      });
+      assert(true, `Sintaxe de script inline válida: ${file}`);
+    } catch (e) {
+      assert(false, `Sintaxe de script inline válida: ${file}`, e.message);
+    }
+  }
+});
+
 console.log('\n🐍 2. Verificação de Sintaxe Python (py_compile)');
 const pyFiles = ['app.py', 'clean_utils.py', 'export_json.py', 'export_oficial.py', 'import_data.py', 'init_db.py', 'repair_template.py', 'update_moveis.py'];
 pyFiles.forEach(pyFile => {
@@ -1432,6 +1450,11 @@ assert(fs.readFileSync('limpeza.html', 'utf8').includes('Criado por Eullon'), 'M
 assert(fs.readFileSync('ronda.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no ronda.html');
 assert(fs.readFileSync('chamado.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no chamado.html');
 assert(fs.readFileSync('frontend/chamado.html', 'utf8').includes('Criado por Eullon'), 'Marca d\'água discreta presente no frontend/chamado.html');
+
+// 22.7 Verificação de Carregamento Instantâneo e Não-Bloqueante de Ronda
+assert(rondaHtmlContent.includes('carregarRegistrosPontoHoje(p.id, meta);'), 'carregarRegistrosPontoHoje executado de forma não-bloqueante');
+assert(rondaHtmlContent.includes('carregarHistoricoPlaquinhaRonda(p.id, p.tipo, p.nome, p.setor);'), 'carregarHistoricoPlaquinhaRonda executado imediatamente');
+assert(!rondaHtmlContent.includes("descServico = 'Troca de Refil / Filtro d'Água';"), 'Ausência de SyntaxError de aspas em descServico de ronda.html');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

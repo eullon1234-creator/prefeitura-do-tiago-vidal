@@ -1192,11 +1192,11 @@
       }
 
       // Buscar registros do dia de hoje para calcular progresso
-      await carregarRegistrosPontoHoje(p.id, meta);
+      carregarRegistrosPontoHoje(p.id, meta);
       carregarHistoricoPlaquinhaRonda(p.id, p.tipo, p.nome, p.setor);
     }
 
-    async function carregarRegistrosPontoHoje(pontoId, meta) {
+    function carregarRegistrosPontoHoje(pontoId, meta) {
       const dataHoje = getDataHojeLocal();
       let regs = [];
 
@@ -1208,22 +1208,30 @@
         }
       } catch (e) {}
 
-      if (firestoreDb) {
-        try {
-          const snap = await firestoreDb.collection('ronda_registros')
-            .where('ponto_id', '==', pontoId)
-            .where('data', '==', dataHoje)
-            .get();
-          const remotas = [];
-          snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
-          if (remotas.length > 0) regs = remotas;
-        } catch (e) {}
-      }
-
       regs.sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
       registrosPontoHoje = regs;
+      renderizarStatusProgressoHojeUI(regs.length, meta, regs);
 
-      const qtdHoje = regs.length;
+      // Sincronizar em segundo plano sem travar a interface
+      if (firestoreDb && navigator.onLine) {
+        firestoreDb.collection('ronda_registros')
+          .where('ponto_id', '==', pontoId)
+          .where('data', '==', dataHoje)
+          .get()
+          .then(snap => {
+            if (!snap.empty) {
+              const remotas = [];
+              snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+              remotas.sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
+              registrosPontoHoje = remotas;
+              renderizarStatusProgressoHojeUI(remotas.length, meta, remotas);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
+    function renderizarStatusProgressoHojeUI(qtdHoje, meta, regs) {
       const badgeEl = document.getElementById('badgeProgressoHoje');
       const textoEl = document.getElementById('textoStatusHoje');
 
@@ -1240,11 +1248,11 @@
         if (qtdHoje === 0) {
           textoEl.innerHTML = `<span class="text-amber-300 font-semibold">Pendente:</span> Nenhuma limpeza registrada hoje ainda. Esta será a <b>1ª limpeza do dia</b>.`;
         } else if (qtdHoje < meta) {
-          const ult = regs[regs.length - 1];
-          textoEl.innerHTML = `<span class="text-amber-300 font-semibold">Em andamento:</span> ${qtdHoje}ª limpeza realizada às ${ult.hora || '--:--'} por ${ult.responsavel || 'Colaborador'}. Registrando a <b>${qtdHoje + 1}ª limpeza do dia</b>.`;
+          const ult = regs && regs.length > 0 ? regs[regs.length - 1] : null;
+          textoEl.innerHTML = `<span class="text-amber-300 font-semibold">Em andamento:</span> ${qtdHoje}ª limpeza realizada às ${ult ? (ult.hora || '--:--') : '--:--'} por ${ult ? (ult.responsavel || 'Colaborador') : 'Colaborador'}. Registrando a <b>${qtdHoje + 1}ª limpeza do dia</b>.`;
         } else {
-          const ult = regs[regs.length - 1];
-          textoEl.innerHTML = `<span class="text-emerald-400 font-semibold">Meta de hoje batida!</span> (${qtdHoje} limpezas feitas, última às ${ult.hora || '--:--'}). Você pode registrar uma limpeza extra se necessário.`;
+          const ult = regs && regs.length > 0 ? regs[regs.length - 1] : null;
+          textoEl.innerHTML = `<span class="text-emerald-400 font-semibold">Meta de hoje batida!</span> (${qtdHoje} limpezas feitas, última às ${ult ? (ult.hora || '--:--') : '--:--'}). Você pode registrar uma limpeza extra se necessário.`;
         }
       }
     }
@@ -1474,10 +1482,10 @@
       }
     }
 
-    async function carregarHistoricoPlaquinhaRonda(pontoId, pontoTipo, pontoNome, pontoSetor) {
+    function carregarHistoricoPlaquinhaRonda(pontoId, pontoTipo, pontoNome, pontoSetor) {
       let registros = [];
 
-      // 1. Ler do cache local
+      // 1. Ler do cache local imediatamente (Síncrono!)
       try {
         const cached = localStorage.getItem('ronda_registros_cache');
         if (cached) {
@@ -1486,24 +1494,7 @@
         }
       } catch (e) {}
 
-      // 2. Tentar sincronizar da nuvem se online
-      if (typeof firestoreDb !== 'undefined' && firestoreDb && navigator.onLine) {
-        try {
-          const snap = await firestoreDb.collection('ronda_registros')
-            .where('ponto_id', '==', pontoId)
-            .limit(30)
-            .get();
-          if (!snap.empty) {
-            const remotos = [];
-            snap.forEach(doc => remotos.push({ id: doc.id, ...doc.data() }));
-            registros = remotos;
-          }
-        } catch (err) {
-          console.warn('Aviso ao carregar histórico de ronda:', err);
-        }
-      }
-
-      // Ordenar por data_hora decrescente
+      // Ordenar por data_hora decrescente e exibir instantaneamente na tela
       registros.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0));
       historicoPlaquinhaRonda = registros;
 
@@ -1523,6 +1514,25 @@
 
       atualizarBadgeCicloRonda(registros, pontoTipo);
       renderizarTabelaPlaquinhaRonda(pontoTipo);
+
+      // 2. Sincronizar da nuvem em segundo plano sem travar a interface
+      if (typeof firestoreDb !== 'undefined' && firestoreDb && navigator.onLine) {
+        firestoreDb.collection('ronda_registros')
+          .where('ponto_id', '==', pontoId)
+          .limit(30)
+          .get()
+          .then(snap => {
+            if (!snap.empty) {
+              const remotos = [];
+              snap.forEach(doc => remotos.push({ id: doc.id, ...doc.data() }));
+              remotos.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0));
+              historicoPlaquinhaRonda = remotos;
+              atualizarBadgeCicloRonda(remotos, pontoTipo);
+              renderizarTabelaPlaquinhaRonda(pontoTipo);
+            }
+          })
+          .catch(err => console.warn('Aviso ao carregar histórico de ronda remota:', err));
+      }
     }
 
     function atualizarBadgeCicloRonda(registros, pontoTipo) {
@@ -1570,7 +1580,7 @@
         if (reg) {
           let descServico = reg.tipo === 'bebedouro' ? 'Higienização de Bicas & Cuba' : 'Higienização & Desinfecção';
           if (reg.observacoes && reg.observacoes.toLowerCase().includes('refil')) {
-            descServico = 'Troca de Refil / Filtro d'Água';
+            descServico = "Troca de Refil / Filtro d'Água";
           } else if (reg.observacoes && reg.observacoes.toLowerCase().includes('esgotamento')) {
             descServico = 'Esgotamento / Limpeza Pesada';
           }
