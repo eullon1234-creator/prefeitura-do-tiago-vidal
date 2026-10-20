@@ -67,6 +67,19 @@
     </div>
   </header>
 
+  <!-- Barra de Alternância Rápida para Ronda de Sanitários/Bebedouros -->
+  <div class="bg-slate-950/70 border-b border-slate-800/80 px-4 py-2">
+    <div class="max-w-md mx-auto flex items-center justify-between text-xs">
+      <span class="text-slate-400 flex items-center gap-1.5 text-[11px]">
+        <i class="fa-solid fa-house-chimney text-teal-400"></i> Ficha de Residência / Quarto
+      </span>
+      <a href="ronda.html" class="inline-flex items-center gap-1 text-[11px] font-bold text-teal-400 hover:text-teal-300 hover:underline">
+        <span>Ir para Banheiros/Bebedouros</span>
+        <i class="fa-solid fa-arrow-right text-[10px]"></i>
+      </a>
+    </div>
+  </div>
+
   <!-- Container Principal -->
   <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
 
@@ -789,36 +802,28 @@
       const urlTipo = urlParams.get('tipo');
       const urlAcao = urlParams.get('acao');
       const urlCasaId = urlParams.get('casa_id');
-
-      // Se por engano o leitor abriu limpeza.html com QR Code de Ronda / Sanitário / Bebedouro, redirecionar imediatamente
-      const isRondaDetectada = (urlPontoId && (urlPontoId.startsWith('ponto_') || urlPontoId.includes('banheiro') || urlPontoId.includes('bebedouro'))) ||
-                               (urlTipo === 'banheiro' || urlTipo === 'bebedouro') ||
-                               urlAcao === 'ronda' ||
-                               (urlCasaId && (urlCasaId.startsWith('ponto_') || urlCasaId.includes('banheiro') || urlCasaId.includes('bebedouro') || urlCasaId.includes('ronda.html'))) ||
-                               window.location.search.includes('ponto_id=') ||
-                               window.location.search.includes('banheiro') ||
-                               window.location.search.includes('bebedouro');
-
-      if (isRondaDetectada) {
-        let extractedId = urlPontoId || (urlTipo === 'bebedouro' ? 'ponto_bebedouro_refeitorio' : 'ponto_banheiro_01');
-        if (urlCasaId && (urlCasaId.startsWith('ponto_') || urlCasaId.includes('banheiro') || urlCasaId.includes('bebedouro'))) {
-          extractedId = urlCasaId;
-          if (urlCasaId.includes('ponto_id=')) {
-            try {
-              const u = new URL(urlCasaId.startsWith('http') ? urlCasaId : `https://dummy.local/${urlCasaId}`);
-              extractedId = u.searchParams.get('ponto_id') || urlCasaId;
-            } catch(e) {}
-          }
-        }
-        window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(extractedId)}${urlTipo ? '&tipo=' + encodeURIComponent(urlTipo) : ''}`);
-        return;
-      }
-
       const urlQuartoId = urlParams.get('quarto_id');
       const urlQuartoNum = urlParams.get('quarto_num') || urlParams.get('quarto');
       const urlBloco = urlParams.get('bloco');
       const urlBlocoId = urlParams.get('bloco_id');
       const urlModo = urlParams.get('modo');
+
+      // Se houver parâmetros de Casa ou Quarto válidos, NUNCA redirecionar para ronda
+      const isAlvoLimpeza = Boolean(urlCasaId || urlQuartoId || urlQuartoNum || urlBloco || urlBlocoId);
+
+      if (!isAlvoLimpeza) {
+        // Se por engano o leitor abriu limpeza.html com QR Code de Ronda / Sanitário / Bebedouro, redirecionar imediatamente
+        const isRondaDetectada = (urlPontoId && (urlPontoId.startsWith('ponto_') || urlPontoId.includes('banheiro') || urlPontoId.includes('bebedouro'))) ||
+                                 (urlTipo === 'banheiro' || urlTipo === 'bebedouro') ||
+                                 urlAcao === 'ronda' ||
+                                 window.location.search.includes('ponto_id=');
+
+        if (isRondaDetectada) {
+          let extractedId = urlPontoId || (urlTipo === 'bebedouro' ? 'ponto_bebedouro_refeitorio' : 'ponto_banheiro_01');
+          window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(extractedId)}${urlTipo ? '&tipo=' + encodeURIComponent(urlTipo) : ''}`);
+          return;
+        }
+      }
 
       if (urlModo === 'problema' || urlModo === 'ocorrencia') {
         trocarModoLimpeza('problema');
@@ -911,7 +916,7 @@
       document.getElementById('containerSelecaoCasa').classList.remove('hidden');
     }
 
-    async function carregarCasa(casaId) {
+    function carregarCasa(casaId) {
       try {
         const cachedCasas = localStorage.getItem('casas_cidade_cache');
         if (cachedCasas) {
@@ -919,25 +924,7 @@
         }
       } catch (e) {}
 
-      if (firestoreDb) {
-        try {
-          const snap = await firestoreDb.collection('casas_cidade').get();
-          const remotas = [];
-          snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
-          if (remotas.length > 0) {
-            listaCasasDisponiveis = remotas;
-          }
-        } catch (err) {
-          console.warn("Aviso ao buscar casas do Firestore:", err);
-        }
-      }
-
-      const selEl = document.getElementById('selectCasaManual');
-      if (selEl && listaCasasDisponiveis.length > 0) {
-        selEl.innerHTML = '<option value="">Selecione uma casa...</option>' + 
-          listaCasasDisponiveis.map(c => `<option value="${c.id}">${c.nome} - ${c.endereco || ''}</option>`).join('');
-      }
-
+      // Renderizar imediatamente sem aguardar Firestore
       if (casaId) {
         if (String(casaId).startsWith('bloco_')) {
           aplicarDadosBlocoAlojamento(decodeURIComponent(String(casaId).replace('bloco_', '')));
@@ -949,18 +936,10 @@
           return;
         }
         casaCarregada = listaCasasDisponiveis.find(c => c.id === casaId);
-        if (!casaCarregada && firestoreDb) {
-          try {
-            const doc = await firestoreDb.collection('casas_cidade').doc(casaId).get();
-            if (doc.exists) {
-              casaCarregada = { id: doc.id, ...doc.data() };
-            }
-          } catch (e) {}
-        }
 
-        // Fallback resiliente caso o ID da casa não esteja no cache local (ex: primeiro acesso no celular)
+        // Fallback resiliente caso o ID da casa não esteja no cache local
         if (!casaCarregada) {
-          let nomeAuto = String(casaId).replace(/^casa_/, '').replace(/_/g, ' ');
+          let nomeAuto = String(casaId).replace(/^casa_/i, '').replace(/^casa-/i, '').replace(/_/g, ' ');
           nomeAuto = nomeAuto.charAt(0).toUpperCase() + nomeAuto.slice(1);
           casaCarregada = {
             id: casaId,
@@ -980,6 +959,36 @@
         document.getElementById('containerSelecaoCasa').classList.remove('hidden');
         document.getElementById('badgeQrIdentificado').classList.add('hidden');
       }
+
+      const selEl = document.getElementById('selectCasaManual');
+      if (selEl && listaCasasDisponiveis.length > 0) {
+        selEl.innerHTML = '<option value="">Selecione uma casa...</option>' + 
+          listaCasasDisponiveis.map(c => `<option value="${c.id}">${c.nome} - ${c.endereco || ''}</option>`).join('');
+        if (casaCarregada) selEl.value = casaCarregada.id;
+      }
+
+      // Sincronização em segundo plano (background) com Firestore
+      if (firestoreDb && navigator.onLine) {
+        firestoreDb.collection('casas_cidade').get().then(snap => {
+          if (!snap.empty) {
+            const remotas = [];
+            snap.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+            if (remotas.length > 0) {
+              listaCasasDisponiveis = remotas;
+              localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasDisponiveis));
+              if (casaId) {
+                const atualizada = remotas.find(c => c.id === casaId);
+                if (atualizada) {
+                  casaCarregada = atualizada;
+                  aplicarDadosCasa(atualizada);
+                }
+              }
+            }
+          }
+        }).catch(err => {
+          console.warn("Aviso ao sincronizar casas em background:", err);
+        });
+      }
     }
 
     function aplicarDadosCasa(c) {
@@ -996,6 +1005,10 @@
 
       const selEl = document.getElementById('selectCasaManual');
       if (selEl) selEl.value = c.id;
+
+      if (typeof carregarHistoricoPlaquinhaLimpeza === 'function') {
+        carregarHistoricoPlaquinhaLimpeza(c.id, null, null);
+      }
     }
 
     function selecionarCasaManual(id) {

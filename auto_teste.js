@@ -1097,7 +1097,7 @@ assert(appJsContentSec16.includes("collection('canteiro_metadata').doc('snapshot
 
 // 5. PWA Offline em sw.js
 const swContent = fs.readFileSync('sw.js', 'utf8');
-assert(/prefeitura-pwa-v4\.[12]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
+assert(/prefeitura-pwa-v4\.[123]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
 assert(swContent.includes("'ronda.html'"), 'ronda.html incluído no pré-cache offline de sw.js');
 assert(swContent.includes("response.type !== 'opaque'"), 'Suporte a cache de recursos de CDN (Tailwind, FontAwesome) ativo em sw.js');
 
@@ -1474,6 +1474,28 @@ assert(rondaHtmlContent.includes('carregarRegistrosPontoHoje(p.id, meta);'), 'ca
 assert(rondaHtmlContent.includes('carregarHistoricoPlaquinhaRonda(p.id, p.tipo, p.nome, p.setor);'), 'carregarHistoricoPlaquinhaRonda executado imediatamente');
 assert(!rondaHtmlContent.includes("descServico = 'Troca de Refil / Filtro d'Água';"), 'Ausência de SyntaxError de aspas em descServico de ronda.html');
 assert(rondaHtmlContent.includes('function verificarAutenticacaoEquipeHoje()'), 'Função verificarAutenticacaoEquipeHoje definida em ronda.html');
+
+// -------------------------------------------------------------
+// 23. RESOLUÇÃO DE CONFLITOS DE QR CODE, MODAIS E NAVEGAÇÃO PWA
+// -------------------------------------------------------------
+console.log('\n📱 23. Verificação de Desconflito de QR Code, Modais & Navegação PWA');
+
+const manifestContent = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+assert(manifestContent.launch_handler && manifestContent.launch_handler.client_mode === 'navigate-existing', 'manifest.json configurado com launch_handler navigate-existing para Android PWA');
+
+const indexHtmlAtual = fs.readFileSync('index.html', 'utf8');
+assert(indexHtmlAtual.includes('id="modalRegistroLimpezaCasa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[85]'), 'modalRegistroLimpezaCasa configurado com z-[85] acima de modais concorrentes');
+
+const appJsAtual = fs.readFileSync('app.js', 'utf8');
+assert(appJsAtual.includes('function fecharTodosModaisQR()'), 'Função fecharTodosModaisQR implementada em app.js');
+assert(appJsAtual.includes("fecharModal('modalRegistroManualRonda');") && appJsAtual.includes("fecharModal('modalRegistroLimpezaCasa');"), 'abrirModalRegistroLimpeza e abrirModalRegistroManualRonda fecham modais concorrentes');
+assert(appJsAtual.includes('const isCasaPropria ='), 'processarLeituraQRCasa possui detecção mútua blindada');
+assert(appJsAtual.includes('const isCasaDetectada ='), 'processarLeituraQRRonda possui detecção mútua blindada');
+
+const limpezaHtmlAtual = fs.readFileSync('limpeza.html', 'utf8');
+assert(limpezaHtmlAtual.includes('const isAlvoLimpeza = Boolean(urlCasaId || urlQuartoId || urlQuartoNum || urlBloco || urlBlocoId);'), 'limpeza.html não redireciona casas ou quartos válidos');
+assert(limpezaHtmlAtual.includes('function carregarCasa(casaId)'), 'carregarCasa em limpeza.html renderiza de forma imediata e síncrona');
+assert(limpezaHtmlAtual.includes('carregarHistoricoPlaquinhaLimpeza(c.id, null, null);'), 'aplicarDadosCasa atualiza histórico da plaquinha da casa');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

@@ -72,6 +72,19 @@
     </div>
   </header>
 
+  <!-- Barra de Alternância Rápida para Casas/Alojamentos -->
+  <div class="bg-slate-950/70 border-b border-slate-800/80 px-4 py-2">
+    <div class="max-w-md mx-auto flex items-center justify-between text-xs">
+      <span class="text-slate-400 flex items-center gap-1.5 text-[11px]">
+        <i class="fa-solid fa-toilet-portable text-teal-400"></i> Ronda de Sanitários & Bebedouros
+      </span>
+      <a href="limpeza.html" class="inline-flex items-center gap-1 text-[11px] font-bold text-teal-400 hover:text-teal-300 hover:underline">
+        <span>Ir para Residências/Quartos</span>
+        <i class="fa-solid fa-arrow-right text-[10px]"></i>
+      </a>
+    </div>
+  </div>
+
   <!-- Container Principal -->
   <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
 
@@ -955,34 +968,46 @@
       // 4. Capturar parâmetros da URL de forma tolerante e sem travar
       const urlParams = new URLSearchParams(window.location.search);
       
-      // Busca case-insensitive para todos os nomes possíveis
-      let urlPontoId = urlParams.get('ponto_id') || urlParams.get('PONTO_ID') || 
-                       urlParams.get('id') || urlParams.get('ID') || 
-                       urlParams.get('ponto') || urlParams.get('PONTO') || 
-                       urlParams.get('p') || urlParams.get('pontoId');
-                       
-      let urlTipo = urlParams.get('tipo') || urlParams.get('TIPO') || urlParams.get('type');
-
-      // Se por engano o leitor abriu ronda.html com parâmetros de Casa ou Quarto/Bloco, redirecionar para limpeza.html (apenas se NÃO for ponto de ronda)
+      // Se a URL contiver parâmetros de Casa ou Quarto, redirecionar imediatamente para limpeza.html
       const urlCasaId = urlParams.get('casa_id');
       const urlQuartoId = urlParams.get('quarto_id');
       const urlBloco = urlParams.get('bloco');
       const urlBlocoId = urlParams.get('bloco_id');
-      const isRondaAlvo = urlPontoId || urlTipo || window.location.search.includes('ponto_') || window.location.search.includes('banheiro') || window.location.search.includes('bebedouro');
-      if (!isRondaAlvo) {
+      const paramIdCru = urlParams.get('id') || urlParams.get('ID') || urlParams.get('ponto_id') || urlParams.get('PONTO_ID');
+
+      const isCasaOuQuartoExplicito = urlCasaId || urlQuartoId || urlBloco || urlBlocoId ||
+        (paramIdCru && (String(paramIdCru).toLowerCase().startsWith('casa') || String(paramIdCru).toLowerCase().startsWith('quarto') || String(paramIdCru).toLowerCase().startsWith('bloco')));
+
+      if (isCasaOuQuartoExplicito) {
         if (urlCasaId) {
           window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(urlCasaId)}`);
-          return;
-        }
-        if (urlQuartoId) {
-          window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(urlQuartoId)}${urlBloco ? '&bloco=' + encodeURIComponent(urlBloco) : ''}`);
           return;
         }
         if (urlBloco || urlBlocoId) {
           window.location.replace(`limpeza.html?bloco=${encodeURIComponent(urlBloco || urlBlocoId)}`);
           return;
         }
+        if (urlQuartoId) {
+          window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(urlQuartoId)}${urlBloco ? '&bloco=' + encodeURIComponent(urlBloco) : ''}`);
+          return;
+        }
+        if (paramIdCru) {
+          if (String(paramIdCru).toLowerCase().startsWith('casa')) {
+            window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(paramIdCru)}`);
+            return;
+          }
+          window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(paramIdCru)}`);
+          return;
+        }
       }
+
+      // Busca case-insensitive para todos os nomes possíveis de ponto de ronda
+      let urlPontoId = urlParams.get('ponto_id') || urlParams.get('PONTO_ID') || 
+                       urlParams.get('id') || urlParams.get('ID') || 
+                       urlParams.get('ponto') || urlParams.get('PONTO') || 
+                       urlParams.get('p') || urlParams.get('pontoId');
+                       
+      let urlTipo = urlParams.get('tipo') || urlParams.get('TIPO') || urlParams.get('type');
 
       // 5. Carregar ponto de forma imediata e síncrona
       carregarPontoRonda(urlPontoId, urlTipo);

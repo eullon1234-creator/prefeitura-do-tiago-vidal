@@ -14334,8 +14334,19 @@ function getQRCodeUrlQuarto(q) {
   return `${getCleanSystemUrl('limpeza.html')}?quarto_id=${encodeURIComponent(qId)}&quarto_num=${encodeURIComponent(qNum)}&bloco=${encodeURIComponent(qBloco)}`;
 }
 
+// Helper universal para fechar todos os modais de visualização de QR e Placas
+function fecharTodosModaisQR() {
+  fecharModal('modalPlacaQRCasa');
+  fecharModal('modalPlacaQRRonda');
+  fecharModal('modalPlaquinhaManutencaoA4');
+  fecharModal('modalPlaquinhaQR');
+  fecharModal('modalScannerLimpezaQR');
+  fecharModal('modalScannerRondaQR');
+}
+
 // Abrir modal com placa QR Code da Casa (Impressão A4)
 function abrirModalPlacaQRCasa(casaId) {
+  fecharTodosModaisQR();
   const c = (listaCasasCidade || []).find(x => x.id === casaId);
   if (!c) {
     showToast('Casa não encontrada para gerar placa.', 'warning');
@@ -14365,8 +14376,9 @@ function abrirModalPlacaQRCasa(casaId) {
   if (endEl) endEl.textContent = `Endereço: ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  // Alta resolução para impressão
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
+  // Alta resolução para impressão sem cache obsoleto
+  if (imgEl) imgEl.src = '';
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
   if (imgEl) imgEl.src = qrApiUrl;
 
   abrirModal('modalPlacaQRCasa');
@@ -14374,6 +14386,7 @@ function abrirModalPlacaQRCasa(casaId) {
 
 // Abrir modal com placa QR Code do Bloco do Alojamento (1 QR Code Oficial por Bloco - Impressão A4)
 function abrirModalPlacaQRBloco(blocoIdOuNome = null) {
+  fecharTodosModaisQR();
   let nomeBloco = 'Bloco 1';
 
   if (blocoIdOuNome) {
@@ -14424,12 +14437,14 @@ function renderizarConteudoPlacaQRBloco(blocoNome) {
   if (endEl) endEl.textContent = `Canteiro de Obras Taboca 2 • GEL Engenharia`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
+  if (imgEl) imgEl.src = '';
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
   if (imgEl) imgEl.src = qrApiUrl;
 }
 
 // Abrir modal com placa QR Code do Quarto do Alojamento (Impressão A4)
 function abrirModalPlacaQRQuarto(quartoId) {
+  fecharTodosModaisQR();
   const q = (allQuartosData || []).find(x => String(x.id) === String(quartoId));
   if (!q) {
     showToast('Quarto não encontrado para gerar placa QR.', 'warning');
@@ -14459,7 +14474,8 @@ function abrirModalPlacaQRQuarto(quartoId) {
   if (endEl) endEl.textContent = `Setor: Alojamento do Canteiro • Capacidade: ${q.capacidade || 4} vagas`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
+  if (imgEl) imgEl.src = '';
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
   if (imgEl) imgEl.src = qrApiUrl;
 
   abrirModal('modalPlacaQRCasa');
@@ -14585,7 +14601,10 @@ function processarLeituraQRCasa(texto) {
   texto = String(texto).trim();
 
   // 0. Detecção inteligente de desvio: Se for QR Code de Ronda / Sanitário / Bebedouro
-  if (texto.includes('ponto_id=') || texto.includes('ronda.html') || texto.startsWith('ponto_') || texto.includes('banheiro') || texto.includes('bebedouro') || texto.includes('sanitario') || texto.includes('purificador') || texto.includes('tipo=banheiro') || texto.includes('tipo=bebedouro') || (typeof listaPontosRonda !== 'undefined' && listaPontosRonda.some(p => p.id === texto))) {
+  const isRondaPropria = texto.includes('ponto_id=') || texto.includes('ronda.html') || texto.startsWith('ponto_') || texto.includes('tipo=banheiro') || texto.includes('tipo=bebedouro') || (typeof listaPontosRonda !== 'undefined' && listaPontosRonda.some(p => p.id === texto));
+  const isCasaPropria = texto.includes('casa_id=') || texto.includes('quarto_id=') || texto.includes('bloco=') || texto.includes('limpeza.html') || texto.toLowerCase().startsWith('casa:') || texto.toLowerCase().startsWith('quarto:') || texto.toLowerCase().startsWith('bloco:') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(c => c.id === texto)) || String(texto).toLowerCase().startsWith('casa-') || String(texto).toLowerCase().startsWith('casa_');
+
+  if (isRondaPropria && !isCasaPropria) {
     fecharScannerLimpezaQR();
     showToast('QR Code de Sanitário/Bebedouro detectado! Abrindo ficha de ronda...', 'info');
     if (typeof processarLeituraQRRonda === 'function') {
@@ -14670,6 +14689,10 @@ function abrirModalRegistroLimpezaQuarto(quartoId, tipoPadrao = 'rotina') {
 
 // Abrir formulário para registrar limpeza ou manutenção (Suporta Bloco, Quarto e Casa)
 function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
+  fecharModal('modalRegistroManualRonda');
+  fecharModal('modalScannerLimpezaQR');
+  fecharModal('modalScannerRondaQR');
+
   let nomeUnidade = '';
   let enderecoHtml = '';
   let subTituloTxt = '';
@@ -17593,6 +17616,7 @@ function getQRCodeUrlRonda(pontoId) {
 
 // Abrir modal com placa QR Code da Ronda (Impressão A4)
 function abrirModalPlacaQRRonda(pontoId) {
+  fecharTodosModaisQR();
   const p = (listaPontosRonda || []).find(x => x.id === pontoId);
   if (!p) {
     showToast('Ponto de ronda não localizado.', 'warning');
@@ -17616,7 +17640,8 @@ function abrirModalPlacaQRRonda(pontoId) {
   }
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png`;
+  if (imgEl) imgEl.src = '';
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
   if (imgEl) imgEl.src = qrApiUrl;
 
   abrirModal('modalPlacaQRRonda');
@@ -17668,6 +17693,10 @@ function salvarConfigRonda(e) {
 
 // Registro Manual / Vistoria pelo Prefeito
 function abrirModalRegistroManualRonda(pontoId) {
+  fecharModal('modalRegistroLimpezaCasa');
+  fecharModal('modalScannerLimpezaQR');
+  fecharModal('modalScannerRondaQR');
+
   const p = (listaPontosRonda || []).find(x => x.id === pontoId);
   if (!p) return;
 
@@ -17934,8 +17963,11 @@ function processarLeituraQRRonda(texto) {
   texto = String(texto).trim();
 
   // 0. Detecção inteligente de desvio: Se for QR Code de Casa ou Bloco/Quarto de Alojamento
-  const isRondaPropria = texto.includes('ponto_') || texto.includes('banheiro') || texto.includes('bebedouro') || texto.includes('sanitario') || texto.includes('purificador') || texto.includes('ronda.html');
-  if (!isRondaPropria && (texto.includes('casa_id=') || texto.includes('quarto_id=') || texto.includes('bloco=') || texto.includes('limpeza.html') || texto.startsWith('casa:') || texto.startsWith('quarto:') || texto.startsWith('bloco:') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(c => c.id === texto)))) {
+  const isCasaDetectada = texto.includes('casa_id=') || texto.includes('quarto_id=') || texto.includes('bloco=') || texto.includes('limpeza.html') || texto.toLowerCase().startsWith('casa:') || texto.toLowerCase().startsWith('quarto:') || texto.toLowerCase().startsWith('bloco:') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(c => c.id === texto)) || String(texto).toLowerCase().startsWith('casa-') || String(texto).toLowerCase().startsWith('casa_');
+
+  const isRondaPropria = texto.includes('ponto_id=') || texto.includes('ronda.html') || texto.startsWith('ponto_') || texto.includes('tipo=banheiro') || texto.includes('tipo=bebedouro') || (typeof listaPontosRonda !== 'undefined' && listaPontosRonda.some(p => p.id === texto));
+
+  if (isCasaDetectada && !isRondaPropria) {
     fecharScannerRondaQR();
     showToast('QR Code de Residência/Alojamento detectado! Abrindo ficha de limpeza...', 'info');
     if (typeof processarLeituraQRCasa === 'function') {
@@ -18726,8 +18758,10 @@ let plaquinhaModalEstado = {
 };
 
 function abrirModalPlaquinhaManutencao(tipo = 'ar', id = null) {
+  fecharTodosModaisQR();
   if (tipo === 'ronda') tipo = 'banheiro';
-  if ((tipo === 'banheiro' || tipo === 'bebedouro') && String(id).startsWith('casa_')) {
+  const isIdCasa = id && (String(id).toLowerCase().startsWith('casa') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(x => x.id === id)));
+  if ((tipo === 'banheiro' || tipo === 'bebedouro') && isIdCasa) {
     id = null;
   }
   plaquinhaModalEstado.tipo = tipo;
@@ -18750,7 +18784,8 @@ function abrirModalPlaquinhaManutencao(tipo = 'ar', id = null) {
 
 function aoMudarModeloPlaquinhaManutencao(novoTipo) {
   plaquinhaModalEstado.tipo = novoTipo;
-  if ((novoTipo === 'banheiro' || novoTipo === 'bebedouro') && String(plaquinhaModalEstado.id).startsWith('casa_')) {
+  const isIdCasa = plaquinhaModalEstado.id && (String(plaquinhaModalEstado.id).toLowerCase().startsWith('casa') || (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(x => x.id === plaquinhaModalEstado.id)));
+  if ((novoTipo === 'banheiro' || novoTipo === 'bebedouro') && isIdCasa) {
     plaquinhaModalEstado.id = null;
   }
   if ((novoTipo === 'ar' || novoTipo === 'quarto') && String(plaquinhaModalEstado.id).startsWith('ponto_')) {
@@ -18786,9 +18821,14 @@ function renderizarConteudoModalPlaquinha() {
 
   if (tipo === 'ar' || tipo === 'ar_casa' || tipo === 'ar_quarto') {
     titulo = cfg.titulo_plaquinha_ar;
-    if (id && typeof listaCasasCidade !== 'undefined' && String(id).startsWith('casa_')) {
+    const isCasa = id && (
+      String(id).toLowerCase().startsWith('casa') ||
+      (typeof listaCasasCidade !== 'undefined' && listaCasasCidade.some(x => x.id === id))
+    );
+    if (isCasa && typeof listaCasasCidade !== 'undefined') {
       const c = listaCasasCidade.find(x => x.id === id);
       if (c) localTexto = `${(c.nome || 'Casa').toUpperCase()} • GESTÃO URBANA`;
+      else localTexto = `CASA ${String(id).toUpperCase()} • GESTÃO URBANA`;
     } else if (id && typeof StaticApiEngine !== 'undefined' && StaticApiEngine.dbState && StaticApiEngine.dbState.quartos) {
       const q = StaticApiEngine.dbState.quartos.find(x => x.id === Number(id) || String(x.id) === String(id) || String(x.numero) === String(id));
       if (q) localTexto = `QUARTO ${q.numero} • ${(q.bloco_nome || 'CANTEIRO TABOCA 2').toUpperCase()}`;
@@ -18797,7 +18837,11 @@ function renderizarConteudoModalPlaquinha() {
       localTexto = 'ALOJAMENTO • BLOCOS DO CANTEIRO';
     }
     const cleanLimpeza = getCleanSystemUrl('limpeza.html');
-    qrUrl = id ? `${cleanLimpeza}?quarto_id=${encodeURIComponent(id)}` : cleanLimpeza;
+    if (isCasa) {
+      qrUrl = id ? `${cleanLimpeza}?casa_id=${encodeURIComponent(id)}` : cleanLimpeza;
+    } else {
+      qrUrl = id ? `${cleanLimpeza}?quarto_id=${encodeURIComponent(id)}` : cleanLimpeza;
+    }
   } else if (tipo === 'bebedouro') {
     titulo = cfg.titulo_plaquinha_bebedouro;
     let pObj = null;
@@ -18874,22 +18918,11 @@ function renderizarConteudoModalPlaquinha() {
   // Gerar QR Code no canto da plaquinha
   if (qrContainer) {
     qrContainer.innerHTML = '';
-    if (typeof QRCode !== 'undefined') {
-      try {
-        new QRCode(qrContainer, {
-          text: qrUrl,
-          width: 64,
-          height: 64,
-          colorDark: '#0f172a',
-          colorLight: '#ffffff',
-          correctLevel: QRCode.CorrectLevel.M
-        });
-      } catch (e) {
-        qrContainer.innerHTML = '<i class="fa-solid fa-qrcode text-3xl text-slate-800"></i>';
-      }
-    } else {
-      qrContainer.innerHTML = '<i class="fa-solid fa-qrcode text-3xl text-slate-800"></i>';
-    }
+    const imgQr = document.createElement('img');
+    imgQr.className = 'w-16 h-16 object-contain rounded-lg shadow-sm border border-slate-300';
+    imgQr.alt = 'QR Code';
+    imgQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
+    qrContainer.appendChild(imgQr);
   }
 
   // Obter registros reais do histórico
