@@ -1374,6 +1374,58 @@ assert(resMudo.emitido === true && resMudo.som === false, 'Modo silencioso prese
 assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html após Seção 21');
 assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js após Seção 21');
 
+
+// -------------------------------------------------------------
+// 22. PLAQUINHA DIGITAL DE CONTROLE DE MANUTENÇÃO & HISTÓRICO
+// -------------------------------------------------------------
+console.log('\n🏷️ 22. Verificação da Plaquinha Digital de Manutenção & Histórico (NR-18 & NR-24)');
+
+const limpezaHtmlContent = fs.readFileSync('limpeza.html', 'utf8');
+const rondaHtmlContent = fs.readFileSync('ronda.html', 'utf8');
+const indexHtmlContentPlaquinha = fs.readFileSync('index.html', 'utf8');
+const appJsContentPlaquinha = fs.readFileSync('app.js', 'utf8');
+
+// 22.1 Elementos da Plaquinha Digital em limpeza.html
+assert(limpezaHtmlContent.includes('id="cardPlaquinhaControle"'), 'Plaquinha Digital presente em limpeza.html');
+assert(limpezaHtmlContent.includes('id="plaquinhaTituloEquipamento"'), 'Título oficial da plaquinha presente em limpeza.html');
+assert(limpezaHtmlContent.includes('id="plaquinhaIdentificacaoAparelho"'), 'Identificação do aparelho/quarto presente em limpeza.html');
+assert(limpezaHtmlContent.includes('id="badgeStatusCicloPlaquinha"'), 'Badge de ciclo preventivo presente em limpeza.html');
+assert(limpezaHtmlContent.includes('id="plaquinhaTbodyHistorico"'), 'Tabela de histórico de manutenções presente em limpeza.html');
+assert(limpezaHtmlContent.includes('id="tabPlaquinhaAr"'), 'Alternador Ar-Condicionado presente na plaquinha de limpeza.html');
+assert(limpezaHtmlContent.includes('id="tabPlaquinhaRotina"'), 'Alternador Limpeza de Rotina presente na plaquinha de limpeza.html');
+assert(limpezaHtmlContent.includes('id="boxSubtipoAr"'), 'Seletor de Limpeza de Filtro vs Higienização Total presente no formulário');
+
+// 22.2 Funções de Renderização e Ciclo em limpeza.html
+assert(limpezaHtmlContent.includes('function alternarAbaPlaquinha'), 'Função alternarAbaPlaquinha presente em limpeza.html');
+assert(limpezaHtmlContent.includes('function carregarHistoricoPlaquinhaLimpeza'), 'Função carregarHistoricoPlaquinhaLimpeza presente em limpeza.html');
+assert(limpezaHtmlContent.includes('function renderizarTabelaPlaquinha'), 'Função renderizarTabelaPlaquinha presente em limpeza.html');
+assert(limpezaHtmlContent.includes('function irParaFormularioNovaManutencao'), 'Função irParaFormularioNovaManutencao presente em limpeza.html');
+
+// 22.3 Elementos da Plaquinha Digital em ronda.html
+assert(rondaHtmlContent.includes('id="cardPlaquinhaControleRonda"'), 'Plaquinha Digital presente em ronda.html');
+assert(rondaHtmlContent.includes('id="plaquinhaTituloRonda"'), 'Título de ronda presente na plaquinha de ronda.html');
+assert(rondaHtmlContent.includes('id="plaquinhaIdentificacaoPonto"'), 'Identificação do ponto presente em ronda.html');
+assert(rondaHtmlContent.includes('id="plaquinhaTbodyHistoricoRonda"'), 'Tabela de histórico de rondas presente em ronda.html');
+assert(rondaHtmlContent.includes('function carregarHistoricoPlaquinhaRonda'), 'Função carregarHistoricoPlaquinhaRonda presente em ronda.html');
+assert(rondaHtmlContent.includes('function renderizarTabelaPlaquinhaRonda'), 'Função renderizarTabelaPlaquinhaRonda presente em ronda.html');
+assert(rondaHtmlContent.includes('function irParaFormularioNovaManutencaoRonda'), 'Função irParaFormularioNovaManutencaoRonda presente em ronda.html');
+
+// 22.4 Modal de Plaquinha e Impressão A4 no index.html e app.js
+assert(indexHtmlContentPlaquinha.includes('id="modalPlaquinhaManutencaoA4"'), 'Modal de Plaquinha A4 presente no index.html');
+assert(indexHtmlContentPlaquinha.includes('id="modalPlaquinhaHeaderTitulo"'), 'Cabeçalho oficial do modal presente no index.html');
+assert(indexHtmlContentPlaquinha.includes('id="modalPlaquinhaTbodyHistorico"'), 'Tabela pautada oficial presente no modal do index.html');
+assert(indexHtmlContentPlaquinha.includes('id="modalPlaquinhaQRCodeContainer"'), 'Container de QR Code estampado presente no modal do index.html');
+assert(appJsContentPlaquinha.includes('function abrirModalPlaquinhaManutencao'), 'Função abrirModalPlaquinhaManutencao presente em app.js');
+assert(appJsContentPlaquinha.includes('function aoMudarModeloPlaquinhaManutencao'), 'Função aoMudarModeloPlaquinhaManutencao presente em app.js');
+assert(appJsContentPlaquinha.includes('function renderizarConteudoModalPlaquinha'), 'Função renderizarConteudoModalPlaquinha presente em app.js');
+assert(appJsContentPlaquinha.includes('function imprimirPlaquinhaManutencao'), 'Função imprimirPlaquinhaManutencao presente em app.js');
+
+// 22.5 Verificação de Paridade Rigorosa 100%
+assert(fs.readFileSync('limpeza.html', 'utf8') === fs.readFileSync('frontend/limpeza.html', 'utf8'), 'Paridade 100% limpeza.html e frontend/limpeza.html');
+assert(fs.readFileSync('ronda.html', 'utf8') === fs.readFileSync('frontend/ronda.html', 'utf8'), 'Paridade 100% ronda.html e frontend/ronda.html');
+assert(fs.readFileSync('index.html', 'utf8') === fs.readFileSync('frontend/index.html', 'utf8'), 'Paridade 100% index.html e frontend/index.html após Seção 22');
+assert(fs.readFileSync('app.js', 'utf8') === fs.readFileSync('frontend/app.js', 'utf8'), 'Paridade 100% app.js e frontend/app.js após Seção 22');
+
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------

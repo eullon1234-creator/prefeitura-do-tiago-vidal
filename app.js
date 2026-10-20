@@ -18435,3 +18435,174 @@ window.inicializarConfigNotificacoes = inicializarConfigNotificacoes;
 window.atualizarCamposConfigNotificacoesUI = atualizarCamposConfigNotificacoesUI;
 window.configNotificacoes = configNotificacoes;
 window.CONFIG_NOTIFICACOES_PADRAO = CONFIG_NOTIFICACOES_PADRAO;
+
+
+// ========================================================
+// PLAQUINHA OFICIAL DE CONTROLE DE MANUTENÇÃO (NR-18 & NR-24)
+// ========================================================
+let plaquinhaModalEstado = {
+  tipo: 'ar',
+  id: null,
+  nome: 'Quarto 14 • Bloco 2'
+};
+
+function abrirModalPlaquinhaManutencao(tipo = 'ar', id = null) {
+  plaquinhaModalEstado.tipo = tipo;
+  plaquinhaModalEstado.id = id;
+
+  const select = document.getElementById('selectTipoPlaquinhaModal');
+  if (tipo.includes('ar')) {
+    if (select) select.value = 'ar';
+  } else if (tipo.includes('bebedouro')) {
+    if (select) select.value = 'bebedouro';
+  } else if (tipo.includes('banheiro')) {
+    if (select) select.value = 'banheiro';
+  } else if (tipo.includes('ronda')) {
+    if (select) select.value = 'banheiro';
+  } else {
+    if (select) select.value = 'quarto';
+  }
+
+  renderizarConteudoModalPlaquinha();
+  abrirModal('modalPlaquinhaManutencaoA4');
+}
+
+function aoMudarModeloPlaquinhaManutencao(novoTipo) {
+  plaquinhaModalEstado.tipo = novoTipo;
+  renderizarConteudoModalPlaquinha();
+}
+
+function renderizarConteudoModalPlaquinha() {
+  const tipo = plaquinhaModalEstado.tipo;
+  const id = plaquinhaModalEstado.id;
+
+  const titEl = document.getElementById('modalPlaquinhaHeaderTitulo');
+  const localEl = document.getElementById('modalPlaquinhaLocalNome');
+  const qrContainer = document.getElementById('modalPlaquinhaQRCodeContainer');
+  const tbody = document.getElementById('modalPlaquinhaTbodyHistorico');
+
+  let titulo = 'CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO';
+  let localTexto = 'QUARTO 14 • BLOCO 2';
+  let qrUrl = '';
+
+  if (tipo === 'ar' || tipo === 'ar_casa' || tipo === 'ar_quarto') {
+    titulo = 'CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO';
+    if (id && typeof listaCasasCidade !== 'undefined') {
+      const c = listaCasasCidade.find(x => x.id === id);
+      if (c) localTexto = `${(c.nome || 'Casa').toUpperCase()} • GESTÃO URBANA`;
+    } else {
+      localTexto = 'ALOJAMENTO • BLOCOS DO CANTEIRO';
+    }
+    qrUrl = getCleanSystemUrl() + 'limpeza.html' + (id ? `?casa_id=${id}` : '');
+  } else if (tipo === 'bebedouro') {
+    titulo = 'CONTROLE DE MANUTENÇÃO & HIGIENIZAÇÃO DE BEBEDOUROS';
+    localTexto = 'BEBEDOURO / PURIFICADOR • REFEITÓRIO / CANTEIRO';
+    qrUrl = getCleanSystemUrl() + 'ronda.html?tipo=bebedouro';
+  } else if (tipo === 'banheiro') {
+    titulo = 'CONTROLE DE HIGIENIZAÇÃO & RONDA DE SANITÁRIOS';
+    localTexto = 'SANITÁRIOS / BANHEIROS QUÍMICOS • FRENTE DE OBRA';
+    qrUrl = getCleanSystemUrl() + 'ronda.html?tipo=banheiro';
+  } else {
+    titulo = 'CONTROLE DE LIMPEZA & HIGIENIZAÇÃO DE ALOJAMENTO';
+    localTexto = 'ALOJAMENTO DO CANTEIRO • NR-18 & NR-24';
+    qrUrl = getCleanSystemUrl() + 'limpeza.html';
+  }
+
+  if (titEl) titEl.textContent = titulo;
+  if (localEl) localEl.textContent = localTexto;
+
+  // Gerar QR Code no canto da plaquinha
+  if (qrContainer) {
+    qrContainer.innerHTML = '';
+    if (typeof QRCode !== 'undefined') {
+      try {
+        new QRCode(qrContainer, {
+          text: qrUrl,
+          width: 64,
+          height: 64,
+          colorDark: '#0f172a',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (e) {
+        qrContainer.innerHTML = '<i class="fa-solid fa-qrcode text-3xl text-slate-800"></i>';
+      }
+    } else {
+      qrContainer.innerHTML = '<i class="fa-solid fa-qrcode text-3xl text-slate-800"></i>';
+    }
+  }
+
+  // Obter registros reais do histórico
+  let historico = [];
+  try {
+    if (tipo.includes('ar') || tipo === 'quarto') {
+      const cached = localStorage.getItem('casas_limpezas_cache');
+      if (cached) {
+        historico = JSON.parse(cached);
+        if (id) historico = historico.filter(r => r.casa_id === id || r.quarto_id === String(id));
+      }
+    } else {
+      const cached = localStorage.getItem('ronda_registros_cache');
+      if (cached) {
+        historico = JSON.parse(cached);
+        if (tipo === 'bebedouro') historico = historico.filter(r => r.tipo === 'bebedouro');
+        else historico = historico.filter(r => r.tipo !== 'bebedouro');
+      }
+    }
+  } catch (e) {}
+
+  // Renderizar linhas pautadas
+  let html = '';
+  const totalLinhas = 8;
+  for (let i = 0; i < totalLinhas; i++) {
+    const reg = historico[i];
+    const numSeq = String(i + 1).padStart(2, '0');
+
+    if (reg) {
+      const dataBr = reg.data ? reg.data.split('-').reverse().join('/') : '--/--/----';
+      const horaStr = reg.hora || '08:00';
+      const descServico = reg.tipo === 'ar_condicionado' 
+        ? (reg.subtipo === 'total' ? 'Higienização Total' : 'Limpeza de Filtro')
+        : (reg.tipo === 'bebedouro' ? 'Higienização de Bicas' : 'Higienização Geral');
+      const mesStr = reg.data ? 'Mês ' + reg.data.split('-')[1] : '--';
+      const assinatura = reg.responsavel || 'Fiscal GEL';
+
+      html += `
+        <tr>
+          <td class="border-2 border-blue-950 px-2 py-1.5 text-center font-bold bg-slate-50">${numSeq}</td>
+          <td class="border-2 border-blue-950 px-3 py-1.5 text-center font-bold">${dataBr}</td>
+          <td class="border-2 border-blue-950 px-2 py-1.5 text-center font-semibold text-slate-700">${horaStr}</td>
+          <td class="border-2 border-blue-950 px-3 py-1.5 font-bold text-blue-950">${descServico}</td>
+          <td class="border-2 border-blue-950 px-2 py-1.5 text-center font-bold text-slate-600">${mesStr}</td>
+          <td class="border-2 border-blue-950 px-3 py-1.5 text-center font-serif italic font-bold text-blue-900">${assinatura}</td>
+        </tr>
+      `;
+    } else {
+      html += `
+        <tr class="text-slate-400">
+          <td class="border-2 border-blue-950 px-2 py-1.5 text-center font-bold bg-slate-50 text-slate-400">${numSeq}</td>
+          <td class="border-2 border-blue-950 px-3 py-1.5 text-center border-dashed">--/--/----</td>
+          <td class="border-2 border-blue-950 px-2 py-1.5 text-center border-dashed">--:--</td>
+          <td class="border-2 border-blue-950 px-3 py-1.5 text-slate-300 italic">--------------------------------</td>
+          <td class="border-2 border-blue-950 px-2 py-1.5 text-center border-dashed">----</td>
+          <td class="border-2 border-blue-950 px-3 py-1.5 text-center border-dashed">----------------</td>
+        </tr>
+      `;
+    }
+  }
+
+  if (tbody) tbody.innerHTML = html;
+}
+
+function imprimirPlaquinhaManutencao() {
+  document.body.classList.add('imprimindo-plaquinha-manutencao');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('imprimindo-plaquinha-manutencao');
+  }, 1000);
+}
+
+window.abrirModalPlaquinhaManutencao = abrirModalPlaquinhaManutencao;
+window.aoMudarModeloPlaquinhaManutencao = aoMudarModeloPlaquinhaManutencao;
+window.renderizarConteudoModalPlaquinha = renderizarConteudoModalPlaquinha;
+window.imprimirPlaquinhaManutencao = imprimirPlaquinhaManutencao;

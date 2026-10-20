@@ -119,6 +119,91 @@
       </div>
     </div>
 
+    
+    <!-- PLAQUINHA DIGITAL OFICIAL: CONTROLE DE HIGIENIZAÇÃO & MANUTENÇÃO (GEL) -->
+    <div id="cardPlaquinhaControleRonda" class="bg-white text-slate-900 rounded-2xl border-2 border-blue-600 shadow-2xl overflow-hidden space-y-0 transition">
+      
+      <!-- Cabeçalho Oficial GEL (Estilo Etiqueta Adesiva Industrial) -->
+      <div class="p-3.5 bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white flex items-center justify-between border-b-2 border-blue-600">
+        <div class="flex items-center gap-2.5">
+          <div class="h-10 px-2 py-0.5 rounded-lg bg-white flex items-center justify-center shadow-xs flex-shrink-0">
+            <img src="logo_gel_oficial.png" alt="GEL Logo" class="h-7 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+          </div>
+          <div>
+            <h2 id="plaquinhaTituloRonda" class="text-xs sm:text-sm font-black tracking-wider uppercase leading-tight text-white drop-shadow-xs">
+              CONTROLE DE HIGIENIZAÇÃO DE SANITÁRIOS
+            </h2>
+            <div class="flex items-center gap-2 text-[10px] text-blue-200 font-semibold">
+              <span>EMPRESA: <strong>GEL ENGENHARIA</strong></span>
+              <span>•</span>
+              <span id="plaquinhaSubtituloRonda">CANTEIRO TABOCA 2</span>
+            </div>
+          </div>
+        </div>
+        <div class="text-right hidden sm:block">
+          <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-blue-950/80 border border-blue-400 text-blue-200">
+            NR-18 • NR-24
+          </span>
+        </div>
+      </div>
+
+      <!-- Barra de Identificação do Ponto & Status -->
+      <div class="bg-blue-50 px-3.5 py-2.5 border-b border-blue-200 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
+          <span class="text-xs font-black text-blue-950 uppercase" id="plaquinhaIdentificacaoPonto">
+            Ponto de Ronda
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="badgeStatusCicloRonda" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i> <span id="textoStatusCicloRonda">Higienização em Dia</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- TABELA OFICIAL DE HISTÓRICO DE MANUTENÇÕES (RÉPLICA DA ETIQUETA FÍSICA) -->
+      <div class="p-2 sm:p-3 overflow-x-auto bg-white">
+        <table class="w-full border-collapse border border-blue-900 text-[11px] text-slate-900">
+          <thead>
+            <tr class="bg-blue-900 text-white font-black text-center text-[10px] uppercase tracking-wider">
+              <th class="border border-blue-900 px-1.5 py-1.5 w-7">Nº</th>
+              <th class="border border-blue-900 px-2 py-1.5 w-20">DATA</th>
+              <th class="border border-blue-900 px-1.5 py-1.5 w-14">HORA</th>
+              <th class="border border-blue-900 px-2.5 py-1.5 text-left">TIPO DE LIMPEZA / MANUTENÇÃO</th>
+              <th class="border border-blue-900 px-1.5 py-1.5 w-16">TURNO</th>
+              <th class="border border-blue-900 px-2 py-1.5 w-24">ASSINATURA</th>
+            </tr>
+          </thead>
+          <tbody id="plaquinhaTbodyHistoricoRonda">
+            <tr>
+              <td colspan="6" class="p-4 text-center text-slate-400 italic">
+                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Carregando ficha de manutenção...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Rodapé da Plaquinha com Ações Diretas -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        <div class="text-[10px] text-slate-500 flex items-center gap-1 text-center sm:text-left">
+          <i class="fa-solid fa-shield-halved text-blue-600"></i>
+          <span>Registro digital de conformidade com NR-18 e NR-24</span>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <button type="button" onclick="irParaFormularioNovaManutencaoRonda()" class="flex-1 sm:flex-initial py-2 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition">
+            <i class="fa-solid fa-pen-nib"></i>
+            <span>+ Assinar Limpeza</span>
+          </button>
+          <button type="button" onclick="trocarModoRonda('problema')" class="flex-1 sm:flex-initial py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs flex items-center justify-center gap-1 shadow-md transition">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Relatar Problema</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- SELETOR DE MODO: EQUIPE DE LIMPEZA OU OPERÁRIO RELATANDO PROBLEMA -->
     <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl shadow-sm">
       <button 
@@ -1079,6 +1164,7 @@
 
       // Buscar registros do dia de hoje para calcular progresso
       await carregarRegistrosPontoHoje(p.id, meta);
+      carregarHistoricoPlaquinhaRonda(p.id, p.tipo, p.nome, p.setor);
     }
 
     async function carregarRegistrosPontoHoje(pontoId, meta) {
@@ -1254,6 +1340,7 @@
       } catch (e) {}
 
       // 3. Exibir Tela de Sucesso com status transparente
+      carregarHistoricoPlaquinhaRonda(pontoId, p.tipo, p.nome, p.setor);
       document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
       document.getElementById('sucessoPontoNome').textContent = pontoNome;
       document.getElementById('sucessoSetor').textContent = pontoSetor;
@@ -1335,6 +1422,165 @@
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  
+    // ========================================================
+    // PLAQUINHA DIGITAL DE CONTROLE DE RONDA / SANITÁRIOS (GEL)
+    // ========================================================
+    let historicoPlaquinhaRonda = [];
+
+    function irParaFormularioNovaManutencaoRonda() {
+      const containerSenha = document.getElementById('containerSenhaLimpeza');
+      const formChecklist = document.getElementById('formChecklistRonda');
+
+      trocarModoRonda('limpeza');
+
+      if (formChecklist && !formChecklist.classList.contains('hidden')) {
+        formChecklist.scrollIntoView({ behavior: 'smooth' });
+        const inputNome = document.getElementById('inputNomeResponsavel');
+        if (inputNome) inputNome.focus();
+      } else if (containerSenha) {
+        containerSenha.scrollIntoView({ behavior: 'smooth' });
+        const inputSenha = document.getElementById('inputSenhaEquipe');
+        if (inputSenha) inputSenha.focus();
+      }
+    }
+
+    async function carregarHistoricoPlaquinhaRonda(pontoId, pontoTipo, pontoNome, pontoSetor) {
+      let registros = [];
+
+      // 1. Ler do cache local
+      try {
+        const cached = localStorage.getItem('ronda_registros_cache');
+        if (cached) {
+          const todos = JSON.parse(cached);
+          registros = todos.filter(r => r.ponto_id === pontoId);
+        }
+      } catch (e) {}
+
+      // 2. Tentar sincronizar da nuvem se online
+      if (typeof firestoreDb !== 'undefined' && firestoreDb && navigator.onLine) {
+        try {
+          const snap = await firestoreDb.collection('ronda_registros')
+            .where('ponto_id', '==', pontoId)
+            .limit(30)
+            .get();
+          if (!snap.empty) {
+            const remotos = [];
+            snap.forEach(doc => remotos.push({ id: doc.id, ...doc.data() }));
+            registros = remotos;
+          }
+        } catch (err) {
+          console.warn('Aviso ao carregar histórico de ronda:', err);
+        }
+      }
+
+      // Ordenar por data_hora decrescente
+      registros.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0));
+      historicoPlaquinhaRonda = registros;
+
+      // Atualizar títulos
+      const titEl = document.getElementById('plaquinhaTituloRonda');
+      const subEl = document.getElementById('plaquinhaSubtituloRonda');
+      const identEl = document.getElementById('plaquinhaIdentificacaoPonto');
+
+      if (pontoTipo === 'bebedouro') {
+        if (titEl) titEl.textContent = 'CONTROLE DE MANUTENÇÃO & HIGIENIZAÇÃO DE BEBEDOUROS';
+      } else {
+        if (titEl) titEl.textContent = 'CONTROLE DE HIGIENIZAÇÃO & RONDA DE SANITÁRIOS';
+      }
+
+      if (identEl) identEl.textContent = (pontoNome || 'Ponto de Ronda').toUpperCase();
+      if (subEl) subEl.textContent = pontoSetor ? `${pontoSetor.toUpperCase()} • CANTEIRO TABOCA 2` : 'CANTEIRO TABOCA 2';
+
+      atualizarBadgeCicloRonda(registros, pontoTipo);
+      renderizarTabelaPlaquinhaRonda(pontoTipo);
+    }
+
+    function atualizarBadgeCicloRonda(registros, pontoTipo) {
+      const badge = document.getElementById('badgeStatusCicloRonda');
+      const texto = document.getElementById('textoStatusCicloRonda');
+      if (!badge || !texto) return;
+
+      const dataHoje = getDataHojeLocal();
+      const registrosHoje = (registros || []).filter(r => r.data === dataHoje);
+
+      if (pontoTipo === 'bebedouro') {
+        if (registrosHoje.length > 0) {
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1';
+          badge.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>Higienizado Hoje • Filtro OK</span>';
+        } else {
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1';
+          badge.innerHTML = '<i class="fa-solid fa-clock text-amber-600"></i> <span>Aguardando Ronda do Dia</span>';
+        }
+      } else {
+        if (registrosHoje.length >= 2) {
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1';
+          badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>Meta Atingida (${registrosHoje.length}x Hoje)</span>`;
+        } else if (registrosHoje.length === 1) {
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-sky-100 text-sky-800 border border-sky-300 flex items-center gap-1';
+          badge.innerHTML = '<i class="fa-solid fa-circle-half-stroke text-sky-600"></i> <span>1ª Limpeza Feita • Falta 1x</span>';
+        } else {
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1';
+          badge.innerHTML = '<i class="fa-solid fa-circle-exclamation text-rose-600"></i> <span>Pendente Hoje (Meta 2x)</span>';
+        }
+      }
+    }
+
+    function renderizarTabelaPlaquinhaRonda(pontoTipo) {
+      const tbody = document.getElementById('plaquinhaTbodyHistoricoRonda');
+      if (!tbody) return;
+
+      const regs = historicoPlaquinhaRonda || [];
+      const totalExibir = Math.max(regs.length, 5);
+      let html = '';
+
+      for (let i = 0; i < totalExibir; i++) {
+        const reg = regs[i];
+        const numSeq = String(i + 1).padStart(2, '0');
+
+        if (reg) {
+          let descServico = reg.tipo === 'bebedouro' ? 'Higienização de Bicas & Cuba' : 'Higienização & Desinfecção';
+          if (reg.observacoes && reg.observacoes.toLowerCase().includes('refil')) {
+            descServico = 'Troca de Refil / Filtro d'Água';
+          } else if (reg.observacoes && reg.observacoes.toLowerCase().includes('esgotamento')) {
+            descServico = 'Esgotamento / Limpeza Pesada';
+          }
+
+          let badgeServico = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300">${descServico}</span>`;
+
+          const dataBr = reg.data ? reg.data.split('-').reverse().join('/') : '--/--/----';
+          const horaStr = reg.hora || '08:00';
+          const horaNum = parseInt(horaStr.split(':')[0] || '8', 10);
+          const turnoStr = horaNum < 12 ? 'Manhã' : (horaNum < 18 ? 'Tarde' : 'Noite');
+          const assinatura = reg.responsavel || 'Fiscal GEL';
+
+          html += `
+            <tr class="hover:bg-blue-50/50 transition">
+              <td class="border border-blue-900 px-1.5 py-1.5 text-center font-bold text-slate-800 bg-slate-50">${numSeq}</td>
+              <td class="border border-blue-900 px-2 py-1.5 text-center font-bold text-slate-900 whitespace-nowrap">${dataBr}</td>
+              <td class="border border-blue-900 px-1.5 py-1.5 text-center font-semibold text-slate-700">${horaStr}</td>
+              <td class="border border-blue-900 px-2.5 py-1.5 font-bold text-slate-900">${badgeServico}</td>
+              <td class="border border-blue-900 px-1.5 py-1.5 text-center font-bold text-slate-600">${turnoStr}</td>
+              <td class="border border-blue-900 px-2 py-1.5 text-center font-serif italic font-bold text-blue-900 whitespace-nowrap">${assinatura}</td>
+            </tr>
+          `;
+        } else {
+          html += `
+            <tr class="text-slate-400 bg-white">
+              <td class="border border-blue-900 px-1.5 py-1 text-center font-mono text-[10px] bg-slate-50 text-slate-400">${numSeq}</td>
+              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">--/--/----</td>
+              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">--:--</td>
+              <td class="border border-blue-900 px-2.5 py-1 text-slate-300 text-[10px] italic">--------------------------------</td>
+              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">------</td>
+              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">----------------</td>
+            </tr>
+          `;
+        }
+      }
+
+      tbody.innerHTML = html;
+    }
+
   </script>
 
 </body>

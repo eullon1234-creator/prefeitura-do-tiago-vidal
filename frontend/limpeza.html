@@ -133,6 +133,104 @@
       </div>
     </div>
 
+    
+    <!-- PLAQUINHA DIGITAL OFICIAL: CONTROLE DE MANUTENÇÃO & HIGIENIZAÇÃO (GEL) -->
+    <div id="cardPlaquinhaControle" class="bg-white text-slate-900 rounded-2xl border-2 border-blue-600 shadow-2xl overflow-hidden space-y-0 transition">
+      
+      <!-- Cabeçalho Oficial GEL (Estilo Etiqueta Adesiva Industrial) -->
+      <div class="p-3.5 bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white flex items-center justify-between border-b-2 border-blue-600">
+        <div class="flex items-center gap-2.5">
+          <div class="h-10 px-2 py-0.5 rounded-lg bg-white flex items-center justify-center shadow-xs flex-shrink-0">
+            <img src="logo_gel_oficial.png" alt="GEL Logo" class="h-7 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+          </div>
+          <div>
+            <h2 id="plaquinhaTituloEquipamento" class="text-xs sm:text-sm font-black tracking-wider uppercase leading-tight text-white drop-shadow-xs">
+              CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO
+            </h2>
+            <div class="flex items-center gap-2 text-[10px] text-blue-200 font-semibold">
+              <span>EMPRESA: <strong>GEL ENGENHARIA</strong></span>
+              <span>•</span>
+              <span id="plaquinhaSubtituloLocal">CANTEIRO TABOCA 2</span>
+            </div>
+          </div>
+        </div>
+        <div class="text-right hidden sm:block">
+          <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-blue-950/80 border border-blue-400 text-blue-200">
+            NR-18 • NR-24
+          </span>
+        </div>
+      </div>
+
+      <!-- Barra de Identificação do Aparelho & Status do Prazo -->
+      <div class="bg-blue-50 px-3.5 py-2.5 border-b border-blue-200 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-600 animate-ping"></span>
+          <span class="text-xs font-black text-blue-950 uppercase" id="plaquinhaIdentificacaoAparelho">
+            Aparelho / Acomodação
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="badgeStatusCicloPlaquinha" class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i> <span id="textoStatusCicloPlaquinha">Em Dia (Ciclo 30d)</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Abas Rápidas da Plaquinha: Ar Condicionado vs Faxina do Quarto -->
+      <div class="p-2 bg-slate-100 border-b border-slate-200 flex items-center gap-1.5">
+        <button type="button" id="tabPlaquinhaAr" onclick="alternarAbaPlaquinha('ar')" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-xs">
+          <i class="fa-solid fa-snowflake text-[11px]"></i>
+          <span>Ar Condicionado (Filtro & Total)</span>
+        </button>
+        <button type="button" id="tabPlaquinhaRotina" onclick="alternarAbaPlaquinha('rotina')" class="flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 bg-white text-slate-700 hover:bg-slate-200 border border-slate-300">
+          <i class="fa-solid fa-broom text-[11px]"></i>
+          <span>Limpeza do Quarto / Casa</span>
+        </button>
+      </div>
+
+      <!-- TABELA OFICIAL DE HISTÓRICO DE MANUTENÇÕES (RÉPLICA DA ETIQUETA FÍSICA) -->
+      <div class="p-2 sm:p-3 overflow-x-auto bg-white">
+        <table class="w-full border-collapse border border-blue-900 text-[11px] text-slate-900">
+          <thead>
+            <tr class="bg-blue-900 text-white font-black text-center text-[10px] uppercase tracking-wider">
+              <th class="border border-blue-900 px-1.5 py-1.5 w-7">Nº</th>
+              <th class="border border-blue-900 px-2 py-1.5 w-20">DATA</th>
+              <th class="border border-blue-900 px-1.5 py-1.5 w-14">HORA</th>
+              <th class="border border-blue-900 px-2.5 py-1.5 text-left">TIPO DE LIMPEZA / MANUTENÇÃO</th>
+              <th class="border border-blue-900 px-1.5 py-1.5 w-16">MÊS</th>
+              <th class="border border-blue-900 px-2 py-1.5 w-24">ASSINATURA</th>
+            </tr>
+          </thead>
+          <tbody id="plaquinhaTbodyHistorico">
+            <!-- Linhas geradas dinamicamente via JS -->
+            <tr>
+              <td colspan="6" class="p-4 text-center text-slate-400 italic">
+                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Carregando ficha de manutenção...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Rodapé da Plaquinha com Ações Diretas -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        <div class="text-[10px] text-slate-500 flex items-center gap-1 text-center sm:text-left">
+          <i class="fa-solid fa-shield-halved text-blue-600"></i>
+          <span>Registro digital certificado • Conforme NR-18 e NR-24</span>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <button type="button" onclick="irParaFormularioNovaManutencao()" class="flex-1 sm:flex-initial py-2 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition">
+            <i class="fa-solid fa-pen-nib"></i>
+            <span>+ Assinar Nova Limpeza</span>
+          </button>
+          <button type="button" onclick="trocarModoLimpeza('problema')" class="flex-1 sm:flex-initial py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs flex items-center justify-center gap-1 shadow-md transition">
+            <i class="fa-solid fa-bullhorn"></i>
+            <span>Relatar Defeito</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- SELETOR DE MODO: EQUIPE DE LIMPEZA (COM SENHA) vs MORADOR / ALOJADO (SEM SENHA) -->
     <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/90 border border-slate-800 rounded-2xl shadow-md">
       <button 
@@ -246,6 +344,37 @@
             <span class="text-xs font-extrabold text-white">Ar Condicionado</span>
             <span class="text-[10px] text-slate-400 mt-0.5">Higienização (30d)</span>
           </div>
+        </div>
+      </div>
+
+      
+      <!-- Sub-tipo de Manutenção de Ar Condicionado (Filtro vs Higienização Total) -->
+      <div id="boxSubtipoAr" class="hidden p-3 rounded-xl bg-slate-900 border border-sky-500/40 space-y-2">
+        <label class="block text-xs font-bold text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-screwdriver-wrench text-sky-400"></i> Tipo de Manutenção no Ar Condicionado *
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <label class="cursor-pointer p-2.5 rounded-xl border border-sky-500/50 bg-sky-950/30 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
+            <input type="radio" name="subtipo_ar" value="filtro" checked class="text-sky-500 focus:ring-sky-500">
+            <div>
+              <div class="text-[11px] font-black text-sky-200">Limpeza de Filtro</div>
+              <div class="text-[9px] text-slate-400 font-normal">Telas lavadas e desinfetadas</div>
+            </div>
+          </label>
+          <label class="cursor-pointer p-2.5 rounded-xl border border-slate-700 bg-slate-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
+            <input type="radio" name="subtipo_ar" value="total" class="text-sky-500 focus:ring-sky-500">
+            <div>
+              <div class="text-[11px] font-black text-emerald-300">Higienização Total</div>
+              <div class="text-[9px] text-slate-400 font-normal">Serpentina + Dreno + Bactericida</div>
+            </div>
+          </label>
+          <label class="cursor-pointer p-2.5 rounded-xl border border-slate-700 bg-slate-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
+            <input type="radio" name="subtipo_ar" value="corretiva" class="text-sky-500 focus:ring-sky-500">
+            <div>
+              <div class="text-[11px] font-black text-amber-300">Corretiva / Reparo</div>
+              <div class="text-[9px] text-slate-400 font-normal">Gás, dreno ou elétrica</div>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -790,6 +919,7 @@
       document.getElementById('boxQuartoOcorrenciaAlojamento').classList.remove('hidden');
       document.getElementById('boxQuartoAtendidoLimpeza').classList.remove('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
+      carregarHistoricoPlaquinhaLimpeza(null, null, blocoNome);
     }
 
     function definirFaxinaGeralBloco() {
@@ -817,6 +947,7 @@
       document.getElementById('boxQuartoAtendidoLimpeza').classList.add('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
       document.getElementById('badgeQrIdentificado').classList.remove('hidden');
+      carregarHistoricoPlaquinhaLimpeza(idUnificado, quartoId, blocoNome);
     }
 
     function alternarTipoSelecaoManual(tipo) {
@@ -1020,7 +1151,15 @@
       const agora = new Date();
       const protocolo = 'LIMP-' + Math.floor(100000 + Math.random() * 900000);
       const dataHoraStr = `${data}T${hora}:00`;
-      const descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado (Ciclo 30d)';
+      let subtipoAr = '';
+      if (tipo === 'ar_condicionado') {
+        const rad = document.querySelector('input[name="subtipo_ar"]:checked');
+        subtipoAr = rad ? rad.value : 'filtro';
+      }
+      let descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado';
+      if (subtipoAr === 'filtro') descTipo = 'Limpeza de Filtro de Ar';
+      else if (subtipoAr === 'total') descTipo = 'Higienização Total de Ar (Ciclo 30d)';
+      else if (subtipoAr === 'corretiva') descTipo = 'Manutenção Corretiva de Ar';
 
       const registro = {
         id: protocolo,
@@ -1031,6 +1170,7 @@
         quarto_numero: quartoNumero ? String(quartoNumero) : '',
         bloco_nome: blocoNome || '',
         tipo: tipo,
+        subtipo: subtipoAr,
         data: data,
         hora: hora,
         data_hora: dataHoraStr,
@@ -1076,6 +1216,7 @@
         localStorage.setItem('casas_limpezas_cache', JSON.stringify(lista.slice(0, 200)));
       } catch (e) {}
 
+      carregarHistoricoPlaquinhaLimpeza(casaId, quartoId, blocoNome);
       document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
       document.getElementById('sucessoCasaNome').textContent = casaNome;
       document.getElementById('sucessoTipo').textContent = descTipo;
@@ -1281,6 +1422,217 @@
       document.getElementById('formOcorrenciaLocal').classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  
+    // ========================================================
+    // PLAQUINHA DIGITAL DE MANUTENÇÃO & HIGIENIZAÇÃO (GEL)
+    // ========================================================
+    let abaPlaquinhaAtual = 'ar'; // 'ar' ou 'rotina'
+    let historicoPlaquinhaAtual = [];
+
+    function alternarAbaPlaquinha(aba) {
+      abaPlaquinhaAtual = aba;
+      const tabAr = document.getElementById('tabPlaquinhaAr');
+      const tabRotina = document.getElementById('tabPlaquinhaRotina');
+      const tit = document.getElementById('plaquinhaTituloEquipamento');
+
+      if (aba === 'ar') {
+        if (tabAr) {
+          tabAr.className = 'flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-xs';
+        }
+        if (tabRotina) {
+          tabRotina.className = 'flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 bg-white text-slate-700 hover:bg-slate-200 border border-slate-300';
+        }
+        if (tit) tit.textContent = 'CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO';
+      } else {
+        if (tabAr) {
+          tabAr.className = 'flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 bg-white text-slate-700 hover:bg-slate-200 border border-slate-300';
+        }
+        if (tabRotina) {
+          tabRotina.className = 'flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 bg-teal-600 text-white shadow-xs';
+        }
+        if (tit) tit.textContent = 'CONTROLE DE HIGIENIZAÇÃO & LIMPEZA DE ALOJAMENTO';
+      }
+
+      renderizarTabelaPlaquinha();
+    }
+
+    function irParaFormularioNovaManutencao() {
+      const containerSenha = document.getElementById('containerSenhaLimpeza');
+      const formLimpeza = document.getElementById('formRegistroLimpeza');
+      
+      trocarModoLimpeza('limpeza');
+
+      if (formLimpeza && !formLimpeza.classList.contains('hidden')) {
+        formLimpeza.scrollIntoView({ behavior: 'smooth' });
+        const inputNome = document.getElementById('inputResponsavel');
+        if (inputNome) inputNome.focus();
+      } else if (containerSenha) {
+        containerSenha.scrollIntoView({ behavior: 'smooth' });
+        const inputSenha = document.getElementById('inputSenhaEquipe');
+        if (inputSenha) inputSenha.focus();
+      }
+    }
+
+    async function carregarHistoricoPlaquinhaLimpeza(casaId, quartoId, blocoNome) {
+      let registros = [];
+
+      // 1. Tentar ler do cache local
+      try {
+        const cached = localStorage.getItem('casas_limpezas_cache');
+        if (cached) {
+          const todos = JSON.parse(cached);
+          registros = todos.filter(r => {
+            if (quartoId && r.quarto_id && String(r.quarto_id) === String(quartoId)) return true;
+            if (blocoNome && r.bloco_nome && String(r.bloco_nome).toLowerCase() === String(blocoNome).toLowerCase()) return true;
+            if (casaId && r.casa_id && String(r.casa_id) === String(casaId)) return true;
+            return false;
+          });
+        }
+      } catch (e) {}
+
+      // 2. Tentar sincronizar da nuvem Firestore se online
+      if (typeof firestoreDb !== 'undefined' && firestoreDb && navigator.onLine) {
+        try {
+          let query = firestoreDb.collection('casas_limpezas');
+          if (quartoId) {
+            query = query.where('quarto_id', '==', String(quartoId));
+          } else if (casaId) {
+            query = query.where('casa_id', '==', String(casaId));
+          }
+          const snap = await query.limit(30).get();
+          if (!snap.empty) {
+            const remotos = [];
+            snap.forEach(doc => remotos.push({ id: doc.id, ...doc.data() }));
+            registros = remotos;
+          }
+        } catch (err) {
+          console.warn('Aviso ao carregar histórico da plaquinha no Firestore:', err);
+        }
+      }
+
+      // Ordenar por data mais recente primeiro
+      registros.sort((a, b) => new Date(b.data_hora || b.criado_em || 0) - new Date(a.data_hora || a.criado_em || 0));
+      historicoPlaquinhaAtual = registros;
+
+      // Atualizar Identificação do Aparelho no topo da Plaquinha
+      const elIdent = document.getElementById('plaquinhaIdentificacaoAparelho');
+      const elSub = document.getElementById('plaquinhaSubtituloLocal');
+      const nomeUnidade = document.getElementById('displayCasaNome')?.textContent || 'Alojamento';
+
+      if (elIdent) {
+        elIdent.textContent = nomeUnidade.toUpperCase();
+      }
+      if (elSub) {
+        elSub.textContent = blocoNome ? `${blocoNome.toUpperCase()} • CANTEIRO TABOCA 2` : 'CANTEIRO TABOCA 2';
+      }
+
+      atualizarBadgeCicloPlaquinha(registros);
+      renderizarTabelaPlaquinha();
+    }
+
+    function atualizarBadgeCicloPlaquinha(registros) {
+      const badge = document.getElementById('badgeStatusCicloPlaquinha');
+      const texto = document.getElementById('textoStatusCicloPlaquinha');
+      if (!badge || !texto) return;
+
+      const manutencoesAr = (registros || []).filter(r => r.tipo === 'ar_condicionado');
+      if (manutencoesAr.length === 0) {
+        badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1';
+        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-600"></i> <span>Aguardando 1ª Limpeza</span>';
+        return;
+      }
+
+      const ult = manutencoesAr[0];
+      const dataUlt = new Date(ult.data || ult.criado_em);
+      const hoje = new Date();
+      const diffMs = hoje - dataUlt;
+      const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDias <= 24) {
+        badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1';
+        badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>Em Dia (${diffDias}d atrÃ¡s)</span>`;
+      } else if (diffDias <= 30) {
+        badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1';
+        badge.innerHTML = `<i class="fa-solid fa-clock text-amber-600"></i> <span>AtenÃ§Ã£o (${diffDias}d - PrÃ³ximo)</span>`;
+      } else {
+        badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1';
+        badge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600"></i> <span>Vencido (${diffDias}d - Limpar)</span>`;
+      }
+    }
+
+    function formatarMesAbreviado(dataStr) {
+      if (!dataStr) return 'MÃªs --';
+      try {
+        const partes = dataStr.split('-');
+        if (partes.length >= 2) {
+          const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+          const idx = parseInt(partes[1], 10) - 1;
+          return meses[idx] || ('MÃªs ' + partes[1]);
+        }
+      } catch (e) {}
+      return 'MÃªs --';
+    }
+
+    function renderizarTabelaPlaquinha() {
+      const tbody = document.getElementById('plaquinhaTbodyHistorico');
+      if (!tbody) return;
+
+      const filtrados = (historicoPlaquinhaAtual || []).filter(r => {
+        if (abaPlaquinhaAtual === 'ar') return r.tipo === 'ar_condicionado';
+        return r.tipo !== 'ar_condicionado';
+      });
+
+      let html = '';
+      const totalExibir = Math.max(filtrados.length, 5); // Garantir mÃ­nimo de 5 linhas estilo plaquinha fÃ­sica
+
+      for (let i = 0; i < totalExibir; i++) {
+        const reg = filtrados[i];
+        const numSeq = String(i + 1).padStart(2, '0');
+
+        if (reg) {
+          // Linha preenchida com dados reais
+          let tipoTag = '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300">L. DE FILTRO</span>';
+          if (reg.subtipo === 'total' || (reg.observacoes && reg.observacoes.toLowerCase().includes('total'))) {
+            tipoTag = '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">HIGIENIZAÃ‡ÃƒO TOTAL</span>';
+          } else if (reg.subtipo === 'corretiva' || (reg.observacoes && reg.observacoes.toLowerCase().includes('reparo'))) {
+            tipoTag = '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">CORRETIVA / GÃ S</span>';
+          } else if (reg.tipo === 'rotina') {
+            tipoTag = '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-teal-100 text-teal-900 border border-teal-300">FAXINA DE ROTINA</span>';
+          }
+
+          const dataBr = reg.data ? reg.data.split('-').reverse().join('/') : '--/--/----';
+          const horaStr = reg.hora || (reg.data_hora ? reg.data_hora.substring(11, 16) : '08:00');
+          const mesStr = formatarMesAbreviado(reg.data);
+          const assinatura = reg.responsavel || reg.criado_por || 'TÃ©cnico GEL';
+
+          html += `
+            <tr class="hover:bg-blue-50/50 transition">
+              <td class="border border-blue-900 px-1.5 py-1.5 text-center font-bold text-slate-800 bg-slate-50">${numSeq}</td>
+              <td class="border border-blue-900 px-2 py-1.5 text-center font-bold text-slate-900 whitespace-nowrap">${dataBr}</td>
+              <td class="border border-blue-900 px-1.5 py-1.5 text-center font-semibold text-slate-700">${horaStr}</td>
+              <td class="border border-blue-900 px-2.5 py-1.5 font-bold text-slate-900">${tipoTag}</td>
+              <td class="border border-blue-900 px-1.5 py-1.5 text-center font-bold text-slate-600">${mesStr}</td>
+              <td class="border border-blue-900 px-2 py-1.5 text-center font-serif italic font-bold text-blue-900 whitespace-nowrap">${assinatura}</td>
+            </tr>
+          `;
+        } else {
+          // Linha pontilhada / em branco para preenchimento manual (igual Ã  foto da etiqueta fÃ­sica)
+          html += `
+            <tr class="text-slate-400 bg-white">
+              <td class="border border-blue-900 px-1.5 py-1 text-center font-mono text-[10px] bg-slate-50 text-slate-400">${numSeq}</td>
+              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">--/--/----</td>
+              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">--:--</td>
+              <td class="border border-blue-900 px-2.5 py-1 text-slate-300 text-[10px] italic">--------------------------------</td>
+              <td class="border border-blue-900 px-1.5 py-1 text-center border-dashed text-[10px]">----</td>
+              <td class="border border-blue-900 px-2 py-1 text-center border-dashed text-[10px]">----------------</td>
+            </tr>
+          `;
+        }
+      }
+
+      tbody.innerHTML = html;
+    }
+
   </script>
 
 </body>

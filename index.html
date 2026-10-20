@@ -130,6 +130,27 @@
         background: white !important;
         padding: 0 !important;
       }
+      
+      /* Impressão da Plaquinha de Manutenção Oficial (Adesivo/A4) */
+      body.imprimindo-plaquinha-manutencao > *:not(#modalPlaquinhaManutencaoA4) { display: none !important; }
+      body.imprimindo-plaquinha-manutencao #modalPlaquinhaManutencaoA4 {
+        position: static !important;
+        display: block !important;
+        background: transparent !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+      }
+      body.imprimindo-plaquinha-manutencao #modalPlaquinhaManutencaoA4 > div {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      body.imprimindo-plaquinha-manutencao #areaImpressaoPlaquinhaManutencao {
+        background: white !important;
+        padding: 0 !important;
+      }
+
       /* Impressão da Placa QR da Ronda do Canteiro (Banheiros e Bebedouros) */
       body.imprimindo-placa-ronda > *:not(#modalPlacaQRRonda) { display: none !important; }
       body.imprimindo-placa-ronda #modalPlacaQRRonda {
@@ -781,6 +802,9 @@
               </button>
               <button onclick="abrirModalRelatorioLimpezaExecutivo('alojamento')" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
                 <i class="fa-solid fa-file-pdf"></i> Relatório Limpeza (A4)
+              </button>
+              <button onclick="abrirModalPlaquinhaManutencao('ronda', null)" class="px-3 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition" title="Imprimir Plaquinha Oficial de Manutenção e Ronda">
+                <i class="fa-solid fa-tag"></i> Plaquinha de Manutenção (Adesivo)
               </button>
               <button onclick="abrirModalConfigRonda()" class="btn-prefeito px-3 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition" title="Configurar Senha da Equipe de Limpeza no QR Code">
                 <i class="fa-solid fa-lock"></i> Senha Equipe QR
@@ -4941,6 +4965,9 @@ service cloud.firestore {
               <p class="text-xs text-slate-500">Auditoria completa com data/hora, responsável e observações</p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="abrirModalPlaquinhaManutencao('ar_casa', casaSelecionadaId)" class="btn-prefeito px-3.5 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-snowflake text-sky-300"></i> Plaquinha Ar Condicionado
+              </button>
               <button onclick="abrirModalPlacaQRCasa(casaSelecionadaId)" class="btn-prefeito px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
                 <i class="fa-solid fa-qrcode text-amber-400"></i> Placa QR da Casa
               </button>
@@ -6590,6 +6617,123 @@ service cloud.firestore {
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  
+  <!-- ================= MODAL PLAQUINHA OFICIAL DE MANUTENÇÃO & HIGIENIZAÇÃO (IMPRESSÃO A4 / ADESIVO) ================= -->
+  <div id="modalPlaquinhaManutencaoA4" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[85] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      
+      <!-- Topo Modal (Não sai na impressão) -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between no-print flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+            <i class="fa-solid fa-tag text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Plaquinha Oficial de Controle de Manutenção (NR-18 & NR-24)</h3>
+            <p class="text-[11px] text-slate-400">Etiqueta de controle periódico idêntica ao modelo físico para fixação nos aparelhos</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="selectTipoPlaquinhaModal" onchange="aoMudarModeloPlaquinhaManutencao(this.value)" class="bg-slate-800 text-blue-300 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none cursor-pointer">
+            <option value="ar">❄️ Ar Condicionado</option>
+            <option value="bebedouro">🚰 Bebedouro / Purificador</option>
+            <option value="banheiro">🚻 Banheiro Químico / Sanitário</option>
+            <option value="quarto">🧹 Quarto / Alojamento</option>
+          </select>
+          <button onclick="imprimirPlaquinhaManutencao()" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-print"></i> Imprimir Plaquinha
+          </button>
+          <button onclick="fecharModal('modalPlaquinhaManutencaoA4')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo Visual da Placa (Imprimível em A4 ou Papel Adesivo) -->
+      <div class="p-6 overflow-y-auto flex-1 bg-slate-100 flex items-center justify-center" id="areaImpressaoPlaquinhaManutencao">
+        
+        <!-- Placa Estilizada Oficial GEL (Idêntica à Etiqueta Física Agratto) -->
+        <div class="bg-white w-full max-w-2xl rounded-2xl p-6 sm:p-8 border-4 border-blue-900 shadow-xl space-y-4 text-slate-900">
+          
+          <!-- Cabeçalho Oficial -->
+          <div class="border-b-2 border-blue-900 pb-3 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="h-12 w-auto flex items-center justify-center">
+                <img src="logo_gel_oficial.png" alt="Logo GEL Oficial" class="h-10 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+              </div>
+              <div>
+                <h2 id="modalPlaquinhaHeaderTitulo" class="text-base sm:text-lg font-black tracking-wider uppercase text-blue-950 leading-tight">
+                  CONTROLE DE MANUTENÇÃO DE AR CONDICIONADO
+                </h2>
+                <div class="text-xs font-extrabold text-slate-600 uppercase">
+                  EMPRESA: <span class="text-blue-900 font-black">GEL ENGENHARIA</span> • <span id="modalPlaquinhaHeaderObra">CANTEIRO TABOCA 2</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- QR Code de Acesso Rápido Estampado no Canto -->
+            <div class="flex flex-col items-center p-2 rounded-xl border border-slate-300 bg-slate-50 flex-shrink-0">
+              <div id="modalPlaquinhaQRCodeContainer" class="w-16 h-16 flex items-center justify-center bg-white"></div>
+              <span class="text-[8px] font-black uppercase text-blue-950 mt-1">Escanear QR</span>
+            </div>
+          </div>
+
+          <!-- Faixa de Identificação do Local / Aparelho -->
+          <div class="flex items-center justify-between bg-blue-50 px-3.5 py-2 rounded-lg border border-blue-200 text-xs">
+            <div>
+              <span class="font-bold text-slate-500 uppercase text-[10px]">Identificação do Local:</span>
+              <span id="modalPlaquinhaLocalNome" class="font-black text-blue-950 text-xs sm:text-sm ml-1">QUARTO 14 • BLOCO 2</span>
+            </div>
+            <div>
+              <span class="font-bold text-slate-500 uppercase text-[10px]">Ciclo Preventivo:</span>
+              <span class="font-black text-emerald-800 text-xs ml-1">NR-18 & NR-24 (30 DIAS)</span>
+            </div>
+          </div>
+
+          <!-- Tabela de Controle de Manutenções (Linhas Oficiais Pautadas) -->
+          <div class="overflow-x-auto">
+            <table class="w-full border-collapse border-2 border-blue-950 text-xs">
+              <thead>
+                <tr class="bg-blue-950 text-white font-black text-center text-[10px] uppercase tracking-wider">
+                  <th class="border-2 border-blue-950 px-2 py-2 w-8">Nº</th>
+                  <th class="border-2 border-blue-950 px-3 py-2 w-24">DATA</th>
+                  <th class="border-2 border-blue-950 px-2 py-2 w-16">HORA</th>
+                  <th class="border-2 border-blue-950 px-3 py-2 text-left">TIPO DE LIMPEZA / MANUTENÇÃO</th>
+                  <th class="border-2 border-blue-950 px-2 py-2 w-16">MÊS</th>
+                  <th class="border-2 border-blue-950 px-3 py-2 w-28">ASSINATURA</th>
+                </tr>
+              </thead>
+              <tbody id="modalPlaquinhaTbodyHistorico">
+                <!-- Populado dinamicamente com dados ou pautas em branco para preenchimento manual -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Rodapé Institucional da Placa -->
+          <div class="border-t border-slate-300 pt-2 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+            <span>Sistema Prefeitura de Canteiro • GEL Engenharia</span>
+            <span>Documento emitido conforme Normas Regulamentadoras NR-18 e NR-24</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Rodapé Modal (Não sai na impressão) -->
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between no-print flex-shrink-0">
+        <span class="text-xs text-slate-500">Imprima em papel sulfite comum ou papel adesivo vinílico para colar no aparelho.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="fecharModal('modalPlaquinhaManutencaoA4')" class="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
+            Fechar
+          </button>
+          <button type="button" onclick="imprimirPlaquinhaManutencao()" class="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-print"></i> Imprimir Plaquinha
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 
