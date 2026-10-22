@@ -1097,7 +1097,7 @@ assert(appJsContentSec16.includes("collection('canteiro_metadata').doc('snapshot
 
 // 5. PWA Offline em sw.js
 const swContent = fs.readFileSync('sw.js', 'utf8');
-assert(/prefeitura-pwa-v4\.[1234]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
+assert(/prefeitura-pwa-v4\.[123456]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
 assert(swContent.includes("'ronda.html'"), 'ronda.html incluído no pré-cache offline de sw.js');
 assert(swContent.includes("response.type !== 'opaque'"), 'Suporte a cache de recursos de CDN (Tailwind, FontAwesome) ativo em sw.js');
 
@@ -1530,6 +1530,58 @@ const limpezaHtmlAtual = fs.readFileSync('limpeza.html', 'utf8');
 assert(limpezaHtmlAtual.includes('const isAlvoLimpeza = Boolean(urlCasaId || urlQuartoId || urlQuartoNum || urlBloco || urlBlocoId);'), 'limpeza.html não redireciona casas ou quartos válidos');
 assert(limpezaHtmlAtual.includes('function carregarCasa(casaId)'), 'carregarCasa em limpeza.html renderiza de forma imediata e síncrona');
 assert(limpezaHtmlAtual.includes('carregarHistoricoPlaquinhaLimpeza(c.id, null, null);'), 'aplicarDadosCasa atualiza histórico da plaquinha da casa');
+
+// -------------------------------------------------------------
+// SEÇÃO 24: PENTE FINO EM TODOS OS TIPOS DE QR CODE (OFFLINE ENGINE, FALLBACKS, PARIDADE E BLINDAGEM)
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 24: AUDITORIA E BLINDAGEM DE TODOS OS QR CODES ---');
+
+// 1. Motor de QR Code Offline Local (pure JS)
+assert(fs.existsSync('qrcode.min.js'), 'Biblioteca qrcode.min.js presente na raiz');
+assert(fs.existsSync('frontend/qrcode.min.js'), 'Biblioteca qrcode.min.js presente em frontend/');
+const qrcodeRaiz = fs.readFileSync('qrcode.min.js', 'utf8');
+const qrcodeFrontend = fs.readFileSync('frontend/qrcode.min.js', 'utf8');
+assert(qrcodeRaiz.length > 5000 && qrcodeRaiz === qrcodeFrontend, 'qrcode.min.js tem paridade exata de 100% entre raiz e frontend');
+
+// 2. Funções Centrais de Renderização de QR Code em app.js
+assert(appJsAtual.includes('function gerarQRCodeDataUrl(texto,'), 'gerarQRCodeDataUrl implementada com suporte a motor offline e fallback');
+assert(appJsAtual.includes('function renderizarQRCodeEmImagem(imgEl, texto,'), 'renderizarQRCodeEmImagem implementada para atualização segura de img tags');
+assert(appJsAtual.includes('function copiarLinkPlacaQRCasa()'), 'copiarLinkPlacaQRCasa implementada para contingência e compartilhamento');
+assert(appJsAtual.includes('function copiarLinkPlacaQRRonda()'), 'copiarLinkPlacaQRRonda implementada para contingência e compartilhamento');
+assert(appJsAtual.includes('function escanearArquivoQRLimpeza(input)'), 'escanearArquivoQRLimpeza implementado para upload de foto no scanner de limpeza');
+assert(appJsAtual.includes('function escanearArquivoQRRonda(input)'), 'escanearArquivoQRRonda implementado para upload de foto no scanner de ronda');
+
+// 3. Script qrcode.min.js injetado nas páginas
+assert(indexHtmlAtual.includes('src="qrcode.min.js"'), 'qrcode.min.js incluído em index.html');
+const indexFrontend = fs.readFileSync('frontend/index.html', 'utf8');
+assert(indexFrontend.includes('src="qrcode.min.js"'), 'qrcode.min.js incluído em frontend/index.html');
+const chamadoHtmlAtual = fs.readFileSync('chamado.html', 'utf8');
+assert(chamadoHtmlAtual.includes('src="qrcode.min.js"'), 'chamado.html inclui motor de QR Code');
+
+// 4. Correção do Bug de Duplicação de Prefixo Quarto (quarto_quarto_14)
+assert(limpezaHtmlAtual.includes("replace(/^quarto_/i, '')"), 'limpeza.html sanitiza prefixo quarto_ duplicado ao aplicar dados do quarto');
+assert(appJsAtual.includes("replace(/^quarto_/i, '')"), 'app.js sanitiza prefixo quarto_ duplicado em calcularStatusLimpezasCasa');
+
+// 5. Histórico Filtrado do Bloco em limpeza.html
+assert(limpezaHtmlAtual.includes("query.where('bloco_nome', '==', String(blocoNome))"), 'limpeza.html filtra histórico do bloco exclusivamente pelo bloco_nome');
+
+// 6. Plaquinha de Manutenção A4 com Bloco e Quarto Num
+assert(appJsAtual.includes('quarto_num=${encodeURIComponent(qNum)}&bloco=${encodeURIComponent(qBloco)}'), 'Plaquinha de ar condicionado passa quarto_num e bloco para limpeza.html');
+
+// 7. Resiliência Contra ReferenceError em Quartos e Timeouts de Rede no Celular
+assert(appJsAtual.includes('function obterTodosQuartos()'), 'Função obterTodosQuartos implementada para acesso seguro aos quartos');
+assert(appJsAtual.includes("defineProperty(window, 'allQuartosData'"), 'Getter allQuartosData blindado no window para compatibilidade total');
+assert(limpezaHtmlAtual.includes('Promise.race(['), 'limpeza.html possui timeout resiliente de gravação com Promise.race');
+const rondaHtmlAtual = fs.readFileSync('ronda.html', 'utf8');
+assert(rondaHtmlAtual.includes('Promise.race(['), 'ronda.html possui timeout resiliente de gravação com Promise.race');
+
+// 8. Paridade de Arquivos Críticos entre Raiz e frontend/
+const arquivosVerificarParidade = ['app.js', 'index.html', 'limpeza.html', 'ronda.html', 'chamado.html', 'sw.js', 'qrcode.min.js'];
+arquivosVerificarParidade.forEach(arq => {
+  const cRaiz = fs.readFileSync(arq, 'utf8');
+  const cFront = fs.readFileSync(`frontend/${arq}`, 'utf8');
+  assert(cRaiz === cFront, `Paridade estrita de 100% no arquivo ${arq}`);
+});
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

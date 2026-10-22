@@ -34,6 +34,34 @@ let globalBlocos = [];
 let globalEmpresas = [];
 let globalQuartos = [];
 let globalVagasLivres = [];
+
+// Acesso seguro e resiliente a todos os quartos do alojamento em memória
+function obterTodosQuartos() {
+  if (typeof StaticApiEngine !== 'undefined' && StaticApiEngine.dbState && Array.isArray(StaticApiEngine.dbState.quartos) && StaticApiEngine.dbState.quartos.length > 0) {
+    return StaticApiEngine.dbState.quartos;
+  }
+  if (Array.isArray(globalQuartos) && globalQuartos.length > 0) {
+    return globalQuartos;
+  }
+  if (typeof window !== 'undefined' && Array.isArray(window.globalQuartos) && window.globalQuartos.length > 0) {
+    return window.globalQuartos;
+  }
+  return [];
+}
+
+// Aliases globais e reativos para compatibilidade total entre telas e módulos
+var allQuartosData = [];
+if (typeof window !== 'undefined') {
+  try {
+    Object.defineProperty(window, 'allQuartosData', {
+      get: function() { return obterTodosQuartos(); },
+      set: function(val) { if (Array.isArray(val)) globalQuartos = val; },
+      configurable: true
+    });
+  } catch (e) {
+    window.allQuartosData = globalQuartos;
+  }
+}
 let chartBlocosInstance = null;
 let chartEmpresasInstance = null;
 let chartCasasCidadeInstance = null;
@@ -10885,6 +10913,14 @@ async function excluirChamado(protocolo) {
 
 // Helper universal para obter URLs de páginas do sistema preservando domínio e caminhos limpos
 function getCleanSystemUrl(targetPage = 'chamado.html') {
+  // 1. Suporte a URL Pública Base personalizada (configurada nas configurações do sistema)
+  const customBase = localStorage.getItem('prefeitura_base_url_custom');
+  if (customBase && customBase.trim().startsWith('http')) {
+    let base = customBase.trim().replace(/\/+$/, '');
+    base = base.replace(/\/[^/]+\.html$/i, '');
+    return `${base}/${targetPage}`;
+  }
+
   const href = window.location.href;
   let cleanUrl = href.split('?')[0].split('#')[0];
   // Remove qualquer arquivo HTML no final (index.html, limpeza.html, ronda.html, chamado.html, etc.)
@@ -10895,6 +10931,36 @@ function getCleanSystemUrl(targetPage = 'chamado.html') {
   return `${cleanUrl}${targetPage}`;
 }
 
+// Gerador nativo e autônomo de QR Code em Data URL (100% offline via qrcode-generator com fallback transparente)
+function gerarQRCodeDataUrl(texto, cellSize = 6, margin = 4) {
+  if (!texto) return '';
+  try {
+    if (typeof qrcode === 'function') {
+      const qr = qrcode(0, 'M');
+      qr.addData(String(texto));
+      qr.make();
+      return qr.createDataURL(cellSize, margin);
+    }
+  } catch (err) {
+    console.warn("Falha no gerador nativo offline de QR Code, usando fallback:", err);
+  }
+  // Fallback para API pública caso a biblioteca local não esteja disponível
+  return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(texto)}&format=png&_t=${Date.now()}`;
+}
+
+// Renderizar QR Code no elemento de imagem com proteção contra erros e carregamento offline
+function renderizarQRCodeEmImagem(imgEl, texto, tamanho = 400) {
+  if (!imgEl) return;
+  const cellSize = tamanho >= 350 ? 6 : (tamanho >= 200 ? 5 : 3);
+  const dataUrl = gerarQRCodeDataUrl(texto, cellSize, 4);
+
+  imgEl.onerror = function() {
+    this.onerror = null;
+    this.src = `https://api.qrserver.com/v1/create-qr-code/?size=${tamanho}x${tamanho}&data=${encodeURIComponent(texto)}&format=png`;
+  };
+  imgEl.src = dataUrl;
+}
+
 // Obter link público do chamado para o QR Code
 function getQRCodeUrl() {
   return getCleanSystemUrl('chamado.html');
@@ -10902,14 +10968,14 @@ function getQRCodeUrl() {
 
 // Plaquinha QR Code
 function abrirModalPlaquinhaQR() {
+  fecharTodosModaisQR();
   const qrUrl = getQRCodeUrl();
   const imgEl = document.getElementById('imgPlaquinhaQRCode');
   const txtEl = document.getElementById('textoPlaquinhaUrl');
   const configDisplay = document.getElementById('configQrLinkDisplay');
 
-  // Gerador de QR Code em alta resolução com API confiável
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrUrl)}&format=png`;
-  if (imgEl) imgEl.src = qrApiUrl;
+  // Gerador de QR Code autônomo e offline em alta resolução
+  renderizarQRCodeEmImagem(imgEl, qrUrl, 350);
   if (txtEl) txtEl.textContent = qrUrl;
   if (configDisplay) configDisplay.value = qrUrl;
 
@@ -14162,8 +14228,13 @@ function calcularStatusLimpezasCasa(casaId, quartoObj = null) {
   const limpezasCasa = (listaLimpezasCasas || []).filter(l => {
     if (l.casa_id === casaId) return true;
     if (quartoObj) {
-      if (String(l.quarto_id) === String(quartoObj.id)) return true;
-      if (l.tipo_local === 'alojamento' && String(l.quarto_numero) === String(quartoObj.numero) && (!l.bloco_nome || String(l.bloco_nome).toLowerCase() === String(quartoObj.bloco_nome || '').toLowerCase())) return true;
+      const qIdStr = String(quartoObj.id || '');
+      const qNumStr = String(quartoObj.numero || '');
+      const lQuartoIdLimpo = String(l.quarto_id || '').replace(/^quarto_/i, '').trim();
+      const lQuartoNumLimpo = String(l.quarto_numero || '').replace(/^quarto_/i, '').trim();
+      if (lQuartoIdLimpo && (lQuartoIdLimpo === qIdStr || lQuartoIdLimpo === qNumStr)) return true;
+      if (String(l.quarto_id) === qIdStr) return true;
+      if (l.tipo_local === 'alojamento' && (lQuartoNumLimpo === qNumStr || String(l.quarto_numero) === qNumStr) && (!l.bloco_nome || String(l.bloco_nome).toLowerCase() === String(quartoObj.bloco_nome || '').toLowerCase())) return true;
     }
     return false;
   });
@@ -14376,10 +14447,8 @@ function abrirModalPlacaQRCasa(casaId) {
   if (endEl) endEl.textContent = `Endereço: ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  // Alta resolução para impressão sem cache obsoleto
-  if (imgEl) imgEl.src = '';
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
-  if (imgEl) imgEl.src = qrApiUrl;
+  // Alta resolução e carregamento nativo offline para impressão
+  renderizarQRCodeEmImagem(imgEl, qrUrl, 400);
 
   abrirModal('modalPlacaQRCasa');
 }
@@ -14437,15 +14506,13 @@ function renderizarConteudoPlacaQRBloco(blocoNome) {
   if (endEl) endEl.textContent = `Canteiro de Obras Taboca 2 • GEL Engenharia`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  if (imgEl) imgEl.src = '';
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
-  if (imgEl) imgEl.src = qrApiUrl;
+  renderizarQRCodeEmImagem(imgEl, qrUrl, 400);
 }
 
 // Abrir modal com placa QR Code do Quarto do Alojamento (Impressão A4)
 function abrirModalPlacaQRQuarto(quartoId) {
   fecharTodosModaisQR();
-  const q = (allQuartosData || []).find(x => String(x.id) === String(quartoId));
+  const q = obterTodosQuartos().find(x => String(x.id) === String(quartoId));
   if (!q) {
     showToast('Quarto não encontrado para gerar placa QR.', 'warning');
     return;
@@ -14474,9 +14541,7 @@ function abrirModalPlacaQRQuarto(quartoId) {
   if (endEl) endEl.textContent = `Setor: Alojamento do Canteiro • Capacidade: ${q.capacidade || 4} vagas`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  if (imgEl) imgEl.src = '';
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
-  if (imgEl) imgEl.src = qrApiUrl;
+  renderizarQRCodeEmImagem(imgEl, qrUrl, 400);
 
   abrirModal('modalPlacaQRCasa');
 }
@@ -14497,7 +14562,7 @@ function abrirScannerLimpezaQR() {
   const sel = document.getElementById('selectCasaScannerManual');
   if (sel) {
     const opcoesCasas = (listaCasasCidade || []).map(c => `<option value="${c.id}">🏡 ${c.nome} - ${c.endereco || ''}</option>`).join('');
-    const opcoesQuartos = (allQuartosData || []).map(q => `<option value="quarto_${q.id}">🛏️ Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})</option>`).join('');
+    const opcoesQuartos = obterTodosQuartos().map(q => `<option value="quarto_${q.id}">🛏️ Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})</option>`).join('');
     sel.innerHTML = '<option value="">Selecione uma casa ou quarto...</option>' +
       (opcoesCasas ? `<optgroup label="Casas na Cidade">${opcoesCasas}</optgroup>` : '') +
       (opcoesQuartos ? `<optgroup label="Quartos do Alojamento">${opcoesQuartos}</optgroup>` : '');
@@ -14626,17 +14691,24 @@ function processarLeituraQRCasa(texto) {
     }
 
     if (urlObj) {
-      const qCasaId = urlObj.searchParams.get('casa_id');
-      const qQuartoId = urlObj.searchParams.get('quarto_id');
-      const qBloco = urlObj.searchParams.get('bloco');
+      const qCasaId = urlObj.searchParams.get('casa_id') || urlObj.searchParams.get('casa');
+      const qQuartoId = urlObj.searchParams.get('quarto_id') || urlObj.searchParams.get('quarto') || urlObj.searchParams.get('quarto_num');
+      const qBloco = urlObj.searchParams.get('bloco') || urlObj.searchParams.get('bloco_id');
       const qTipo = urlObj.searchParams.get('tipo');
+      const rawId = urlObj.searchParams.get('id');
 
       if (qCasaId) {
         casaId = qCasaId;
       } else if (qQuartoId) {
-        casaId = 'quarto_' + qQuartoId;
+        casaId = 'quarto_' + String(qQuartoId).replace(/^quarto_/i, '');
       } else if (qBloco) {
         casaId = 'bloco_' + qBloco;
+      } else if (rawId) {
+        const rawLower = String(rawId).toLowerCase();
+        if (rawLower.startsWith('casa')) casaId = rawId;
+        else if (rawLower.startsWith('quarto')) casaId = 'quarto_' + String(rawId).replace(/^quarto_/i, '');
+        else if (rawLower.startsWith('bloco')) casaId = 'bloco_' + String(rawId).replace(/^bloco_/i, '');
+        else casaId = rawId;
       }
       if (qTipo && (qTipo === 'ar_condicionado' || qTipo === 'rotina')) tipoPadrao = qTipo;
     }
@@ -14674,8 +14746,13 @@ function processarLeituraQRCasa(texto) {
     if (achouBloco) casaId = 'bloco_' + achouBloco.nome;
   }
 
-  if (!casaId) {
+  if (!casaId && !texto.startsWith('http://') && !texto.startsWith('https://') && !texto.startsWith('file://')) {
     casaId = texto;
+  }
+
+  if (!casaId || (typeof casaId === 'string' && (casaId.startsWith('http://') || casaId.startsWith('https://') || casaId.startsWith('file://')))) {
+    showToast('Não foi possível identificar a unidade no QR Code lido.', 'warning');
+    return;
   }
 
   fecharScannerLimpezaQR();
@@ -14704,7 +14781,7 @@ function abrirModalRegistroLimpeza(casaId, tipoPadrao = 'rotina') {
     subTituloTxt = `Alojamento: ${blocoNome}`;
   } else if (String(casaId).startsWith('quarto_')) {
     const qId = String(casaId).replace('quarto_', '');
-    const q = (allQuartosData || []).find(x => String(x.id) === String(qId));
+    const q = obterTodosQuartos().find(x => String(x.id) === String(qId));
     if (!q) {
       showToast('Quarto não encontrado para registrar limpeza', 'error');
       return;
@@ -14781,109 +14858,115 @@ function atualizarEstiloTipoLimpeza() {
 async function salvarRegistroLimpeza(e) {
   if (e && e.preventDefault) e.preventDefault();
 
-  const casaId = document.getElementById('registroLimpezaCasaId').value;
-  const tipo = document.querySelector('input[name="registroLimpezaTipo"]:checked')?.value || 'rotina';
-  const data = document.getElementById('registroLimpezaData').value;
-  const hora = document.getElementById('registroLimpezaHora').value;
-  const responsavel = document.getElementById('registroLimpezaResponsavel').value.trim();
-  const observacoes = document.getElementById('registroLimpezaObservacoes').value.trim();
-
-  if (!casaId) {
-    showToast('Erro: nenhuma unidade selecionada para a limpeza.', 'error');
-    return;
-  }
-  if (!data || !hora) {
-    showToast('Informe a data e o horário da limpeza.', 'warning');
-    return;
-  }
-  if (!responsavel) {
-    showToast('Informe o nome do responsável pela limpeza.', 'warning');
-    return;
-  }
-
-  const dataHoraStr = `${data}T${hora}:00`;
-  const isQuarto = String(casaId).startsWith('quarto_');
-  const isBloco = String(casaId).startsWith('bloco_');
-  let casaNome = 'Unidade';
-  let extraQuarto = {};
-
-  if (isQuarto) {
-    const qId = String(casaId).replace('quarto_', '');
-    const q = (allQuartosData || []).find(x => String(x.id) === String(qId));
-    casaNome = q ? `Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})` : `Quarto #${qId}`;
-    extraQuarto = {
-      tipo_local: 'alojamento',
-      quarto_id: String(qId),
-      quarto_numero: q ? String(q.numero) : String(qId),
-      bloco_nome: q ? String(q.bloco_nome || 'Bloco') : 'Bloco'
-    };
-  } else if (isBloco) {
-    const bNome = decodeURIComponent(String(casaId).replace('bloco_', ''));
-    casaNome = `${bNome} (Alojamento)`;
-    extraQuarto = {
-      tipo_local: 'alojamento_bloco',
-      bloco_nome: bNome
-    };
-  } else {
-    const casa = (listaCasasCidade || []).find(x => x.id === casaId);
-    casaNome = casa ? casa.nome : 'Casa';
-    extraQuarto = { tipo_local: 'casa_cidade' };
-  }
-
-  const novoId = 'limpeza_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-  const registro = {
-    id: novoId,
-    casa_id: casaId,
-    casa_nome: casaNome,
-    ...extraQuarto,
-    tipo: tipo,
-    data: data,
-    hora: hora,
-    data_hora: dataHoraStr,
-    responsavel: responsavel,
-    observacoes: observacoes || '',
-    criado_em: new Date().toISOString(),
-    criado_por: currentUserName || 'Usuário'
-  };
-
-  // 1. Salvar no estado local
-  listaLimpezasCasas.unshift(registro);
   try {
-    localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
-  } catch (err) {}
+    const casaId = document.getElementById('registroLimpezaCasaId').value;
+    const tipo = document.querySelector('input[name="registroLimpezaTipo"]:checked')?.value || 'rotina';
+    const data = document.getElementById('registroLimpezaData').value;
+    const hora = document.getElementById('registroLimpezaHora').value;
+    const responsavel = document.getElementById('registroLimpezaResponsavel').value.trim();
+    const observacoes = document.getElementById('registroLimpezaObservacoes').value.trim();
 
-  // 2. Registrar na auditoria central
-  if (typeof registrarAuditoria === 'function') {
-    const descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado (Ciclo 30d)';
-    registrarAuditoria(
-      isQuarto ? 'quartos' : 'casas',
-      'LIMPEZA',
-      casaNome,
-      `${descTipo} registrada para ${casaNome} por ${responsavel}. Obs: ${observacoes || 'Nenhuma'}`,
-      responsavel
-    );
-  }
-
-  // 3. Salvar no Firestore se disponível
-  if (firestoreDb) {
-    try {
-      await firestoreDb.collection('casas_limpezas').doc(novoId).set(registro);
-    } catch (err) {
-      console.warn("Aviso ao salvar limpeza no Firestore:", err);
+    if (!casaId) {
+      showToast('Erro: nenhuma unidade selecionada para a limpeza.', 'error');
+      return;
     }
-  }
+    if (!data || !hora) {
+      showToast('Informe a data e o horário da limpeza.', 'warning');
+      return;
+    }
+    if (!responsavel) {
+      showToast('Informe o nome do responsável pela limpeza.', 'warning');
+      return;
+    }
 
-  fecharModal('modalRegistroLimpezaCasa');
-  showToast(`✅ Limpeza (${tipo === 'rotina' ? 'Rotina Diária' : 'Ar Condicionado'}) registrada em ${casaNome}!`, 'success');
+    const dataHoraStr = `${data}T${hora}:00`;
+    const isQuarto = String(casaId).startsWith('quarto_');
+    const isBloco = String(casaId).startsWith('bloco_');
+    let casaNome = 'Unidade';
+    let extraQuarto = {};
 
-  // Atualizar visualizações
-  if (activeTab === 'casas_cidade') {
-    filtrarCasasCidadeUI();
-  } else if (activeTab === 'blocos') {
-    carregarQuartos();
-  }
-  if (casaSelecionadaId === casaId) {
-    renderizarHistoricoLimpezasCasa(casaId);
+    if (isQuarto) {
+      const qId = String(casaId).replace('quarto_', '');
+      const q = obterTodosQuartos().find(x => String(x.id) === String(qId));
+      casaNome = q ? `Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})` : `Quarto #${qId}`;
+      extraQuarto = {
+        tipo_local: 'alojamento',
+        quarto_id: String(qId),
+        quarto_numero: q ? String(q.numero) : String(qId),
+        bloco_nome: q ? String(q.bloco_nome || 'Bloco') : 'Bloco'
+      };
+    } else if (isBloco) {
+      const bNome = decodeURIComponent(String(casaId).replace('bloco_', ''));
+      casaNome = `${bNome} (Alojamento)`;
+      extraQuarto = {
+        tipo_local: 'alojamento_bloco',
+        bloco_nome: bNome
+      };
+    } else {
+      const casa = (listaCasasCidade || []).find(x => x.id === casaId);
+      casaNome = casa ? casa.nome : 'Casa';
+      extraQuarto = { tipo_local: 'casa_cidade' };
+    }
+
+    const novoId = 'limpeza_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const registro = {
+      id: novoId,
+      casa_id: casaId,
+      casa_nome: casaNome,
+      ...extraQuarto,
+      tipo: tipo,
+      data: data,
+      hora: hora,
+      data_hora: dataHoraStr,
+      responsavel: responsavel,
+      observacoes: observacoes || '',
+      criado_em: new Date().toISOString(),
+      criado_por: currentUserName || 'Usuário'
+    };
+
+    // 1. Salvar no estado local imediatamente (Offline-First)
+    listaLimpezasCasas.unshift(registro);
+    try {
+      localStorage.setItem('casas_limpezas_cache', JSON.stringify(listaLimpezasCasas));
+    } catch (err) {}
+
+    // 2. Registrar na auditoria central
+    if (typeof registrarAuditoria === 'function') {
+      const descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado (Ciclo 30d)';
+      registrarAuditoria(
+        isQuarto ? 'quartos' : 'casas',
+        'LIMPEZA',
+        casaNome,
+        `${descTipo} registrada para ${casaNome} por ${responsavel}. Obs: ${observacoes || 'Nenhuma'}`,
+        responsavel
+      );
+    }
+
+    // 3. Fechar modal imediatamente para o usuário não ficar preso esperando rede
+    fecharModal('modalRegistroLimpezaCasa');
+    showToast(`✅ Limpeza (${tipo === 'rotina' ? 'Rotina Diária' : 'Ar Condicionado'}) registrada em ${casaNome}!`, 'success');
+
+    // Atualizar visualizações
+    if (activeTab === 'casas_cidade') {
+      filtrarCasasCidadeUI();
+    } else if (activeTab === 'blocos') {
+      carregarQuartos();
+    }
+    if (casaSelecionadaId === casaId) {
+      renderizarHistoricoLimpezasCasa(casaId);
+    }
+
+    // 4. Salvar no Firestore com timeout seguro em segundo plano (background)
+    if (firestoreDb && navigator.onLine) {
+      const envioPromise = firestoreDb.collection('casas_limpezas').doc(novoId).set(registro);
+      const timeoutPromise = new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout de rede Firestore')), 3000));
+      Promise.race([envioPromise, timeoutPromise]).catch(err => {
+        console.warn("Aviso ao salvar limpeza no Firestore (salvo localmente):", err);
+      });
+    }
+  } catch (errGlobal) {
+    console.error("Erro ao salvar limpeza:", errGlobal);
+    showToast("Erro ao processar o salvamento da limpeza. Tente novamente.", "error");
   }
 }
 
@@ -15069,7 +15152,7 @@ function abrirModalOcorrenciasUnidade(tipoLocal, unidadeId) {
   let chamadosUnidade = [];
 
   if (tipoLocal === 'quarto') {
-    const q = (allQuartosData || []).find(x => String(x.id) === String(unidadeId));
+    const q = obterTodosQuartos().find(x => String(x.id) === String(unidadeId));
     nomeUnidade = q ? `Quarto ${q.numero} (${q.bloco_nome || 'Bloco'})` : `Quarto #${unidadeId}`;
     chamadosUnidade = q ? obterChamadosAbertosQuarto(q) : [];
   } else {
@@ -15221,7 +15304,7 @@ function renderizarRelatorioLimpezaExecutivoUI() {
 
   // 2. Incluir Quartos do Alojamento se escopo = 'todos' ou 'alojamento'
   if (escopo === 'todos' || escopo === 'alojamento') {
-    (allQuartosData || []).forEach(q => {
+    obterTodosQuartos().forEach(q => {
       const st = calcularStatusLimpezaQuarto(q);
       const chAbertos = obterChamadosAbertosQuarto(q);
       if (st.rotina.status === 'ok') totalFaxinaOk++;
@@ -17640,9 +17723,8 @@ function abrirModalPlacaQRRonda(pontoId) {
   }
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
-  if (imgEl) imgEl.src = '';
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
-  if (imgEl) imgEl.src = qrApiUrl;
+  // Alta resolução e carregamento nativo offline para impressão
+  renderizarQRCodeEmImagem(imgEl, qrUrl, 400);
 
   abrirModal('modalPlacaQRRonda');
 }
@@ -17978,9 +18060,9 @@ function processarLeituraQRRonda(texto) {
 
   let pontoId = null;
   try {
-    if (texto.includes('ponto_id=')) {
-      const urlObj = new URL(texto.startsWith('http') ? texto : `https://dummy.local/${texto}`);
-      pontoId = urlObj.searchParams.get('ponto_id');
+    if (texto.startsWith('http://') || texto.startsWith('https://') || texto.includes('?') || texto.includes('ponto_id=') || texto.includes('ponto=')) {
+      const urlObj = new URL(texto.startsWith('http') ? texto : `https://dummy.local/${texto.startsWith('?') ? texto : '?' + texto}`);
+      pontoId = urlObj.searchParams.get('ponto_id') || urlObj.searchParams.get('ponto') || urlObj.searchParams.get('id') || urlObj.searchParams.get('p') || urlObj.searchParams.get('pontoId');
     }
   } catch (e) {}
 
@@ -17989,7 +18071,9 @@ function processarLeituraQRRonda(texto) {
     if (achou) pontoId = achou.id;
   }
 
-  if (!pontoId) pontoId = texto;
+  if (!pontoId && !texto.startsWith('http://') && !texto.startsWith('https://') && !texto.startsWith('file://')) {
+    pontoId = texto;
+  }
 
   let pontoEncontrado = (listaPontosRonda || []).find(p => p.id === pontoId);
 
@@ -18840,7 +18924,17 @@ function renderizarConteudoModalPlaquinha() {
     if (isCasa) {
       qrUrl = id ? `${cleanLimpeza}?casa_id=${encodeURIComponent(id)}` : cleanLimpeza;
     } else {
-      qrUrl = id ? `${cleanLimpeza}?quarto_id=${encodeURIComponent(id)}` : cleanLimpeza;
+      let qObj = null;
+      if (typeof StaticApiEngine !== 'undefined' && StaticApiEngine.dbState && StaticApiEngine.dbState.quartos) {
+        qObj = StaticApiEngine.dbState.quartos.find(x => x.id === Number(id) || String(x.id) === String(id) || String(x.numero) === String(id));
+      }
+      if (!qObj) {
+        qObj = obterTodosQuartos().find(x => String(x.id) === String(id) || String(x.numero) === String(id));
+      }
+      const qId = qObj ? qObj.id : String(id).replace(/^quarto_/i, '');
+      const qNum = qObj ? qObj.numero : qId;
+      const qBloco = qObj ? (qObj.bloco_nome || 'Bloco 1') : 'Bloco 1';
+      qrUrl = id ? `${cleanLimpeza}?quarto_id=${encodeURIComponent(qId)}&quarto_num=${encodeURIComponent(qNum)}&bloco=${encodeURIComponent(qBloco)}` : cleanLimpeza;
     }
   } else if (tipo === 'bebedouro') {
     titulo = cfg.titulo_plaquinha_bebedouro;
@@ -18921,7 +19015,7 @@ function renderizarConteudoModalPlaquinha() {
     const imgQr = document.createElement('img');
     imgQr.className = 'w-16 h-16 object-contain rounded-lg shadow-sm border border-slate-300';
     imgQr.alt = 'QR Code';
-    imgQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}&format=png&_t=${Date.now()}`;
+    renderizarQRCodeEmImagem(imgQr, qrUrl, 150);
     qrContainer.appendChild(imgQr);
   }
 
@@ -19007,14 +19101,99 @@ function imprimirPlaquinhaManutencao() {
   }, 1000);
 }
 
+// Helpers para copiar links de placas QR Code diretamente
+function copiarLinkPlacaQRCasa() {
+  const txtUrlEl = document.getElementById('textoPlacaQRCasaUrl');
+  const qrUrl = txtUrlEl ? txtUrlEl.textContent.trim() : '';
+  if (!qrUrl) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(qrUrl).then(() => {
+      showToast('Link da Placa QR copiado com sucesso!', 'success');
+    }).catch(() => {
+      prompt('Copie o link abaixo:', qrUrl);
+    });
+  } else {
+    prompt('Copie o link abaixo:', qrUrl);
+  }
+}
+
+function copiarLinkPlacaQRRonda() {
+  const txtUrlEl = document.getElementById('textoPlacaQRRondaUrl');
+  const qrUrl = txtUrlEl ? txtUrlEl.textContent.trim() : '';
+  if (!qrUrl) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(qrUrl).then(() => {
+      showToast('Link do Ponto de Ronda copiado com sucesso!', 'success');
+    }).catch(() => {
+      prompt('Copie o link abaixo:', qrUrl);
+    });
+  } else {
+    prompt('Copie o link abaixo:', qrUrl);
+  }
+}
+
+// Suporte para escanear arquivo de foto/imagem de QR Code via Html5Qrcode.scanFile
+function escanearArquivoQRLimpeza(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('Biblioteca do leitor QR não disponível.', 'error');
+    return;
+  }
+  showToast('Lendo imagem do QR Code...', 'info');
+  const tempScanner = new Html5Qrcode("qrReaderCameraArea");
+  tempScanner.scanFile(file, true)
+    .then(decodedText => {
+      fecharScannerLimpezaQR();
+      processarLeituraQRCasa(decodedText);
+    })
+    .catch(err => {
+      console.warn("Falha ao decodificar imagem:", err);
+      showToast('Nenhum QR Code nítido encontrado na imagem. Tente aproximar a foto.', 'warning');
+    })
+    .finally(() => {
+      input.value = '';
+    });
+}
+
+function escanearArquivoQRRonda(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('Biblioteca do leitor QR não disponível.', 'error');
+    return;
+  }
+  showToast('Lendo imagem do QR Code...', 'info');
+  const tempScanner = new Html5Qrcode("leitorCameraRonda");
+  tempScanner.scanFile(file, true)
+    .then(decodedText => {
+      fecharScannerRondaQR();
+      processarLeituraQRRonda(decodedText);
+    })
+    .catch(err => {
+      console.warn("Falha ao decodificar imagem:", err);
+      showToast('Nenhum QR Code nítido encontrado na imagem. Tente aproximar a foto.', 'warning');
+    })
+    .finally(() => {
+      input.value = '';
+    });
+}
+
 window.abrirModalPlaquinhaManutencao = abrirModalPlaquinhaManutencao;
 window.aoMudarModeloPlaquinhaManutencao = aoMudarModeloPlaquinhaManutencao;
 window.renderizarConteudoModalPlaquinha = renderizarConteudoModalPlaquinha;
 window.imprimirPlaquinhaManutencao = imprimirPlaquinhaManutencao;
-
 
 window.obterConfigManutencao = obterConfigManutencao;
 window.salvarConfigManutencaoUI = salvarConfigManutencaoUI;
 window.restaurarConfigManutencaoPadraoUI = restaurarConfigManutencaoPadraoUI;
 window.inicializarConfigManutencaoUI = inicializarConfigManutencaoUI;
 window.calcularTempoProximaLimpeza = calcularTempoProximaLimpeza;
+
+window.gerarQRCodeDataUrl = gerarQRCodeDataUrl;
+window.renderizarQRCodeEmImagem = renderizarQRCodeEmImagem;
+window.copiarLinkPlacaQRCasa = copiarLinkPlacaQRCasa;
+window.copiarLinkPlacaQRRonda = copiarLinkPlacaQRRonda;
+window.escanearArquivoQRLimpeza = escanearArquivoQRLimpeza;
+window.escanearArquivoQRRonda = escanearArquivoQRRonda;
+window.obterTodosQuartos = obterTodosQuartos;

@@ -17,6 +17,8 @@
   <!-- Firebase SDKs compat v10 -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <!-- Motor Nativo de QR Code Offline -->
+  <script src="qrcode.min.js"></script>
 
   <style>
     body {
@@ -433,8 +435,9 @@
           document.getElementById('inputCasaComodo').value = urlParams.get('comodo') || '';
         }
       } else {
-        if (urlParams.has('quarto')) {
-          document.getElementById('inputQuarto').value = urlParams.get('quarto');
+        const qVal = urlParams.get('quarto') || urlParams.get('quarto_num') || urlParams.get('quarto_id');
+        if (qVal) {
+          document.getElementById('inputQuarto').value = String(qVal).replace(/^quarto_/i, '');
         }
         if (urlParams.has('bloco')) {
           document.getElementById('inputBloco').value = urlParams.get('bloco');
@@ -445,7 +448,8 @@
     function irParaModoEquipeLimpeza() {
       const urlParams = new URLSearchParams(window.location.search);
       const tipoLocal = document.getElementById('inputTipoLocal')?.value || 'alojamento';
-      const quarto = document.getElementById('inputQuarto')?.value.trim() || urlParams.get('quarto') || '';
+      const quartoRaw = document.getElementById('inputQuarto')?.value.trim() || urlParams.get('quarto') || urlParams.get('quarto_num') || '';
+      const quarto = String(quartoRaw).replace(/^quarto_/i, '');
       const bloco = document.getElementById('inputBloco')?.value.trim() || urlParams.get('bloco') || 'Bloco 1';
       const casaId = urlParams.get('casa_id') || '';
 
@@ -551,27 +555,30 @@
         data_formatada: dataHoraStr
       };
 
-      // 1. Salvar no Firebase Firestore
-      let salvoOnline = false;
-      if (firestoreDb && navigator.onLine) {
-        try {
-          await firestoreDb.collection('chamados_suporte').doc(protocolo).set(chamadoData);
-          console.log("[FIREBASE] Chamado salvo com sucesso:", protocolo);
-          salvoOnline = true;
-        } catch (err) {
-          console.warn("[FIREBASE] Falha ao salvar online, enfileirando localmente:", err);
-        }
-      }
-
-      chamadoData.sync_pendente = !salvoOnline;
-
-      // Salvar também em cache local (com tag de sincronização pendente se offline)
+      // 1. Salvar imediatamente em cache local (Offline-First Garantido)
       try {
         const cached = localStorage.getItem('chamados_suporte_cache');
         const lista = cached ? JSON.parse(cached) : [];
         lista.unshift(chamadoData);
         localStorage.setItem('chamados_suporte_cache', JSON.stringify(lista.slice(0, 150)));
       } catch (e) {}
+
+      // 2. Salvar no Firebase Firestore com timeout resiliente de 2,5s
+      let salvoOnline = false;
+      if (firestoreDb && navigator.onLine) {
+        try {
+          const envioPromise = firestoreDb.collection('chamados_suporte').doc(protocolo).set(chamadoData);
+          const timeoutPromise = new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout chamado Firestore')), 2500));
+          await Promise.race([envioPromise, timeoutPromise]);
+          console.log("[FIREBASE] Chamado salvo com sucesso:", protocolo);
+          salvoOnline = true;
+        } catch (err) {
+          console.warn("[FIREBASE] Falha ao salvar online, gravado com sucesso no dispositivo:", err);
+          salvoOnline = false;
+        }
+      }
+
+      chamadoData.sync_pendente = !salvoOnline;
 
       // 2. Se for destino WhatsApp, redirecionar para a conversa do Prefeito
       if (destino === 'whatsapp') {

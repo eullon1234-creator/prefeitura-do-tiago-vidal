@@ -798,15 +798,33 @@
       carregarConfiguracoesSeguranca();
 
       const urlParams = new URLSearchParams(window.location.search);
-      const urlPontoId = urlParams.get('ponto_id') || urlParams.get('id') || urlParams.get('ponto') || urlParams.get('p');
+      let urlCasaId = urlParams.get('casa_id') || urlParams.get('casa');
+      let urlQuartoId = urlParams.get('quarto_id');
+      let urlQuartoNum = urlParams.get('quarto_num') || urlParams.get('quarto');
+      let urlBloco = urlParams.get('bloco') || urlParams.get('bloco_id');
       const urlTipo = urlParams.get('tipo');
       const urlAcao = urlParams.get('acao');
-      const urlCasaId = urlParams.get('casa_id');
-      const urlQuartoId = urlParams.get('quarto_id');
-      const urlQuartoNum = urlParams.get('quarto_num') || urlParams.get('quarto');
-      const urlBloco = urlParams.get('bloco');
-      const urlBlocoId = urlParams.get('bloco_id');
       const urlModo = urlParams.get('modo');
+
+      // Processar parâmetro genérico ?id=... de forma inteligente
+      const rawId = urlParams.get('id') || urlParams.get('ID');
+      if (rawId) {
+        const rawLower = String(rawId).toLowerCase();
+        if (rawLower.startsWith('casa_') || rawLower.startsWith('casa-') || (rawLower.startsWith('casa') && !rawLower.startsWith('casa_de_bombas'))) {
+          if (!urlCasaId) urlCasaId = rawId;
+        } else if (rawLower.startsWith('quarto_') || rawLower.startsWith('quarto-') || rawLower.startsWith('quarto')) {
+          if (!urlQuartoId) urlQuartoId = rawId;
+        } else if (rawLower.startsWith('bloco_') || rawLower.startsWith('bloco-') || rawLower.startsWith('bloco')) {
+          if (!urlBloco) urlBloco = rawId;
+        } else if (!urlCasaId && !urlQuartoId && !urlBloco && !rawLower.startsWith('ponto_') && !urlParams.has('ponto_id')) {
+          urlCasaId = rawId;
+        }
+      }
+
+      const urlPontoId = urlParams.get('ponto_id') || urlParams.get('ponto') || urlParams.get('p');
+
+      let urlBlocoId = urlParams.get('bloco_id');
+      if (!urlBloco && urlBlocoId) urlBloco = urlBlocoId;
 
       // Se houver parâmetros de Casa ou Quarto válidos, NUNCA redirecionar para ronda
       const isAlvoLimpeza = Boolean(urlCasaId || urlQuartoId || urlQuartoNum || urlBloco || urlBlocoId);
@@ -814,12 +832,13 @@
       if (!isAlvoLimpeza) {
         // Se por engano o leitor abriu limpeza.html com QR Code de Ronda / Sanitário / Bebedouro, redirecionar imediatamente
         const isRondaDetectada = (urlPontoId && (urlPontoId.startsWith('ponto_') || urlPontoId.includes('banheiro') || urlPontoId.includes('bebedouro'))) ||
+                                 (rawId && String(rawId).startsWith('ponto_')) ||
                                  (urlTipo === 'banheiro' || urlTipo === 'bebedouro') ||
                                  urlAcao === 'ronda' ||
                                  window.location.search.includes('ponto_id=');
 
         if (isRondaDetectada) {
-          let extractedId = urlPontoId || (urlTipo === 'bebedouro' ? 'ponto_bebedouro_refeitorio' : 'ponto_banheiro_01');
+          let extractedId = urlPontoId || rawId || (urlTipo === 'bebedouro' ? 'ponto_bebedouro_refeitorio' : 'ponto_banheiro_01');
           window.location.replace(`ronda.html?ponto_id=${encodeURIComponent(extractedId)}${urlTipo ? '&tipo=' + encodeURIComponent(urlTipo) : ''}`);
           return;
         }
@@ -832,9 +851,11 @@
       if (urlCasaId && urlCasaId.startsWith('bloco_')) {
         aplicarDadosBlocoAlojamento(decodeURIComponent(urlCasaId.replace('bloco_', '')));
       } else if (urlQuartoId || urlQuartoNum) {
-        aplicarDadosQuartoAlojamento(urlQuartoId || `q_${urlBloco || 'Bloco'}_${urlQuartoNum}`, urlQuartoNum || urlQuartoId, urlBloco || 'Bloco 1');
-      } else if (urlBloco || urlBlocoId) {
-        aplicarDadosBlocoAlojamento(urlBloco || `Bloco ${urlBlocoId}`);
+        const qIdLimpo = String(urlQuartoId || '').replace(/^quarto_/i, '');
+        const qNumLimpo = String(urlQuartoNum || qIdLimpo).replace(/^quarto_/i, '');
+        aplicarDadosQuartoAlojamento(qIdLimpo || `q_${urlBloco || 'Bloco'}_${qNumLimpo}`, qNumLimpo, urlBloco || 'Bloco 1');
+      } else if (urlBloco) {
+        aplicarDadosBlocoAlojamento(urlBloco.replace(/^bloco_/i, ''));
       } else {
         carregarCasa(urlCasaId);
       }
@@ -866,12 +887,14 @@
     }
 
     function aplicarDadosQuartoAlojamento(quartoId, quartoNum, blocoNome) {
-      const idUnificado = `quarto_${quartoId}`;
-      const nomeFormatado = `Quarto ${quartoNum} • ${blocoNome}`;
+      const idLimpo = String(quartoId || '').replace(/^quarto_/i, '').trim();
+      const numLimpo = String(quartoNum || idLimpo).replace(/^quarto_/i, '').trim();
+      const idUnificado = `quarto_${idLimpo}`;
+      const nomeFormatado = `Quarto ${numLimpo} • ${blocoNome}`;
 
       document.getElementById('inputTipoLocal').value = 'alojamento';
-      document.getElementById('inputQuartoId').value = String(quartoId);
-      document.getElementById('inputQuartoNumero').value = String(quartoNum);
+      document.getElementById('inputQuartoId').value = String(idLimpo);
+      document.getElementById('inputQuartoNumero').value = String(numLimpo);
       document.getElementById('inputBlocoNome').value = String(blocoNome);
       document.getElementById('inputCasaId').value = idUnificado;
       document.getElementById('inputCasaNome').value = nomeFormatado;
@@ -885,7 +908,7 @@
       document.getElementById('boxQuartoAtendidoLimpeza').classList.add('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
       document.getElementById('badgeQrIdentificado').classList.remove('hidden');
-      carregarHistoricoPlaquinhaLimpeza(idUnificado, quartoId, blocoNome);
+      carregarHistoricoPlaquinhaLimpeza(idUnificado, idLimpo, blocoNome);
     }
 
     function alternarTipoSelecaoManual(tipo) {
@@ -1049,6 +1072,19 @@
       btn.className = 'problema-chip active p-2.5 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-200 font-bold text-left transition text-[11px] flex items-center gap-1.5';
     }
 
+    // Função auxiliar para formatação segura de data sem lançar exceções
+    function formatarDataSeguraBR(dataStr) {
+      if (!dataStr) return '--/--/----';
+      try {
+        if (dataStr.includes('-')) {
+          return dataStr.split('-').reverse().join('/');
+        }
+        return String(dataStr);
+      } catch (e) {
+        return String(dataStr || '--');
+      }
+    }
+
     // Salvar Registro de Limpeza (Equipe Autenticada)
     async function salvarLimpezaPublica(e) {
       if (e) e.preventDefault();
@@ -1060,19 +1096,22 @@
       let quartoNumero = document.getElementById('inputQuartoNumero').value || '';
       const blocoNome = document.getElementById('inputBlocoNome').value || '';
       const tipo = document.getElementById('inputTipo').value || 'rotina';
-      const responsavel = document.getElementById('inputResponsavel').value.trim();
-      const data = document.getElementById('inputData').value;
-      const hora = document.getElementById('inputHora').value;
-      const avaliacao = document.getElementById('inputAvaliacao').value;
-      const observacoes = document.getElementById('inputObservacoes').value.trim();
+      const responsavel = (document.getElementById('inputResponsavel')?.value || '').trim();
+      const data = document.getElementById('inputData')?.value || getDataHojeLocal();
+      const hora = document.getElementById('inputHora')?.value || getHoraAgoraLocal();
+      const avaliacao = document.getElementById('inputAvaliacao')?.value || 'Excelente / Tudo Limpo';
+      const observacoes = (document.getElementById('inputObservacoes')?.value || '').trim();
 
       if (tipoLocal === 'alojamento') {
         const qAtendido = (document.getElementById('inputQuartoAtendidoNum')?.value || '').trim();
-        if (qAtendido) {
-          quartoNumero = qAtendido;
-          quartoId = qAtendido;
+        if (qAtendido && !qAtendido.toLowerCase().includes('todos')) {
+          quartoNumero = qAtendido.replace(/^quarto_/i, '');
+          quartoId = quartoNumero;
           casaId = `quarto_${blocoNome}_${quartoNumero}`;
           casaNome = `Quarto ${quartoNumero} • ${blocoNome}`;
+        } else {
+          quartoId = String(quartoId).replace(/^quarto_/i, '');
+          quartoNumero = String(quartoNumero).replace(/^quarto_/i, '');
         }
       }
 
@@ -1082,7 +1121,7 @@
       }
       if (!responsavel) {
         alert('Por favor, digite o seu nome.');
-        document.getElementById('inputResponsavel').focus();
+        document.getElementById('inputResponsavel')?.focus();
         return;
       }
       if (!data || !hora) {
@@ -1091,8 +1130,10 @@
       }
 
       const btn = document.getElementById('btnConfirmar');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Gravando Limpeza...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Gravando Limpeza...';
+      }
 
       const agora = new Date();
       const protocolo = 'LIMP-' + Math.floor(100000 + Math.random() * 900000);
@@ -1128,71 +1169,104 @@
         criado_por: responsavel
       };
 
-      let salvoOnline = false;
-      if (firestoreDb && navigator.onLine) {
-        try {
-          await firestoreDb.collection('casas_limpezas').doc(protocolo).set(registro);
-          salvoOnline = true;
-        } catch (err) {
-          console.warn("Aviso ao salvar limpeza:", err);
-        }
-
-        try {
-          const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-          const logObj = {
-            id: logId,
-            data_hora: `${data.split('-').reverse().join('/')} ${hora}`,
-            timestamp: agora.toISOString(),
-            usuario: String(responsavel),
-            modulo: tipoLocal === 'alojamento' ? 'alojamentos' : 'casas',
-            acao: 'LIMPEZA',
-            entidade: String(casaNome),
-            detalhes: `${descTipo} realizada por ${responsavel} via QR Code. Estado: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
-          };
-          await firestoreDb.collection('auditoria_logs').doc(logId).set(logObj);
-        } catch (err) {}
-      }
-
-      registro.sync_pendente = !salvoOnline;
-
       try {
-        const cached = localStorage.getItem('casas_limpezas_cache');
-        const lista = cached ? JSON.parse(cached) : [];
-        lista.unshift(registro);
-        localStorage.setItem('casas_limpezas_cache', JSON.stringify(lista.slice(0, 200)));
-      } catch (e) {}
-
-      carregarHistoricoPlaquinhaLimpeza(casaId, quartoId, blocoNome);
-      document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
-      document.getElementById('sucessoCasaNome').textContent = casaNome;
-      document.getElementById('sucessoTipo').textContent = descTipo;
-      document.getElementById('sucessoResponsavel').textContent = responsavel;
-      document.getElementById('sucessoDataHora').textContent = `${data.split('-').reverse().join('/')} às ${hora}`;
-
-      const titEl = document.getElementById('sucessoTituloLimpeza');
-      const descEl = document.getElementById('sucessoDescricaoLimpeza');
-      const badgeEl = document.getElementById('sucessoBadgeStatusLimpeza');
-
-      if (salvoOnline) {
-        if (titEl) titEl.textContent = 'Registro Concluído com Sucesso!';
-        if (descEl) descEl.textContent = 'O painel do Prefeito foi atualizado na nuvem em tempo real.';
-        if (badgeEl) {
-          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-          badgeEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> <span>Transmitido para a Nuvem da Obra</span>';
+        // 1. Salvar IMEDIATAMENTE no cache local (Offline-First Garantido)
+        try {
+          const cached = localStorage.getItem('casas_limpezas_cache');
+          const lista = cached ? JSON.parse(cached) : [];
+          lista.unshift(registro);
+          localStorage.setItem('casas_limpezas_cache', JSON.stringify(lista.slice(0, 200)));
+        } catch (e) {
+          console.warn('Erro ao salvar no cache local:', e);
         }
-      } else {
-        if (titEl) titEl.textContent = 'Registro Gravado no Aparelho!';
-        if (descEl) descEl.textContent = 'A limpeza foi registrada localmente (offline). O envio está em fila e será sincronizado assim que a conexão retornar.';
-        if (badgeEl) {
-          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
-          badgeEl.innerHTML = '<i class="fa-solid fa-clock text-amber-400"></i> <span>Salvo no Dispositivo (Envio Pendente de Internet)</span>';
+
+        // 2. Envio para Firestore com timeout resiliente de 2,5s
+        let salvoOnline = false;
+        if (firestoreDb && navigator.onLine) {
+          try {
+            const envioPromise = firestoreDb.collection('casas_limpezas').doc(protocolo).set(registro);
+            const timeoutPromise = new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout rede Firestore')), 2500));
+            await Promise.race([envioPromise, timeoutPromise]);
+            salvoOnline = true;
+
+            // Salvar log em auditoria em segundo plano (background)
+            try {
+              const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+              const logObj = {
+                id: logId,
+                data_hora: `${formatarDataSeguraBR(data)} ${hora}`,
+                timestamp: agora.toISOString(),
+                usuario: String(responsavel),
+                modulo: tipoLocal === 'alojamento' ? 'alojamentos' : 'casas',
+                acao: 'LIMPEZA',
+                entidade: String(casaNome),
+                detalhes: `${descTipo} realizada por ${responsavel} via QR Code. Estado: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
+              };
+              firestoreDb.collection('auditoria_logs').doc(logId).set(logObj).catch(() => {});
+            } catch (err) {}
+          } catch (err) {
+            console.warn("Aviso ao salvar limpeza online (gravada localmente com sucesso):", err);
+            salvoOnline = false;
+          }
+        }
+
+        registro.sync_pendente = !salvoOnline;
+
+        // Atualizar histórico da plaquinha de forma segura
+        try {
+          carregarHistoricoPlaquinhaLimpeza(casaId, quartoId, blocoNome);
+        } catch (e) {}
+
+        const elProt = document.getElementById('sucessoProtocolo');
+        if (elProt) elProt.textContent = '#' + protocolo;
+        const elCasa = document.getElementById('sucessoCasaNome');
+        if (elCasa) elCasa.textContent = casaNome;
+        const elTipo = document.getElementById('sucessoTipo');
+        if (elTipo) elTipo.textContent = descTipo;
+        const elResp = document.getElementById('sucessoResponsavel');
+        if (elResp) elResp.textContent = responsavel;
+        const elData = document.getElementById('sucessoDataHora');
+        if (elData) elData.textContent = `${formatarDataSeguraBR(data)} às ${hora}`;
+
+        const titEl = document.getElementById('sucessoTituloLimpeza');
+        const descEl = document.getElementById('sucessoDescricaoLimpeza');
+        const badgeEl = document.getElementById('sucessoBadgeStatusLimpeza');
+
+        if (salvoOnline) {
+          if (titEl) titEl.textContent = 'Registro Concluído com Sucesso!';
+          if (descEl) descEl.textContent = 'O painel do Prefeito foi atualizado na nuvem em tempo real.';
+          if (badgeEl) {
+            badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            badgeEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> <span>Transmitido para a Nuvem da Obra</span>';
+          }
+        } else {
+          if (titEl) titEl.textContent = 'Registro Gravado no Aparelho!';
+          if (descEl) descEl.textContent = 'A limpeza foi registrada localmente (offline). O envio está em fila e será sincronizado assim que a conexão retornar.';
+          if (badgeEl) {
+            badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+            badgeEl.innerHTML = '<i class="fa-solid fa-clock text-amber-400"></i> <span>Salvo no Dispositivo (Envio Pendente de Internet)</span>';
+          }
+        }
+
+        const formLimp = document.getElementById('formLimpeza');
+        if (formLimp) formLimp.classList.add('hidden');
+        const telaSuc = document.getElementById('telaSucesso');
+        if (telaSuc) telaSuc.classList.remove('hidden');
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (errGlobal) {
+        console.error("Erro crítico ao salvar limpeza:", errGlobal);
+        alert("Ocorreu uma instabilidade na gravação. O registro foi armazenado com segurança no dispositivo.");
+        const formLimp = document.getElementById('formLimpeza');
+        if (formLimp) formLimp.classList.add('hidden');
+        const telaSuc = document.getElementById('telaSucesso');
+        if (telaSuc) telaSuc.classList.remove('hidden');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-check text-base"></i> <span>Confirmar Registro de Limpeza</span>';
         }
       }
-
-      document.getElementById('formLimpeza').classList.add('hidden');
-      document.getElementById('telaSucesso').classList.remove('hidden');
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // Auto-sincronização de limpezas pendentes ao reconectar
@@ -1300,20 +1374,24 @@
         data_formatada: dataHoraStr
       };
 
-      if (firestoreDb) {
-        try {
-          await firestoreDb.collection('chamados_suporte').doc(protocolo).set(chamadoData);
-        } catch (err) {
-          console.warn("Aviso ao salvar chamado no Firestore:", err);
-        }
-      }
-
+      // 1. Salvar no cache local imediatamente (Offline-First)
       try {
         const cached = localStorage.getItem('chamados_suporte_cache');
         const lista = cached ? JSON.parse(cached) : [];
         lista.unshift(chamadoData);
         localStorage.setItem('chamados_suporte_cache', JSON.stringify(lista.slice(0, 150)));
       } catch (e) {}
+
+      // 2. Enviar ao Firestore com timeout seguro
+      if (firestoreDb && navigator.onLine) {
+        try {
+          const promisseEnvio = firestoreDb.collection('chamados_suporte').doc(protocolo).set(chamadoData);
+          const promisseTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout chamado')), 2500));
+          await Promise.race([promisseEnvio, promisseTimeout]);
+        } catch (err) {
+          console.warn("Aviso ao salvar chamado no Firestore (salvo localmente):", err);
+        }
+      }
 
       if (destino === 'whatsapp') {
         const zapContato = zapMorador ? `\n📱 *Contato:* ${zapMorador}` : '';
@@ -1442,8 +1520,10 @@
           let query = firestoreDb.collection('casas_limpezas');
           if (quartoId) {
             query = query.where('quarto_id', '==', String(quartoId));
-          } else if (casaId) {
+          } else if (casaId && !String(casaId).startsWith('bloco_')) {
             query = query.where('casa_id', '==', String(casaId));
+          } else if (blocoNome) {
+            query = query.where('bloco_nome', '==', String(blocoNome));
           }
           const snap = await query.limit(30).get();
           if (!snap.empty) {

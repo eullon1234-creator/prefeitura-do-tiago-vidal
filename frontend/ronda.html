@@ -969,14 +969,17 @@
       const urlParams = new URLSearchParams(window.location.search);
       
       // Se a URL contiver parâmetros de Casa ou Quarto, redirecionar imediatamente para limpeza.html
-      const urlCasaId = urlParams.get('casa_id');
+      const urlCasaId = urlParams.get('casa_id') || urlParams.get('casa');
       const urlQuartoId = urlParams.get('quarto_id');
       const urlBloco = urlParams.get('bloco');
       const urlBlocoId = urlParams.get('bloco_id');
       const paramIdCru = urlParams.get('id') || urlParams.get('ID') || urlParams.get('ponto_id') || urlParams.get('PONTO_ID');
 
-      const isCasaOuQuartoExplicito = urlCasaId || urlQuartoId || urlBloco || urlBlocoId ||
-        (paramIdCru && (String(paramIdCru).toLowerCase().startsWith('casa') || String(paramIdCru).toLowerCase().startsWith('quarto') || String(paramIdCru).toLowerCase().startsWith('bloco')));
+      // Se for explicitamente ponto de ronda (ex: começa com ponto_ ou tem parâmetro ponto_id), NUNCA redirecionar para limpeza.html
+      const isPontoRondaDeclarado = (paramIdCru && String(paramIdCru).startsWith('ponto_')) || urlParams.has('ponto_id') || urlParams.has('PONTO_ID');
+
+      const isCasaOuQuartoExplicito = !isPontoRondaDeclarado && (urlCasaId || urlQuartoId || urlBloco || urlBlocoId ||
+        (paramIdCru && (String(paramIdCru).toLowerCase().startsWith('casa_') || String(paramIdCru).toLowerCase().startsWith('quarto_') || String(paramIdCru).toLowerCase().startsWith('bloco_'))));
 
       if (isCasaOuQuartoExplicito) {
         if (urlCasaId) {
@@ -994,6 +997,10 @@
         if (paramIdCru) {
           if (String(paramIdCru).toLowerCase().startsWith('casa')) {
             window.location.replace(`limpeza.html?casa_id=${encodeURIComponent(paramIdCru)}`);
+            return;
+          }
+          if (String(paramIdCru).toLowerCase().startsWith('bloco')) {
+            window.location.replace(`limpeza.html?bloco=${encodeURIComponent(paramIdCru)}`);
             return;
           }
           window.location.replace(`limpeza.html?quarto_id=${encodeURIComponent(paramIdCru)}`);
@@ -1293,12 +1300,14 @@
       } catch (e) {}
 
       const btn = document.getElementById('btnConfirmarRonda');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Gravando Ronda...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Gravando Ronda...';
+      }
 
       const protocolo = 'RONDA-' + Math.floor(100000 + Math.random() * 900000);
       const dataHoraStr = `${data}T${hora}:00`;
-      const ordemDia = registrosPontoHoje.length + 1;
+      const ordemDia = (registrosPontoHoje || []).length + 1;
 
       const registro = {
         id: protocolo,
@@ -1318,74 +1327,107 @@
         criado_em: new Date().toISOString()
       };
 
-      // 1. Salvar no Firestore
-      let salvoOnline = false;
-      if (firestoreDb && navigator.onLine) {
-        try {
-          await firestoreDb.collection('ronda_registros').doc(protocolo).set(registro);
-          salvoOnline = true;
-
-          // Salvar log na auditoria central para o Prefeito ver
-          const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-          const descTipo = pontoTipo === 'banheiro' ? 'Banheiro' : 'Bebedouro';
-          const logObj = {
-            id: logId,
-            data_hora: new Date().toISOString(),
-            usuario: String(responsavel),
-            modulo: 'ronda',
-            acao: 'RONDA_HIGIENE',
-            entidade: String(pontoNome),
-            detalhes: `Ronda de ${descTipo} (${ordemDia}ª de hoje). Local: ${pontoSetor}. Avaliação: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
-          };
-          await firestoreDb.collection('auditoria_logs').doc(logId).set(logObj);
-        } catch (err) {
-          console.warn("Aviso ao salvar registro no Firestore:", err);
-        }
-      }
-
-      registro.sync_pendente = !salvoOnline;
-
-      // 2. Atualizar cache local
       try {
-        const cached = localStorage.getItem('ronda_registros_cache');
-        const lista = cached ? JSON.parse(cached) : [];
-        lista.unshift(registro);
-        localStorage.setItem('ronda_registros_cache', JSON.stringify(lista.slice(0, 200)));
-      } catch (e) {}
+        // 1. Salvar no cache local imediatamente (Offline-First Garantido)
+        try {
+          const cached = localStorage.getItem('ronda_registros_cache');
+          const lista = cached ? JSON.parse(cached) : [];
+          lista.unshift(registro);
+          localStorage.setItem('ronda_registros_cache', JSON.stringify(lista.slice(0, 200)));
+        } catch (e) {}
 
-      // 3. Exibir Tela de Sucesso com status transparente
-      carregarHistoricoPlaquinhaRonda(pontoId, p.tipo, p.nome, p.setor);
-      document.getElementById('sucessoProtocolo').textContent = '#' + protocolo;
-      document.getElementById('sucessoPontoNome').textContent = pontoNome;
-      document.getElementById('sucessoSetor').textContent = pontoSetor;
-      document.getElementById('sucessoOrdemDia').textContent = `${ordemDia}ª limpeza de hoje (Meta: ${meta}x)`;
-      document.getElementById('sucessoResponsavel').textContent = responsavel;
-      document.getElementById('sucessoDataHora').textContent = `${data.split('-').reverse().join('/')} às ${hora}`;
+        // 2. Salvar no Firestore com timeout seguro de 2,5s
+        let salvoOnline = false;
+        if (firestoreDb && navigator.onLine) {
+          try {
+            const envioPromise = firestoreDb.collection('ronda_registros').doc(protocolo).set(registro);
+            const timeoutPromise = new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout rede Firestore')), 2500));
+            await Promise.race([envioPromise, timeoutPromise]);
+            salvoOnline = true;
 
-      const titEl = document.getElementById('sucessoTituloRonda');
-      const descEl = document.getElementById('sucessoDescricaoRonda');
-      const badgeEl = document.getElementById('sucessoBadgeStatusRonda');
-
-      if (salvoOnline) {
-        if (titEl) titEl.textContent = 'Ronda Registrada com Sucesso!';
-        if (descEl) descEl.textContent = 'A confirmação foi transmitida para a nuvem da obra em tempo real.';
-        if (badgeEl) {
-          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-          badgeEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> <span>Transmitido para a Nuvem da Obra</span>';
+            // Salvar log na auditoria central para o Prefeito ver em background
+            try {
+              const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+              const descTipo = pontoTipo === 'banheiro' ? 'Banheiro' : 'Bebedouro';
+              const logObj = {
+                id: logId,
+                data_hora: new Date().toISOString(),
+                usuario: String(responsavel),
+                modulo: 'ronda',
+                acao: 'RONDA_HIGIENE',
+                entidade: String(pontoNome),
+                detalhes: `Ronda de ${descTipo} (${ordemDia}ª de hoje). Local: ${pontoSetor}. Avaliação: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
+              };
+              firestoreDb.collection('auditoria_logs').doc(logId).set(logObj).catch(() => {});
+            } catch (errLog) {}
+          } catch (err) {
+            console.warn("Aviso ao salvar registro no Firestore (gravado no aparelho):", err);
+            salvoOnline = false;
+          }
         }
-      } else {
-        if (titEl) titEl.textContent = 'Ronda Gravada no Aparelho!';
-        if (descEl) descEl.textContent = 'A vistoria foi registrada localmente (offline). O envio está em fila e será transmitido automaticamente assim que a conexão retornar.';
-        if (badgeEl) {
-          badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
-          badgeEl.innerHTML = '<i class="fa-solid fa-clock text-amber-400"></i> <span>Salvo no Dispositivo (Envio Pendente de Internet)</span>';
+
+        registro.sync_pendente = !salvoOnline;
+
+        // 3. Exibir Tela de Sucesso com status transparente
+        try {
+          carregarHistoricoPlaquinhaRonda(pontoId, p.tipo, p.nome, p.setor);
+        } catch (e) {}
+
+        const elProt = document.getElementById('sucessoProtocolo');
+        if (elProt) elProt.textContent = '#' + protocolo;
+        const elNome = document.getElementById('sucessoPontoNome');
+        if (elNome) elNome.textContent = pontoNome;
+        const elSetor = document.getElementById('sucessoSetor');
+        if (elSetor) elSetor.textContent = pontoSetor;
+        const elOrdem = document.getElementById('sucessoOrdemDia');
+        if (elOrdem) elOrdem.textContent = `${ordemDia}ª limpeza de hoje (Meta: ${meta}x)`;
+        const elResp = document.getElementById('sucessoResponsavel');
+        if (elResp) elResp.textContent = responsavel;
+        const elData = document.getElementById('sucessoDataHora');
+        if (elData) {
+          const dataFmt = data.includes('-') ? data.split('-').reverse().join('/') : data;
+          elData.textContent = `${dataFmt} às ${hora}`;
+        }
+
+        const titEl = document.getElementById('sucessoTituloRonda');
+        const descEl = document.getElementById('sucessoDescricaoRonda');
+        const badgeEl = document.getElementById('sucessoBadgeStatusRonda');
+
+        if (salvoOnline) {
+          if (titEl) titEl.textContent = 'Ronda Registrada com Sucesso!';
+          if (descEl) descEl.textContent = 'A confirmação foi transmitida para a nuvem da obra em tempo real.';
+          if (badgeEl) {
+            badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            badgeEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> <span>Transmitido para a Nuvem da Obra</span>';
+          }
+        } else {
+          if (titEl) titEl.textContent = 'Ronda Gravada no Aparelho!';
+          if (descEl) descEl.textContent = 'A vistoria foi registrada localmente (offline). O envio está em fila e será transmitido automaticamente assim que a conexão retornar.';
+          if (badgeEl) {
+            badgeEl.className = 'mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+            badgeEl.innerHTML = '<i class="fa-solid fa-clock text-amber-400"></i> <span>Salvo no Dispositivo (Envio Pendente de Internet)</span>';
+          }
+        }
+
+        const formRondaEl = document.getElementById('formRonda');
+        if (formRondaEl) formRondaEl.classList.add('hidden');
+        const telaSuc = document.getElementById('telaSucessoRonda');
+        if (telaSuc) telaSuc.classList.remove('hidden');
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (errGlobal) {
+        console.error("Erro crítico ao salvar ronda:", errGlobal);
+        alert("Ocorreu uma instabilidade na gravação. A ronda foi salva com segurança no aparelho.");
+        const formRondaEl = document.getElementById('formRonda');
+        if (formRondaEl) formRondaEl.classList.add('hidden');
+        const telaSuc = document.getElementById('telaSucessoRonda');
+        if (telaSuc) telaSuc.classList.remove('hidden');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-check text-base mr-2"></i><span>Confirmar Registro de Ronda</span>';
         }
       }
-
-      document.getElementById('formRonda').classList.add('hidden');
-      document.getElementById('telaSucessoRonda').classList.remove('hidden');
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // Auto-sincronização de rondas pendentes ao reconectar

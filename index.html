@@ -37,6 +37,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
   <!-- HTML5 QR Code Scanner para Câmera Móvel (PWA) -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
+  <!-- Gerador Nativo de QR Code 100% Offline (Zero Dependencia Externa) -->
+  <script src="qrcode.min.js"></script>
   <!-- Firebase SDKs (v10 compat para sincronização com Firestore) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -6419,6 +6421,13 @@ service cloud.firestore {
       <div class="p-4 bg-slate-950 flex flex-col items-center justify-center">
         <!-- Área da Câmera html5-qrcode -->
         <div id="qrReaderCameraArea" class="w-full max-w-[320px] aspect-square rounded-xl overflow-hidden bg-black border-2 border-teal-500 shadow-inner"></div>
+        <div class="mt-2.5 flex items-center justify-center gap-2">
+          <label for="inputUploadQRFileLimpeza" class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 hover:text-white text-xs font-semibold border border-slate-700 transition">
+            <i class="fa-solid fa-camera-rotate"></i>
+            <span>Tirar Foto / Carregar QR Code</span>
+          </label>
+          <input type="file" id="inputUploadQRFileLimpeza" accept="image/*" class="hidden" onchange="escanearArquivoQRLimpeza(this)">
+        </div>
         <p class="text-xs text-slate-400 mt-3 text-center">
           <i class="fa-solid fa-camera mr-1 text-teal-400"></i> Posicione o QR Code da casa no quadrado acima.
         </p>
@@ -6625,6 +6634,9 @@ service cloud.firestore {
         <div class="flex items-center gap-2">
           <button type="button" onclick="fecharModal('modalPlacaQRCasa')" class="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
             Fechar
+          </button>
+          <button type="button" onclick="copiarLinkPlacaQRCasa()" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition" title="Copiar link do QR Code">
+            <i class="fa-solid fa-copy"></i> Copiar Link
           </button>
           <button type="button" onclick="imprimirPlacaQRCasa()" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition">
             <i class="fa-solid fa-print"></i> Imprimir Placa
@@ -7012,6 +7024,9 @@ service cloud.firestore {
           <button type="button" onclick="fecharModal('modalPlacaQRRonda')" class="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
             Fechar
           </button>
+          <button type="button" onclick="copiarLinkPlacaQRRonda()" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition" title="Copiar link do QR Code">
+            <i class="fa-solid fa-copy"></i> Copiar Link
+          </button>
           <button type="button" onclick="imprimirPlacaQRRonda()" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition">
             <i class="fa-solid fa-print"></i> Imprimir Placa
           </button>
@@ -7233,6 +7248,13 @@ service cloud.firestore {
         <!-- Área da Câmera -->
         <div class="relative w-full aspect-square bg-slate-950 rounded-2xl overflow-hidden border-2 border-dashed border-teal-500/50 flex flex-col items-center justify-center text-slate-400">
           <div id="leitorCameraRonda" class="w-full h-full"></div>
+        </div>
+        <div class="mt-2.5 flex items-center justify-center gap-2">
+          <label for="inputUploadQRFileRonda" class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 hover:text-white text-xs font-semibold border border-slate-700 transition">
+            <i class="fa-solid fa-camera-rotate"></i>
+            <span>Tirar Foto / Carregar QR Code</span>
+          </label>
+          <input type="file" id="inputUploadQRFileRonda" accept="image/*" class="hidden" onchange="escanearArquivoQRRonda(this)">
         </div>
 
         <p class="text-center text-slate-500 text-[11px]">
@@ -7654,6 +7676,6 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=4.4"></script>
+  <script src="app.js?v=4.6"></script>
 </body>
 </html>
