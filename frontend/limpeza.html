@@ -256,7 +256,9 @@
         <span class="text-emerald-300 font-bold flex items-center gap-1.5">
           <i class="fa-solid fa-shield-check text-emerald-400"></i> Equipe Autenticada
         </span>
-        <span class="text-[10px] text-slate-400">Auditoria Ativa</span>
+        <button type="button" onclick="bloquearSessaoEquipe()" class="text-[11px] text-amber-300 hover:text-amber-200 underline font-semibold flex items-center gap-1 transition">
+          <i class="fa-solid fa-lock text-[10px]"></i> Sair / Bloquear Senha
+        </button>
       </div>
 
       <!-- Seleção do Tipo de Serviço -->
@@ -788,6 +790,16 @@
         erroEl.classList.remove('hidden');
         document.getElementById('inputSenhaEquipe').select();
       }
+    }
+
+    function bloquearSessaoEquipe() {
+      try {
+        localStorage.removeItem('equipe_limpeza_auth_' + getDataHojeLocal());
+      } catch (e) {}
+      senhaLiberadaNestaSessao = false;
+      const inp = document.getElementById('inputSenhaEquipe');
+      if (inp) inp.value = '';
+      atualizarVisibilidadeModo();
     }
 
     window.addEventListener('DOMContentLoaded', () => {
