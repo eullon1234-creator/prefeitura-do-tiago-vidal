@@ -88,6 +88,22 @@
   <!-- Container Principal -->
   <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
 
+    <!-- Pílula de Conexão e Fila Offline (Feedback Visual de Campo) -->
+    <div id="barraStatusConexao" class="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/90 border border-slate-700/80 text-slate-300 shadow-md">
+      <div class="flex items-center gap-2">
+        <span id="iconeStatusConexao" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span id="textoStatusConexao" class="text-[11px]"><strong class="text-emerald-400">Conectado</strong> • Nuvem em tempo real</span>
+      </div>
+      <div id="boxFilaOffline" class="hidden flex items-center gap-2">
+        <span id="badgeFilaOffline" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+          0 no aparelho
+        </span>
+        <button type="button" id="btnForcarSync" onclick="forcarSincronizacaoOffline()" class="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition active:scale-95">
+          <i class="fa-solid fa-cloud-arrow-up"></i> <span>Subir</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Card de Identificação do Ponto -->
     <div class="bg-gradient-to-br from-slate-800 to-slate-850 p-4 rounded-2xl border border-slate-700/80 shadow-lg space-y-2">
       <div class="flex items-start justify-between gap-3">
@@ -770,6 +786,7 @@
         if (erro) erro.classList.add('hidden');
         equipeAutenticada = true;
         sessionStorage.setItem('ronda_equipe_autenticada', 'true');
+        dispararFeedbackTati('scan');
 
         const checkLembrar = document.getElementById('checkLembrarSenhaHoje');
         if (checkLembrar && checkLembrar.checked) {
@@ -782,6 +799,7 @@
         if (containerSenha) containerSenha.classList.add('hidden');
         if (formRonda) formRonda.classList.remove('hidden');
       } else {
+        dispararFeedbackTati('alerta');
         if (erro) erro.classList.remove('hidden');
         if (input) {
           input.focus();
@@ -1258,9 +1276,15 @@
       btn.className = 'avaliacao-chip active p-2.5 rounded-xl border border-teal-500 bg-teal-600 text-white font-bold text-center transition text-[11px]';
     }
 
+    let isSubmetendoRonda = false;
+
     // Salvar Registro de Ronda
     async function salvarRondaPublica(e) {
       if (e) e.preventDefault();
+
+      // Proteção anti-duplo clique (debounce)
+      if (isSubmetendoRonda) return;
+      isSubmetendoRonda = true;
 
       const pontoId = document.getElementById('inputPontoId').value;
       const pontoNome = document.getElementById('inputPontoNome').value || document.getElementById('displayPontoNome').textContent;
@@ -1274,16 +1298,22 @@
       const observacoes = document.getElementById('inputObservacoes').value.trim();
 
       if (!pontoId) {
+        dispararFeedbackTati('alerta');
         alert('Por favor, selecione qual banheiro ou bebedouro você está atendendo.');
+        isSubmetendoRonda = false;
         return;
       }
       if (!responsavel) {
+        dispararFeedbackTati('alerta');
         alert('Por favor, digite o seu nome.');
         document.getElementById('inputResponsavel').focus();
+        isSubmetendoRonda = false;
         return;
       }
       if (!data || !hora) {
+        dispararFeedbackTati('alerta');
         alert('Informe a data e o horário.');
+        isSubmetendoRonda = false;
         return;
       }
 
@@ -1414,6 +1444,9 @@
         const telaSuc = document.getElementById('telaSucessoRonda');
         if (telaSuc) telaSuc.classList.remove('hidden');
 
+        dispararFeedbackTati('sucesso');
+        atualizarBarraStatusConexao();
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (errGlobal) {
         console.error("Erro crítico ao salvar ronda:", errGlobal);
@@ -1427,15 +1460,96 @@
           btn.disabled = false;
           btn.innerHTML = '<i class="fa-solid fa-check text-base mr-2"></i><span>Confirmar Registro de Ronda</span>';
         }
+        setTimeout(() => { isSubmetendoRonda = false; }, 1000);
+      }
+    }
+
+    // Feedback tátil com suporte à Vibration API (ergonomia de canteiro sob sol forte)
+    function dispararFeedbackTati(tipo = 'sucesso') {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          if (tipo === 'sucesso') {
+            navigator.vibrate([60, 60, 60]);
+          } else if (tipo === 'scan') {
+            navigator.vibrate(50);
+          } else if (tipo === 'alerta') {
+            navigator.vibrate([100, 50, 100]);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Contagem de registros de ronda salvos localmente aguardando sinal de internet
+    function contarItensPendentesSyncRonda() {
+      try {
+        const cached = localStorage.getItem('ronda_registros_cache');
+        if (!cached) return 0;
+        const lista = JSON.parse(cached);
+        return (lista || []).filter(item => item && item.sync_pendente).length;
+      } catch (e) {
+        return 0;
+      }
+    }
+
+    // Atualização visual do status de conexão e fila offline
+    function atualizarBarraStatusConexao() {
+      const bar = document.getElementById('barraStatusConexao');
+      const icone = document.getElementById('iconeStatusConexao');
+      const txt = document.getElementById('textoStatusConexao');
+      const boxFila = document.getElementById('boxFilaOffline');
+      const badgeFila = document.getElementById('badgeFilaOffline');
+      if (!bar || !icone || !txt) return;
+
+      const isOnline = navigator.onLine;
+      const pendentes = contarItensPendentesSyncRonda();
+
+      if (pendentes > 0) {
+        if (boxFila) boxFila.classList.remove('hidden');
+        if (badgeFila) badgeFila.textContent = `${pendentes} no aparelho`;
+        icone.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping';
+        txt.innerHTML = isOnline 
+          ? `<strong class="text-amber-300">${pendentes} em fila</strong> • subindo à nuvem...`
+          : `<strong class="text-amber-400">${pendentes} salvos</strong> • sem sinal`;
+      } else {
+        if (boxFila) boxFila.classList.add('hidden');
+        if (isOnline) {
+          icone.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+          txt.innerHTML = `<strong class="text-emerald-400">Conectado</strong> • Nuvem em tempo real`;
+        } else {
+          icone.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+          txt.innerHTML = `<strong class="text-slate-400">Modo Offline</strong> • Salvando no celular`;
+        }
+      }
+    }
+
+    // Disparar sincronização manual da fila offline pelo botão no cabeçalho
+    async function forcarSincronizacaoOffline() {
+      const btn = document.getElementById('btnForcarSync');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>';
+      }
+      dispararFeedbackTati('scan');
+      await sincronizarRondasPendentesOffline();
+      atualizarBarraStatusConexao();
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Subir</span>';
       }
     }
 
     // Auto-sincronização de rondas pendentes ao reconectar
     async function sincronizarRondasPendentesOffline() {
-      if (!navigator.onLine || !firestoreDb) return;
+      if (!navigator.onLine || !firestoreDb) {
+        atualizarBarraStatusConexao();
+        return;
+      }
       try {
         const cached = localStorage.getItem('ronda_registros_cache');
-        if (!cached) return;
+        if (!cached) {
+          atualizarBarraStatusConexao();
+          return;
+        }
         const lista = JSON.parse(cached);
         let alterado = false;
         for (const r of lista) {
@@ -1451,12 +1565,18 @@
         }
         if (alterado) {
           localStorage.setItem('ronda_registros_cache', JSON.stringify(lista));
-          console.log('[SYNC] Registros de ronda pendentes sincronizados com a nuvem.');
+          console.log('[SYNC] Rondas pendentes sincronizadas com a nuvem.');
         }
       } catch (e) {}
+      atualizarBarraStatusConexao();
     }
-    window.addEventListener('online', sincronizarRondasPendentesOffline);
+    window.addEventListener('online', () => {
+      atualizarBarraStatusConexao();
+      sincronizarRondasPendentesOffline();
+    });
+    window.addEventListener('offline', atualizarBarraStatusConexao);
     setTimeout(sincronizarRondasPendentesOffline, 3500);
+    setInterval(atualizarBarraStatusConexao, 6000);
 
     function fazerOutroRegistroRonda() {
       const agora = new Date();

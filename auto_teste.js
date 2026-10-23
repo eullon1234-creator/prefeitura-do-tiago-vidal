@@ -1575,7 +1575,27 @@ assert(limpezaHtmlAtual.includes('Promise.race(['), 'limpeza.html possui timeout
 const rondaHtmlAtual = fs.readFileSync('ronda.html', 'utf8');
 assert(rondaHtmlAtual.includes('Promise.race(['), 'ronda.html possui timeout resiliente de gravação com Promise.race');
 
-// 8. Paridade de Arquivos Críticos entre Raiz e frontend/
+// 8. Blindagem de Campo (Feedback Tátil, Status de Conexão e Fila Offline)
+console.log('\n--- SEÇÃO 25: BLINDAGEM DE CAMPO, FEEDBACK TÁTIL E FILA OFFLINE ---');
+const limpezaCampo = fs.readFileSync('limpeza.html', 'utf8');
+const rondaCampo = fs.readFileSync('ronda.html', 'utf8');
+const chamadoCampo = fs.readFileSync('chamado.html', 'utf8');
+const appJsCampo = fs.readFileSync('app.js', 'utf8');
+
+assert(limpezaCampo.includes('id="barraStatusConexao"'), 'Barra de status de conexão e fila offline presente em limpeza.html');
+assert(rondaCampo.includes('id="barraStatusConexao"'), 'Barra de status de conexão e fila offline presente em ronda.html');
+assert(chamadoCampo.includes('id="barraStatusConexao"'), 'Barra de status de conexão e fila offline presente em chamado.html');
+
+assert(limpezaCampo.includes('function dispararFeedbackTati('), 'Feedback tátil (Vibration API) implementado em limpeza.html');
+assert(rondaCampo.includes('function dispararFeedbackTati('), 'Feedback tátil (Vibration API) implementado em ronda.html');
+assert(chamadoCampo.includes('function dispararFeedbackTati('), 'Feedback tátil (Vibration API) implementado em chamado.html');
+assert(appJsCampo.includes('function dispararFeedbackTati('), 'Feedback tátil (Vibration API) implementado em app.js');
+
+assert(limpezaCampo.includes('isSubmetendoLimpeza'), 'Proteção anti-duplo clique implementada em limpeza.html');
+assert(rondaCampo.includes('isSubmetendoRonda'), 'Proteção anti-duplo clique implementada em ronda.html');
+assert(chamadoCampo.includes('isSubmetendoChamado'), 'Proteção anti-duplo clique implementada em chamado.html');
+
+// 9. Paridade de Arquivos Críticos entre Raiz e frontend/
 const arquivosVerificarParidade = ['app.js', 'index.html', 'limpeza.html', 'ronda.html', 'chamado.html', 'sw.js', 'qrcode.min.js'];
 arquivosVerificarParidade.forEach(arq => {
   const cRaiz = fs.readFileSync(arq, 'utf8');

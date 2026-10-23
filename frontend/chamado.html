@@ -61,6 +61,22 @@
   <!-- Container Principal -->
   <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
 
+    <!-- Pílula de Conexão e Fila Offline (Feedback Visual de Campo) -->
+    <div id="barraStatusConexao" class="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900/90 border border-slate-700/80 text-slate-300 shadow-md">
+      <div class="flex items-center gap-2">
+        <span id="iconeStatusConexao" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span id="textoStatusConexao" class="text-[11px]"><strong class="text-emerald-400">Conectado</strong> • Nuvem em tempo real</span>
+      </div>
+      <div id="boxFilaOffline" class="hidden flex items-center gap-2">
+        <span id="badgeFilaOffline" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+          0 no aparelho
+        </span>
+        <button type="button" id="btnForcarSync" onclick="forcarSincronizacaoOffline()" class="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition active:scale-95">
+          <i class="fa-solid fa-cloud-arrow-up"></i> <span>Subir</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Alternador Rápido: Morador (Sem Senha) vs Equipe de Limpeza (Com Senha) -->
     <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/90 border border-slate-800 rounded-2xl shadow-md">
       <button type="button" class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-amber-500 text-slate-950 shadow-sm">
@@ -477,6 +493,9 @@
 
     // Enviar chamado
     async function enviarChamado(destino) {
+      if (isSubmetendoChamado) return;
+      isSubmetendoChamado = true;
+
       const urlParams = new URLSearchParams(window.location.search);
       const tipoLocal = document.getElementById('inputTipoLocal')?.value || 'alojamento';
       const quarto = document.getElementById('inputQuarto')?.value.trim() || '';
@@ -491,30 +510,40 @@
       // Validações específicas por local
       if (tipoLocal === 'casa_cidade') {
         if (!casaNome) {
+          dispararFeedbackTati('alerta');
           alert("Por favor, informe o nome ou identificação da Casa na Cidade.");
           document.getElementById('inputCasaNome').focus();
+          isSubmetendoChamado = false;
           return;
         }
         if (!casaComodo) {
+          dispararFeedbackTati('alerta');
           alert("Por favor, informe em qual cômodo ou área ocorreu o problema.");
           document.getElementById('inputCasaComodo').focus();
+          isSubmetendoChamado = false;
           return;
         }
       } else {
         if (!quarto) {
+          dispararFeedbackTati('alerta');
           alert("Por favor, informe o número do seu quarto.");
           document.getElementById('inputQuarto').focus();
+          isSubmetendoChamado = false;
           return;
         }
       }
 
       if (!categoria) {
+        dispararFeedbackTati('alerta');
         alert("Por favor, escolha qual é o problema (Lâmpada, Ar, Chuveiro, etc.).");
+        isSubmetendoChamado = false;
         return;
       }
       if (!descricao) {
+        dispararFeedbackTati('alerta');
         alert("Por favor, descreva rapidamente o que aconteceu.");
         document.getElementById('inputDescricao').focus();
+        isSubmetendoChamado = false;
         return;
       }
 
@@ -642,16 +671,102 @@
       document.getElementById('formChamado').classList.add('hidden');
       document.getElementById('telaSucesso').classList.remove('hidden');
 
+      dispararFeedbackTati('sucesso');
+      atualizarBarraStatusConexao();
+      setTimeout(() => { isSubmetendoChamado = false; }, 1000);
+
       // Scroll para o topo suavemente
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Auto-sincronização de chamados pendentes ao reconectar
-    async function sincronizarChamadosPendentesOffline() {
-      if (!navigator.onLine || !firestoreDb) return;
+    let isSubmetendoChamado = false;
+
+    // Feedback tátil com suporte à Vibration API (ergonomia de canteiro sob sol forte)
+    function dispararFeedbackTati(tipo = 'sucesso') {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          if (tipo === 'sucesso') {
+            navigator.vibrate([60, 60, 60]);
+          } else if (tipo === 'scan') {
+            navigator.vibrate(50);
+          } else if (tipo === 'alerta') {
+            navigator.vibrate([100, 50, 100]);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Contagem de chamados salvos localmente aguardando sinal de internet
+    function contarItensPendentesSyncChamado() {
       try {
         const cached = localStorage.getItem('chamados_suporte_cache');
-        if (!cached) return;
+        if (!cached) return 0;
+        const lista = JSON.parse(cached);
+        return (lista || []).filter(item => item && item.sync_pendente).length;
+      } catch (e) {
+        return 0;
+      }
+    }
+
+    // Atualização visual do status de conexão e fila offline
+    function atualizarBarraStatusConexao() {
+      const bar = document.getElementById('barraStatusConexao');
+      const icone = document.getElementById('iconeStatusConexao');
+      const txt = document.getElementById('textoStatusConexao');
+      const boxFila = document.getElementById('boxFilaOffline');
+      const badgeFila = document.getElementById('badgeFilaOffline');
+      if (!bar || !icone || !txt) return;
+
+      const isOnline = navigator.onLine;
+      const pendentes = contarItensPendentesSyncChamado();
+
+      if (pendentes > 0) {
+        if (boxFila) boxFila.classList.remove('hidden');
+        if (badgeFila) badgeFila.textContent = `${pendentes} no aparelho`;
+        icone.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping';
+        txt.innerHTML = isOnline 
+          ? `<strong class="text-amber-300">${pendentes} em fila</strong> • subindo à nuvem...`
+          : `<strong class="text-amber-400">${pendentes} salvos</strong> • sem sinal`;
+      } else {
+        if (boxFila) boxFila.classList.add('hidden');
+        if (isOnline) {
+          icone.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+          txt.innerHTML = `<strong class="text-emerald-400">Conectado</strong> • Nuvem em tempo real`;
+        } else {
+          icone.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+          txt.innerHTML = `<strong class="text-slate-400">Modo Offline</strong> • Salvando no celular`;
+        }
+      }
+    }
+
+    // Disparar sincronização manual da fila offline pelo botão no cabeçalho
+    async function forcarSincronizacaoOffline() {
+      const btn = document.getElementById('btnForcarSync');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>';
+      }
+      dispararFeedbackTati('scan');
+      await sincronizarChamadosPendentesOffline();
+      atualizarBarraStatusConexao();
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Subir</span>';
+      }
+    }
+
+    // Auto-sincronização de chamados pendentes ao reconectar
+    async function sincronizarChamadosPendentesOffline() {
+      if (!navigator.onLine || !firestoreDb) {
+        atualizarBarraStatusConexao();
+        return;
+      }
+      try {
+        const cached = localStorage.getItem('chamados_suporte_cache');
+        if (!cached) {
+          atualizarBarraStatusConexao();
+          return;
+        }
         const lista = JSON.parse(cached);
         let alterado = false;
         for (const ch of lista) {
@@ -670,9 +785,15 @@
           console.log('[SYNC] Chamados pendentes sincronizados com a nuvem.');
         }
       } catch (e) {}
+      atualizarBarraStatusConexao();
     }
-    window.addEventListener('online', sincronizarChamadosPendentesOffline);
+    window.addEventListener('online', () => {
+      atualizarBarraStatusConexao();
+      sincronizarChamadosPendentesOffline();
+    });
+    window.addEventListener('offline', atualizarBarraStatusConexao);
     setTimeout(sincronizarChamadosPendentesOffline, 3500);
+    setInterval(atualizarBarraStatusConexao, 6000);
 
     function novoChamadoReset() {
       document.getElementById('formChamado').reset();

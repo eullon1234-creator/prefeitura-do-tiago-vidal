@@ -10931,6 +10931,21 @@ function getCleanSystemUrl(targetPage = 'chamado.html') {
   return `${cleanUrl}${targetPage}`;
 }
 
+// Feedback tátil com suporte à Vibration API (ergonomia sob sol forte no canteiro)
+function dispararFeedbackTati(tipo = 'sucesso') {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      if (tipo === 'sucesso') {
+        navigator.vibrate([60, 60, 60]);
+      } else if (tipo === 'scan') {
+        navigator.vibrate(50);
+      } else if (tipo === 'alerta') {
+        navigator.vibrate([100, 50, 100]);
+      }
+    } catch (e) {}
+  }
+}
+
 // Gerador nativo e autônomo de QR Code em Data URL (100% offline via qrcode-generator com fallback transparente)
 function gerarQRCodeDataUrl(texto, cellSize = 6, margin = 4) {
   if (!texto) return '';
@@ -14751,10 +14766,12 @@ function processarLeituraQRCasa(texto) {
   }
 
   if (!casaId || (typeof casaId === 'string' && (casaId.startsWith('http://') || casaId.startsWith('https://') || casaId.startsWith('file://')))) {
+    dispararFeedbackTati('alerta');
     showToast('Não foi possível identificar a unidade no QR Code lido.', 'warning');
     return;
   }
 
+  dispararFeedbackTati('scan');
   fecharScannerLimpezaQR();
   abrirModalRegistroLimpeza(casaId, tipoPadrao);
 }
@@ -14944,6 +14961,7 @@ async function salvarRegistroLimpeza(e) {
 
     // 3. Fechar modal imediatamente para o usuário não ficar preso esperando rede
     fecharModal('modalRegistroLimpezaCasa');
+    dispararFeedbackTati('sucesso');
     showToast(`✅ Limpeza (${tipo === 'rotina' ? 'Rotina Diária' : 'Ar Condicionado'}) registrada em ${casaNome}!`, 'success');
 
     // Atualizar visualizações
@@ -17853,6 +17871,7 @@ async function salvarRegistroManualRonda(e) {
   localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda.slice(0, 500)));
 
   fecharModal('modalRegistroManualRonda');
+  dispararFeedbackTati('sucesso');
   atualizarContadoresRondaUI();
   filtrarRondaUI();
 
@@ -18086,10 +18105,12 @@ function processarLeituraQRRonda(texto) {
   }
 
   if (!pontoEncontrado) {
+    dispararFeedbackTati('alerta');
     showToast(`QR Code lido ("${pontoId}"), mas o ponto não foi localizado.`, 'warning');
     return;
   }
 
+  dispararFeedbackTati('scan');
   showToast(`Ponto "${pontoEncontrado.nome}" identificado!`, 'success');
   fecharScannerRondaQR();
   abrirModalRegistroManualRonda(pontoId);
@@ -19197,3 +19218,4 @@ window.copiarLinkPlacaQRRonda = copiarLinkPlacaQRRonda;
 window.escanearArquivoQRLimpeza = escanearArquivoQRLimpeza;
 window.escanearArquivoQRRonda = escanearArquivoQRRonda;
 window.obterTodosQuartos = obterTodosQuartos;
+window.dispararFeedbackTati = dispararFeedbackTati;
