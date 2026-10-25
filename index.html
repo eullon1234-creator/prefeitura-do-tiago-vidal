@@ -3278,6 +3278,7 @@ service cloud.firestore {
               <option value="todos">Todos os Tipos</option>
               <option value="banheiro">🚻 Apenas Banheiros</option>
               <option value="bebedouro">🚰 Apenas Bebedouros</option>
+              <option value="maquina_gelo">🧊 Apenas Máquinas de Gelo</option>
             </select>
 
             <!-- Filtro por Status do Dia -->
@@ -6739,19 +6740,26 @@ service cloud.firestore {
           <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
             Tipo de Instalação *
           </label>
-          <div class="grid grid-cols-2 gap-3">
-            <label class="cursor-pointer border-2 border-teal-500 bg-teal-50/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none" id="labelTipoPontoBanheiro">
+          <div class="grid grid-cols-3 gap-2.5">
+            <label class="cursor-pointer border-2 border-teal-500 bg-teal-50/60 rounded-xl p-2.5 flex flex-col items-center text-center transition select-none" id="labelTipoPontoBanheiro">
               <input type="radio" name="pontoRondaTipo" value="banheiro" checked onchange="aoMudarTipoPontoRonda('banheiro')" class="hidden">
               <span class="text-2xl mb-1">🚻</span>
               <span class="font-extrabold text-slate-900 text-xs">Banheiro</span>
-              <span class="text-[10px] text-slate-500">Químico / Contêiner / Alvenaria</span>
+              <span class="text-[10px] text-slate-500">Químico / Fixo</span>
             </label>
 
-            <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-3 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70" id="labelTipoPontoBebedouro">
+            <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70" id="labelTipoPontoBebedouro">
               <input type="radio" name="pontoRondaTipo" value="bebedouro" onchange="aoMudarTipoPontoRonda('bebedouro')" class="hidden">
               <span class="text-2xl mb-1">🚰</span>
               <span class="font-extrabold text-slate-900 text-xs">Bebedouro</span>
-              <span class="text-[10px] text-slate-500">Industrial / Coluna / Galão</span>
+              <span class="text-[10px] text-slate-500">Industrial / Galão</span>
+            </label>
+
+            <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70" id="labelTipoPontoGelo">
+              <input type="radio" name="pontoRondaTipo" value="maquina_gelo" onchange="aoMudarTipoPontoRonda('maquina_gelo')" class="hidden">
+              <span class="text-2xl mb-1">🧊</span>
+              <span class="font-extrabold text-slate-900 text-xs">Máquina Gelo</span>
+              <span class="text-[10px] text-slate-500">Produção & Saída</span>
             </label>
           </div>
         </div>
@@ -7217,6 +7225,53 @@ service cloud.firestore {
               Horário *
             </label>
             <input type="time" id="regManualRondaHora" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-semibold outline-none focus:border-teal-500">
+          </div>
+        </div>
+
+        <!-- Bloco Especial de Produção e Saída de Gelo (Desktop) -->
+        <div id="boxGeloRegistroManualDesktop" class="hidden p-3.5 rounded-xl bg-cyan-50 border border-cyan-200 space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-cyan-200">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🧊</span>
+              <span class="font-bold text-cyan-900 text-xs uppercase tracking-wide">Lançamento de Produção & Saída</span>
+            </div>
+            <!-- Alternar Unidade -->
+            <div class="flex items-center gap-1 bg-white rounded-lg p-0.5 border border-cyan-300 text-[10px]">
+              <button type="button" id="btnManualGeloSacos" onclick="alternarUnidadeGeloManualDesktop('sacos')" class="px-2 py-0.5 rounded font-bold transition bg-cyan-600 text-white shadow-2xs">
+                Sacos (Padrão)
+              </button>
+              <button type="button" id="btnManualGeloKg" onclick="alternarUnidadeGeloManualDesktop('kg')" class="px-2 py-0.5 rounded font-bold transition text-cyan-800 hover:text-cyan-950">
+                Kg
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label for="regManualGeloProduzido" class="block font-bold text-emerald-800 text-[10px] uppercase mb-1">
+                Produzido <span class="labelUnidadeManualGelo">(sacos)</span>
+              </label>
+              <input type="number" id="regManualGeloProduzido" min="0" step="any" placeholder="0" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-center font-bold text-xs text-slate-900 outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label for="regManualGeloSaida" class="block font-bold text-amber-800 text-[10px] uppercase mb-1">
+                Saída <span class="labelUnidadeManualGelo">(sacos)</span>
+              </label>
+              <input type="number" id="regManualGeloSaida" min="0" step="any" placeholder="0" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-center font-bold text-xs text-slate-900 outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label for="regManualGeloSaldo" class="block font-bold text-cyan-800 text-[10px] uppercase mb-1">
+                Saldo Silo <span class="labelUnidadeManualGelo">(sacos)</span>
+              </label>
+              <input type="number" id="regManualGeloSaldo" min="0" step="any" placeholder="0" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-center font-bold text-xs text-cyan-900 outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div>
+            <label for="regManualGeloDestinos" class="block font-bold text-slate-700 text-[10px] uppercase mb-1">
+              Frentes Atendidas / Destino do Gelo
+            </label>
+            <input type="text" id="regManualGeloDestinos" placeholder="Ex: Frente KM 12, Terraplenagem, Refeitório..." class="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-cyan-500">
           </div>
         </div>
 

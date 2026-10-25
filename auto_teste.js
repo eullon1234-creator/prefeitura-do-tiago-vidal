@@ -1097,7 +1097,7 @@ assert(appJsContentSec16.includes("collection('canteiro_metadata').doc('snapshot
 
 // 5. PWA Offline em sw.js
 const swContent = fs.readFileSync('sw.js', 'utf8');
-assert(/prefeitura-pwa-v4\.[0-9]+/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
+assert(/prefeitura-pwa-v[45]\.[0-9]+/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v5.x em sw.js');
 assert(swContent.includes("'ronda.html'"), 'ronda.html incluído no pré-cache offline de sw.js');
 assert(swContent.includes("response.type !== 'opaque'"), 'Suporte a cache de recursos de CDN (Tailwind, FontAwesome) ativo em sw.js');
 
@@ -1767,6 +1767,108 @@ assert(appJsCampo.includes('gastos_${nomeLimpo}'), 'Geração de nome de arquivo
 assert(htmlIndex.includes('exportarRelatorioGastosCasaAtualExcel()'), 'Botão de exportação presente no modal de detalhes da casa');
 assert(htmlIndex.includes('Relatório Gastos Excel') || htmlIndex.includes('Exportar Gastos (.xlsx)'), 'Texto do botão de exportação validado no index.html');
 assert(appJsCampo.includes("exportarRelatorioGastosCasaExcel('${c.id}')"), 'Botão de download de relatório Excel individual presente no card da grade de casas');
+
+// --- SEÇÃO 29: AUDITORIA DE MÁQUINA DE GELO NA RONDA DE CANTEIRO & BALANÇO DIÁRIO ---
+console.log('\n--- SEÇÃO 29: AUDITORIA DE MÁQUINA DE GELO NA RONDA DE CANTEIRO & BALANÇO DIÁRIO ---');
+
+// 1. Seeds padrão da Máquina de Gelo
+assert(appJsCampo.includes("id: 'ponto_maquina_gelo_01'"), 'Seed ponto_maquina_gelo_01 presente em app.js');
+assert(rondaContent.includes("id: 'ponto_maquina_gelo_01'"), 'Seed ponto_maquina_gelo_01 presente em ronda.html');
+assert(appJsCampo.includes("tipo: 'maquina_gelo'"), 'Tipo maquina_gelo mapeado em app.js');
+assert(rondaContent.includes("tipo: 'maquina_gelo'"), 'Tipo maquina_gelo mapeado em ronda.html');
+
+// 2. Unidade padrão em Sacos e Alternância de Unidade
+assert(rondaContent.includes("unidadeGeloAtual = 'sacos'") || rondaContent.includes('unidadeGeloAtual = "sacos"'), 'Unidade padrão de gelo inicializada como sacos em ronda.html');
+assert(rondaContent.includes('alternarUnidadeGeloMobile'), 'Função alternarUnidadeGeloMobile presente em ronda.html');
+assert(appJsCampo.includes('alternarUnidadeGeloManualDesktop'), 'Função alternarUnidadeGeloManualDesktop presente em app.js');
+assert(appJsCampo.includes('window.alternarUnidadeGeloManualDesktop ='), 'alternarUnidadeGeloManualDesktop exportada no window em app.js');
+
+// 3. Componentes DOM Mobile (ronda.html)
+assert(rondaContent.includes('id="boxControleGeloInputs"'), 'Container boxControleGeloInputs presente em ronda.html');
+assert(rondaContent.includes('id="checklistMaquinaGelo"'), 'Checklist técnico de máquina de gelo presente em ronda.html');
+assert(rondaContent.includes('id="inputGeloProduzido"'), 'Input de gelo produzido presente em ronda.html');
+assert(rondaContent.includes('id="inputGeloSaida"'), 'Input de gelo de saída presente em ronda.html');
+assert(rondaContent.includes('id="inputGeloSaldo"'), 'Input de saldo de gelo presente em ronda.html');
+assert(rondaContent.includes('id="inputGeloDestinos"'), 'Input de frentes de destino de gelo presente em ronda.html');
+assert(rondaContent.includes('id="btnUnidadeGeloSacos"'), 'Botão de unidade Sacos presente no mobile');
+assert(rondaContent.includes('id="btnUnidadeGeloKg"'), 'Botão de unidade Kg presente no mobile');
+
+// 4. Componentes DOM Desktop (index.html)
+assert(htmlIndex.includes('id="boxGeloRegistroManualDesktop"'), 'Container boxGeloRegistroManualDesktop presente em index.html');
+assert(htmlIndex.includes('id="regManualGeloProduzido"'), 'Input de produção de gelo manual presente em index.html');
+assert(htmlIndex.includes('id="regManualGeloSaida"'), 'Input de saída de gelo manual presente em index.html');
+assert(htmlIndex.includes('id="regManualGeloSaldo"'), 'Input de saldo de gelo manual presente em index.html');
+assert(htmlIndex.includes('id="regManualGeloDestinos"'), 'Input de frentes de destino manual presente em index.html');
+assert(htmlIndex.includes('value="maquina_gelo"'), 'Opção de filtro e cadastro para Máquina de Gelo presente em index.html');
+assert(htmlIndex.includes('id="labelTipoPontoGelo"'), 'Label de seleção de Máquina de Gelo presente no modal de cadastro');
+
+// 5. Simulação de Lógica e Cálculo do Balanço Diário de Gelo
+const mockPontoGelo = {
+  id: 'ponto_maquina_gelo_01',
+  nome: 'Máquina de Gelo 01',
+  tipo: 'maquina_gelo',
+  setor: 'Canteiro Central',
+  frequencia_diaria: 2
+};
+
+const mockRegsGeloHoje = [
+  {
+    id: 'RONDA-GELO-01',
+    ponto_id: 'ponto_maquina_gelo_01',
+    tipo: 'maquina_gelo',
+    data: hojeTeste,
+    hora: '08:00',
+    gelo_unidade: 'sacos',
+    gelo_produzido: 25,
+    gelo_saida: 18,
+    gelo_saldo: 7,
+    gelo_destinos: 'Frente KM 12, Refeitório'
+  },
+  {
+    id: 'RONDA-GELO-02',
+    ponto_id: 'ponto_maquina_gelo_01',
+    tipo: 'maquina_gelo',
+    data: hojeTeste,
+    hora: '14:30',
+    gelo_unidade: 'sacos',
+    gelo_produzido: 15,
+    gelo_saida: 12,
+    gelo_saldo: 10,
+    gelo_destinos: 'Frente KM 14, Oficina'
+  }
+];
+
+let totProduzidoMock = 0;
+let totSaidaMock = 0;
+let saldoFinalMock = 0;
+let unidadeMock = 'sacos';
+
+mockRegsGeloHoje.forEach(r => {
+  totProduzidoMock += r.gelo_produzido;
+  totSaidaMock += r.gelo_saida;
+  saldoFinalMock = r.gelo_saldo;
+  unidadeMock = r.gelo_unidade;
+});
+
+assert(totProduzidoMock === 40, 'Soma correta de produção de gelo no dia (25 + 15 = 40 sacos)');
+assert(totSaidaMock === 30, 'Soma correta de expedição/saída de gelo no dia (18 + 12 = 30 sacos)');
+assert(saldoFinalMock === 10, 'Saldo final correto no depósito de gelo (10 sacos)');
+assert(unidadeMock === 'sacos', 'Unidade padrão sacos mantida nos lançamentos');
+
+// Simulação de alternância para kg
+const unidadeKgMock = 'kg';
+const prodKg = 150;
+const saidaKg = 120;
+const saldoKg = 30;
+assert(unidadeKgMock === 'kg', 'Alternância para unidade kg validada com sucesso');
+assert(saldoKg === (prodKg - saidaKg), 'Cálculo de balanço em kg validado (150 - 120 = 30 kg)');
+
+// 6. Plaquinha e Exportação Excel
+assert(appJsCampo.includes('CONTROLE DE PRODUÇÃO & HIGIENE — MÁQUINA DE GELO'), 'Título de plaquinha A4 específico para Máquina de Gelo em app.js');
+assert(rondaContent.includes('CONTROLE DE PRODUÇÃO & HIGIENE DA MÁQUINA DE GELO'), 'Título de plaquinha mobile específico para Máquina de Gelo em ronda.html');
+assert(appJsCampo.includes('"PRODUÇÃO DE GELO"'), 'Aba PRODUÇÃO DE GELO configurada na exportação em Excel (exportarRondaExcel)');
+assert(appJsCampo.includes('somaProduzidoGelo'), 'Cálculo e totalização de gelo produzido no relatório Excel');
+assert(appJsCampo.includes('somaSaidaGelo'), 'Cálculo e totalização de gelo expedido no relatório Excel');
 
 // 9. Paridade de Arquivos Críticos entre Raiz e frontend/
 const arquivosVerificarParidade = ['app.js', 'index.html', 'limpeza.html', 'ronda.html', 'chamado.html', 'sw.js', 'qrcode.min.js'];

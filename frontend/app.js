@@ -17945,6 +17945,17 @@ const PONTOS_RONDA_PADRAO_SEED = [
     observacoes: 'Higienização de bicas diária',
     ativo: true,
     criado_em: new Date().toISOString()
+  },
+  {
+    id: 'ponto_maquina_gelo_01',
+    nome: 'Máquina de Gelo 01 - Canteiro Central',
+    tipo: 'maquina_gelo',
+    setor: 'Canteiro Central - Refeitório / Apoio',
+    frequencia_diaria: 2,
+    horarios_sugeridos: '07:30 e 14:00',
+    observacoes: 'Controle diário de produção e expedição de gelo para frentes de obra',
+    ativo: true,
+    criado_em: new Date().toISOString()
   }
 ];
 
@@ -18058,6 +18069,33 @@ function calcularStatusPontoRonda(ponto) {
   const temAlerta = temOcorrenciaAberta || regsHoje.some(r => r.avaliacao && (r.avaliacao.includes('Precisa Reparo') || r.avaliacao.includes('Aviso')));
   const faltaInsumo = regsHoje.some(r => r.avaliacao && r.avaliacao.includes('Falta Insumo'));
 
+  // Métricas específicas de Máquina de Gelo
+  let geloTotProduzido = 0;
+  let geloTotSaida = 0;
+  let geloSaldoAtual = null;
+  let geloUnidade = 'sacos';
+  let geloUltimoDestinos = '';
+
+  if (ponto.tipo === 'maquina_gelo') {
+    regsHoje.forEach(r => {
+      geloTotProduzido += parseFloat(r.gelo_produzido || 0) || 0;
+      geloTotSaida += parseFloat(r.gelo_saida || 0) || 0;
+      if (typeof r.gelo_saldo !== 'undefined' && r.gelo_saldo !== null) geloSaldoAtual = r.gelo_saldo;
+      if (r.gelo_unidade) geloUnidade = r.gelo_unidade;
+      if (r.gelo_destinos) geloUltimoDestinos = r.gelo_destinos;
+    });
+
+    if (geloSaldoAtual === null) {
+      const regAnteriores = (listaRegistrosRonda || []).filter(r => r.ponto_id === ponto.id);
+      if (regAnteriores.length > 0 && typeof regAnteriores[0].gelo_saldo !== 'undefined') {
+        geloSaldoAtual = regAnteriores[0].gelo_saldo;
+        if (regAnteriores[0].gelo_unidade) geloUnidade = regAnteriores[0].gelo_unidade;
+      } else {
+        geloSaldoAtual = 0;
+      }
+    }
+  }
+
   let statusKey = 'pendente';
   let badgeLabel = `PENDENTE (0/${meta})`;
   let badgeClass = 'bg-orange-100 text-orange-800 border-orange-300';
@@ -18115,7 +18153,12 @@ function calcularStatusPontoRonda(ponto) {
     temAlerta,
     faltaInsumo,
     ocsAberta,
-    ocsPonto
+    ocsPonto,
+    geloTotProduzido,
+    geloTotSaida,
+    geloSaldoAtual,
+    geloUnidade,
+    geloUltimoDestinos
   };
 }
 
@@ -18125,6 +18168,7 @@ function atualizarContadoresRondaUI() {
   const tot = pontos.length;
   let totBanheiros = 0;
   let totBebedouros = 0;
+  let totMaquinasGelo = 0;
   let emDia = 0;
   let emAndamento = 0;
   let pendentes = 0;
@@ -18134,6 +18178,7 @@ function atualizarContadoresRondaUI() {
 
   pontos.forEach(p => {
     if (p.tipo === 'banheiro') totBanheiros++;
+    else if (p.tipo === 'maquina_gelo') totMaquinasGelo++;
     else totBebedouros++;
 
     const st = calcularStatusPontoRonda(p);
@@ -18151,7 +18196,7 @@ function atualizarContadoresRondaUI() {
   const elTot = document.getElementById('kpiRondaTotalPontos');
   if (elTot) elTot.textContent = tot;
   const elSub = document.getElementById('kpiRondaSubPontos');
-  if (elSub) elSub.textContent = `${totBanheiros} banheiros • ${totBebedouros} bebedouros`;
+  if (elSub) elSub.textContent = `${totBanheiros} banheiros • ${totBebedouros} bebedouros • ${totMaquinasGelo} máquinas de gelo`;
 
   const elProgTaxa = document.getElementById('kpiRondaProgressoTaxa');
   if (elProgTaxa) elProgTaxa.textContent = `${taxaGeral}%`;
@@ -18256,28 +18301,32 @@ function renderizarGridRonda(pontos) {
 
   grid.innerHTML = pontos.map(p => {
     const isBanheiro = p.tipo === 'banheiro';
+    const isGelo = p.tipo === 'maquina_gelo';
     const st = calcularStatusPontoRonda(p);
-    const icone = isBanheiro ? '🚻' : '🚰';
+    const icone = isBanheiro ? '🚻' : (isGelo ? '🧊' : '🚰');
 
     let htmlRegs = '';
     if (st.regsHoje.length > 0) {
       htmlRegs = st.regsHoje.map((r, idx) => `
         <div class="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-slate-50 border border-slate-200/70">
           <div class="flex items-center gap-1.5">
-            <span class="w-4 h-4 rounded-full bg-teal-100 text-teal-800 font-bold text-[9px] flex items-center justify-center">${idx + 1}ª</span>
+            <span class="w-4 h-4 rounded-full ${isGelo ? 'bg-cyan-100 text-cyan-800' : 'bg-teal-100 text-teal-800'} font-bold text-[9px] flex items-center justify-center">${idx + 1}ª</span>
             <span class="font-bold text-slate-800">${r.hora || '--:--'}</span>
             <span class="text-slate-500 font-medium">(${r.responsavel || 'Equipe'})</span>
           </div>
-          <span class="text-[10px] font-semibold ${r.avaliacao && r.avaliacao.includes('Precisa Reparo') ? 'text-rose-600 font-bold' : 'text-emerald-700'}">
-            ${r.avaliacao || 'Tudo OK'}
-          </span>
+          <div class="flex items-center gap-1.5">
+            ${isGelo ? `<span class="text-[9px] font-bold text-cyan-800 bg-cyan-100/70 px-1.5 py-0.5 rounded border border-cyan-200">+${r.gelo_produzido || 0} / -${r.gelo_saida || 0} ${r.gelo_unidade || 'sacos'}</span>` : ''}
+            <span class="text-[10px] font-semibold ${r.avaliacao && r.avaliacao.includes('Precisa Reparo') ? 'text-rose-600 font-bold' : 'text-emerald-700'}">
+              ${r.avaliacao || 'Tudo OK'}
+            </span>
+          </div>
         </div>
       `).join('');
     } else {
       htmlRegs = `
         <div class="p-2 rounded-lg bg-orange-50/60 border border-orange-200/70 text-[11px] text-orange-800 flex items-center gap-1.5">
           <i class="fa-solid fa-clock text-orange-500"></i>
-          <span>Nenhuma limpeza realizada hoje ainda.</span>
+          <span>${isGelo ? 'Nenhuma checagem de gelo realizada hoje ainda.' : 'Nenhuma limpeza realizada hoje ainda.'}</span>
         </div>
       `;
     }
@@ -18319,6 +18368,37 @@ function renderizarGridRonda(pontos) {
               <div class="h-2 rounded-full transition-all duration-500 ${st.qtdHoje >= st.meta ? 'bg-emerald-500' : 'bg-amber-500'}" style="width: ${st.pct}%"></div>
             </div>
           </div>
+
+          ${isGelo ? `
+            <!-- Balanço Diário de Fabricação e Distribuição de Gelo -->
+            <div class="p-2.5 rounded-xl bg-cyan-50/80 border border-cyan-200 text-cyan-950 text-xs space-y-1.5">
+              <div class="flex items-center justify-between font-bold">
+                <span class="flex items-center gap-1.5 text-cyan-800 text-[11px]">
+                  <i class="fa-solid fa-cube text-cyan-600"></i> Balanço de Gelo (Hoje):
+                </span>
+                <span class="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-cyan-200/70 text-cyan-900 border border-cyan-300">Unidade: ${st.geloUnidade}</span>
+              </div>
+              <div class="grid grid-cols-3 gap-1.5 text-center font-semibold text-[11px]">
+                <div class="bg-white p-1 rounded-lg border border-cyan-100 shadow-2xs">
+                  <span class="text-[9px] text-slate-500 block uppercase font-bold">Produzido</span>
+                  <span class="font-black text-emerald-700 text-xs">${st.geloTotProduzido} ${st.geloUnidade}</span>
+                </div>
+                <div class="bg-white p-1 rounded-lg border border-cyan-100 shadow-2xs">
+                  <span class="text-[9px] text-slate-500 block uppercase font-bold">Saída</span>
+                  <span class="font-black text-amber-700 text-xs">${st.geloTotSaida} ${st.geloUnidade}</span>
+                </div>
+                <div class="bg-white p-1 rounded-lg border border-cyan-100 shadow-2xs">
+                  <span class="text-[9px] text-slate-500 block uppercase font-bold">Saldo Silo</span>
+                  <span class="font-black text-cyan-900 text-xs">${st.geloSaldoAtual} ${st.geloUnidade}</span>
+                </div>
+              </div>
+              ${st.geloUltimoDestinos ? `
+                <p class="text-[10px] text-slate-600 truncate mt-0.5">
+                  <b class="text-slate-700">Destinos:</b> ${st.geloUltimoDestinos}
+                </p>
+              ` : ''}
+            </div>
+          ` : ''}
 
           <!-- Batidas de Hoje -->
           <div class="space-y-1.5 pt-1">
@@ -18442,17 +18522,27 @@ function abrirModalNovoPontoRonda(pontoId = null) {
 function aoMudarTipoPontoRonda(tipo) {
   const lblBanheiro = document.getElementById('labelTipoPontoBanheiro');
   const lblBebedouro = document.getElementById('labelTipoPontoBebedouro');
+  const lblGelo = document.getElementById('labelTipoPontoGelo');
   const freqSelect = document.getElementById('pontoRondaFrequencia');
 
   if (tipo === 'banheiro') {
-    if (lblBanheiro) lblBanheiro.className = 'cursor-pointer border-2 border-teal-500 bg-teal-50/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none shadow-xs';
-    if (lblBebedouro) lblBebedouro.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-3 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+    if (lblBanheiro) lblBanheiro.className = 'cursor-pointer border-2 border-teal-500 bg-teal-50/60 rounded-xl p-2.5 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (lblBebedouro) lblBebedouro.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+    if (lblGelo) lblGelo.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
     if (freqSelect && !document.getElementById('pontoRondaId').value) {
       freqSelect.value = String(configRonda.freq_padrao_banheiro || 2);
     }
+  } else if (tipo === 'maquina_gelo') {
+    if (lblBanheiro) lblBanheiro.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+    if (lblBebedouro) lblBebedouro.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+    if (lblGelo) lblGelo.className = 'cursor-pointer border-2 border-cyan-500 bg-cyan-50/60 rounded-xl p-2.5 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (freqSelect && !document.getElementById('pontoRondaId').value) {
+      freqSelect.value = '2';
+    }
   } else {
-    if (lblBanheiro) lblBanheiro.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-3 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
-    if (lblBebedouro) lblBebedouro.className = 'cursor-pointer border-2 border-sky-500 bg-sky-50/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (lblBanheiro) lblBanheiro.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+    if (lblBebedouro) lblBebedouro.className = 'cursor-pointer border-2 border-sky-500 bg-sky-50/60 rounded-xl p-2.5 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (lblGelo) lblGelo.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2.5 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
     if (freqSelect && !document.getElementById('pontoRondaId').value) {
       freqSelect.value = String(configRonda.freq_padrao_bebedouro || 1);
     }
@@ -18581,7 +18671,11 @@ function abrirModalPlacaQRRonda(pontoId) {
 
   if (titEl) titEl.textContent = (p.nome || 'Ponto de Ronda').toUpperCase();
   if (setEl) setEl.textContent = `Setor: ${p.setor || 'Canteiro Central'} ${p.observacoes ? '• ' + p.observacoes : ''}`;
-  if (headEl) headEl.textContent = p.tipo === 'banheiro' ? 'CONTROLE DE HIGIENE DE SANITÁRIO' : 'CONTROLE DE HIGIENE DE BEBEDOURO';
+  if (headEl) {
+    if (p.tipo === 'banheiro') headEl.textContent = 'CONTROLE DE HIGIENE DE SANITÁRIO';
+    else if (p.tipo === 'maquina_gelo') headEl.textContent = 'CONTROLE DE PRODUÇÃO & HIGIENE — MÁQUINA DE GELO';
+    else headEl.textContent = 'CONTROLE DE HIGIENE DE BEBEDOURO';
+  }
   if (freqEl) {
     const meta = Number(p.frequencia_diaria || (p.tipo === 'banheiro' ? 2 : 1));
     freqEl.textContent = `META DE HIGIENE: ${meta}x AO DIA ${p.horarios_sugeridos ? '(' + p.horarios_sugeridos + ')' : ''}`;
@@ -18638,6 +18732,26 @@ function salvarConfigRonda(e) {
   showToast('Metas e Senha da Equipe atualizadas com sucesso!', 'success');
 }
 
+let unidadeGeloManualDesktop = 'sacos';
+
+function alternarUnidadeGeloManualDesktop(unidade) {
+  unidadeGeloManualDesktop = unidade === 'kg' ? 'kg' : 'sacos';
+  const btnSacos = document.getElementById('btnManualGeloSacos');
+  const btnKg = document.getElementById('btnManualGeloKg');
+  if (btnSacos && btnKg) {
+    if (unidadeGeloManualDesktop === 'sacos') {
+      btnSacos.className = 'px-2 py-0.5 rounded font-bold transition bg-cyan-600 text-white shadow-2xs';
+      btnKg.className = 'px-2 py-0.5 rounded font-bold transition text-cyan-800 hover:text-cyan-950';
+    } else {
+      btnKg.className = 'px-2 py-0.5 rounded font-bold transition bg-cyan-600 text-white shadow-2xs';
+      btnSacos.className = 'px-2 py-0.5 rounded font-bold transition text-cyan-800 hover:text-cyan-950';
+    }
+  }
+  document.querySelectorAll('.labelUnidadeManualGelo').forEach(el => {
+    el.textContent = `(${unidadeGeloManualDesktop})`;
+  });
+}
+
 // Registro Manual / Vistoria pelo Prefeito
 function abrirModalRegistroManualRonda(pontoId) {
   fecharModal('modalRegistroLimpezaCasa');
@@ -18655,7 +18769,24 @@ function abrirModalRegistroManualRonda(pontoId) {
   const obsInput = document.getElementById('regManualRondaObs');
 
   if (idInput) idInput.value = pontoId;
-  if (subTit) subTit.textContent = `${p.tipo === 'banheiro' ? '🚻' : '🚰'} ${p.nome} (${p.setor})`;
+  const isGelo = p.tipo === 'maquina_gelo';
+  if (subTit) subTit.textContent = `${p.tipo === 'banheiro' ? '🚻' : (isGelo ? '🧊' : '🚰')} ${p.nome} (${p.setor})`;
+
+  const boxGelo = document.getElementById('boxGeloRegistroManualDesktop');
+  if (isGelo) {
+    if (boxGelo) boxGelo.classList.remove('hidden');
+    const inpProd = document.getElementById('regManualGeloProduzido');
+    const inpSaida = document.getElementById('regManualGeloSaida');
+    const inpSaldo = document.getElementById('regManualGeloSaldo');
+    const inpDest = document.getElementById('regManualGeloDestinos');
+    if (inpProd) inpProd.value = '';
+    if (inpSaida) inpSaida.value = '';
+    if (inpSaldo) inpSaldo.value = '';
+    if (inpDest) inpDest.value = '';
+    alternarUnidadeGeloManualDesktop('sacos');
+  } else {
+    if (boxGelo) boxGelo.classList.add('hidden');
+  }
 
   const agora = new Date();
   if (dtInput) dtInput.value = getDataHojeLocal(agora);
@@ -18708,11 +18839,24 @@ async function salvarRegistroManualRonda(e) {
     responsavel: responsavel,
     ordem_dia: ordemDia,
     meta_dia: meta,
-    checklist: ['Limpeza Geral e Desinfecção Completa'],
+    checklist: p.tipo === 'maquina_gelo' ? ['Checagem de Silo & Compressor', 'Higienização de Cuba e Pá', 'Inspeção do Filtro de Água', 'Limpeza Externa e Dreno'] : ['Limpeza Geral e Desinfecção Completa'],
     avaliacao: avaliacao,
     observacoes: obs || 'Lançamento manual registrado via painel administrativo',
     criado_em: new Date().toISOString()
   };
+
+  if (p.tipo === 'maquina_gelo') {
+    const prod = parseFloat(document.getElementById('regManualGeloProduzido')?.value || '0') || 0;
+    const saida = parseFloat(document.getElementById('regManualGeloSaida')?.value || '0') || 0;
+    const saldo = parseFloat(document.getElementById('regManualGeloSaldo')?.value || '0') || 0;
+    const destinos = (document.getElementById('regManualGeloDestinos')?.value || '').trim();
+
+    registro.gelo_unidade = unidadeGeloManualDesktop || 'sacos';
+    registro.gelo_produzido = prod;
+    registro.gelo_saida = saida;
+    registro.gelo_saldo = saldo;
+    registro.gelo_destinos = destinos;
+  }
 
   listaRegistrosRonda.unshift(registro);
   localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda.slice(0, 500)));
@@ -18752,7 +18896,7 @@ function abrirModalHistoricoPontoRonda(pontoId) {
   const corpo = document.getElementById('listaHistoricoRondaCorpo');
   const vazio = document.getElementById('historicoRondaVazio');
 
-  if (nomeEl) nomeEl.textContent = `${p.tipo === 'banheiro' ? '🚻' : '🚰'} ${p.nome}`;
+  if (nomeEl) nomeEl.textContent = `${p.tipo === 'banheiro' ? '🚻' : (p.tipo === 'maquina_gelo' ? '🧊' : '🚰')} ${p.nome}`;
   if (setorEl) setorEl.textContent = `Setor: ${p.setor} • Meta: ${p.frequencia_diaria || 2}x ao dia`;
 
   const registros = (listaRegistrosRonda || []).filter(r => r.ponto_id === pontoId);
@@ -18778,8 +18922,17 @@ function abrirModalHistoricoPontoRonda(pontoId) {
 
         <div class="flex items-center justify-between text-slate-600">
           <span><i class="fa-solid fa-user-check mr-1 text-slate-400"></i> Responsável: <b>${r.responsavel || 'Equipe'}</b></span>
-          <span class="text-[11px] text-slate-400">${r.ordem_dia ? r.ordem_dia + 'ª limpeza do dia' : ''}</span>
+          <span class="text-[11px] text-slate-400">${r.ordem_dia ? r.ordem_dia + 'ª checagem' : ''}</span>
         </div>
+
+        ${(p.tipo === 'maquina_gelo' || typeof r.gelo_produzido !== 'undefined') ? `
+          <div class="p-2 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-950 flex items-center justify-between font-semibold text-[11px]">
+            <span>🧊 Produzido: <b>+${r.gelo_produzido || 0} ${r.gelo_unidade || 'sacos'}</b></span>
+            <span>🚚 Saída: <b>-${r.gelo_saida || 0} ${r.gelo_unidade || 'sacos'}</b></span>
+            <span>📦 Saldo Silo: <b>${r.gelo_saldo || 0} ${r.gelo_unidade || 'sacos'}</b></span>
+          </div>
+          ${r.gelo_destinos ? `<p class="text-[10px] text-slate-600 font-medium"><i class="fa-solid fa-location-arrow text-cyan-600 mr-1"></i><b>Destinos:</b> ${r.gelo_destinos}</p>` : ''}
+        ` : ''}
 
         ${Array.isArray(r.checklist) && r.checklist.length > 0 ? `
           <div class="flex flex-wrap gap-1 pt-1">
@@ -19237,7 +19390,7 @@ function exportarRondaExcel() {
       else if (st.statusKey === 'andamento') statusStyle = ExcelProGenerator.estilos.statusOcupada;
 
       ExcelProGenerator.addCell(ws1, r1, 0, p.nome, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
-      ExcelProGenerator.addCell(ws1, r1, 1, isBanheiro ? 'BANHEIRO' : 'BEBEDOURO', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r1, 1, isBanheiro ? 'BANHEIRO' : (p.tipo === 'maquina_gelo' ? 'MÁQUINA DE GELO' : 'BEBEDOURO'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
       ExcelProGenerator.addCell(ws1, r1, 2, p.setor || 'Canteiro', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
       ExcelProGenerator.addCell(ws1, r1, 3, st.meta, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
       ExcelProGenerator.addCell(ws1, r1, 4, st.qtdHoje, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
@@ -19327,6 +19480,63 @@ function exportarRondaExcel() {
     ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws3, "OUVIDORIA & RECLAMAÇÕES");
 
+    // 4. ABA PRODUÇÃO & SAÍDA DE GELO
+    const ws4 = {};
+    ExcelProGenerator.addCabecalhoObra(
+      ws4,
+      `${obraNome.toUpperCase()} — BALANÇO DE PRODUÇÃO & SAÍDA DE GELO`,
+      `Auditoria e Log Diário de Fabricação, Expedição e Saldo de Gelo para Frentes de Serviço`,
+      11
+    );
+    const h4 = ['Protocolo', 'Data', 'Horário', 'Máquina / Ponto', 'Setor', 'Operador / Inspetor', 'Unidade', 'Produzido', 'Saída / Expedido', 'Saldo em Depósito', 'Frentes Atendidas / Destino'];
+    h4.forEach((h, col) => ExcelProGenerator.addCell(ws4, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+    const regsGelo = (listaRegistrosRonda || []).filter(r => r.tipo === 'maquina_gelo' || typeof r.gelo_produzido !== 'undefined');
+    let r4 = 4;
+    let somaProduzidoGelo = 0;
+    let somaSaidaGelo = 0;
+
+    regsGelo.forEach((rg, idx) => {
+      const zebra = idx % 2 === 1;
+      const prod = parseFloat(rg.gelo_produzido || 0) || 0;
+      const saida = parseFloat(rg.gelo_saida || 0) || 0;
+      const saldo = parseFloat(rg.gelo_saldo || 0) || 0;
+      const unid = rg.gelo_unidade || 'sacos';
+      somaProduzidoGelo += prod;
+      somaSaidaGelo += saida;
+
+      ExcelProGenerator.addCell(ws4, r4, 0, rg.id || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 1, formatarDataLimpezaBR(rg.data), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 2, rg.hora || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 3, rg.ponto_nome || 'Máquina de Gelo', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws4, r4, 4, rg.setor || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws4, r4, 5, rg.responsavel || 'Operador', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws4, r4, 6, unid.toUpperCase(), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 7, prod, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 8, saida, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 9, saldo, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 10, rg.gelo_destinos || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      r4++;
+    });
+
+    const totEx4 = r4 + 1;
+    ExcelProGenerator.addCell(ws4, r4, 0, 'TOTAL GERAL EXPEDIDO E PRODUZIDO', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws4, r4, 1, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 4, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 5, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 6, 'TOTAL', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 7, somaProduzidoGelo, { f: `SUM(H5:H${r4})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 8, somaSaidaGelo, { f: `SUM(I5:I${r4})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 9, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, r4, 10, '-', { s: ExcelProGenerator.estilos.total('center') });
+
+    ws4['!ref'] = `A1:K${totEx4}`;
+    ws4['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 30 }, { wch: 24 }, { wch: 24 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 40 }];
+    ws4['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws4, "PRODUÇÃO DE GELO");
+
     XLSX.writeFile(wb, `RELATORIO_EXECUTIVO_RONDA_NR18_${dataHoje}.xlsx`);
     showToast('Planilha executiva da Ronda exportada com sucesso!', 'success');
   } catch (err) {
@@ -19363,6 +19573,7 @@ window.abrirScannerRondaQR = abrirScannerRondaQR;
 window.fecharScannerRondaQR = fecharScannerRondaQR;
 window.confirmarPontoManualScanner = confirmarPontoManualScanner;
 window.processarLeituraQRRonda = processarLeituraQRRonda;
+window.alternarUnidadeGeloManualDesktop = alternarUnidadeGeloManualDesktop;
 
 // Exposição das novas funções no window
 window.aoDigitarUrlFotoItemEstoque = aoDigitarUrlFotoItemEstoque;

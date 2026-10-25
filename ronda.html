@@ -304,6 +304,95 @@
         </div>
       </div>
 
+      <!-- Bloco Especial de Produção & Saída de Gelo (Visível apenas para Máquina de Gelo) -->
+      <div id="boxControleGeloInputs" class="hidden p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-800/60 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-cyan-800/50">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🧊</span>
+            <div>
+              <span class="block text-xs font-bold text-cyan-200 uppercase tracking-wide">Controle de Produção & Saída</span>
+              <span class="block text-[10px] text-cyan-400/80">Lançamento diário de fabricação e distribuição</span>
+            </div>
+          </div>
+          <!-- Seletor de Unidade (Padrão: Sacos) -->
+          <div class="flex items-center bg-slate-900/90 rounded-lg p-0.5 border border-cyan-700/60 text-[10px]">
+            <button type="button" id="btnUnidadeGeloSacos" onclick="alternarUnidadeGeloMobile('sacos')" class="px-2.5 py-1 rounded font-bold transition bg-cyan-600 text-white shadow-xs">
+              Sacos
+            </button>
+            <button type="button" id="btnUnidadeGeloKg" onclick="alternarUnidadeGeloMobile('kg')" class="px-2.5 py-1 rounded font-bold transition text-cyan-300 hover:text-white">
+              Kg
+            </button>
+          </div>
+        </div>
+
+        <!-- Inputs Numéricos de Produção, Saída e Saldo -->
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+              Produção <span class="unidadeGeloLabel">(sacos)</span>
+            </label>
+            <input 
+              type="number" 
+              id="inputGeloProduzido" 
+              min="0" 
+              step="any" 
+              placeholder="0"
+              oninput="calcularSaldoGeloSugeridoMobile()"
+              class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-2.5 py-2 text-white font-bold text-sm outline-none transition text-center"
+            >
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+              Saída <span class="unidadeGeloLabel">(sacos)</span>
+            </label>
+            <input 
+              type="number" 
+              id="inputGeloSaida" 
+              min="0" 
+              step="any" 
+              placeholder="0"
+              oninput="calcularSaldoGeloSugeridoMobile()"
+              class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-2.5 py-2 text-white font-bold text-sm outline-none transition text-center"
+            >
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-cyan-300 uppercase tracking-wider mb-1">
+              Saldo Silo <span class="unidadeGeloLabel">(sacos)</span>
+            </label>
+            <input 
+              type="number" 
+              id="inputGeloSaldo" 
+              min="0" 
+              step="any" 
+              placeholder="0" 
+              class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-2.5 py-2 text-cyan-300 font-bold text-sm outline-none transition text-center"
+            >
+          </div>
+        </div>
+
+        <!-- Frentes de Destino -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+            Frentes Atendidas / Destino do Gelo
+          </label>
+          <input 
+            type="text" 
+            id="inputGeloDestinos" 
+            placeholder="Ex: Frente KM 12, Terraplenagem, Refeitório..." 
+            class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-white font-semibold text-xs outline-none transition placeholder-slate-500"
+          >
+          <!-- Chips Rápidos -->
+          <div class="flex items-center gap-1.5 flex-wrap mt-1.5">
+            <span class="text-[9px] text-slate-400 font-bold">Adicionar:</span>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('KM 12')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ KM 12</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('KM 14')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ KM 14</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('Refeitório')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ Refeitório</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('Oficina')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ Oficina</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('Britagem')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ Britagem</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Checklist Dinâmico de Serviços -->
       <div>
         <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
@@ -356,6 +445,30 @@
           <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
             <input type="checkbox" name="checkItem" value="Inspeção Visual de Filtro e Sem Vazamento" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🔍 Inspeção do Filtro e Ausência de Vazamento</span>
+          </label>
+        </div>
+
+        <!-- Checklist para Máquina de Gelo -->
+        <div id="checklistMaquinaGelo" class="hidden space-y-2">
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Nível do Silo & Funcionamento do Compressor" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🧊 Nível do Silo & Ciclo do Compressor / Refrigeração</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Higienização da Cuba, Tampa e Pá Dosadora" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🧽 Higienização da Cuba, Tampa e Pá de Gelo</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Inspeção do Filtro de Água / Purificador" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>💧 Inspeção do Filtro / Purificador de Água</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Qualidade e Espessura dos Cubos de Gelo" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>❄️ Qualidade do Gelo (Transparência, Sem Odor)</span>
+          </label>
+          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+            <input type="checkbox" name="checkItem" value="Limpeza Externa e Dreno de Degelo Desobstruído" checked class="w-4 h-4 accent-teal-500 rounded">
+            <span>🧹 Limpeza Externa e Dreno de Degelo Desobstruído</span>
           </label>
         </div>
       </div>
@@ -685,6 +798,16 @@
         horarios_sugeridos: '08:00',
         observacoes: 'Higienização de bicas diária',
         ativo: true
+      },
+      {
+        id: 'ponto_maquina_gelo_01',
+        nome: 'Máquina de Gelo 01 - Canteiro Central',
+        tipo: 'maquina_gelo',
+        setor: 'Canteiro Central - Refeitório / Apoio',
+        frequencia_diaria: 2,
+        horarios_sugeridos: '07:30 e 14:00',
+        observacoes: 'Controle diário de produção e expedição de gelo para frentes de obra',
+        ativo: true
       }
     ];
 
@@ -692,6 +815,7 @@
     let listaPontosDisponiveis = [...PONTOS_RONDA_PADRAO_SEED];
     let pontoCarregado = null;
     let registrosPontoHoje = [];
+    let unidadeGeloAtual = 'sacos';
     let configRonda = {
       freq_padrao_banheiro: 2,
       freq_padrao_bebedouro: 1,
@@ -1155,13 +1279,59 @@
       }
     }
 
+    function alternarUnidadeGeloMobile(unidade) {
+      unidadeGeloAtual = unidade === 'kg' ? 'kg' : 'sacos';
+      const btnSacos = document.getElementById('btnUnidadeGeloSacos');
+      const btnKg = document.getElementById('btnUnidadeGeloKg');
+      if (btnSacos && btnKg) {
+        if (unidadeGeloAtual === 'sacos') {
+          btnSacos.className = 'px-2.5 py-1 rounded font-bold transition bg-cyan-600 text-white shadow-xs';
+          btnKg.className = 'px-2.5 py-1 rounded font-bold transition text-cyan-300 hover:text-white';
+        } else {
+          btnKg.className = 'px-2.5 py-1 rounded font-bold transition bg-cyan-600 text-white shadow-xs';
+          btnSacos.className = 'px-2.5 py-1 rounded font-bold transition text-cyan-300 hover:text-white';
+        }
+      }
+      document.querySelectorAll('.unidadeGeloLabel').forEach(el => {
+        el.textContent = `(${unidadeGeloAtual})`;
+      });
+    }
+
+    function adicionarDestinoGeloChipMobile(destino) {
+      const inp = document.getElementById('inputGeloDestinos');
+      if (!inp) return;
+      const atual = inp.value.trim();
+      if (!atual) {
+        inp.value = destino;
+      } else if (!atual.toLowerCase().includes(destino.toLowerCase())) {
+        inp.value = atual + ', ' + destino;
+      }
+    }
+
+    function calcularSaldoGeloSugeridoMobile() {
+      const prod = parseFloat(document.getElementById('inputGeloProduzido')?.value || '0') || 0;
+      const saida = parseFloat(document.getElementById('inputGeloSaida')?.value || '0') || 0;
+      const saldoInput = document.getElementById('inputGeloSaldo');
+      if (saldoInput && !saldoInput.dataset.manualEdited) {
+        let ultimoSaldo = 0;
+        if (registrosPontoHoje && registrosPontoHoje.length > 0) {
+          const ult = registrosPontoHoje[registrosPontoHoje.length - 1];
+          if (typeof ult.gelo_saldo !== 'undefined' && ult.gelo_saldo !== null) {
+            ultimoSaldo = parseFloat(ult.gelo_saldo) || 0;
+          }
+        }
+        const sugerido = Math.max(0, ultimoSaldo + prod - saida);
+        saldoInput.value = sugerido;
+      }
+    }
+
     async function aplicarDadosPonto(p) {
       document.getElementById('inputPontoId').value = p.id;
       document.getElementById('inputPontoNome').value = p.nome;
       document.getElementById('inputPontoTipo').value = p.tipo || 'banheiro';
       document.getElementById('inputPontoSetor').value = p.setor || 'Canteiro Geral';
       
-      const meta = Number(p.frequencia_diaria || (p.tipo === 'banheiro' ? 2 : 1));
+      const meta = Number(p.frequencia_diaria || (p.tipo === 'banheiro' ? 2 : (p.tipo === 'maquina_gelo' ? 2 : 1)));
       document.getElementById('inputPontoMeta').value = meta;
 
       document.getElementById('displayPontoNome').textContent = p.nome;
@@ -1170,10 +1340,13 @@
       document.getElementById('containerSelecaoPonto').classList.add('hidden');
 
       const isBanheiro = (p.tipo || 'banheiro') === 'banheiro';
+      const isGelo = (p.tipo || 'banheiro') === 'maquina_gelo';
       const iconeEl = document.getElementById('displayPontoIcone');
       const badgeTipoEl = document.getElementById('displayPontoTipoBadge');
       const checkBanheiro = document.getElementById('checklistBanheiro');
       const checkBebedouro = document.getElementById('checklistBebedouro');
+      const checkGelo = document.getElementById('checklistMaquinaGelo');
+      const boxGelo = document.getElementById('boxControleGeloInputs');
 
       if (isBanheiro) {
         if (iconeEl) {
@@ -1183,6 +1356,33 @@
         if (badgeTipoEl) badgeTipoEl.textContent = 'Banheiro Identificado';
         if (checkBanheiro) checkBanheiro.classList.remove('hidden');
         if (checkBebedouro) checkBebedouro.classList.add('hidden');
+        if (checkGelo) checkGelo.classList.add('hidden');
+        if (boxGelo) boxGelo.classList.add('hidden');
+      } else if (isGelo) {
+        if (iconeEl) {
+          iconeEl.className = 'w-12 h-12 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center flex-shrink-0 text-2xl border border-cyan-500/30';
+          iconeEl.innerHTML = '🧊';
+        }
+        if (badgeTipoEl) badgeTipoEl.textContent = 'Máquina de Gelo Identificada';
+        if (checkBanheiro) checkBanheiro.classList.add('hidden');
+        if (checkBebedouro) checkBebedouro.classList.add('hidden');
+        if (checkGelo) checkGelo.classList.remove('hidden');
+        if (boxGelo) boxGelo.classList.remove('hidden');
+
+        // Limpar e inicializar campos de gelo
+        const inpProd = document.getElementById('inputGeloProduzido');
+        const inpSaida = document.getElementById('inputGeloSaida');
+        const inpSaldo = document.getElementById('inputGeloSaldo');
+        const inpDest = document.getElementById('inputGeloDestinos');
+        if (inpProd) inpProd.value = '';
+        if (inpSaida) inpSaida.value = '';
+        if (inpSaldo) {
+          inpSaldo.value = '';
+          delete inpSaldo.dataset.manualEdited;
+          inpSaldo.onchange = () => { inpSaldo.dataset.manualEdited = 'true'; };
+        }
+        if (inpDest) inpDest.value = '';
+        alternarUnidadeGeloMobile(unidadeGeloAtual || 'sacos');
       } else {
         if (iconeEl) {
           iconeEl.className = 'w-12 h-12 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0 text-2xl border border-sky-500/30';
@@ -1191,6 +1391,8 @@
         if (badgeTipoEl) badgeTipoEl.textContent = 'Bebedouro Identificado';
         if (checkBanheiro) checkBanheiro.classList.add('hidden');
         if (checkBebedouro) checkBebedouro.classList.remove('hidden');
+        if (checkGelo) checkGelo.classList.add('hidden');
+        if (boxGelo) boxGelo.classList.add('hidden');
       }
 
       // Buscar registros do dia de hoje para calcular progresso
@@ -1247,7 +1449,24 @@
       }
 
       if (textoEl) {
-        if (qtdHoje === 0) {
+        if (pontoCarregado && pontoCarregado.tipo === 'maquina_gelo') {
+          let totProd = 0;
+          let totSaida = 0;
+          let ultimoSaldo = null;
+          let unid = unidadeGeloAtual || 'sacos';
+          (regs || []).forEach(r => {
+            totProd += parseFloat(r.gelo_produzido || 0) || 0;
+            totSaida += parseFloat(r.gelo_saida || 0) || 0;
+            if (typeof r.gelo_saldo !== 'undefined' && r.gelo_saldo !== null) ultimoSaldo = r.gelo_saldo;
+            if (r.gelo_unidade) unid = r.gelo_unidade;
+          });
+          const saldoTexto = ultimoSaldo !== null ? ` | Saldo no Silo: <b>${ultimoSaldo} ${unid}</b>` : '';
+          if (qtdHoje === 0) {
+            textoEl.innerHTML = `<span class="text-amber-300 font-semibold">Pendente:</span> Nenhuma checagem de gelo hoje. Esta será a <b>1ª checagem do dia</b>.`;
+          } else {
+            textoEl.innerHTML = `<span class="text-cyan-300 font-semibold">Balanço de Hoje (${qtdHoje}x):</span> Produzido: <b>${totProd} ${unid}</b> | Saída: <b>${totSaida} ${unid}</b>${saldoTexto}`;
+          }
+        } else if (qtdHoje === 0) {
           textoEl.innerHTML = `<span class="text-amber-300 font-semibold">Pendente:</span> Nenhuma limpeza registrada hoje ainda. Esta será a <b>1ª limpeza do dia</b>.`;
         } else if (qtdHoje < meta) {
           const ult = regs && regs.length > 0 ? regs[regs.length - 1] : null;
@@ -1319,10 +1538,27 @@
 
       // Coletar itens marcados no checklist
       const checksChecked = [];
-      const checklistContainerId = pontoTipo === 'banheiro' ? 'checklistBanheiro' : 'checklistBebedouro';
+      let checklistContainerId = 'checklistBanheiro';
+      if (pontoTipo === 'bebedouro') checklistContainerId = 'checklistBebedouro';
+      else if (pontoTipo === 'maquina_gelo') checklistContainerId = 'checklistMaquinaGelo';
+
       document.querySelectorAll(`#${checklistContainerId} input[name="checkItem"]:checked`).forEach(c => {
         checksChecked.push(c.value);
       });
+
+      // Dados de Produção e Saída de Gelo
+      let geloUnidade = unidadeGeloAtual || 'sacos';
+      let geloProduzido = 0;
+      let geloSaida = 0;
+      let geloSaldo = 0;
+      let geloDestinos = '';
+
+      if (pontoTipo === 'maquina_gelo') {
+        geloProduzido = parseFloat(document.getElementById('inputGeloProduzido')?.value || '0') || 0;
+        geloSaida = parseFloat(document.getElementById('inputGeloSaida')?.value || '0') || 0;
+        geloSaldo = parseFloat(document.getElementById('inputGeloSaldo')?.value || '0') || 0;
+        geloDestinos = (document.getElementById('inputGeloDestinos')?.value || '').trim();
+      }
 
       // Salvar nome do responsável na memória local para agilizar próximos pontos
       try {
@@ -1356,6 +1592,14 @@
         observacoes: observacoes || '',
         criado_em: new Date().toISOString()
       };
+
+      if (pontoTipo === 'maquina_gelo') {
+        registro.gelo_unidade = geloUnidade;
+        registro.gelo_produzido = geloProduzido;
+        registro.gelo_saida = geloSaida;
+        registro.gelo_saldo = geloSaldo;
+        registro.gelo_destinos = geloDestinos;
+      }
 
       try {
         // 1. Salvar no cache local imediatamente (Offline-First Garantido)
@@ -1644,6 +1888,8 @@
 
       if (pontoTipo === 'bebedouro') {
         if (titEl) titEl.textContent = 'CONTROLE DE MANUTENÇÃO & HIGIENIZAÇÃO DE BEBEDOUROS';
+      } else if (pontoTipo === 'maquina_gelo') {
+        if (titEl) titEl.textContent = 'CONTROLE DE PRODUÇÃO & HIGIENE DA MÁQUINA DE GELO';
       } else {
         if (titEl) titEl.textContent = 'CONTROLE DE HIGIENIZAÇÃO & RONDA DE SANITÁRIOS';
       }
@@ -1690,6 +1936,24 @@
           badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1';
           badge.innerHTML = '<i class="fa-solid fa-clock text-amber-600"></i> <span>Aguardando Ronda do Dia</span>';
         }
+      } else if (pontoTipo === 'maquina_gelo') {
+        if (registrosHoje.length > 0) {
+          let totProd = 0;
+          let totSai = 0;
+          let ultSaldo = null;
+          let unid = 'sacos';
+          registrosHoje.forEach(r => {
+            totProd += parseFloat(r.gelo_produzido || 0) || 0;
+            totSai += parseFloat(r.gelo_saida || 0) || 0;
+            if (typeof r.gelo_saldo !== 'undefined' && r.gelo_saldo !== null) ultSaldo = r.gelo_saldo;
+            if (r.gelo_unidade) unid = r.gelo_unidade;
+          });
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-cyan-100 text-cyan-900 border border-cyan-300 flex items-center gap-1';
+          badge.innerHTML = `<i class="fa-solid fa-cube text-cyan-600"></i> <span>Produzido: ${totProd} ${unid} • Saiu: ${totSai} ${unid}</span>`;
+        } else {
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1';
+          badge.innerHTML = '<i class="fa-solid fa-clock text-amber-600"></i> <span>Aguardando Checagem do Dia</span>';
+        }
       } else {
         if (registrosHoje.length >= 2) {
           badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1';
@@ -1718,13 +1982,19 @@
 
         if (reg) {
           let descServico = reg.tipo === 'bebedouro' ? 'Higienização de Bicas & Cuba' : 'Higienização & Desinfecção';
-          if (reg.observacoes && reg.observacoes.toLowerCase().includes('refil')) {
+          let corBadge = 'bg-blue-100 text-blue-900 border-blue-300';
+          if (reg.tipo === 'maquina_gelo') {
+            const unid = reg.gelo_unidade || 'sacos';
+            descServico = `Gelo: +${reg.gelo_produzido || 0} / -${reg.gelo_saida || 0} ${unid} (Saldo: ${reg.gelo_saldo || 0})`;
+            if (reg.gelo_destinos) descServico += ` • ${reg.gelo_destinos}`;
+            corBadge = 'bg-cyan-100 text-cyan-900 border-cyan-300';
+          } else if (reg.observacoes && reg.observacoes.toLowerCase().includes('refil')) {
             descServico = "Troca de Refil / Filtro d'Água";
           } else if (reg.observacoes && reg.observacoes.toLowerCase().includes('esgotamento')) {
             descServico = 'Esgotamento / Limpeza Pesada';
           }
 
-          let badgeServico = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300">${descServico}</span>`;
+          let badgeServico = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black ${corBadge} border">${descServico}</span>`;
 
           const dataBr = reg.data ? reg.data.split('-').reverse().join('/') : '--/--/----';
           const horaStr = reg.hora || '08:00';
