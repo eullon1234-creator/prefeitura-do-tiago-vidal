@@ -1050,7 +1050,15 @@
       document.getElementById('inputCasaNome').value = c.nome;
       document.getElementById('labelTipoUnidade').textContent = 'Residência Urbana Identificada';
       document.getElementById('displayCasaNome').textContent = c.nome;
-      document.getElementById('displayCasaEndereco').innerHTML = `<i class="fa-solid fa-location-dot text-rose-400"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+      const cepSpan = c.cep ? ` • <span class="text-cyan-300 font-mono font-bold">CEP: ${c.cep}</span>` : '';
+      document.getElementById('displayCasaEndereco').innerHTML = `
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <span><i class="fa-solid fa-location-dot text-rose-400"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}${cepSpan}</span>
+          <button type="button" onclick="copiarEnderecoCasa('${c.id}')" class="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-indigo-300 text-[10px] font-bold border border-slate-700 flex items-center gap-1 transition">
+            <i class="fa-solid fa-copy"></i> Copiar Endereço
+          </button>
+        </div>
+      `;
       document.getElementById('iconeUnidade').className = 'fa-solid fa-house';
       document.getElementById('boxComodoOcorrencia').classList.remove('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
@@ -1062,6 +1070,35 @@
       if (typeof carregarHistoricoPlaquinhaLimpeza === 'function') {
         carregarHistoricoPlaquinhaLimpeza(c.id, null, null);
       }
+    }
+
+    function copiarEnderecoCasa(casaId) {
+      const c = (typeof listaCasasDisponiveis !== 'undefined' ? listaCasasDisponiveis.find(x => x.id === casaId) : null) || casaCarregada;
+      if (!c) return;
+      const partes = [];
+      if (c.endereco) partes.push(c.endereco.trim());
+      if (c.bairro) partes.push(c.bairro.trim());
+      if (c.cep) {
+        const cepLimpo = c.cep.trim().toUpperCase().includes('CEP') ? c.cep.trim() : `CEP: ${c.cep.trim()}`;
+        partes.push(cepLimpo);
+      }
+      const texto = partes.join(' - ');
+      if (!texto) return;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto);
+      } else {
+        const t = document.createElement('textarea');
+        t.value = texto;
+        t.style.position = 'fixed';
+        t.style.opacity = '0';
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        document.body.removeChild(t);
+      }
+      if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(40);
+      alert(`📋 Endereço copiado para o celular:\n\n${texto}`);
     }
 
     function selecionarCasaManual(id) {

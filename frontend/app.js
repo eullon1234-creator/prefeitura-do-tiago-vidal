@@ -7534,8 +7534,8 @@ function exportarCasasCidadeExcel() {
 
     // 1. ABA RESUMO DAS CASAS
     const ws1 = {};
-    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CASAS URBANAS NA CIDADE (LIDERANÇA & ENGENHARIA)`, `${empresaNome} • Ocupação, Vagas e Conectividade • Emissão: ${dataHora}`, 14);
-    const headers1 = ['Identificação da Casa', 'Endereço Completo', 'Bairro / Região', 'Responsável do Imóvel', 'Telefone Contato', 'Total Cômodos', 'Capacidade (Camas)', 'Camas Ocupadas', 'Camas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)', 'Provedor Internet', 'Dia Liberada', 'Dia Vencimento', 'Status Internet'];
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CASAS URBANAS NA CIDADE (LIDERANÇA & ENGENHARIA)`, `${empresaNome} • Ocupação, Vagas, CEP e Conectividade • Emissão: ${dataHora}`, 15);
+    const headers1 = ['Identificação da Casa', 'Endereço Completo', 'Bairro / Região', 'CEP', 'Responsável do Imóvel', 'Telefone Contato', 'Total Cômodos', 'Capacidade (Camas)', 'Camas Ocupadas', 'Camas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)', 'Provedor Internet', 'Dia Liberada', 'Dia Vencimento', 'Status Internet'];
     headers1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
     let totCapacidade = 0;
@@ -7564,17 +7564,18 @@ function exportarCasasCidadeExcel() {
       ExcelProGenerator.addCell(ws1, r, 0, c.nome || 'Casa', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
       ExcelProGenerator.addCell(ws1, r, 1, c.endereco || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
       ExcelProGenerator.addCell(ws1, r, 2, c.bairro || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
-      ExcelProGenerator.addCell(ws1, r, 3, c.responsavel || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
-      ExcelProGenerator.addCell(ws1, r, 4, c.telefone_responsavel ? (typeof formatarTelefoneTexto === 'function' ? formatarTelefoneTexto(c.telefone_responsavel) : c.telefone_responsavel) : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
-      ExcelProGenerator.addCell(ws1, r, 5, comodosQtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
-      ExcelProGenerator.addCell(ws1, r, 6, camas, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
-      ExcelProGenerator.addCell(ws1, r, 7, ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
-      ExcelProGenerator.addCell(ws1, r, 8, livres, { f: `G${rowEx}-H${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
-      ExcelProGenerator.addCell(ws1, r, 9, taxa, { f: `IF(G${rowEx}>0,H${rowEx}/G${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
-      ExcelProGenerator.addCell(ws1, r, 10, c.internet_provedor || 'Não config.', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
-      ExcelProGenerator.addCell(ws1, r, 11, c.internet_dia_disponivel ? `Dia ${c.internet_dia_disponivel}` : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
-      ExcelProGenerator.addCell(ws1, r, 12, c.internet_dia_vencimento ? `Dia ${c.internet_dia_vencimento}` : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
-      ExcelProGenerator.addCell(ws1, r, 13, stNet.textoBadge || '-', { s: stNet.status === 'vencida' ? ExcelProGenerator.estilos.statusAlerta : (stNet.status === 'pago' ? ExcelProGenerator.estilos.statusLivre : ExcelProGenerator.estilos.td(zebra, 'center')) });
+      ExcelProGenerator.addCell(ws1, r, 3, c.cep || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 4, c.responsavel || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 5, c.telefone_responsavel ? (typeof formatarTelefoneTexto === 'function' ? formatarTelefoneTexto(c.telefone_responsavel) : c.telefone_responsavel) : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 6, comodosQtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 7, camas, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 8, ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 9, livres, { f: `H${rowEx}-I${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, r, 10, taxa, { f: `IF(H${rowEx}>0,I${rowEx}/H${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 11, c.internet_provedor || 'Não config.', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 12, c.internet_dia_disponivel ? `Dia ${c.internet_dia_disponivel}` : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 13, c.internet_dia_vencimento ? `Dia ${c.internet_dia_vencimento}` : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 14, stNet.textoBadge || '-', { s: stNet.status === 'vencida' ? ExcelProGenerator.estilos.statusAlerta : (stNet.status === 'pago' ? ExcelProGenerator.estilos.statusLivre : ExcelProGenerator.estilos.td(zebra, 'center')) });
     });
 
     const totRow1 = 4 + listaCasasCidade.length;
@@ -7587,24 +7588,25 @@ function exportarCasasCidadeExcel() {
     ExcelProGenerator.addCell(ws1, totRow1, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
     ExcelProGenerator.addCell(ws1, totRow1, 4, '-', { s: ExcelProGenerator.estilos.total('center') });
     ExcelProGenerator.addCell(ws1, totRow1, 5, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRow1, 6, '-', { s: ExcelProGenerator.estilos.total('center') });
 
     if (listaCasasCidade.length > 0) {
-      ExcelProGenerator.addCell(ws1, totRow1, 6, totCapacidade, { f: `SUM(G${firstRow1}:G${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
-      ExcelProGenerator.addCell(ws1, totRow1, 7, totOcupadas, { f: `SUM(H${firstRow1}:H${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
-      ExcelProGenerator.addCell(ws1, totRow1, 8, Math.max(0, totCapacidade - totOcupadas), { f: `G${totEx1}-H${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
-      ExcelProGenerator.addCell(ws1, totRow1, 9, totCapacidade > 0 ? (totOcupadas / totCapacidade) : 0, { f: `IF(G${totEx1}>0,H${totEx1}/G${totEx1},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRow1, 7, totCapacidade, { f: `SUM(H${firstRow1}:H${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 8, totOcupadas, { f: `SUM(I${firstRow1}:I${lastRow1})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 9, Math.max(0, totCapacidade - totOcupadas), { f: `H${totEx1}-I${totEx1}`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 10, totCapacidade > 0 ? (totOcupadas / totCapacidade) : 0, { f: `IF(H${totEx1}>0,I${totEx1}/H${totEx1},0)`, z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
     } else {
-      ExcelProGenerator.addCell(ws1, totRow1, 6, 0, { s: ExcelProGenerator.estilos.total('right') });
       ExcelProGenerator.addCell(ws1, totRow1, 7, 0, { s: ExcelProGenerator.estilos.total('right') });
       ExcelProGenerator.addCell(ws1, totRow1, 8, 0, { s: ExcelProGenerator.estilos.total('right') });
-      ExcelProGenerator.addCell(ws1, totRow1, 9, 0, { z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws1, totRow1, 9, 0, { s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws1, totRow1, 10, 0, { z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
     }
-    for (let cCol = 10; cCol < 14; cCol++) {
+    for (let cCol = 11; cCol < 15; cCol++) {
       ExcelProGenerator.addCell(ws1, totRow1, cCol, '-', { s: ExcelProGenerator.estilos.total('center') });
     }
 
-    ws1['!ref'] = `A1:N${totEx1}`;
-    ws1['!cols'] = [{ wch: 25 }, { wch: 32 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 15 }, { wch: 16 }, { wch: 25 }];
+    ws1['!ref'] = `A1:O${totEx1}`;
+    ws1['!cols'] = [{ wch: 25 }, { wch: 32 }, { wch: 20 }, { wch: 14 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 15 }, { wch: 16 }, { wch: 25 }];
     ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws1, "RESUMO CASAS");
 
@@ -11515,6 +11517,7 @@ function filtrarCasasCidadeUI() {
       const matchEnd = (c.endereco || '').toLowerCase().includes(busca);
       const matchBairro = (c.bairro || '').toLowerCase().includes(busca);
       const matchResp = (c.responsavel || '').toLowerCase().includes(busca);
+      const matchCep = (c.cep || '').toLowerCase().includes(busca);
       const matchInternet = (c.internet_provedor || '').toLowerCase().includes(busca) || 
                             (c.internet_codigo_cliente || '').toLowerCase().includes(busca);
       
@@ -11528,7 +11531,7 @@ function filtrarCasasCidadeUI() {
         (com.moveis || []).some(m => (m.tipo || '').toLowerCase().includes(busca) || (m.marca || '').toLowerCase().includes(busca))
       );
 
-      return matchNome || matchEnd || matchBairro || matchResp || matchMorador || matchMovel || matchInternet;
+      return matchNome || matchEnd || matchBairro || matchCep || matchResp || matchMorador || matchMovel || matchInternet;
     });
   }
 
@@ -11631,8 +11634,10 @@ function renderizarCasasCidadeGrid(casas) {
           <!-- Nome da Casa sobreposto na foto -->
           <div class="absolute bottom-3 left-3 right-3 text-white">
             <h3 class="text-base font-black truncate leading-tight drop-shadow-sm">${c.nome}</h3>
-            <p class="text-xs text-slate-300 truncate mt-0.5 flex items-center gap-1">
-              <i class="fa-solid fa-location-dot text-rose-400 text-[10px]"></i> ${c.endereco || 'Endereço não informado'}
+            <p class="text-xs text-slate-300 truncate mt-0.5 flex items-center gap-1" title="${formatarEnderecoCompletoCasa(c)}">
+              <i class="fa-solid fa-location-dot text-rose-400 text-[10px] flex-shrink-0"></i> 
+              <span class="truncate">${c.endereco || 'Endereço não informado'}</span>
+              ${c.cep ? `<span class="text-cyan-300 font-mono text-[11px] font-semibold flex-shrink-0">• CEP ${c.cep}</span>` : ''}
             </p>
           </div>
         </div>
@@ -11826,8 +11831,11 @@ function renderizarCasasCidadeGrid(casas) {
 
           <!-- Rodapé com Botões de Ação -->
           <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
-            <div>
+            <div class="flex items-center gap-1.5 flex-wrap">
               ${mapsBtn}
+              <button type="button" onclick="event.stopPropagation(); copiarEnderecoCasa('${c.id}')" class="px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold inline-flex items-center gap-1 transition" title="Copiar endereço completo com CEP">
+                <i class="fa-solid fa-copy text-indigo-600"></i> Copiar Endereço
+              </button>
             </div>
 
             <div class="flex items-center gap-1.5">
@@ -11859,6 +11867,116 @@ function renderizarCasasCidadeGrid(casas) {
 // ==========================================
 // MÓDULO INTELIGENTE DE INTERNET & CONECTIVIDADE (REPÚBLICAS)
 // ==========================================
+
+// Máscara e consulta inteligente de CEP
+function mascaraCepInput(input) {
+  if (!input) return;
+  let v = input.value.replace(/\D/g, '');
+  if (v.length > 8) v = v.substring(0, 8);
+  if (v.length > 5) {
+    v = v.substring(0, 5) + '-' + v.substring(5);
+  }
+  input.value = v;
+}
+
+async function consultarCepCasaForm() {
+  const cepEl = document.getElementById('casaFormCep');
+  if (!cepEl) return;
+  const cepRaw = (cepEl.value || '').replace(/\D/g, '');
+  if (cepRaw.length !== 8) return;
+
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${cepRaw}/json/`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.erro) {
+      showToast('⚠️ CEP não encontrado nos Correios.', 'warning');
+      return;
+    }
+
+    const endEl = document.getElementById('casaFormEndereco');
+    const bairroEl = document.getElementById('casaFormBairro');
+
+    if (endEl && (!endEl.value || endEl.value.trim() === '')) {
+      endEl.value = data.logradouro || '';
+      endEl.focus();
+    }
+    if (bairroEl && (!bairroEl.value || bairroEl.value.trim() === '')) {
+      const partes = [];
+      if (data.bairro) partes.push(data.bairro);
+      if (data.localidade) partes.push(data.localidade);
+      if (data.uf) partes.push(data.uf);
+      bairroEl.value = partes.join(' - ');
+    }
+
+    showToast(`📍 CEP localizado: ${data.localidade}/${data.uf}`, 'info');
+  } catch (err) {
+    console.warn("Aviso ao buscar CEP:", err);
+  }
+}
+
+// Obter texto do endereço completo formatado com CEP
+function formatarEnderecoCompletoCasa(casa) {
+  if (!casa) return '';
+  const partes = [];
+  if (casa.endereco && casa.endereco.trim()) partes.push(casa.endereco.trim());
+  if (casa.bairro && casa.bairro.trim()) partes.push(casa.bairro.trim());
+  if (casa.cep && casa.cep.trim()) {
+    const cepLimpo = casa.cep.trim().toUpperCase().includes('CEP') ? casa.cep.trim() : `CEP: ${casa.cep.trim()}`;
+    partes.push(cepLimpo);
+  }
+  return partes.join(' - ');
+}
+
+// Copiar endereço com CEP para a área de transferência
+async function copiarEnderecoCasa(casaIdOuObjeto) {
+  let c = null;
+  if (typeof casaIdOuObjeto === 'object' && casaIdOuObjeto !== null) {
+    c = casaIdOuObjeto;
+  } else if (typeof casaIdOuObjeto === 'string') {
+    c = listaCasasCidade.find(x => x.id === casaIdOuObjeto);
+  } else if (typeof casaSelecionadaId !== 'undefined' && casaSelecionadaId) {
+    c = listaCasasCidade.find(x => x.id === casaSelecionadaId);
+  }
+
+  if (!c) {
+    showToast('Não foi possível identificar a casa para copiar o endereço.', 'error');
+    return;
+  }
+
+  const texto = formatarEnderecoCompletoCasa(c);
+  if (!texto) {
+    showToast('Esta casa ainda não possui endereço ou CEP cadastrados.', 'warning');
+    return;
+  }
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(texto);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = texto;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(40);
+    showToast(`📋 Endereço com CEP copiado:
+"${texto}"`, 'success');
+  } catch (err) {
+    showToast(`Endereço: ${texto}`, 'info');
+  }
+}
+
+function copiarEnderecoCasaAtual() {
+  if (typeof casaSelecionadaId !== 'undefined' && casaSelecionadaId) {
+    copiarEnderecoCasa(casaSelecionadaId);
+  }
+}
 
 function calcularStatusInternetCasa(casa, dataReferencia = new Date()) {
   if (!casa) {
@@ -12517,6 +12635,7 @@ function openModalNovaCasa() {
   setVal('casaFormAguaMatricula', '');
   setVal('casaFormAguaNomeCustom', '');
   setVal('casaFormAguaLinkCustom', '');
+  setVal('casaFormCep', '');
   setVal('casaFormInternetProvedor', '');
   setVal('casaFormInternetDiaDisponivel', '');
   setVal('casaFormInternetDiaVencimento', '');
@@ -12556,6 +12675,7 @@ function editarCasa(id) {
   setVal('casaFormAguaMatricula', c.agua_matricula || '');
   setVal('casaFormAguaNomeCustom', c.agua_nome_custom || '');
   setVal('casaFormAguaLinkCustom', c.agua_link_custom || '');
+  setVal('casaFormCep', c.cep || '');
 
   // Internet & Conectividade
   setVal('casaFormInternetProvedor', c.internet_provedor || '');
@@ -12638,6 +12758,7 @@ async function salvarCasa(event) {
   const nome = document.getElementById('casaFormNome').value.trim();
   const endereco = document.getElementById('casaFormEndereco').value.trim();
   const bairro = document.getElementById('casaFormBairro').value.trim();
+  const cep = document.getElementById('casaFormCep')?.value.trim() || '';
   const mapsUrl = document.getElementById('casaFormMapsUrl').value.trim();
   const responsavel = document.getElementById('casaFormResponsavel').value.trim();
   const aluguelValor = parseFloat(document.getElementById('casaFormAluguelValor').value) || 0;
@@ -12671,6 +12792,7 @@ async function salvarCasa(event) {
     nome: nome,
     endereco: endereco,
     bairro: bairro,
+    cep: cep,
     maps_url: mapsUrl,
     responsavel: responsavel,
     aluguel_valor: aluguelValor,
@@ -12769,7 +12891,8 @@ function abrirModalCasaDetalhes(id) {
 
 function atualizarDadosModalCasaDetalhes(c) {
   document.getElementById('modalCasaDetalhesTitulo').textContent = c.nome;
-  document.getElementById('modalCasaDetalhesEndereco').innerHTML = `<i class="fa-solid fa-location-dot text-rose-400"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+  const cepHtml = c.cep ? ` <span class="px-1.5 py-0.2 rounded bg-slate-800 text-cyan-300 font-mono text-[11px] font-bold border border-slate-700">CEP: ${c.cep}</span>` : '';
+  document.getElementById('modalCasaDetalhesEndereco').innerHTML = `<i class="fa-solid fa-location-dot text-rose-400"></i> ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}${cepHtml}`;
   document.getElementById('modalCasaDetalhesResponsavel').textContent = c.responsavel ? `Resp: ${c.responsavel}` : 'Sem resp. definido';
 
   const mapsLinkEl = document.getElementById('modalCasaDetalhesMapsLink');
@@ -14917,7 +15040,7 @@ function abrirModalPlacaQRCasa(casaId) {
 
   if (catEl) catEl.textContent = 'Prefeitura de Canteiro • Residência Urbana';
   if (titEl) titEl.textContent = (c.nome || 'Casa').toUpperCase();
-  if (endEl) endEl.textContent = `Endereço: ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}`;
+  if (endEl) endEl.textContent = `Endereço: ${c.endereco || 'Endereço não informado'} ${c.bairro ? '• ' + c.bairro : ''}${c.cep ? ' • CEP: ' + c.cep : ''}`;
   if (txtUrlEl) txtUrlEl.textContent = qrUrl;
 
   // Alta resolução e carregamento nativo offline para impressão
@@ -19040,6 +19163,11 @@ window.renderizarCardAgenciasCasaAtual = renderizarCardAgenciasCasaAtual;
 window.calcularStatusInternetCasa = calcularStatusInternetCasa;
 window.alternarStatusInternetCasa = alternarStatusInternetCasa;
 window.atualizarBannerAlertaInternetCasas = atualizarBannerAlertaInternetCasas;
+window.mascaraCepInput = mascaraCepInput;
+window.consultarCepCasaForm = consultarCepCasaForm;
+window.formatarEnderecoCompletoCasa = formatarEnderecoCompletoCasa;
+window.copiarEnderecoCasa = copiarEnderecoCasa;
+window.copiarEnderecoCasaAtual = copiarEnderecoCasaAtual;
 
 
 window.alternarSomNotificacoes = alternarSomNotificacoes;

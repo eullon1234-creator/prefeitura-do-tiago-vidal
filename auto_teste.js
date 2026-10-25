@@ -1698,6 +1698,55 @@ assert(appJsCampo.includes('window.atualizarBannerAlertaInternetCasas ='), 'atua
 assert(appJsCampo.includes('stInternet.cardBg'), 'Card interativo de internet presente na grade de casas');
 assert(appJsCampo.includes('Provedor Internet'), 'Coluna Provedor Internet presente na exportação Excel');
 
+// --- SEÇÃO 27: AUDITORIA DE CEP & COPIAR ENDEREÇO DAS CASAS REPÚBLICA ---
+console.log('\n--- SEÇÃO 27: AUDITORIA DE CEP & COPIAR ENDEREÇO DAS CASAS REPÚBLICA ---');
+
+// Extrair formatarEnderecoCompletoCasa e mascaraCepInput do app.js
+const sandboxCep = { console, String, Boolean, navigator: {} };
+const formatarFnMatch = appJsCampo.match(/function formatarEnderecoCompletoCasa\([\s\S]*?\n\}/);
+assert(formatarFnMatch !== null, 'Função formatarEnderecoCompletoCasa presente no app.js');
+vm.runInNewContext(formatarFnMatch[0], sandboxCep);
+const testFormatarEnd = sandboxCep.formatarEnderecoCompletoCasa;
+
+const mascaraFnMatch = appJsCampo.match(/function mascaraCepInput\([\s\S]*?\n\}/);
+assert(mascaraFnMatch !== null, 'Função mascaraCepInput presente no app.js');
+vm.runInNewContext(mascaraFnMatch[0], sandboxCep);
+const testMascaraCep = sandboxCep.mascaraCepInput;
+
+// 1. Formatação de endereço completo com CEP
+const end1 = testFormatarEnd({ endereco: 'Rua das Flores, 450', bairro: 'Centro - Três Lagoas/MS', cep: '79600-000' });
+assert(end1 === 'Rua das Flores, 450 - Centro - Três Lagoas/MS - CEP: 79600-000', 'Formatação exata do endereço com CEP');
+
+const end2 = testFormatarEnd({ endereco: 'Av. Brasil, 100', bairro: 'Industrial' });
+assert(end2 === 'Av. Brasil, 100 - Industrial', 'Formatação de endereço sem CEP sem erros');
+
+const end3 = testFormatarEnd(null);
+assert(end3 === '', 'Formatação de casa nula retorna string vazia');
+
+// 2. Máscara de CEP
+const mockInput = { value: '79600000' };
+testMascaraCep(mockInput);
+assert(mockInput.value === '79600-000', 'Máscara de CEP formata 8 dígitos para 00000-000');
+
+// 3. Elementos no index.html
+assert(htmlIndex.includes('id="casaFormCep"'), 'Campo de input de CEP presente no modal de cadastro');
+assert(htmlIndex.includes('consultarCepCasaForm()'), 'Botão de busca por CEP presente no formulário');
+assert(htmlIndex.includes('copiarEnderecoCasaAtual()'), 'Botão de copiar endereço presente no cabeçalho de detalhes da casa');
+
+// 4. Integração no app.js
+assert(appJsCampo.includes('function copiarEnderecoCasa('), 'Função copiarEnderecoCasa implementada em app.js');
+assert(appJsCampo.includes('function consultarCepCasaForm('), 'Função consultarCepCasaForm com ViaCEP implementada em app.js');
+assert(appJsCampo.includes('window.copiarEnderecoCasa ='), 'copiarEnderecoCasa exportada no window');
+assert(appJsCampo.includes('window.mascaraCepInput ='), 'mascaraCepInput exportada no window');
+assert(appJsCampo.includes('window.consultarCepCasaForm ='), 'consultarCepCasaForm exportada no window');
+assert(appJsCampo.includes("copiarEnderecoCasa('${c.id}')"), 'Botão de copiar endereço presente no card da grade de casas');
+assert(appJsCampo.includes("'CEP'"), 'Coluna CEP presente na planilha de exportação Excel');
+
+// 5. Integração no limpeza.html (Mobile PWA & QR Code de Casas)
+const limpezaHtmlSrc = fs.readFileSync('limpeza.html', 'utf8');
+assert(limpezaHtmlSrc.includes('function copiarEnderecoCasa('), 'Função copiarEnderecoCasa implementada em limpeza.html');
+assert(limpezaHtmlSrc.includes("copiarEnderecoCasa('${c.id}')"), 'Botão de copiar endereço presente no portal mobile de limpeza da casa');
+
 // 9. Paridade de Arquivos Críticos entre Raiz e frontend/
 const arquivosVerificarParidade = ['app.js', 'index.html', 'limpeza.html', 'ronda.html', 'chamado.html', 'sw.js', 'qrcode.min.js'];
 arquivosVerificarParidade.forEach(arq => {
