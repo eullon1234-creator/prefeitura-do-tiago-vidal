@@ -1097,7 +1097,7 @@ assert(appJsContentSec16.includes("collection('canteiro_metadata').doc('snapshot
 
 // 5. PWA Offline em sw.js
 const swContent = fs.readFileSync('sw.js', 'utf8');
-assert(/prefeitura-pwa-v4\.[123456]/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
+assert(/prefeitura-pwa-v4\.[0-9]+/.test(swContent), 'Versão do cache atualizada para prefeitura-pwa-v4.x em sw.js');
 assert(swContent.includes("'ronda.html'"), 'ronda.html incluído no pré-cache offline de sw.js');
 assert(swContent.includes("response.type !== 'opaque'"), 'Suporte a cache de recursos de CDN (Tailwind, FontAwesome) ativo em sw.js');
 
@@ -1594,6 +1594,109 @@ assert(appJsCampo.includes('function dispararFeedbackTati('), 'Feedback tátil (
 assert(limpezaCampo.includes('isSubmetendoLimpeza'), 'Proteção anti-duplo clique implementada em limpeza.html');
 assert(rondaCampo.includes('isSubmetendoRonda'), 'Proteção anti-duplo clique implementada em ronda.html');
 assert(chamadoCampo.includes('isSubmetendoChamado'), 'Proteção anti-duplo clique implementada em chamado.html');
+
+// --- SEÇÃO 26: CONTROLE INTELIGENTE DE INTERNET & VENCIMENTOS NAS CASAS REPÚBLICA ---
+console.log('\n--- SEÇÃO 26: CONTROLE INTELIGENTE DE INTERNET & VENCIMENTOS NAS CASAS REPÚBLICA ---');
+
+// Extrair a função calcularStatusInternetCasa do app.js para execução direta no teste
+const vm = require('vm');
+const sandbox = { console, Date, Math, parseInt, String, Boolean };
+const calcularFnMatch = appJsCampo.match(/function calcularStatusInternetCasa\([\s\S]*?\n\}/);
+assert(calcularFnMatch !== null, 'Função calcularStatusInternetCasa presente no app.js');
+vm.runInNewContext(calcularFnMatch[0], sandbox);
+const testCalcInternet = sandbox.calcularStatusInternetCasa;
+
+// 1. Casa sem configuração
+const resSemConfig = testCalcInternet({});
+assert(resSemConfig.status === 'sem_config', 'Casa sem dados de internet retorna status sem_config');
+assert(resSemConfig.notificar === false, 'Casa sem config não gera notificação indevida');
+
+// 2. Data de referência fixa para testes previsíveis: 10 de Outubro de 2026
+const dataRef = new Date(2026, 9, 10, 12, 0, 0); // 10/10/2026
+
+// 3. Fatura já paga no mês corrente
+const casaPaga = {
+  internet_provedor: 'Desktop Fibra',
+  internet_dia_disponivel: 5,
+  internet_dia_vencimento: 15,
+  internet_ultimo_mes_pago: '2026-10',
+  internet_data_pagamento: '2026-10-06T10:00:00Z'
+};
+const resPaga = testCalcInternet(casaPaga, dataRef);
+assert(resPaga.status === 'pago', 'Internet paga no mês retorna status pago');
+assert(resPaga.textoCurto === 'Paga em dia', 'Texto curto de internet paga é Paga em dia');
+assert(resPaga.cor === 'emerald', 'Cor de fatura paga é emerald (verde)');
+
+// 4. Fatura Pronta para Pagar (hoje é dia 10, liberada dia 5, vence dia 15)
+const casaPronta = {
+  internet_provedor: 'Desktop Fibra',
+  internet_dia_disponivel: 5,
+  internet_dia_vencimento: 15
+};
+const resPronta = testCalcInternet(casaPronta, dataRef);
+assert(resPronta.status === 'pronta_pagar', 'Fatura entre data disponível e vencimento retorna pronta_pagar');
+assert(resPronta.notificar === true, 'Fatura pronta para pagar gera alerta/notificação ativa');
+assert(resPronta.diasAteVenc === 5, 'Fatura calcula 5 dias restantes até o vencimento');
+assert(resPronta.cor === 'cyan', 'Cor da fatura pronta para pagar é ciano/azul');
+
+// 5. Fatura Vence Hoje (hoje é dia 10, vence dia 10)
+const casaVenceHoje = {
+  internet_provedor: 'Claro Fibra',
+  internet_dia_disponivel: 1,
+  internet_dia_vencimento: 10
+};
+const resVenceHoje = testCalcInternet(casaVenceHoje, dataRef);
+assert(resVenceHoje.status === 'vence_hoje', 'Fatura no dia do vencimento retorna vence_hoje');
+assert(resVenceHoje.notificar === true, 'Fatura vencendo hoje gera notificação');
+assert(resVenceHoje.textoCurto === 'Vence Hoje!', 'Texto curto de vence hoje validado');
+
+// 6. Fatura Vencida (hoje é dia 10, vencia dia 5)
+const casaVencida = {
+  internet_provedor: 'Vivo Fibra',
+  internet_dia_disponivel: 1,
+  internet_dia_vencimento: 5
+};
+const resVencida = testCalcInternet(casaVencida, dataRef);
+assert(resVencida.status === 'vencida', 'Fatura após data de vencimento não paga retorna vencida');
+assert(resVencida.notificar === true, 'Fatura vencida gera notificação crítica');
+assert(resVencida.diasAtraso === 5, 'Cálculo de 5 dias de atraso validado');
+assert(resVencida.cor === 'rose', 'Cor de fatura vencida é rose (vermelho)');
+
+// 7. Fatura Aguardando Liberação (hoje é dia 10, libera dia 15, vence dia 25)
+const casaAguardando = {
+  internet_provedor: 'Starlink',
+  internet_dia_disponivel: 15,
+  internet_dia_vencimento: 25
+};
+const resAguardando = testCalcInternet(casaAguardando, dataRef);
+assert(resAguardando.status === 'aguardando', 'Fatura antes da data de liberação retorna aguardando');
+assert(resAguardando.notificar === false, 'Fatura aguardando não gera notificação de pagamento');
+assert(resAguardando.diasAteDisp === 5, 'Cálculo de 5 dias para liberação validado');
+
+// 8. Elementos DOM no HTML
+const htmlIndex = fs.readFileSync('index.html', 'utf8');
+assert(htmlIndex.includes('id="bannerAlertaInternetCasas"'), 'Banner de alerta de internet presente em index.html');
+assert(htmlIndex.includes('id="modalCasaDetalhesInternetBadge"'), 'Badge de internet presente no topo do modal da casa');
+assert(htmlIndex.includes('id="casaFormInternetProvedor"'), 'Input de Provedor de Internet presente no formulário');
+assert(htmlIndex.includes('id="casaFormInternetDiaDisponivel"'), 'Input de Dia Liberada p/ Pagar presente no formulário');
+assert(htmlIndex.includes('id="casaFormInternetDiaVencimento"'), 'Input de Dia de Vencimento presente no formulário');
+assert(htmlIndex.includes('id="casaFormInternetValor"'), 'Input de Valor Mensal da Internet presente no formulário');
+assert(htmlIndex.includes('id="casaFormInternetCodigo"'), 'Input de Código de Assinante presente no formulário');
+assert(htmlIndex.includes('id="casaFormInternetLink"'), 'Input de Link da 2ª Via da Internet presente no formulário');
+
+// 9. Opções de filtro no select de ocupação
+assert(htmlIndex.includes('value="internet_disponivel"'), 'Filtro de Internet Pronta p/ Pagar presente no select');
+assert(htmlIndex.includes('value="internet_vencida"'), 'Filtro de Internet Vencida / Vence Hoje presente no select');
+assert(htmlIndex.includes('value="internet_paga"'), 'Filtro de Internet Paga presente no select');
+
+// 10. Funções e integrações em app.js
+assert(appJsCampo.includes('function alternarStatusInternetCasa('), 'Função alternarStatusInternetCasa implementada em app.js');
+assert(appJsCampo.includes('function atualizarBannerAlertaInternetCasas('), 'Função atualizarBannerAlertaInternetCasas implementada em app.js');
+assert(appJsCampo.includes('window.calcularStatusInternetCasa ='), 'calcularStatusInternetCasa exportada no window');
+assert(appJsCampo.includes('window.alternarStatusInternetCasa ='), 'alternarStatusInternetCasa exportada no window');
+assert(appJsCampo.includes('window.atualizarBannerAlertaInternetCasas ='), 'atualizarBannerAlertaInternetCasas exportada no window');
+assert(appJsCampo.includes('stInternet.cardBg'), 'Card interativo de internet presente na grade de casas');
+assert(appJsCampo.includes('Provedor Internet'), 'Coluna Provedor Internet presente na exportação Excel');
 
 // 9. Paridade de Arquivos Críticos entre Raiz e frontend/
 const arquivosVerificarParidade = ['app.js', 'index.html', 'limpeza.html', 'ronda.html', 'chamado.html', 'sw.js', 'qrcode.min.js'];

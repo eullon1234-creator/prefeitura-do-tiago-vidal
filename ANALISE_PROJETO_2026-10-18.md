@@ -98,3 +98,59 @@ Testes de maior valor: impedir escrita sem autorização; renderizar chamado com
 6. Refinamento de interface e evoluções funcionais.
 
 Nenhum arquivo de funcionamento do sistema foi alterado nesta análise.
+
+## Atualização da análise — 23/10/2026
+
+### Sincronização com Git
+
+A branch local `main` está limpa e no commit `9afd8c36424354c65c5c1bf3bee7d00c650c0d41`. A branch `main` do GitHub foi consultada diretamente e retorna o mesmo SHA. A atualização tradicional via `git fetch` não pôde gravar `.git/FETCH_HEAD` por permissão, mas a consulta ao GitHub confirmou que as referências coincidem.
+
+Desde o commit que serviu de base à análise original, há 14 commits e 17 arquivos alterados, com aproximadamente 7 mil linhas adicionadas. A maior parte do trabalho foi dedicada a rondas, limpeza, histórico de manutenção, QR codes, notificações, uso em celular e modo offline.
+
+### Verificações executadas
+
+- `node auto_teste.js`: 535 aprovados, nenhuma falha ou aviso.
+- `git diff --check 714673b..HEAD`: apontou espaços em branco ao fim de várias linhas nos arquivos alterados. Isso não impede execução, mas pode ser limpo em manutenção futura.
+- Hashes dos pares raiz/frontend de `index.html`, `app.js`, `chamado.html`, `limpeza.html`, `ronda.html`, `sw.js`, `manifest.json`, `dados_iniciais_taboca.json` e `qrcode.min.js`: todos coincidem.
+- Comparação visual e testes reais nos aparelhos, Firebase e operação sem internet não foram realizados.
+
+### Correções confirmadas em relação à análise original
+
+- `app.js` agora escapa os principais campos textuais exibidos nos cards de chamados (`escapeHTML`, por volta das linhas 10767–10773), reduzindo o risco de injeção identificado anteriormente.
+- A lista fixa que marcava 12 móveis como reparados foi removida.
+- A restauração passou a gravar no documento `canteiro_metadata/snapshot_canteiro` e sincronizar mais coleções.
+- `sw.js` inclui `ronda.html`, incrementou o cache para v4.6 e permite armazenar respostas opacas de CDN.
+- Datas operacionais em `app.js` usam `getDataHojeLocal()` em vários pontos.
+- Chamados, rondas e limpezas agora têm indicador e tentativa de sincronização offline.
+
+### Problemas que continuam ou foram descobertos
+
+#### Alto — fila offline não persiste a marca de pendência
+
+Nos três portais (`chamado.html`, `limpeza.html`, `ronda.html`), o item é gravado em `localStorage` antes de definir `sync_pendente = !salvoOnline` (chamado por volta das linhas 592 e 610; limpeza 1218 e 1253; ronda 1366 e 1399). A contagem e o reenvio posterior consultam a cópia serializada, que não contém a marca. Logo, depois de uma falha de rede, o registro fica no aparelho, mas a fila não o reconhece para reenviar. Os testes atuais verificam nomes de funções e elementos, não essa sequência de persistência.
+
+#### Alto — perfil de prefeito continua sendo apenas um controle visual
+
+`app.js` começa com `currentUserRole = 'prefeito'` e `toggleUserMode()` alterna entre consulta e prefeito sem autenticar. `checkPrefeitoAccess()` protege a interface, mas não é controle de servidor. No backend, `/api/auth/login` ainda retorna `mock-token-*` e as rotas de alteração não usam uma dependência de autenticação. Regras atuais do Firestore não foram inspecionadas; portanto, não dá para afirmar que a base pública esteja acessível sem autorização, mas o backend local não valida o token emitido.
+
+#### Médio — PIN da equipe segue embutido e verificado no navegador
+
+`limpeza.html` conserva senha padrão `1234` e compara o valor no cliente; `ronda.html` também tem configuração padrão `1234`. O botão de sair melhora o uso compartilhado do aparelho, mas não transforma o PIN em autorização de servidor. O valor configurado e a validação ficam acessíveis no código entregue ao navegador.
+
+#### Médio — sincronização da restauração ainda pode declarar sucesso parcial
+
+A restauração atual grava o snapshot no destino correto e cobre mais coleções, mas sincroniza no máximo 50 registros por módulo via `.slice(0, 50)` e usa `set` sem remover documentos que não existem no backup. Erros no bloco de sincronização são capturados e o fluxo segue. Assim, bases maiores ou registros antigos podem deixar a nuvem diferente do backup, apesar da mensagem final de sucesso.
+
+#### Médio — timeout não cancela a gravação Firestore em andamento
+
+Os portais usam `Promise.race` com timeout de 2,5 segundos. Se o timeout vencer enquanto a gravação ainda está em andamento, o cliente marca pendência; a operação original pode ser confirmada depois. Quando a fila passar a persistir corretamente, use o mesmo ID de documento para o reenvio e trate o resultado como idempotente, para evitar duplicidade lógica.
+
+#### Baixo/médio — offline ainda não significa que todos os recursos são independentes da rede
+
+O service worker agora cacheia as rotas e pode guardar respostas opacas, um avanço. Entretanto, os recursos de CDN continuam externos e o modo de falha/cache depende de pelo menos uma carga online bem-sucedida. A validação prática deve instalar o PWA, desligar a rede e abrir cada portal após encerrar e reabrir o app.
+
+### Avaliação final atualizada
+
+O trabalho recente melhorou significativamente o uso em campo, as rotas QR, o histórico de manutenção e a transparência de estado. A suíte ampliada passa, e a paridade dos arquivos de deploy está íntegra. Porém, o indicador de 535/535 é majoritariamente baseado em verificações estruturais e testes simulados. A fila offline apresenta um defeito funcional demonstrável por inspeção; autenticação do backend e administração continuam sem proteção efetiva no código. Recomendo resolver esses itens antes de considerar as correções concluídas.
+
+Esta atualização alterou apenas o relatório, não os arquivos do sistema.

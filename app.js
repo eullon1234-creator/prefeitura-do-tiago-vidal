@@ -7534,8 +7534,8 @@ function exportarCasasCidadeExcel() {
 
     // 1. ABA RESUMO DAS CASAS
     const ws1 = {};
-    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CASAS URBANAS NA CIDADE (LIDERANÇA & ENGENHARIA)`, `${empresaNome} • Ocupação e Capacidade dos Imóveis Alugados • Emissão: ${dataHora}`, 10);
-    const headers1 = ['Identificação da Casa', 'Endereço Completo', 'Bairro / Região', 'Responsável do Imóvel', 'Telefone Contato', 'Total Cômodos', 'Capacidade (Camas)', 'Camas Ocupadas', 'Camas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)'];
+    ExcelProGenerator.addCabecalhoObra(ws1, `${obraNome.toUpperCase()} — CASAS URBANAS NA CIDADE (LIDERANÇA & ENGENHARIA)`, `${empresaNome} • Ocupação, Vagas e Conectividade • Emissão: ${dataHora}`, 14);
+    const headers1 = ['Identificação da Casa', 'Endereço Completo', 'Bairro / Região', 'Responsável do Imóvel', 'Telefone Contato', 'Total Cômodos', 'Capacidade (Camas)', 'Camas Ocupadas', 'Camas Livres (Fórmula)', 'Taxa de Ocupação (Fórmula)', 'Provedor Internet', 'Dia Liberada', 'Dia Vencimento', 'Status Internet'];
     headers1.forEach((h, col) => ExcelProGenerator.addCell(ws1, 3, col, h, { s: ExcelProGenerator.estilos.th }));
 
     let totCapacidade = 0;
@@ -7559,6 +7559,7 @@ function exportarCasasCidadeExcel() {
       totOcupadas += ocup;
       const livres = Math.max(0, camas - ocup);
       const taxa = camas > 0 ? (ocup / camas) : 0;
+      const stNet = typeof calcularStatusInternetCasa === 'function' ? calcularStatusInternetCasa(c) : { textoBadge: '-' };
 
       ExcelProGenerator.addCell(ws1, r, 0, c.nome || 'Casa', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
       ExcelProGenerator.addCell(ws1, r, 1, c.endereco || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
@@ -7570,6 +7571,10 @@ function exportarCasasCidadeExcel() {
       ExcelProGenerator.addCell(ws1, r, 7, ocup, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
       ExcelProGenerator.addCell(ws1, r, 8, livres, { f: `G${rowEx}-H${rowEx}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
       ExcelProGenerator.addCell(ws1, r, 9, taxa, { f: `IF(G${rowEx}>0,H${rowEx}/G${rowEx},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 10, c.internet_provedor || 'Não config.', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 11, c.internet_dia_disponivel ? `Dia ${c.internet_dia_disponivel}` : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 12, c.internet_dia_vencimento ? `Dia ${c.internet_dia_vencimento}` : '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 13, stNet.textoBadge || '-', { s: stNet.status === 'vencida' ? ExcelProGenerator.estilos.statusAlerta : (stNet.status === 'pago' ? ExcelProGenerator.estilos.statusLivre : ExcelProGenerator.estilos.td(zebra, 'center')) });
     });
 
     const totRow1 = 4 + listaCasasCidade.length;
@@ -7594,9 +7599,12 @@ function exportarCasasCidadeExcel() {
       ExcelProGenerator.addCell(ws1, totRow1, 8, 0, { s: ExcelProGenerator.estilos.total('right') });
       ExcelProGenerator.addCell(ws1, totRow1, 9, 0, { z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
     }
+    for (let cCol = 10; cCol < 14; cCol++) {
+      ExcelProGenerator.addCell(ws1, totRow1, cCol, '-', { s: ExcelProGenerator.estilos.total('center') });
+    }
 
-    ws1['!ref'] = `A1:J${totEx1}`;
-    ws1['!cols'] = [{ wch: 25 }, { wch: 32 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 24 }];
+    ws1['!ref'] = `A1:N${totEx1}`;
+    ws1['!cols'] = [{ wch: 25 }, { wch: 32 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 15 }, { wch: 16 }, { wch: 25 }];
     ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
     XLSX.utils.book_append_sheet(wb, ws1, "RESUMO CASAS");
 
@@ -11485,6 +11493,18 @@ function filtrarCasasCidadeUI() {
       if (filtroOcup === 'limpeza_pendente') return stLimp && stLimp.rotina.status !== 'ok';
       if (filtroOcup === 'ar_vencido') return stLimp && stLimp.ar.status !== 'ok';
       if (filtroOcup === 'com_reclamacao') return recs.length > 0;
+      if (filtroOcup === 'internet_disponivel') {
+        const stNet = calcularStatusInternetCasa(c);
+        return stNet.status === 'pronta_pagar';
+      }
+      if (filtroOcup === 'internet_vencida') {
+        const stNet = calcularStatusInternetCasa(c);
+        return stNet.status === 'vencida' || stNet.status === 'vence_hoje';
+      }
+      if (filtroOcup === 'internet_paga') {
+        const stNet = calcularStatusInternetCasa(c);
+        return stNet.status === 'pago';
+      }
       return true;
     });
   }
@@ -11495,6 +11515,8 @@ function filtrarCasasCidadeUI() {
       const matchEnd = (c.endereco || '').toLowerCase().includes(busca);
       const matchBairro = (c.bairro || '').toLowerCase().includes(busca);
       const matchResp = (c.responsavel || '').toLowerCase().includes(busca);
+      const matchInternet = (c.internet_provedor || '').toLowerCase().includes(busca) || 
+                            (c.internet_codigo_cliente || '').toLowerCase().includes(busca);
       
       // Moradores dentro dos cômodos
       const matchMorador = (c.comodos || []).some(com => 
@@ -11506,11 +11528,12 @@ function filtrarCasasCidadeUI() {
         (com.moveis || []).some(m => (m.tipo || '').toLowerCase().includes(busca) || (m.marca || '').toLowerCase().includes(busca))
       );
 
-      return matchNome || matchEnd || matchBairro || matchResp || matchMorador || matchMovel;
+      return matchNome || matchEnd || matchBairro || matchResp || matchMorador || matchMovel || matchInternet;
     });
   }
 
   renderizarCasasCidadeGrid(filtradas);
+  atualizarBannerAlertaInternetCasas();
 }
 
 // Renderização dos cards de casas
@@ -11553,6 +11576,9 @@ function renderizarCasasCidadeGrid(casas) {
 
     const vagasLivres = Math.max(0, totCamas - totMoradores);
     const taxaOcupacao = totCamas > 0 ? Math.round((totMoradores / totCamas) * 100) : 0;
+
+    // Status Inteligente de Internet
+    const stInternet = calcularStatusInternetCasa(c);
 
     // Despesas da casa no mês
     const despCasaMes = listaDespesasCasas.filter(d => d.casa_id === c.id && (d.mes_referencia || '').startsWith(mesAtual));
@@ -11742,6 +11768,41 @@ function renderizarCasasCidadeGrid(casas) {
 
             </div>
 
+            <!-- Card Internet & Conectividade (Aviso de Pagamento & Vencimento) -->
+            <div 
+              onclick="event.stopPropagation(); alternarStatusInternetCasa('${c.id}')" 
+              class="p-2.5 rounded-xl border transition cursor-pointer select-none ${stInternet.cardBg} hover:shadow-xs group/net" 
+              title="${stInternet.provedor} — ${stInternet.textoBadge}. Clique para alternar status de pagamento (Paga / Pendente)."
+            >
+              <div class="flex items-center justify-between gap-1 mb-1">
+                <span class="text-[9px] uppercase font-bold text-slate-500 flex items-center gap-1 truncate">
+                  <i class="fa-solid fa-wifi ${stInternet.cor === 'emerald' ? 'text-emerald-600' : (stInternet.cor === 'rose' ? 'text-rose-600' : (stInternet.cor === 'amber' ? 'text-amber-500' : 'text-cyan-600'))}"></i> 
+                  ${c.internet_provedor || 'Internet República'}
+                </span>
+                <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase border ${stInternet.badgeClass}">
+                  ${stInternet.textoCurto}
+                </span>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="w-2 h-2 rounded-full flex-shrink-0 ${stInternet.badgeDot || 'bg-slate-400'}"></span>
+                  <span class="font-extrabold text-[11px] truncate block ${stInternet.cor === 'rose' ? 'text-rose-900' : (stInternet.cor === 'amber' ? 'text-amber-900' : (stInternet.cor === 'emerald' ? 'text-emerald-900' : 'text-cyan-950'))}">
+                    ${stInternet.textoBadge}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1 flex-shrink-0">
+                  ${c.internet_link_segunda_via ? `
+                    <a href="${c.internet_link_segunda_via}" target="_blank" onclick="event.stopPropagation()" class="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 text-[10px] font-bold shadow-2xs flex items-center gap-1" title="Abrir 2ª via da fatura">
+                      <i class="fa-solid fa-file-invoice text-[9px]"></i> 2ª Via
+                    </a>
+                  ` : ''}
+                  <button type="button" onclick="event.stopPropagation(); alternarStatusInternetCasa('${c.id}')" class="p-1 px-1.5 rounded-md bg-white/80 hover:bg-white text-slate-700 text-[10px] font-bold border border-slate-200 shadow-2xs transition" title="${stInternet.status === 'pago' ? 'Desmarcar pagamento' : 'Marcar fatura como paga'}">
+                    <i class="fa-solid ${stInternet.status === 'pago' ? 'fa-rotate-left text-slate-500' : 'fa-check text-emerald-600'}"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- Resumo Financeiro do Mês -->
             <div class="flex items-center justify-between p-2 rounded-xl bg-amber-50/40 border border-amber-200/60 text-xs">
               <div>
@@ -11793,6 +11854,314 @@ function renderizarCasasCidadeGrid(casas) {
       </div>
     `;
   }).join('');
+}
+
+// ==========================================
+// MÓDULO INTELIGENTE DE INTERNET & CONECTIVIDADE (REPÚBLICAS)
+// ==========================================
+
+function calcularStatusInternetCasa(casa, dataReferencia = new Date()) {
+  if (!casa) {
+    return {
+      status: 'sem_config',
+      provedor: 'Não configurada',
+      textoBadge: 'Não configurada',
+      textoCurto: 'Sem dados',
+      badgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+      badgeDot: 'bg-slate-300',
+      cardBg: 'bg-slate-50 border-slate-200',
+      cor: 'slate',
+      icone: 'fa-solid fa-wifi text-slate-400',
+      notificar: false,
+      prioridade: 0
+    };
+  }
+
+  const provedor = (casa.internet_provedor || '').trim();
+  const rawDisp = casa.internet_dia_disponivel || casa.internet_data_disponivel;
+  const rawVenc = casa.internet_dia_vencimento || casa.internet_data_vencimento;
+
+  if (!rawVenc && !provedor) {
+    return {
+      status: 'sem_config',
+      provedor: provedor || 'Não configurada',
+      textoBadge: 'Internet não configurada',
+      textoCurto: 'Sem config',
+      badgeClass: 'bg-slate-100 text-slate-500 border-slate-200',
+      badgeDot: 'bg-slate-300',
+      cardBg: 'bg-slate-50 border-slate-200',
+      cor: 'slate',
+      icone: 'fa-solid fa-wifi text-slate-400',
+      notificar: false,
+      prioridade: 0
+    };
+  }
+
+  // Data e ciclo de referência
+  const agora = dataReferencia instanceof Date ? dataReferencia : new Date(dataReferencia);
+  const anoAtual = agora.getFullYear();
+  const mesAtual = agora.getMonth(); // 0 a 11
+  const diaHoje = agora.getDate();
+  const mesRefStr = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+
+  // Se já foi marcado como pago no mês atual
+  if (casa.internet_ultimo_mes_pago === mesRefStr) {
+    return {
+      status: 'pago',
+      provedor: provedor || 'Internet',
+      mesRef: mesRefStr,
+      pagoEm: casa.internet_data_pagamento || null,
+      textoBadge: `Fatura Paga (${String(mesAtual + 1).padStart(2, '0')}/${anoAtual})`,
+      textoCurto: 'Paga em dia',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold',
+      badgeDot: 'bg-emerald-500',
+      cardBg: 'bg-emerald-50/60 border-emerald-200',
+      cor: 'emerald',
+      icone: 'fa-solid fa-circle-check text-emerald-600',
+      notificar: false,
+      prioridade: 0
+    };
+  }
+
+  // Tratamento de datas (dia do mês 1..31 ou YYYY-MM-DD)
+  let dataDispDate = null;
+  let dataVencDate = null;
+
+  if (typeof rawVenc === 'string' && rawVenc.includes('-')) {
+    dataVencDate = new Date(rawVenc + 'T12:00:00');
+    if (typeof rawDisp === 'string' && rawDisp.includes('-')) {
+      dataDispDate = new Date(rawDisp + 'T12:00:00');
+    } else {
+      dataDispDate = new Date(dataVencDate.getTime() - (10 * 24 * 60 * 60 * 1000));
+    }
+  } else {
+    const diaVencNum = Math.min(31, Math.max(1, parseInt(rawVenc, 10) || 10));
+    const diaDispNum = Math.min(31, Math.max(1, parseInt(rawDisp, 10) || Math.max(1, diaVencNum - 10)));
+
+    if (diaVencNum >= diaDispNum) {
+      dataDispDate = new Date(anoAtual, mesAtual, diaDispNum, 12, 0, 0);
+      dataVencDate = new Date(anoAtual, mesAtual, diaVencNum, 12, 0, 0);
+    } else {
+      if (diaHoje >= diaDispNum) {
+        dataDispDate = new Date(anoAtual, mesAtual, diaDispNum, 12, 0, 0);
+        dataVencDate = new Date(anoAtual, mesAtual + 1, diaVencNum, 12, 0, 0);
+      } else {
+        dataDispDate = new Date(anoAtual, mesAtual - 1, diaDispNum, 12, 0, 0);
+        dataVencDate = new Date(anoAtual, mesAtual, diaVencNum, 12, 0, 0);
+      }
+    }
+  }
+
+  const hojeZero = new Date(anoAtual, mesAtual, diaHoje).getTime();
+  const dispZero = new Date(dataDispDate.getFullYear(), dataDispDate.getMonth(), dataDispDate.getDate()).getTime();
+  const vencZero = new Date(dataVencDate.getFullYear(), dataVencDate.getMonth(), dataVencDate.getDate()).getTime();
+
+  const msPorDia = 24 * 60 * 60 * 1000;
+  const diasAteVenc = Math.round((vencZero - hojeZero) / msPorDia);
+  const diasAteDisp = Math.round((dispZero - hojeZero) / msPorDia);
+
+  const diaVencFormatado = String(dataVencDate.getDate()).padStart(2, '0') + '/' + String(dataVencDate.getMonth() + 1).padStart(2, '0');
+  const diaDispFormatado = String(dataDispDate.getDate()).padStart(2, '0') + '/' + String(dataDispDate.getMonth() + 1).padStart(2, '0');
+
+  // 1. Fatura Vencida
+  if (hojeZero > vencZero) {
+    const diasAtraso = Math.abs(diasAteVenc);
+    return {
+      status: 'vencida',
+      provedor: provedor || 'Internet',
+      diasAtraso: diasAtraso,
+      dataVencFormatada: diaVencFormatado,
+      dataDispFormatada: diaDispFormatado,
+      textoBadge: diasAtraso === 1 ? 'Vencida há 1 dia!' : `Vencida há ${diasAtraso} dias!`,
+      textoCurto: diasAtraso === 1 ? '1d vencida' : `${diasAtraso}d vencida`,
+      badgeClass: 'bg-rose-100 text-rose-900 border-rose-400 font-black ring-1 ring-rose-400',
+      badgeDot: 'bg-rose-600 animate-ping',
+      cardBg: 'bg-rose-50 border-rose-300 ring-1 ring-rose-200',
+      cor: 'rose',
+      icone: 'fa-solid fa-triangle-exclamation text-rose-600',
+      notificar: true,
+      prioridade: 5
+    };
+  }
+
+  // 2. Vence Hoje
+  if (hojeZero === vencZero) {
+    return {
+      status: 'vence_hoje',
+      provedor: provedor || 'Internet',
+      diasAteVenc: 0,
+      dataVencFormatada: diaVencFormatado,
+      dataDispFormatada: diaDispFormatado,
+      textoBadge: `VENCE HOJE! (${diaVencFormatado})`,
+      textoCurto: 'Vence Hoje!',
+      badgeClass: 'bg-amber-100 text-amber-900 border-amber-400 font-extrabold animate-pulse',
+      badgeDot: 'bg-amber-500 animate-ping',
+      cardBg: 'bg-amber-50 border-amber-300',
+      cor: 'amber',
+      icone: 'fa-solid fa-triangle-exclamation text-amber-600',
+      notificar: true,
+      prioridade: 4
+    };
+  }
+
+  // 3. Pronta para Pagar (Liberada para pagamento e antes do vencimento)
+  if (hojeZero >= dispZero && hojeZero < vencZero) {
+    return {
+      status: 'pronta_pagar',
+      provedor: provedor || 'Internet',
+      diasAteVenc: diasAteVenc,
+      dataVencFormatada: diaVencFormatado,
+      dataDispFormatada: diaDispFormatado,
+      textoBadge: `Pronta p/ Pagar (Vence ${diaVencFormatado})`,
+      textoCurto: diasAteVenc === 1 ? 'Vence amanhã' : `Vence em ${diasAteVenc}d`,
+      badgeClass: 'bg-cyan-100 text-cyan-950 border-cyan-400 font-bold',
+      badgeDot: 'bg-cyan-500',
+      cardBg: 'bg-cyan-50/70 border-cyan-300',
+      cor: 'cyan',
+      icone: 'fa-solid fa-file-invoice-dollar text-cyan-600',
+      notificar: true,
+      prioridade: 3
+    };
+  }
+
+  // 4. Aguardando liberação do boleto pela operadora
+  return {
+    status: 'aguardando',
+    provedor: provedor || 'Internet',
+    diasAteDisp: diasAteDisp,
+    dataVencFormatada: diaVencFormatado,
+    dataDispFormatada: diaDispFormatado,
+    textoBadge: `Disponível em ${diaDispFormatado}`,
+    textoCurto: diasAteDisp === 1 ? 'Libera amanhã' : `Libera em ${diasAteDisp}d`,
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300 font-medium',
+    badgeDot: 'bg-slate-400',
+    cardBg: 'bg-slate-50 border-slate-200',
+    cor: 'slate',
+    icone: 'fa-solid fa-clock text-slate-500',
+    notificar: false,
+    prioridade: 1
+  };
+}
+
+// Alternar status de pagamento da internet (Pago / Pendente)
+async function alternarStatusInternetCasa(casaId, mesRef = null) {
+  const c = listaCasasCidade.find(x => x.id === casaId);
+  if (!c) return;
+
+  const agora = new Date();
+  const mesAtualStr = mesRef || `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+
+  if (c.internet_ultimo_mes_pago === mesAtualStr) {
+    c.internet_ultimo_mes_pago = null;
+    c.internet_data_pagamento = null;
+    if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(50);
+    showToast(`Fatura de Internet de "${c.nome}" desmarcada (Pendente).`, 'info');
+  } else {
+    c.internet_ultimo_mes_pago = mesAtualStr;
+    c.internet_data_pagamento = agora.toISOString();
+    if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati([50, 40, 60]);
+    showToast(`Fatura de Internet de "${c.nome}" marcada como PAGA!`, 'success');
+  }
+
+  c.atualizado_em = agora.toISOString();
+  c.atualizado_por = (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito');
+
+  try {
+    localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasCidade));
+  } catch (e) {}
+
+  atualizarContadoresCasasUI();
+  filtrarCasasCidadeUI();
+
+  if (typeof casaSelecionadaId !== 'undefined' && casaSelecionadaId === casaId) {
+    const modalEl = document.getElementById('modalCasaDetalhes');
+    if (modalEl && !modalEl.classList.contains('hidden')) {
+      atualizarDadosModalCasaDetalhes(c);
+      if (typeof renderizarCardAgenciasCasaAtual === 'function') {
+        renderizarCardAgenciasCasaAtual(c);
+      }
+    }
+  }
+
+  if (firestoreDb) {
+    try {
+      await firestoreDb.collection('casas_cidade').doc(casaId).set({
+        internet_ultimo_mes_pago: c.internet_ultimo_mes_pago,
+        internet_data_pagamento: c.internet_data_pagamento,
+        atualizado_em: c.atualizado_em,
+        atualizado_por: c.atualizado_por
+      }, { merge: true });
+    } catch (err) {
+      console.warn("Aviso ao salvar status de internet no Firestore:", err);
+    }
+  }
+}
+
+// Atualizar o banner de alerta de internet no topo da aba de Casas República
+function atualizarBannerAlertaInternetCasas() {
+  const banner = document.getElementById('bannerAlertaInternetCasas');
+  if (!banner) return;
+
+  let qtdPronta = 0;
+  let qtdVenceHoje = 0;
+  let qtdVencida = 0;
+
+  listaCasasCidade.forEach(c => {
+    const st = calcularStatusInternetCasa(c);
+    if (st.status === 'vencida') {
+      qtdVencida++;
+    } else if (st.status === 'vence_hoje') {
+      qtdVenceHoje++;
+    } else if (st.status === 'pronta_pagar') {
+      qtdPronta++;
+    }
+  });
+
+  const totalAlertas = qtdVencida + qtdVenceHoje + qtdPronta;
+  if (totalAlertas === 0) {
+    banner.classList.add('hidden');
+    banner.innerHTML = '';
+    return;
+  }
+
+  let tagCritica = '';
+  if (qtdVencida > 0) {
+    tagCritica += `<span class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-circle-exclamation text-rose-400"></i> ${qtdVencida} Vencida(s)!</span>`;
+  }
+  if (qtdVenceHoje > 0) {
+    tagCritica += `<span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-clock text-amber-400"></i> ${qtdVenceHoje} Vence Hoje!</span>`;
+  }
+  if (qtdPronta > 0) {
+    tagCritica += `<span class="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-file-invoice-dollar text-cyan-400"></i> ${qtdPronta} Pronta(s) p/ Pagar</span>`;
+  }
+
+  banner.innerHTML = `
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 flex items-center justify-center flex-shrink-0 text-lg">
+        <i class="fa-solid fa-wifi"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs font-black uppercase tracking-wider text-cyan-400">Aviso de Faturas de Internet</span>
+          ${tagCritica}
+        </div>
+        <p class="text-xs text-slate-300 truncate mt-0.5">
+          Há faturas de internet das casas república liberadas para pagamento ou próximas do vencimento.
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <button onclick="document.getElementById('filtroOcupacaoCasas').value = 'internet_disponivel'; filtrarCasasCidadeUI();" class="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+        <i class="fa-solid fa-filter"></i> Prontas p/ Pagar
+      </button>
+      ${(qtdVencida > 0 || qtdVenceHoje > 0) ? `
+        <button onclick="document.getElementById('filtroOcupacaoCasas').value = 'internet_vencida'; filtrarCasasCidadeUI();" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+          <i class="fa-solid fa-triangle-exclamation"></i> Vencidas / Hoje
+        </button>
+      ` : ''}
+    </div>
+  `;
+  banner.classList.remove('hidden');
 }
 
 // ==========================================
@@ -11995,13 +12364,15 @@ function renderizarCardAgenciasCasaAtual(casa) {
 
   const dadosEnergia = obterDadosConcessionariaCasa(casa, 'energia');
   const dadosAgua = obterDadosConcessionariaCasa(casa, 'agua');
+  const stInternet = calcularStatusInternetCasa(casa);
+  const temInternet = Boolean(casa.internet_provedor || casa.internet_dia_vencimento || casa.internet_codigo_cliente);
 
-  if (!dadosEnergia && !dadosAgua) {
+  if (!dadosEnergia && !dadosAgua && !temInternet) {
     card.className = 'p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs';
     card.innerHTML = `
       <div class="flex items-center gap-2">
         <i class="fa-solid fa-circle-info text-amber-500 text-sm"></i>
-        <span>Nenhuma concessionária de Luz ou Água configurada para esta casa.</span>
+        <span>Nenhuma concessionária de Luz, Água ou Internet configurada para esta casa.</span>
       </div>
       <button type="button" onclick="editarCasa('${casa.id}')" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 w-fit">
         <i class="fa-solid fa-gear"></i> Configurar Agora
@@ -12015,17 +12386,17 @@ function renderizarCardAgenciasCasaAtual(casa) {
   card.innerHTML = `
     <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
       <div class="flex items-center gap-2">
-        <span class="w-6 h-6 rounded-md bg-amber-400/20 text-amber-300 flex items-center justify-center text-xs">
+        <span class="w-6 h-6 rounded-md bg-cyan-400/20 text-cyan-300 flex items-center justify-center text-xs">
           <i class="fa-solid fa-bolt"></i>
         </span>
-        <h5 class="text-xs font-bold text-white uppercase tracking-wider">Agências Virtuais & 2ª Via das Contas</h5>
+        <h5 class="text-xs font-bold text-white uppercase tracking-wider">Serviços, 2ª Via das Contas & Conectividade</h5>
       </div>
       <button type="button" onclick="editarCasa('${casa.id}')" class="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition">
-        <i class="fa-solid fa-pen-to-square"></i> Alterar Concessionárias
+        <i class="fa-solid fa-pen-to-square"></i> Alterar Contratos / Dados
       </button>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2.5">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2.5">
       <!-- Concessionária de Luz -->
       <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2.5 min-w-0">
@@ -12047,7 +12418,7 @@ function renderizarCardAgenciasCasaAtual(casa) {
           ` : ''}
           ${dadosEnergia && dadosEnergia.url ? `
             <a href="${dadosEnergia.url}" target="_blank" class="px-2.5 py-1.5 rounded-md bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition" title="Acessar Agência Virtual">
-              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Abrir Agência</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Abrir</span>
             </a>
           ` : ''}
         </div>
@@ -12074,9 +12445,48 @@ function renderizarCardAgenciasCasaAtual(casa) {
           ` : ''}
           ${dadosAgua && dadosAgua.url ? `
             <a href="${dadosAgua.url}" target="_blank" class="px-2.5 py-1.5 rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition" title="Acessar Agência Virtual">
-              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Abrir Agência</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Abrir</span>
             </a>
           ` : ''}
+        </div>
+      </div>
+
+      <!-- Internet & Conectividade -->
+      <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-wifi"></i>
+          </div>
+          <div class="truncate">
+            <div class="flex items-center gap-1">
+              <p class="text-[10px] text-slate-400 font-bold uppercase">Internet</p>
+              <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase border ${stInternet.badgeClass}">${stInternet.textoCurto}</span>
+            </div>
+            <p class="text-xs font-bold text-white truncate">${casa.internet_provedor ? casa.internet_provedor : '<span class="text-slate-400 font-normal italic">Não configurada</span>'}</p>
+            ${casa.internet_codigo_cliente ? `<p class="text-[11px] font-mono text-cyan-300 font-semibold truncate">Cód: ${casa.internet_codigo_cliente}</p>` : ''}
+            ${(casa.internet_dia_disponivel || casa.internet_dia_vencimento) ? `
+              <p class="text-[10px] text-slate-300 font-mono">
+                ${casa.internet_dia_disponivel ? `Lib: dia ${casa.internet_dia_disponivel}` : ''} ${casa.internet_dia_vencimento ? `• Venc: dia ${casa.internet_dia_vencimento}` : ''}
+              </p>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          ${casa.internet_codigo_cliente ? `
+            <button type="button" onclick="copiarCodigoConcessionaria('${casa.internet_codigo_cliente}', 'Cód. Assinante')" class="p-1.5 px-2 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition" title="Copiar Código do Assinante">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          ` : ''}
+          ${casa.internet_link_segunda_via ? `
+            <a href="${casa.internet_link_segunda_via}" target="_blank" class="px-2 py-1.5 rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition" title="Acessar 2ª Via da Internet">
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>2ª Via</span>
+            </a>
+          ` : ''}
+          <button type="button" onclick="alternarStatusInternetCasa('${casa.id}')" class="px-2 py-1.5 rounded-md ${stInternet.status === 'pago' ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' : 'bg-emerald-600 hover:bg-emerald-500 text-white'} text-xs font-bold transition flex items-center gap-1" title="${stInternet.status === 'pago' ? 'Desmarcar pagamento' : 'Marcar fatura do mês como paga'}">
+            <i class="fa-solid ${stInternet.status === 'pago' ? 'fa-rotate-left' : 'fa-check'} text-[10px]"></i>
+            <span class="hidden sm:inline">${stInternet.status === 'pago' ? 'Desfazer' : 'Pagar'}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -12107,6 +12517,12 @@ function openModalNovaCasa() {
   setVal('casaFormAguaMatricula', '');
   setVal('casaFormAguaNomeCustom', '');
   setVal('casaFormAguaLinkCustom', '');
+  setVal('casaFormInternetProvedor', '');
+  setVal('casaFormInternetDiaDisponivel', '');
+  setVal('casaFormInternetDiaVencimento', '');
+  setVal('casaFormInternetValor', '');
+  setVal('casaFormInternetCodigo', '');
+  setVal('casaFormInternetLink', '');
   aoMudarConcessionariaCasa('energia');
   aoMudarConcessionariaCasa('agua');
 
@@ -12140,6 +12556,14 @@ function editarCasa(id) {
   setVal('casaFormAguaMatricula', c.agua_matricula || '');
   setVal('casaFormAguaNomeCustom', c.agua_nome_custom || '');
   setVal('casaFormAguaLinkCustom', c.agua_link_custom || '');
+
+  // Internet & Conectividade
+  setVal('casaFormInternetProvedor', c.internet_provedor || '');
+  setVal('casaFormInternetDiaDisponivel', c.internet_dia_disponivel || c.internet_data_disponivel || '');
+  setVal('casaFormInternetDiaVencimento', c.internet_dia_vencimento || c.internet_data_vencimento || '');
+  setVal('casaFormInternetValor', c.internet_valor || '');
+  setVal('casaFormInternetCodigo', c.internet_codigo_cliente || '');
+  setVal('casaFormInternetLink', c.internet_link_segunda_via || '');
 
   aoMudarConcessionariaCasa('energia');
   aoMudarConcessionariaCasa('agua');
@@ -12231,6 +12655,14 @@ async function salvarCasa(event) {
   const aguaNomeCustom = document.getElementById('casaFormAguaNomeCustom')?.value.trim() || '';
   const aguaLinkCustom = document.getElementById('casaFormAguaLinkCustom')?.value.trim() || '';
 
+  // Internet da República
+  const internetProvedor = document.getElementById('casaFormInternetProvedor')?.value.trim() || '';
+  const internetDiaDisponivel = document.getElementById('casaFormInternetDiaDisponivel')?.value.trim() || '';
+  const internetDiaVencimento = document.getElementById('casaFormInternetDiaVencimento')?.value.trim() || '';
+  const internetValor = parseFloat(document.getElementById('casaFormInternetValor')?.value) || 0;
+  const internetCodigo = document.getElementById('casaFormInternetCodigo')?.value.trim() || '';
+  const internetLink = document.getElementById('casaFormInternetLink')?.value.trim() || '';
+
   // Buscar se já existia cômodos para não perder
   const casaExistente = listaCasasCidade.find(x => x.id === id);
   const comodosExistentes = casaExistente ? (casaExistente.comodos || []) : [];
@@ -12252,6 +12684,14 @@ async function salvarCasa(event) {
     agua_matricula: aguaMatricula,
     agua_nome_custom: aguaNomeCustom,
     agua_link_custom: aguaLinkCustom,
+    internet_provedor: internetProvedor,
+    internet_dia_disponivel: internetDiaDisponivel,
+    internet_dia_vencimento: internetDiaVencimento,
+    internet_valor: internetValor,
+    internet_codigo_cliente: internetCodigo,
+    internet_link_segunda_via: internetLink,
+    internet_ultimo_mes_pago: casaExistente ? (casaExistente.internet_ultimo_mes_pago || null) : null,
+    internet_data_pagamento: casaExistente ? (casaExistente.internet_data_pagamento || null) : null,
     comodos: comodosExistentes,
     atualizado_em: new Date().toISOString(),
     atualizado_por: (typeof currentUserName !== 'undefined' ? currentUserName : 'Prefeito')
@@ -12368,6 +12808,24 @@ function atualizarDadosModalCasaDetalhes(c) {
 
   document.getElementById('modalCasaDetalhesOcupacaoBadge').textContent = `${totMoradores} de ${totCamas} vagas ocupadas`;
   document.getElementById('modalCasaDetalhesComodosCount').textContent = `${(c.comodos || []).length} cômodos cadastrados`;
+
+  // Badge inteligente de Internet no Topo do Modal
+  const badgeNetEl = document.getElementById('modalCasaDetalhesInternetBadge');
+  if (badgeNetEl) {
+    const stNet = calcularStatusInternetCasa(c);
+    if (stNet.status !== 'sem_config') {
+      badgeNetEl.className = `px-2 py-0.5 rounded-md font-bold text-xs flex items-center gap-1 border ${stNet.badgeClass}`;
+      badgeNetEl.innerHTML = `<i class="${stNet.icone}"></i> <span>Internet: ${stNet.textoBadge}</span>`;
+      badgeNetEl.classList.remove('hidden');
+    } else {
+      badgeNetEl.classList.add('hidden');
+    }
+  }
+
+  // Renderizar agências e conectividade
+  if (typeof renderizarCardAgenciasCasaAtual === 'function') {
+    renderizarCardAgenciasCasaAtual(c);
+  }
 
   // Renderizar cômodos
   renderizarComodosCasaDetalhes(c);
@@ -18579,6 +19037,9 @@ window.aoMudarConcessionariaCasa = aoMudarConcessionariaCasa;
 window.copiarCodigoConcessionaria = copiarCodigoConcessionaria;
 window.atualizarInfoConcessionariaDespesaForm = atualizarInfoConcessionariaDespesaForm;
 window.renderizarCardAgenciasCasaAtual = renderizarCardAgenciasCasaAtual;
+window.calcularStatusInternetCasa = calcularStatusInternetCasa;
+window.alternarStatusInternetCasa = alternarStatusInternetCasa;
+window.atualizarBannerAlertaInternetCasas = atualizarBannerAlertaInternetCasas;
 
 
 window.alternarSomNotificacoes = alternarSomNotificacoes;

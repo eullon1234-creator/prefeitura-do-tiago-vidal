@@ -1342,8 +1342,16 @@
                 <option value="limpeza_pendente">🟡 Faxina de Hoje Pendente</option>
                 <option value="ar_vencido">🔴 Ar-Condicionado Vencido (+30d)</option>
                 <option value="com_reclamacao">🚨 Com Reclamação / Chamado Aberto</option>
+                <option value="internet_disponivel">🌐 Internet: Pronta p/ Pagar</option>
+                <option value="internet_vencida">🚨 Internet: Vencida / Vence Hoje</option>
+                <option value="internet_paga">✅ Internet: Fatura Paga no Mês</option>
               </select>
             </div>
+          </div>
+
+          <!-- BANNER DE AVISO: FATURAS DE INTERNET PRONTAS P/ PAGAR OU VENCIDAS -->
+          <div id="bannerAlertaInternetCasas" class="hidden mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 text-white border border-cyan-500/30 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <!-- Populado dinamicamente via atualizarBannerAlertaInternetCasas() -->
           </div>
 
           <!-- Grade de Casas -->
@@ -4923,6 +4931,46 @@ service cloud.firestore {
                 <input type="url" id="casaFormAguaLinkCustom" placeholder="https://link-da-agencia-virtual.com.br" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
               </div>
             </div>
+
+            <!-- Internet & Conectividade da República -->
+            <div class="pt-2.5 border-t border-slate-200">
+              <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-wifi text-cyan-600"></i> Internet & Conectividade (Aviso de Pagamento & Vencimento)
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label class="block text-[11px] text-slate-500 mb-0.5 font-medium">Provedor / Operadora</label>
+                  <input type="text" id="casaFormInternetProvedor" placeholder="Ex: Desktop Fibra, Vivo, Claro" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-500 mb-0.5 font-medium flex items-center gap-1" title="Dia do mês em que a fatura/boleto é liberada para pagamento">
+                    <i class="fa-solid fa-calendar-check text-cyan-600 text-[10px]"></i> Dia Liberada p/ Pagar
+                  </label>
+                  <input type="number" min="1" max="31" id="casaFormInternetDiaDisponivel" placeholder="Ex: 5" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" title="Dia do mês em que a fatura fica pronta para pagamento">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-500 mb-0.5 font-medium flex items-center gap-1" title="Dia do mês de vencimento da fatura da internet">
+                    <i class="fa-solid fa-calendar-xmark text-rose-500 text-[10px]"></i> Dia de Vencimento
+                  </label>
+                  <input type="number" min="1" max="31" id="casaFormInternetDiaVencimento" placeholder="Ex: 15" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-bold text-rose-700" title="Dia do mês em que a fatura vence">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                <div>
+                  <label class="block text-[11px] text-slate-500 mb-0.5 font-medium">Valor Mensal (R$)</label>
+                  <input type="number" step="0.01" id="casaFormInternetValor" placeholder="Ex: 119.90" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-500 mb-0.5 font-medium">Cód. Assinante / Contrato</label>
+                  <input type="text" id="casaFormInternetCodigo" placeholder="Ex: 0098472 / CPF" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-500 mb-0.5 font-medium">Link 2ª Via / Agência Virtual</label>
+                  <input type="url" id="casaFormInternetLink" placeholder="https://central.provedor.com.br" class="w-full py-1.5 px-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -4985,6 +5033,7 @@ service cloud.firestore {
                 <span id="modalCasaDetalhesOcupacaoBadge" class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">0 vagas ocupadas</span>
                 <span id="modalCasaDetalhesComodosCount" class="text-slate-300 flex items-center gap-1"><i class="fa-solid fa-border-all text-amber-400 text-xs"></i> 0 cômodos</span>
                 <span id="modalCasaDetalhesResponsavel" class="text-slate-400">Resp: --</span>
+                <span id="modalCasaDetalhesInternetBadge" class="hidden px-2 py-0.5 rounded-md font-bold text-xs flex items-center gap-1 border"></span>
               </div>
             </div>
           </div>
@@ -7676,6 +7725,6 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=4.6"></script>
+  <script src="app.js?v=4.7"></script>
 </body>
 </html>
