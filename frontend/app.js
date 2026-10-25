@@ -7830,6 +7830,269 @@ function exportarLimpezasExcel() {
   showToast('Biblioteca SheetJS (XLSX) não carregada.', 'error');
 }
 
+
+// ==========================================
+// RELATÓRIO COMPLETO DE GASTOS POR CASA (EXCEL PRO)
+// ==========================================
+
+function exportarRelatorioGastosCasaExcel(casaId) {
+  if (typeof XLSX === 'undefined') {
+    showToast('Biblioteca SheetJS (XLSX) não carregada.', 'error');
+    return;
+  }
+
+  const idAlvo = casaId || (typeof casaSelecionadaId !== 'undefined' ? casaSelecionadaId : null);
+  const c = listaCasasCidade.find(x => x.id === idAlvo);
+  if (!c) {
+    showToast('Casa não encontrada para gerar o relatório de gastos.', 'error');
+    return;
+  }
+
+  showToast(`📊 Gerando Relatório Consolidado de Gastos de "${c.nome}" em Excel...`, 'info');
+  const wb = XLSX.utils.book_new();
+  const dataHora = new Date().toLocaleString('pt-BR');
+  const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL - Construtora';
+  const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro Taboca 2';
+
+  // Buscar todas as despesas da casa
+  const despesasCasa = (listaDespesasCasas || [])
+    .filter(d => d.casa_id === c.id)
+    .sort((a, b) => (b.mes_referencia || '').localeCompare(a.mes_referencia || '') || (b.vencimento || '').localeCompare(a.vencimento || ''));
+
+  const totalGasto = despesasCasa.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+  const totalPago = despesasCasa.filter(d => d.status === 'pago').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+  const totalPendente = despesasCasa.filter(d => d.status === 'pendente').reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+
+  // -------------------------------------------------------------
+  // ABA 1: RESUMO EXECUTIVO & POR CATEGORIA
+  // -------------------------------------------------------------
+  const ws1 = {};
+  ExcelProGenerator.addCabecalhoObra(
+    ws1, 
+    `${obraNome.toUpperCase()} — RELATÓRIO CONSOLIDADO DE GASTOS: ${c.nome.toUpperCase()}`, 
+    `${empresaNome} • Demonstrativo Financeiro Completo da Residência • Emissão: ${dataHora}`, 
+    6
+  );
+
+  // Cartão com Dados Gerais do Imóvel
+  ExcelProGenerator.addCell(ws1, 3, 0, 'DADOS DO IMÓVEL', { s: ExcelProGenerator.estilos.th });
+  ExcelProGenerator.addCell(ws1, 3, 1, c.nome, { s: ExcelProGenerator.estilos.td(false, 'left') });
+  ExcelProGenerator.addCell(ws1, 3, 2, 'RESPONSÁVEL', { s: ExcelProGenerator.estilos.th });
+  ExcelProGenerator.addCell(ws1, 3, 3, c.responsavel || 'Não informado', { s: ExcelProGenerator.estilos.td(false, 'left') });
+  ExcelProGenerator.addCell(ws1, 3, 4, 'ALUGUEL BASE', { s: ExcelProGenerator.estilos.th });
+  ExcelProGenerator.addCell(ws1, 3, 5, Number(c.aluguel_valor) || 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(false, 'right') });
+
+  ExcelProGenerator.addCell(ws1, 4, 0, 'ENDEREÇO', { s: ExcelProGenerator.estilos.th });
+  ExcelProGenerator.addCell(ws1, 4, 1, `${c.endereco || '-'} • ${c.bairro || '-'}`, { s: ExcelProGenerator.estilos.td(false, 'left') });
+  ExcelProGenerator.addCell(ws1, 4, 2, 'CEP', { s: ExcelProGenerator.estilos.th });
+  ExcelProGenerator.addCell(ws1, 4, 3, c.cep || '-', { s: ExcelProGenerator.estilos.td(false, 'center') });
+  ExcelProGenerator.addCell(ws1, 4, 4, 'INTERNET', { s: ExcelProGenerator.estilos.th });
+  ExcelProGenerator.addCell(ws1, 4, 5, `${c.internet_provedor || 'Não config.'} ${c.internet_valor ? '(R$ ' + Number(c.internet_valor).toFixed(2) + ')' : ''}`, { s: ExcelProGenerator.estilos.td(false, 'left') });
+
+  // Título da Tabela de Categorias
+  const headersCat = ['Categoria / Tipo de Despesa', 'Qtd de Faturas', 'Total Pago (R$)', 'Total Pendente (R$)', 'Total Gasto (R$)', '% Participação'];
+  headersCat.forEach((h, col) => ExcelProGenerator.addCell(ws1, 6, col, h, { s: ExcelProGenerator.estilos.th }));
+
+  // Agrupamento por Categoria
+  const categoriasMap = {};
+  despesasCasa.forEach(d => {
+    const cat = d.categoria || 'Outras Despesas';
+    if (!categoriasMap[cat]) {
+      categoriasMap[cat] = { qtd: 0, pago: 0, pendente: 0, total: 0 };
+    }
+    const val = Number(d.valor) || 0;
+    categoriasMap[cat].qtd++;
+    categoriasMap[cat].total += val;
+    if (d.status === 'pago') categoriasMap[cat].pago += val;
+    else categoriasMap[cat].pendente += val;
+  });
+
+  const categoriasLista = Object.keys(categoriasMap).sort((a, b) => categoriasMap[b].total - categoriasMap[a].total);
+
+  categoriasLista.forEach((cat, idx) => {
+    const r = 7 + idx;
+    const rowEx = r + 1;
+    const zebra = idx % 2 === 1;
+    const item = categoriasMap[cat];
+    const pct = totalGasto > 0 ? (item.total / totalGasto) : 0;
+
+    ExcelProGenerator.addCell(ws1, r, 0, cat, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    ExcelProGenerator.addCell(ws1, r, 1, item.qtd, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws1, r, 2, item.pago, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws1, r, 3, item.pendente, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws1, r, 4, item.total, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws1, r, 5, pct, { z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+  });
+
+  const totCatRow = 7 + categoriasLista.length;
+  const totCatEx = totCatRow + 1;
+  const firstCatRow = 8;
+  const lastCatRow = totCatRow;
+
+  ExcelProGenerator.addCell(ws1, totCatRow, 0, 'TOTAL GERAL GASTO', { s: ExcelProGenerator.estilos.total('left') });
+  if (categoriasLista.length > 0) {
+    ExcelProGenerator.addCell(ws1, totCatRow, 1, despesasCasa.length, { f: `SUM(B${firstCatRow}:B${lastCatRow})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 2, totalPago, { f: `SUM(C${firstCatRow}:C${lastCatRow})`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 3, totalPendente, { f: `SUM(D${firstCatRow}:D${lastCatRow})`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 4, totalGasto, { f: `SUM(E${firstCatRow}:E${lastCatRow})`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 5, 1, { z: '100.0%', s: ExcelProGenerator.estilos.total('center') });
+  } else {
+    ExcelProGenerator.addCell(ws1, totCatRow, 1, 0, { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 2, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 3, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 4, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totCatRow, 5, 0, { z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+  }
+
+  ws1['!ref'] = `A1:F${totCatEx}`;
+  ws1['!cols'] = [{ wch: 30 }, { wch: 16 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 18 }];
+  ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 22 }, { hpt: 22 }, { hpt: 10 }, { hpt: 26 }];
+  XLSX.utils.book_append_sheet(wb, ws1, "RESUMO EXECUTIVO");
+
+  // -------------------------------------------------------------
+  // ABA 2: EXTRATO COMPLETO DE DESPESAS
+  // -------------------------------------------------------------
+  const ws2 = {};
+  ExcelProGenerator.addCabecalhoObra(
+    ws2, 
+    `${obraNome.toUpperCase()} — EXTRATO DETALHADO DE CONTAS: ${c.nome.toUpperCase()}`, 
+    `${empresaNome} • Todas as Faturas Lançadas • Emissão: ${dataHora}`, 
+    8
+  );
+
+  const headers2 = ['Mês Ref.', 'Data Vencimento', 'Categoria', 'Descrição / Detalhes', 'Valor Fatura (R$)', 'Status', 'Data do Pagamento', 'Comprovante / Obs'];
+  headers2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+  despesasCasa.forEach((d, idx) => {
+    const r = 4 + idx;
+    const zebra = idx % 2 === 1;
+    const ehPago = d.status === 'pago';
+    const vencFormatado = d.vencimento ? (d.vencimento.includes('-') ? d.vencimento.split('-').reverse().join('/') : d.vencimento) : '--/--/----';
+    const valorNum = Number(d.valor) || 0;
+
+    ExcelProGenerator.addCell(ws2, r, 0, d.mes_referencia || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws2, r, 1, vencFormatado, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws2, r, 2, d.categoria || 'Despesa', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    ExcelProGenerator.addCell(ws2, r, 3, d.observacoes || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    ExcelProGenerator.addCell(ws2, r, 4, valorNum, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws2, r, 5, ehPago ? 'PAGO' : 'PENDENTE', { s: ehPago ? ExcelProGenerator.estilos.statusLivre : ExcelProGenerator.estilos.statusAlerta });
+    ExcelProGenerator.addCell(ws2, r, 6, d.data_pagamento || (ehPago ? 'CONFIRMADO' : '-'), { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws2, r, 7, d.comprovante_nome || d.cadastrado_por || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+  });
+
+  const totRow2 = 4 + despesasCasa.length;
+  const totEx2 = totRow2 + 1;
+  const firstRow2 = 5;
+  const lastRow2 = totRow2;
+
+  ExcelProGenerator.addCell(ws2, totRow2, 0, 'TOTAL DAS CONTAS', { s: ExcelProGenerator.estilos.total('left') });
+  ExcelProGenerator.addCell(ws2, totRow2, 1, `${despesasCasa.length} faturas`, { s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws2, totRow2, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws2, totRow2, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+  if (despesasCasa.length > 0) {
+    ExcelProGenerator.addCell(ws2, totRow2, 4, totalGasto, { f: `SUM(E${firstRow2}:E${lastRow2})`, z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+  } else {
+    ExcelProGenerator.addCell(ws2, totRow2, 4, 0, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.total('right') });
+  }
+  ExcelProGenerator.addCell(ws2, totRow2, 5, '-', { s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws2, totRow2, 6, '-', { s: ExcelProGenerator.estilos.total('center') });
+  ExcelProGenerator.addCell(ws2, totRow2, 7, '-', { s: ExcelProGenerator.estilos.total('center') });
+
+  ws2['!ref'] = `A1:H${totEx2}`;
+  ws2['!cols'] = [{ wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 32 }, { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 24 }];
+  ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+  XLSX.utils.book_append_sheet(wb, ws2, "EXTRATO CONTAS");
+
+  // -------------------------------------------------------------
+  // ABA 3: CONTRATOS, CONCESSIONÁRIAS & INTERNET
+  // -------------------------------------------------------------
+  const ws3 = {};
+  ExcelProGenerator.addCabecalhoObra(
+    ws3, 
+    `${obraNome.toUpperCase()} — CONTRATOS E SERVIÇOS FIXOS: ${c.nome.toUpperCase()}`, 
+    `${empresaNome} • Cadastro de Concessionárias, Códigos e Conectividade • Emissão: ${dataHora}`, 
+    7
+  );
+
+  const headers3 = ['Serviço / Contrato', 'Concessionária / Operadora', 'Código do Cliente / UC / Matrícula', 'Dia / Vencimento', 'Valor Mensal Estimado', 'Status Atual', 'Link Agência / 2ª Via'];
+  headers3.forEach((h, col) => ExcelProGenerator.addCell(ws3, 3, col, h, { s: ExcelProGenerator.estilos.th }));
+
+  const dadosEnergia = typeof obterDadosConcessionariaCasa === 'function' ? obterDadosConcessionariaCasa(c, 'energia') : null;
+  const dadosAgua = typeof obterDadosConcessionariaCasa === 'function' ? obterDadosConcessionariaCasa(c, 'agua') : null;
+  const stInternet = typeof calcularStatusInternetCasa === 'function' ? calcularStatusInternetCasa(c) : { textoBadge: '-' };
+
+  const servicos = [
+    {
+      tipo: 'Aluguel do Imóvel',
+      concessionaria: c.responsavel || 'Proprietário / Imobiliária',
+      codigo: 'Contrato de Locação',
+      vencimento: 'Mensal',
+      valor: Number(c.aluguel_valor) || 0,
+      status: 'Ativo',
+      link: c.maps_url || '-'
+    },
+    {
+      tipo: 'Energia Elétrica',
+      concessionaria: dadosEnergia ? dadosEnergia.nome : (c.energia_concessionaria || 'Não configurada'),
+      codigo: c.energia_uc ? `UC: ${c.energia_uc}` : '-',
+      vencimento: 'Conforme Fatura Mensal',
+      valor: 0,
+      status: c.energia_uc ? 'Configurada' : 'Pendente',
+      link: dadosEnergia ? dadosEnergia.url : '-'
+    },
+    {
+      tipo: 'Água & Esgoto',
+      concessionaria: dadosAgua ? dadosAgua.nome : (c.agua_concessionaria || 'Não configurada'),
+      codigo: c.agua_matricula ? `Matrícula: ${c.agua_matricula}` : '-',
+      vencimento: 'Conforme Fatura Mensal',
+      valor: 0,
+      status: c.agua_matricula ? 'Configurada' : 'Pendente',
+      link: dadosAgua ? dadosAgua.url : '-'
+    },
+    {
+      tipo: 'Internet & Conectividade',
+      concessionaria: c.internet_provedor || 'Não configurada',
+      codigo: c.internet_codigo_cliente ? `Assinante: ${c.internet_codigo_cliente}` : '-',
+      vencimento: c.internet_dia_vencimento ? `Dia ${c.internet_dia_vencimento}` : '-',
+      valor: Number(c.internet_valor) || 0,
+      status: stInternet.textoBadge || '-',
+      link: c.internet_link_segunda_via || '-'
+    }
+  ];
+
+  servicos.forEach((s, idx) => {
+    const r = 4 + idx;
+    const zebra = idx % 2 === 1;
+
+    ExcelProGenerator.addCell(ws3, r, 0, s.tipo, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    ExcelProGenerator.addCell(ws3, r, 1, s.concessionaria, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+    ExcelProGenerator.addCell(ws3, r, 2, s.codigo, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws3, r, 3, s.vencimento, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+    ExcelProGenerator.addCell(ws3, r, 4, s.valor, { z: 'R$ #,##0.00', s: ExcelProGenerator.estilos.td(zebra, 'right') });
+    ExcelProGenerator.addCell(ws3, r, 5, s.status, { s: s.status.includes('Pendente') ? ExcelProGenerator.estilos.statusAlerta : ExcelProGenerator.estilos.statusLivre });
+    ExcelProGenerator.addCell(ws3, r, 6, s.link, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+  });
+
+  ws3['!ref'] = `A1:G${4 + servicos.length}`;
+  ws3['!cols'] = [{ wch: 24 }, { wch: 28 }, { wch: 24 }, { wch: 24 }, { wch: 22 }, { wch: 20 }, { wch: 35 }];
+  ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 26 }];
+  XLSX.utils.book_append_sheet(wb, ws3, "CONTRATOS E SERVIÇOS");
+
+  // Nome do arquivo seguro e limpo
+  const nomeLimpo = (c.nome || 'casa').toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+  const dataArquivo = getDataHojeLocal();
+  const nomeArquivo = `gastos_${nomeLimpo}_${dataArquivo}.xlsx`;
+
+  XLSX.writeFile(wb, nomeArquivo);
+  showToast(`📊 Relatório completo de gastos de "${c.nome}" baixado com sucesso!`, 'success');
+}
+
+function exportarRelatorioGastosCasaAtualExcel() {
+  if (typeof casaSelecionadaId !== 'undefined' && casaSelecionadaId) {
+    exportarRelatorioGastosCasaExcel(casaSelecionadaId);
+  }
+}
+
 function exportarDespesasCasasExcel() {
   if (typeof XLSX !== 'undefined') {
     showToast('💵 Gerando Relatório Consolidado de Contas em Excel...', 'info');
@@ -11839,6 +12102,9 @@ function renderizarCasasCidadeGrid(casas) {
             </div>
 
             <div class="flex items-center gap-1.5">
+              <button onclick="event.stopPropagation(); exportarRelatorioGastosCasaExcel('${c.id}')" class="btn-prefeito p-2 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 text-xs transition" title="Baixar Relatório de Gastos em Excel desta Casa">
+                <i class="fa-solid fa-file-excel text-emerald-600"></i>
+              </button>
               <button onclick="abrirModalPlacaQRCasa('${c.id}')" class="btn-prefeito p-2 rounded-lg text-slate-500 hover:text-teal-600 hover:bg-slate-100 text-xs transition" title="Ver Placa QR Code da Casa">
                 <i class="fa-solid fa-qrcode text-teal-600"></i>
               </button>
@@ -19137,6 +19403,8 @@ window.renderChartCasasTab = renderChartCasasTab;
 window.exportarCasasCidadeExcel = exportarCasasCidadeExcel;
 window.exportarLimpezasExcel = exportarLimpezasExcel;
 window.exportarDespesasCasasExcel = exportarDespesasCasasExcel;
+window.exportarRelatorioGastosCasaExcel = exportarRelatorioGastosCasaExcel;
+window.exportarRelatorioGastosCasaAtualExcel = exportarRelatorioGastosCasaAtualExcel;
 window.abrirModalTermoResponsabilidadeGenerico = abrirModalTermoResponsabilidadeGenerico;
 window.gerarTermoResponsabilidadeAlojado = gerarTermoResponsabilidadeAlojado;
 window.gerarTermoResponsabilidadeMoradorCasa = gerarTermoResponsabilidadeMoradorCasa;

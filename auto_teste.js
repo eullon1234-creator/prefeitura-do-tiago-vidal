@@ -1747,6 +1747,27 @@ const limpezaHtmlSrc = fs.readFileSync('limpeza.html', 'utf8');
 assert(limpezaHtmlSrc.includes('function copiarEnderecoCasa('), 'Função copiarEnderecoCasa implementada em limpeza.html');
 assert(limpezaHtmlSrc.includes("copiarEnderecoCasa('${c.id}')"), 'Botão de copiar endereço presente no portal mobile de limpeza da casa');
 
+// --- SEÇÃO 28: AUDITORIA DE RELATÓRIO INDIVIDUAL DE GASTOS POR CASA (EXCEL PRO) ---
+console.log('\n--- SEÇÃO 28: AUDITORIA DE RELATÓRIO INDIVIDUAL DE GASTOS POR CASA (EXCEL PRO) ---');
+
+// 1. Funções em app.js
+assert(appJsCampo.includes('function exportarRelatorioGastosCasaExcel('), 'Função exportarRelatorioGastosCasaExcel implementada em app.js');
+assert(appJsCampo.includes('function exportarRelatorioGastosCasaAtualExcel('), 'Função exportarRelatorioGastosCasaAtualExcel implementada em app.js');
+assert(appJsCampo.includes('window.exportarRelatorioGastosCasaExcel ='), 'exportarRelatorioGastosCasaExcel exportada no window');
+assert(appJsCampo.includes('window.exportarRelatorioGastosCasaAtualExcel ='), 'exportarRelatorioGastosCasaAtualExcel exportada no window');
+
+// 2. Abas do relatório individual em app.js
+assert(appJsCampo.includes('"RESUMO EXECUTIVO"'), 'Aba RESUMO EXECUTIVO configurada no relatório de gastos da casa');
+assert(appJsCampo.includes('"EXTRATO CONTAS"'), 'Aba EXTRATO CONTAS configurada no relatório de gastos da casa');
+assert(appJsCampo.includes('"CONTRATOS E SERVIÇOS"'), 'Aba CONTRATOS E SERVIÇOS configurada no relatório de gastos da casa');
+assert(appJsCampo.includes('categoriasMap'), 'Agrupamento dinâmico de despesas por categoria presente no relatório');
+assert(appJsCampo.includes('gastos_${nomeLimpo}'), 'Geração de nome de arquivo seguro formatado para cada casa');
+
+// 3. Botões na interface index.html
+assert(htmlIndex.includes('exportarRelatorioGastosCasaAtualExcel()'), 'Botão de exportação presente no modal de detalhes da casa');
+assert(htmlIndex.includes('Relatório Gastos Excel') || htmlIndex.includes('Exportar Gastos (.xlsx)'), 'Texto do botão de exportação validado no index.html');
+assert(appJsCampo.includes("exportarRelatorioGastosCasaExcel('${c.id}')"), 'Botão de download de relatório Excel individual presente no card da grade de casas');
+
 // 9. Paridade de Arquivos Críticos entre Raiz e frontend/
 const arquivosVerificarParidade = ['app.js', 'index.html', 'limpeza.html', 'ronda.html', 'chamado.html', 'sw.js', 'qrcode.min.js'];
 arquivosVerificarParidade.forEach(arq => {
