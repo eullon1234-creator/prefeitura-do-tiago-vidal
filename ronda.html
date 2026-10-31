@@ -193,55 +193,73 @@
     </div>
 
     <!-- BLOCO 1: AUTENTICAÇÃO COM SENHA DA EQUIPE DE LIMPEZA -->
-    <div id="containerSenhaLimpeza" class="bg-slate-800/90 backdrop-blur rounded-2xl p-5 border border-slate-700/80 shadow-xl space-y-4">
+    <div id="containerSenhaLimpeza" class="bg-slate-800/90 backdrop-blur rounded-2xl p-4 sm:p-5 border border-teal-500/40 shadow-xl space-y-3.5">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg flex-shrink-0 border border-teal-500/30">
           <i class="fa-solid fa-key"></i>
         </div>
         <div>
-          <h3 class="text-sm font-bold text-white">Acesso da Equipe de Limpeza</h3>
-          <p class="text-[11px] text-slate-400">Digite o PIN / Senha fornecido pelo Prefeito de Canteiro.</p>
+          <h3 class="text-sm font-black text-white uppercase tracking-wide">Acesso da Equipe de Limpeza</h3>
+          <p class="text-[11px] text-slate-300 leading-snug">Toque no teclado numérico ou digite o PIN fornecido pelo Prefeito.</p>
         </div>
       </div>
 
-      <div class="space-y-3 pt-1">
-        <div>
-          <label for="inputSenhaEquipeRonda" class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-            Senha da Equipe *
-          </label>
-          <div class="relative">
-            <input 
-              type="password" 
-              id="inputSenhaEquipeRonda" 
-              placeholder="Digite a senha..." 
-              class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-4 py-3 text-center text-lg font-mono font-bold tracking-widest text-white outline-none transition placeholder-slate-600"
-              onkeydown="if(event.key === 'Enter') validarSenhaEquipeRonda()"
-            >
-            <button type="button" onclick="alternarVisibilidadeSenhaRonda()" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1">
-              <i class="fa-solid fa-eye" id="iconeOlhoSenhaRonda"></i>
-            </button>
-          </div>
+      <!-- Indicadores de Dígitos do PIN -->
+      <div class="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 text-center space-y-2">
+        <div class="flex justify-center items-center gap-2.5 py-1">
+          <span id="pinRondaDot1" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
+          <span id="pinRondaDot2" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
+          <span id="pinRondaDot3" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
+          <span id="pinRondaDot4" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
+          <span id="pinRondaDot5" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
+          <span id="pinRondaDot6" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
         </div>
 
-        <div id="msgErroSenhaRonda" class="hidden p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs text-center font-semibold">
+        <div class="relative flex items-center">
+          <input 
+            type="password" 
+            id="inputSenhaEquipeRonda" 
+            inputmode="numeric"
+            placeholder="Ou digite o PIN..." 
+            oninput="atualizarIndicadoresPinKeypadRonda()"
+            class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-4 py-2 text-center text-sm font-mono font-bold tracking-widest text-white outline-none transition placeholder-slate-500"
+            onkeydown="if(event.key === 'Enter') validarSenhaEquipeRonda()"
+          >
+          <button 
+            type="button" 
+            onclick="validarSenhaEquipeRonda()" 
+            class="ml-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-bold text-xs uppercase tracking-wider shadow-md transition flex items-center gap-1"
+          >
+            <i class="fa-solid fa-unlock"></i> OK
+          </button>
+        </div>
+
+        <div id="msgErroSenhaRonda" class="hidden p-2 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs text-center font-bold">
           <i class="fa-solid fa-circle-exclamation mr-1"></i> Senha incorreta! Solicite ao Prefeito da Obra.
         </div>
+      </div>
 
-        <div class="flex items-center justify-between text-xs text-slate-400">
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" id="checkLembrarSenhaHoje" checked class="w-4 h-4 accent-teal-500 rounded">
-            <span class="text-[11px]">Lembrar senha neste aparelho hoje</span>
-          </label>
-        </div>
+      <!-- Keypad Numérico Virtual (52px por tecla para uso com luva ou campo) -->
+      <div class="max-w-xs mx-auto grid grid-cols-3 gap-2 pt-1 select-none">
+        <button type="button" onclick="digitarPinKeypadRonda('1')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">1</button>
+        <button type="button" onclick="digitarPinKeypadRonda('2')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">2</button>
+        <button type="button" onclick="digitarPinKeypadRonda('3')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">3</button>
+        <button type="button" onclick="digitarPinKeypadRonda('4')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">4</button>
+        <button type="button" onclick="digitarPinKeypadRonda('5')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">5</button>
+        <button type="button" onclick="digitarPinKeypadRonda('6')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">6</button>
+        <button type="button" onclick="digitarPinKeypadRonda('7')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">7</button>
+        <button type="button" onclick="digitarPinKeypadRonda('8')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">8</button>
+        <button type="button" onclick="digitarPinKeypadRonda('9')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">9</button>
+        <button type="button" onclick="limparPinKeypadRonda()" class="min-h-[52px] h-13 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold text-xs hover:text-white active:scale-95 transition">Limpar</button>
+        <button type="button" onclick="digitarPinKeypadRonda('0')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">0</button>
+        <button type="button" onclick="apagarPinKeypadRonda()" class="min-h-[52px] h-13 rounded-2xl bg-slate-950 border border-slate-800 text-rose-400 hover:text-rose-300 text-base active:scale-95 transition" title="Apagar último"><i class="fa-solid fa-delete-left"></i></button>
+      </div>
 
-        <button 
-          type="button" 
-          onclick="validarSenhaEquipeRonda()" 
-          class="w-full py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition"
-        >
-          <i class="fa-solid fa-unlock"></i>
-          <span>Entrar no Formulário de Limpeza</span>
-        </button>
+      <div class="flex items-center justify-between text-xs text-slate-300 pt-1 border-t border-slate-800">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" id="checkLembrarSenhaHoje" checked class="w-4 h-4 accent-teal-500 rounded">
+          <span class="text-[11px]">Lembrar senha neste aparelho hoje</span>
+        </label>
       </div>
     </div>
 
@@ -382,13 +400,13 @@
             class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-white font-semibold text-xs outline-none transition placeholder-slate-500"
           >
           <!-- Chips Rápidos -->
-          <div class="flex items-center gap-1.5 flex-wrap mt-1.5">
-            <span class="text-[9px] text-slate-400 font-bold">Adicionar:</span>
-            <button type="button" onclick="adicionarDestinoGeloChipMobile('KM 12')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ KM 12</button>
-            <button type="button" onclick="adicionarDestinoGeloChipMobile('KM 14')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ KM 14</button>
-            <button type="button" onclick="adicionarDestinoGeloChipMobile('Refeitório')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ Refeitório</button>
-            <button type="button" onclick="adicionarDestinoGeloChipMobile('Oficina')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ Oficina</button>
-            <button type="button" onclick="adicionarDestinoGeloChipMobile('Britagem')" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 font-semibold transition">+ Britagem</button>
+          <div class="flex items-center gap-2 flex-wrap mt-2">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Atalhos:</span>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('KM 12')" class="min-h-[36px] text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-cyan-900/60 active:scale-95 border-2 border-slate-700 hover:border-cyan-500 text-cyan-300 font-bold transition shadow-xs">+ KM 12</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('KM 14')" class="min-h-[36px] text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-cyan-900/60 active:scale-95 border-2 border-slate-700 hover:border-cyan-500 text-cyan-300 font-bold transition shadow-xs">+ KM 14</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('Refeitório')" class="min-h-[36px] text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-cyan-900/60 active:scale-95 border-2 border-slate-700 hover:border-cyan-500 text-cyan-300 font-bold transition shadow-xs">+ Refeitório</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('Oficina')" class="min-h-[36px] text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-cyan-900/60 active:scale-95 border-2 border-slate-700 hover:border-cyan-500 text-cyan-300 font-bold transition shadow-xs">+ Oficina</button>
+            <button type="button" onclick="adicionarDestinoGeloChipMobile('Britagem')" class="min-h-[36px] text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-cyan-900/60 active:scale-95 border-2 border-slate-700 hover:border-cyan-500 text-cyan-300 font-bold transition shadow-xs">+ Britagem</button>
           </div>
         </div>
       </div>
@@ -402,23 +420,23 @@
         
         <!-- Checklist para Banheiro -->
         <div id="checklistBanheiro" class="space-y-2">
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Recolhimento de Lixo e Troca de Saco" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🗑️ Esvaziamento de Lixeiras & Troca de Sacos</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Lavagem e Desinfecção Geral (Vaso/Piso)" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🧼 Lavagem e Desinfecção (Vaso, Mictório e Piso)</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Reposição de Papel Higiênico" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🧻 Reposição de Papel Higiênico</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Reposição de Sabonete / Álcool 70%" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🧴 Reposição de Sabonete Líquido / Álcool</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Pia Limpa e Checagem de Descarga/Água" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🚿 Limpeza da Pia e Checagem de Descarga</span>
           </label>
@@ -426,23 +444,23 @@
 
         <!-- Checklist para Bebedouro -->
         <div id="checklistBebedouro" class="hidden space-y-2">
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Higienização das Bicas com Álcool 70%" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🚰 Higienização e Desinfecção das Bicas / Torneiras</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Lavagem da Cuba, Ralo e Bandeja" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>✨ Limpeza da Cuba, Ralo e Bandeja Pingadeira</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Troca ou Abastecimento de Água/Galão" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>💧 Troca de Garrafão / Abastecimento de Água</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Checagem de Refrigeração (Água Gelada)" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>❄️ Checagem de Refrigeração (Água Gelando)</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Inspeção Visual de Filtro e Sem Vazamento" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🔍 Inspeção do Filtro e Ausência de Vazamento</span>
           </label>
@@ -450,23 +468,23 @@
 
         <!-- Checklist para Máquina de Gelo -->
         <div id="checklistMaquinaGelo" class="hidden space-y-2">
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Nível do Silo & Funcionamento do Compressor" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🧊 Nível do Silo & Ciclo do Compressor / Refrigeração</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Higienização da Cuba, Tampa e Pá Dosadora" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🧽 Higienização da Cuba, Tampa e Pá de Gelo</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Inspeção do Filtro de Água / Purificador" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>💧 Inspeção do Filtro / Purificador de Água</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Qualidade e Espessura dos Cubos de Gelo" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>❄️ Qualidade do Gelo (Transparência, Sem Odor)</span>
           </label>
-          <label class="check-item flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 cursor-pointer text-xs select-none">
+          <label class="check-item min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-2xl border-2 border-slate-700/80 hover:border-teal-500 bg-slate-900/70 cursor-pointer text-xs font-semibold text-slate-100 select-none active:scale-[0.99] transition">
             <input type="checkbox" name="checkItem" value="Limpeza Externa e Dreno de Degelo Desobstruído" checked class="w-4 h-4 accent-teal-500 rounded">
             <span>🧹 Limpeza Externa e Dreno de Degelo Desobstruído</span>
           </label>
@@ -900,6 +918,54 @@
     }
 
     // Validar Senha da Equipe de Limpeza
+    
+    // FUNÇÕES DO KEYPAD NUMÉRICO VIRTUAL (USABILIDADE DE CAMPO / RONDA)
+    function digitarPinKeypadRonda(digito) {
+      const inp = document.getElementById('inputSenhaEquipeRonda');
+      if (!inp) return;
+      if (inp.value.length >= 8) return;
+      inp.value += String(digito);
+      atualizarIndicadoresPinKeypadRonda();
+      if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(30);
+
+      const senhaEsperada = String(configRonda.senha_equipe || '1234').trim();
+      if (inp.value === senhaEsperada) {
+        validarSenhaEquipeRonda();
+      }
+    }
+
+    function apagarPinKeypadRonda() {
+      const inp = document.getElementById('inputSenhaEquipeRonda');
+      if (!inp) return;
+      inp.value = inp.value.slice(0, -1);
+      atualizarIndicadoresPinKeypadRonda();
+      if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(25);
+    }
+
+    function limparPinKeypadRonda() {
+      const inp = document.getElementById('inputSenhaEquipeRonda');
+      if (!inp) return;
+      inp.value = '';
+      atualizarIndicadoresPinKeypadRonda();
+      const erro = document.getElementById('msgErroSenhaRonda');
+      if (erro) erro.classList.add('hidden');
+    }
+
+    function atualizarIndicadoresPinKeypadRonda() {
+      const inp = document.getElementById('inputSenhaEquipeRonda');
+      const len = inp ? inp.value.length : 0;
+      for (let i = 1; i <= 6; i++) {
+        const dot = document.getElementById('pinRondaDot' + i);
+        if (dot) {
+          if (i <= len) {
+            dot.className = 'w-3.5 h-3.5 rounded-full border-2 border-teal-400 bg-teal-400 transition-all scale-110';
+          } else {
+            dot.className = 'w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all';
+          }
+        }
+      }
+    }
+
     function validarSenhaEquipeRonda() {
       const input = document.getElementById('inputSenhaEquipeRonda');
       const erro = document.getElementById('msgErroSenhaRonda');
@@ -1498,6 +1564,19 @@
     let isSubmetendoRonda = false;
 
     // Salvar Registro de Ronda
+    function acionarEnvioRondaThumb() {
+      if (modoAtual === 'problema') {
+        salvarOcorrenciaPublica();
+      } else {
+        const formRonda = document.getElementById('formRonda');
+        if (formRonda && !formRonda.classList.contains('hidden')) {
+          salvarRondaPublica();
+        } else {
+          validarSenhaEquipeRonda();
+        }
+      }
+    }
+
     async function salvarRondaPublica(e) {
       if (e) e.preventDefault();
 
@@ -1622,7 +1701,7 @@
             // Salvar log na auditoria central para o Prefeito ver em background
             try {
               const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-              const descTipo = pontoTipo === 'banheiro' ? 'Banheiro' : 'Bebedouro';
+              const descTipo = pontoTipo === 'banheiro' ? 'Banheiro' : (pontoTipo === 'maquina_gelo' ? 'Máquina de Gelo' : 'Bebedouro');
               const logObj = {
                 id: logId,
                 data_hora: new Date().toISOString(),
@@ -2030,6 +2109,17 @@
     }
 
   </script>
+
+
+  <!-- BARRA FIXA INFERIOR DE CONFIRMAÇÃO DA RONDA (THUMB ZONE PARA CELULAR) -->
+  <aside aria-label="Ações rápidas de ronda" id="barraFixaThumbRonda" class="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-2.5 z-40 sm:hidden shadow-2xl">
+    <div class="max-w-md mx-auto">
+      <button type="button" onclick="acionarEnvioRondaThumb()" class="w-full min-h-[48px] py-3 px-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 active:scale-95 text-white font-black text-xs shadow-lg shadow-teal-950/50 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-check text-base"></i>
+        <span>Confirmar Registro de Ronda</span>
+      </button>
+    </div>
+  </aside>
 
 </body>
 </html>

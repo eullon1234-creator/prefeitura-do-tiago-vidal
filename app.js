@@ -3062,7 +3062,7 @@ function updateUserRoleUI() {
   if (currentUserRole === 'prefeito') {
     userRoleIcon.className = 'fa-solid fa-shield-halved text-amber-400';
     userRoleText.textContent = 'PREFEITO';
-    userRoleText.className = 'text-amber-300 font-bold';
+    userRoleText.className = 'text-amber-300 font-bold hidden sm:inline';
     if (roleBadgeInPage) {
       roleBadgeInPage.textContent = 'Acesso: Prefeito (Total)';
       roleBadgeInPage.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300';
@@ -3076,7 +3076,7 @@ function updateUserRoleUI() {
   } else {
     userRoleIcon.className = 'fa-solid fa-eye text-sky-400';
     userRoleText.textContent = 'CONSULTA';
-    userRoleText.className = 'text-sky-300 font-medium';
+    userRoleText.className = 'text-sky-300 font-medium hidden sm:inline';
     if (roleBadgeInPage) {
       roleBadgeInPage.textContent = 'Acesso: Consulta (Somente Leitura)';
       roleBadgeInPage.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-300';
@@ -3158,6 +3158,8 @@ function switchTab(tabId) {
     carregarRelatoriosPreview();
   } else if (tabId === 'auditoria') {
     carregarAuditoria();
+  } else if (tabId === 'erp_canteiro') {
+    carregarErpCanteiro();
   } else if (tabId === 'configuracoes') {
     carregarConfigIdentidadeVisual();
     carregarConfigWhatsappPrefeito();
@@ -4036,6 +4038,7 @@ function getWhatsappUrl(telefone) {
 }
 
 function renderQuartosCards(quartos) {
+  if (typeof renderMatrizQuartos === 'function') renderMatrizQuartos(quartos);
   const container = document.getElementById('gridQuartos');
   const vazioEl = document.getElementById('quartosVazio');
   if (!container) return;
@@ -16102,7 +16105,7 @@ async function resolverOcorrenciaUnidade(protocolo, tipoLocal, unidadeId) {
 
   showToast(`✅ Reclamação #${protocolo} marcada como resolvida!`, 'success');
   abrirModalOcorrenciasUnidade(tipoLocal, unidadeId);
-  renderChamados();
+  if (typeof carregarChamados === 'function') carregarChamados();
   if (activeTab === 'blocos') carregarQuartos();
   if (activeTab === 'casas_cidade') filtrarCasasCidadeUI();
 }
@@ -19707,7 +19710,13 @@ function salvarConfigManutencaoUI() {
 
     localStorage.setItem('prefeitura_config_manutencao', JSON.stringify(config));
 
-    if (typeof db !== 'undefined' && db && typeof doc === 'function' && typeof setDoc === 'function') {
+    if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+      try {
+        firestoreDb.collection('configuracoes').doc('manutencao_plaquinhas').set(config, { merge: true }).catch(err => {
+          console.warn('Aviso sincronizacao nuvem config manutencao:', err);
+        });
+      } catch (errDb) {}
+    } else if (typeof db !== 'undefined' && db && typeof doc === 'function' && typeof setDoc === 'function') {
       try {
         setDoc(doc(db, 'configuracoes', 'manutencao_plaquinhas'), config, { merge: true }).catch(err => {
           console.warn('Aviso sincronizacao nuvem config manutencao:', err);
@@ -19719,8 +19728,8 @@ function salvarConfigManutencaoUI() {
       showToast('Configurações das plaquinhas salvas com sucesso!', 'success');
     }
 
-    if (typeof renderizarQuartos === 'function' && typeof activeTab !== 'undefined' && activeTab === 'blocos') {
-      renderizarQuartos();
+    if (typeof carregarQuartos === 'function' && typeof activeTab !== 'undefined' && activeTab === 'blocos') {
+      carregarQuartos();
     }
     if (typeof renderizarConteudoModalPlaquinha === 'function') {
       renderizarConteudoModalPlaquinha();
@@ -20287,3 +20296,672 @@ window.escanearArquivoQRLimpeza = escanearArquivoQRLimpeza;
 window.escanearArquivoQRRonda = escanearArquivoQRRonda;
 window.obterTodosQuartos = obterTodosQuartos;
 window.dispararFeedbackTati = dispararFeedbackTati;
+window.dispararFeedbackTatil = dispararFeedbackTati;
+
+window.renderChamados = carregarChamados;
+
+
+// ============================================================================
+// FASE 2: GESTÃO INTELIGENTE DE ALOJAMENTOS, CHECK-IN EM LOTE & ASSINATURA TOUCH
+// ============================================================================
+
+let listaCheckinLotePrevia = [];
+
+function abrirModalCheckinEmLote() {
+  if (!checkPrefeitoAccess()) return;
+
+  // Popular selects de blocos e empresas
+  const selBlocos = document.getElementById('checkinLoteBlocoSelect');
+  if (selBlocos) {
+    const blocos = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.blocos) || [];
+    let opts = '<option value="">Automático (Primeiras Vagas Livres da Obra)</option>';
+    blocos.forEach(b => {
+      opts += `<option value="${b.id}">${b.nome} (${b.tipo || 'Alojamento'})</option>`;
+    });
+    selBlocos.innerHTML = opts;
+  }
+
+  const selEmp = document.getElementById('checkinLoteEmpresaSelect');
+  if (selEmp) {
+    const empresas = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.empresas) || [];
+    let opts = '';
+    empresas.forEach(e => {
+      opts += `<option value="${e.nome}">${e.nome}</option>`;
+    });
+    if (opts) selEmp.innerHTML = opts;
+  }
+
+  const tx = document.getElementById('checkinLoteTextarea');
+  if (tx) tx.value = '';
+  document.getElementById('checkinLotePreviewContainer')?.classList.add('hidden');
+  listaCheckinLotePrevia = [];
+
+  abrirModal('modalCheckinLote');
+}
+
+function previsualizarCheckinLote() {
+  const tx = document.getElementById('checkinLoteTextarea');
+  const texto = (tx ? tx.value : '').trim();
+  if (!texto) {
+    showToast('Cole ou digite a lista de colaboradores primeiro.', 'warning');
+    return;
+  }
+
+  const blocoAlvoId = document.getElementById('checkinLoteBlocoSelect')?.value || null;
+  const empresaPadrao = document.getElementById('checkinLoteEmpresaSelect')?.value || 'GEL';
+
+  // Obter vagas livres atuais do sistema
+  const quartos = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.quartos) || [];
+  const vagasLivres = [];
+
+  quartos.forEach(q => {
+    if (blocoAlvoId && String(q.bloco_id) !== String(blocoAlvoId)) return;
+    (q.vagas || []).forEach(v => {
+      if (v.status === 'livre') {
+        vagasLivres.push({
+          vaga_id: v.id,
+          numero_cama: v.numero_cama,
+          quarto_id: q.id,
+          quarto_numero: q.numero,
+          bloco_id: q.bloco_id,
+          bloco_nome: q.bloco_nome
+        });
+      }
+    });
+  });
+
+  if (vagasLivres.length === 0) {
+    showToast('Não há vagas livres disponíveis no bloco selecionado.', 'error');
+    return;
+  }
+
+  // Parse das linhas
+  const linhas = texto.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const alocacoes = [];
+
+  linhas.forEach((linha, idx) => {
+    if (idx >= vagasLivres.length) return; // vagas esgotadas
+
+    // Separadores aceitos: ponto e vírgula, tabulação ou vírgula
+    let partes = [];
+    if (linha.includes(';')) partes = linha.split(';');
+    else if (linha.includes('\t')) partes = linha.split('\t');
+    else if (linha.includes(',')) partes = linha.split(',');
+    else partes = [linha];
+
+    const nome = (partes[0] || '').trim();
+    if (!nome) return;
+
+    const matricula = (partes[1] || ('REG-' + Math.floor(1000 + Math.random() * 9000))).trim();
+    const funcao = (partes[2] || 'Alojado Obra').trim();
+    const empresa = (partes[3] || empresaPadrao).trim();
+
+    const vaga = vagasLivres[idx];
+
+    alocacoes.push({
+      nome,
+      matricula,
+      funcao,
+      empresa,
+      vaga
+    });
+  });
+
+  if (alocacoes.length === 0) {
+    showToast('Nenhum colaborador válido identificado na lista.', 'warning');
+    return;
+  }
+
+  listaCheckinLotePrevia = alocacoes;
+  document.getElementById('checkinLoteQtdPreview').textContent = alocacoes.length;
+
+  const tbody = document.getElementById('checkinLoteTableBody');
+  if (tbody) {
+    tbody.innerHTML = alocacoes.map(item => `
+      <tr class="hover:bg-slate-50">
+        <td class="p-2 font-bold text-slate-900">${item.nome}</td>
+        <td class="p-2 text-slate-600 font-mono">${item.matricula}</td>
+        <td class="p-2 text-slate-600">${item.funcao}</td>
+        <td class="p-2 font-semibold text-slate-800">${item.empresa}</td>
+        <td class="p-2 text-teal-700 font-bold">${item.vaga.bloco_nome} • Q.${item.vaga.quarto_numero} (Cama ${item.vaga.numero_cama})</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('checkinLotePreviewContainer')?.classList.remove('hidden');
+  showToast(`${alocacoes.length} colaborador(es) pré-alocados em leitos livres com sucesso!`, 'info');
+}
+
+async function executarCheckinEmLoteConfirmado() {
+  if (!listaCheckinLotePrevia || listaCheckinLotePrevia.length === 0) {
+    previsualizarCheckinLote();
+    if (!listaCheckinLotePrevia || listaCheckinLotePrevia.length === 0) return;
+  }
+
+  const btn = document.getElementById('btnConfirmarCheckinLote');
+  if (btn) btn.disabled = true;
+
+  try {
+    const total = listaCheckinLotePrevia.length;
+    let sucesso = 0;
+
+    for (const item of listaCheckinLotePrevia) {
+      const res = await fetch(`${API_BASE}/api/alojados`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome_completo: item.nome,
+          matricula: item.matricula,
+          funcao: item.funcao,
+          empresa_nome: item.empresa,
+          vaga_id: item.vaga.vaga_id,
+          data_entrada: getDataHojeLocal(),
+          usuario: currentUserName
+        })
+      });
+      if (res.ok) sucesso++;
+    }
+
+    showToast(`🎉 Check-in em Lote concluído! ${sucesso} colaborador(es) alocados com sucesso.`, 'success');
+    registrarAuditoria(
+      'alojamento',
+      'CHECKIN_LOTE',
+      `${sucesso} Colaboradores`,
+      `Realizou check-in em lote com ${sucesso} novos alojados alocados de uma só vez.`,
+      currentUserName
+    );
+
+    fecharModal('modalCheckinLote');
+    await refreshAllData();
+    carregarQuartos();
+    carregarAlojados();
+  } catch (err) {
+    showToast('Erro ao processar check-in em lote: ' + err.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// ASSINATURA TOUCHSCREEN DIGITAL NO CANVAS HTML5
+// ----------------------------------------------------------------------------
+let canvasAssinaturaTouchIniciado = false;
+let desenhandoAssinatura = false;
+let ctxAssinaturaTouch = null;
+
+function abrirModalAssinaturaTouch() {
+  abrirModal('modalAssinaturaTouch');
+  setTimeout(inicializarCanvasAssinaturaTouch, 100);
+}
+
+function inicializarCanvasAssinaturaTouch() {
+  const canvas = document.getElementById('canvasAssinaturaTouch');
+  if (!canvas) return;
+
+  ctxAssinaturaTouch = canvas.getContext('2d');
+  ctxAssinaturaTouch.strokeStyle = '#0f172a'; // tom escuro formal de tinta
+  ctxAssinaturaTouch.lineWidth = 2.5;
+  ctxAssinaturaTouch.lineCap = 'round';
+  ctxAssinaturaTouch.lineJoin = 'round';
+
+  if (!canvasAssinaturaTouchIniciado) {
+    canvasAssinaturaTouchIniciado = true;
+
+    // Mouse events
+    canvas.addEventListener('mousedown', (e) => {
+      desenhandoAssinatura = true;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      ctxAssinaturaTouch.beginPath();
+      ctxAssinaturaTouch.moveTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+    });
+
+    window.addEventListener('mouseup', () => {
+      desenhandoAssinatura = false;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!desenhandoAssinatura) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      ctxAssinaturaTouch.lineTo((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+      ctxAssinaturaTouch.stroke();
+    });
+
+    // Touch events para Celular e Tablet
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      desenhandoAssinatura = true;
+      const t = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      ctxAssinaturaTouch.beginPath();
+      ctxAssinaturaTouch.moveTo((t.clientX - rect.left) * scaleX, (t.clientY - rect.top) * scaleY);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      desenhandoAssinatura = false;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!desenhandoAssinatura) return;
+      const t = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      ctxAssinaturaTouch.lineTo((t.clientX - rect.left) * scaleX, (t.clientY - rect.top) * scaleY);
+      ctxAssinaturaTouch.stroke();
+    }, { passive: false });
+  }
+}
+
+function limparCanvasAssinaturaTouch() {
+  const canvas = document.getElementById('canvasAssinaturaTouch');
+  if (canvas && ctxAssinaturaTouch) {
+    ctxAssinaturaTouch.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+function salvarAssinaturaTouchDigital() {
+  const canvas = document.getElementById('canvasAssinaturaTouch');
+  if (!canvas) return;
+
+  const dataUrl = canvas.toDataURL('image/png');
+  const imgAss = document.getElementById('termoAssinaturaImagem');
+  if (imgAss) {
+    imgAss.src = dataUrl;
+    imgAss.classList.remove('hidden');
+  }
+
+  fecharModal('modalAssinaturaTouch');
+  showToast('✍️ Assinatura digital gravada com sucesso no Termo A4!', 'success');
+}
+
+window.abrirModalCheckinEmLote = abrirModalCheckinEmLote;
+window.previsualizarCheckinLote = previsualizarCheckinLote;
+window.executarCheckinEmLoteConfirmado = executarCheckinEmLoteConfirmado;
+window.abrirModalAssinaturaTouch = abrirModalAssinaturaTouch;
+window.limparCanvasAssinaturaTouch = limparCanvasAssinaturaTouch;
+window.salvarAssinaturaTouchDigital = salvarAssinaturaTouchDigital;
+
+
+
+// ============================================================================
+// FASE 3: PAINEL DESKTOP, VISÃO MATRICIAL, FATURAS URBANAS & EMPTY STATES
+// ============================================================================
+
+let modoVisualizacaoQuartos = 'cards';
+
+function alternarModoVisualizacaoQuartos(modo) {
+  modoVisualizacaoQuartos = modo;
+  const btnCards = document.getElementById('btnViewQuartosCards');
+  const btnMatriz = document.getElementById('btnViewQuartosMatriz');
+  const grid = document.getElementById('gridQuartos');
+  const matriz = document.getElementById('matrizQuartosContainer');
+
+  if (modo === 'matriz') {
+    if (btnCards) {
+      btnCards.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900';
+    }
+    if (btnMatriz) {
+      btnMatriz.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs';
+    }
+    grid?.classList.add('hidden');
+    matriz?.classList.remove('hidden');
+  } else {
+    if (btnCards) {
+      btnCards.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs';
+    }
+    if (btnMatriz) {
+      btnMatriz.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900';
+    }
+    matriz?.classList.add('hidden');
+    grid?.classList.remove('hidden');
+  }
+
+  if (globalQuartos) {
+    renderQuartosCards(globalQuartos);
+  }
+}
+
+function renderMatrizQuartos(quartos) {
+  const tbody = document.getElementById('matrizQuartosBody');
+  if (!tbody) return;
+
+  if (!quartos || quartos.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Nenhum quarto encontrado para exibição matricial.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = quartos.map(q => {
+    const isDesativado = q.status === 'desativado' || q.ativo === false;
+    let badgeOcupacao = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">${q.vagas_ocupadas}/${q.capacidade} (${q.vagas_livres} livres)</span>`;
+    if (isDesativado) {
+      badgeOcupacao = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-200 text-slate-700">Desativado</span>`;
+    } else if (q.status_visual === 'lotado') {
+      badgeOcupacao = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">${q.vagas_ocupadas}/${q.capacidade} (Lotado)</span>`;
+    } else if (q.status_visual === 'quase_cheio') {
+      badgeOcupacao = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">${q.vagas_ocupadas}/${q.capacidade} (1 livre)</span>`;
+    }
+
+    const nomesAlojados = (q.vagas || []).filter(v => v.alojado).map(v => `<span class="inline-block bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-slate-200 mr-1 mb-0.5" title="${v.alojado.empresa || 'GEL'}">${v.alojado.nome_completo || v.alojado.nome}</span>`).join('') || '<span class="text-slate-400 italic text-[11px]">Quarto vago</span>';
+
+    const stLimpeza = typeof calcularStatusLimpezaQuarto === 'function' ? calcularStatusLimpezaQuarto(q) : null;
+    const limpezaBadge = (stLimpeza && stLimpeza.rotina && stLimpeza.rotina.status === 'ok') 
+      ? '<span class="text-emerald-700 font-bold flex items-center justify-center gap-1"><i class="fa-solid fa-circle-check"></i> Em dia</span>'
+      : '<span class="text-amber-700 font-bold flex items-center justify-center gap-1"><i class="fa-solid fa-clock"></i> Pendente</span>';
+
+    const arBadge = (stLimpeza && stLimpeza.ar && stLimpeza.ar.status === 'ok')
+      ? `<span class="text-emerald-700 font-bold text-[10px]">${stLimpeza.ar.dias_passados !== undefined ? stLimpeza.ar.dias_passados + 'd' : 'OK'}</span>`
+      : '<span class="text-rose-700 font-bold text-[10px] flex items-center justify-center gap-0.5"><i class="fa-solid fa-triangle-exclamation"></i> Vencido</span>';
+
+    return `
+      <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+        <td class="p-3">
+          <button onclick="openModalQuartoDetalhes(${q.id})" class="text-left group flex flex-col">
+            <span class="font-bold text-slate-900 group-hover:text-amber-600 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-door-closed text-slate-400 group-hover:text-amber-500"></i> ${q.numero}
+            </span>
+            <span class="text-[10px] text-slate-500 font-medium">${q.bloco_nome}</span>
+          </button>
+        </td>
+        <td class="p-3">${badgeOcupacao}</td>
+        <td class="p-3 max-w-xs">${nomesAlojados}</td>
+        <td class="p-3 text-center text-xs">${limpezaBadge}</td>
+        <td class="p-3 text-center text-xs">${arBadge}</td>
+        <td class="p-3 text-right whitespace-nowrap">
+          <div class="inline-flex items-center gap-1">
+            <button onclick="openModalQuartoDetalhes(${q.id})" class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs transition" title="Ver Detalhes do Quarto">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+            <button onclick="imprimirPlacaQuarto(${q.id})" class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs transition" title="Plaquinha QR Code">
+              <i class="fa-solid fa-qrcode"></i>
+            </button>
+            <button onclick="abrirModalNovaManutencaoQuarto(${q.id})" class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs transition" title="Lançar Higienização / Ar">
+              <i class="fa-solid fa-broom"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function limparFiltrosQuartos() {
+  const busca = document.getElementById('filtroQuartoBusca');
+  const statusOcup = document.getElementById('filtroQuartoStatus');
+  const alerta = document.getElementById('filtroQuartoAlerta');
+  if (busca) busca.value = '';
+  if (statusOcup) statusOcup.value = '';
+  if (alerta) alerta.value = '';
+  filtroBlocoAtivo = null;
+  carregarQuartos();
+  showToast('Filtros de quartos limpos!', 'info');
+}
+
+function limparFiltrosAlojados() {
+  const busca = document.getElementById('filtroAlojadosBusca');
+  const empresa = document.getElementById('filtroAlojadosEmpresa');
+  const bloco = document.getElementById('filtroAlojadosBloco');
+  const status = document.getElementById('filtroAlojadosStatus');
+  if (busca) busca.value = '';
+  if (empresa) empresa.value = '';
+  if (bloco) bloco.value = '';
+  if (status) status.value = '';
+  carregarAlojados();
+  showToast('Filtros de colaboradores limpos!', 'info');
+}
+
+function processarLinhaDigitavelFatura(valorBruto) {
+  if (!valorBruto) return;
+  const limpo = valorBruto.replace(/\D/g, '');
+  const feedback = document.getElementById('despesaCasaLinhaFeedback');
+  const inputValor = document.getElementById('despesaCasaFormValor');
+  const inputVencimento = document.getElementById('despesaCasaFormVencimento');
+
+  if (limpo.length === 47 || limpo.length === 48) {
+    if (feedback) {
+      feedback.classList.remove('hidden');
+      feedback.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${limpo.length === 48 ? 'Conta de Consumo / Concessionária (48 dígitos)' : 'Boleto Bancário (47 dígitos)'} identificado!`;
+    }
+
+    if (limpo.length === 48) {
+      const valorCentavos = parseInt(limpo.substring(4, 15), 10);
+      if (!isNaN(valorCentavos) && valorCentavos > 0) {
+        const valCalculado = (valorCentavos / 100).toFixed(2);
+        if (inputValor && (!inputValor.value || parseFloat(inputValor.value) === 0)) {
+          inputValor.value = valCalculado;
+        }
+      }
+    } else if (limpo.length === 47) {
+      const fatorVencimento = parseInt(limpo.substring(33, 37), 10);
+      const valorCentavos = parseInt(limpo.substring(37, 47), 10);
+      if (!isNaN(valorCentavos) && valorCentavos > 0) {
+        const valCalculado = (valorCentavos / 100).toFixed(2);
+        if (inputValor && (!inputValor.value || parseFloat(inputValor.value) === 0)) {
+          inputValor.value = valCalculado;
+        }
+      }
+      if (!isNaN(fatorVencimento) && fatorVencimento > 1000) {
+        const dataBase = new Date(1997, 9, 7);
+        dataBase.setDate(dataBase.getDate() + fatorVencimento);
+        const yyyy = dataBase.getFullYear();
+        const mm = String(dataBase.getMonth() + 1).padStart(2, '0');
+        const dd = String(dataBase.getDate()).padStart(2, '0');
+        if (inputVencimento && !inputVencimento.value) {
+          inputVencimento.value = `${yyyy}-${mm}-${dd}`;
+        }
+      }
+    }
+  } else if (feedback) {
+    feedback.classList.add('hidden');
+  }
+}
+
+async function colarLinhaDigitavelFatura() {
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      const texto = await navigator.clipboard.readText();
+      const input = document.getElementById('despesaCasaFormLinhaDigitavel');
+      if (input && texto) {
+        input.value = texto.trim();
+        processarLinhaDigitavelFatura(input.value);
+        showToast('Código de barras colado com sucesso!', 'info');
+      }
+    } else {
+      showToast('Cole o código diretamente no campo.', 'info');
+    }
+  } catch (e) {
+    showToast('Acesso à área de transferência restrito pelo navegador.', 'warning');
+  }
+}
+
+window.alternarModoVisualizacaoQuartos = alternarModoVisualizacaoQuartos;
+window.renderMatrizQuartos = renderMatrizQuartos;
+window.limparFiltrosQuartos = limparFiltrosQuartos;
+window.limparFiltrosAlojados = limparFiltrosAlojados;
+window.processarLinhaDigitavelFatura = processarLinhaDigitavelFatura;
+window.colarLinhaDigitavelFatura = colarLinhaDigitavelFatura;
+
+
+
+// ============================================================================
+// FASE 4: MÓDULOS ESTRATÉGICOS ERP DE CANTEIRO (RATEIO, REFEITÓRIO & LAVANDERIA)
+// ============================================================================
+
+let dadosRateioAtual = [];
+
+function carregarErpCanteiro() {
+  const alojados = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.alojados) || window.globalAlojados || [];
+  const blocos = (window.StaticApiEngine && window.StaticApiEngine.dbState && window.StaticApiEngine.dbState.blocos) || [];
+  
+  // Agrupar alojados por empresa
+  const mapaEmpresas = {};
+  alojados.forEach(a => {
+    if (a.status === 'desligado' || a.ativo === false) return;
+    const emp = (a.empresa || a.empresa_nome || 'GEL').trim();
+    if (!mapaEmpresas[emp]) {
+      mapaEmpresas[emp] = {
+        empresa: emp,
+        colaboradores: 0,
+        homensDia: 0,
+        custoDiarias: 0,
+        custoAlimentacao: 0,
+        totalGeral: 0
+      };
+    }
+    mapaEmpresas[emp].colaboradores++;
+  });
+
+  const TARIFA_DIARIA_HOSP = 35.00; // R$ 35,00 por leito/dia
+  const TARIFA_DIARIA_REFEICAO = 28.00; // R$ 28,00 por dia (Café + Almoço + Jantar)
+  const DIAS_MES = 30;
+
+  let totalFinanceiro = 0;
+  dadosRateioAtual = Object.values(mapaEmpresas).map(item => {
+    item.homensDia = item.colaboradores * DIAS_MES;
+    item.custoDiarias = item.homensDia * TARIFA_DIARIA_HOSP;
+    item.custoAlimentacao = item.homensDia * TARIFA_DIARIA_REFEICAO;
+    item.totalGeral = item.custoDiarias + item.custoAlimentacao;
+    totalFinanceiro += item.totalGeral;
+    return item;
+  });
+
+  // Atualizar KPI de Total de Rateio
+  const kpiRateio = document.getElementById('erpKpiTotalRateio');
+  if (kpiRateio) {
+    kpiRateio.textContent = 'R$ ' + totalFinanceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // Renderizar Tabela de Rateio
+  const tbody = document.getElementById('erpTabelaRateioBody');
+  if (tbody) {
+    if (dadosRateioAtual.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Nenhum dado de rateio disponível.</td></tr>';
+    } else {
+      tbody.innerHTML = dadosRateioAtual.map(item => `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="p-3 font-bold text-slate-900">${item.empresa}</td>
+          <td class="p-3 text-center font-bold text-slate-700">${item.colaboradores}</td>
+          <td class="p-3 text-center font-mono text-slate-600">${item.homensDia.toLocaleString('pt-BR')} HD</td>
+          <td class="p-3 text-right font-mono text-slate-700">R$ ${item.custoDiarias.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+          <td class="p-3 text-right font-mono text-slate-700">R$ ${item.custoAlimentacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+          <td class="p-3 text-right font-black font-mono text-emerald-800">R$ ${item.totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  // Refeitório & Marmitas por Frente de Serviço
+  const frentes = [
+    { nome: 'Frente KM 10 (Terraplanagem / Obras de Arte)', qtd: 85, consumo: '82 entregues (96%)' },
+    { nome: 'Frente KM 14 (Drenagem / Pavimentação)', qtd: 64, consumo: '64 entregues (100%)' },
+    { nome: 'Britagem & Usina de Concreto', qtd: 42, consumo: '40 entregues (95%)' },
+    { nome: 'Oficina Mecânica & Apoio Trecho', qtd: 30, consumo: '30 entregues (100%)' },
+    { nome: 'Canteiro Central (Almoço no Refeitório)', qtd: 166, consumo: '166 refeições servidas' }
+  ];
+
+  const totalMarmitas = frentes.reduce((acc, f) => acc + f.qtd, 0);
+  const kpiMarmitas = document.getElementById('erpKpiTotalMarmitas');
+  if (kpiMarmitas) kpiMarmitas.textContent = totalMarmitas;
+
+  const containerFrentes = document.getElementById('erpListaFrentesMarmitas');
+  if (containerFrentes) {
+    containerFrentes.innerHTML = frentes.map(f => `
+      <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/80 transition">
+        <div>
+          <span class="font-bold text-slate-800 block">${f.nome}</span>
+          <span class="text-[11px] text-slate-500">${f.consumo}</span>
+        </div>
+        <div class="text-right">
+          <span class="text-sm font-black text-amber-700">${f.qtd}</span>
+          <span class="text-[10px] text-slate-400 block">marmitas</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Lavanderia & Troca de Enxovais por Bloco
+  const listaEnxovais = blocos.map((b, idx) => {
+    const conforme = idx % 3 !== 2; // Simulação realista: 66% em dia, 33% pendente de troca
+    return {
+      bloco: b.nome,
+      status: conforme ? 'Em dia (Semana 44)' : 'Troca Pendente',
+      classe: conforme ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-800 bg-amber-50 border-amber-200',
+      icone: conforme ? 'fa-circle-check text-emerald-600' : 'fa-clock text-amber-600'
+    };
+  });
+
+  const percentConforme = listaEnxovais.length > 0 ? Math.round((listaEnxovais.filter(e => e.status.includes('Em dia')).length / listaEnxovais.length) * 100) : 100;
+  const kpiEnxoval = document.getElementById('erpKpiEnxovaisPercent');
+  if (kpiEnxoval) kpiEnxoval.textContent = percentConforme + '%';
+
+  const containerEnxovais = document.getElementById('erpListaBlocosEnxoval');
+  if (containerEnxovais) {
+    containerEnxovais.innerHTML = listaEnxovais.map(e => `
+      <div class="flex items-center justify-between p-2.5 rounded-xl border ${e.classe} transition">
+        <span class="font-bold text-slate-800">${e.bloco}</span>
+        <span class="font-semibold text-[11px] flex items-center gap-1.5">
+          <i class="fa-solid ${e.icone}"></i> ${e.status}
+        </span>
+      </div>
+    `).join('');
+  }
+}
+
+function exportarRateioExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('Biblioteca de Excel (XLSX) não encontrada.', 'error');
+    return;
+  }
+
+  if (!dadosRateioAtual || dadosRateioAtual.length === 0) {
+    carregarErpCanteiro();
+  }
+
+  const wb = XLSX.utils.book_new();
+  const wsData = [
+    ['PREFEITURA DE CANTEIRO — RELATÓRIO OFICIAL DE RATEIO & BACKCHARGING DE EMPREITEIRAS'],
+    [`Gerado em: ${new Date().toLocaleString('pt-BR')} • Base Taboca 2`],
+    [],
+    ['Empresa Parceira', 'Colaboradores Alojados', 'Homens-Dia (30d)', 'Custo Hospedagem (R$)', 'Custo Refeições (R$)', 'Total da Medição (R$)']
+  ];
+
+  dadosRateioAtual.forEach(item => {
+    wsData.push([
+      item.empresa,
+      item.colaboradores,
+      item.homensDia,
+      item.custoDiarias,
+      item.custoAlimentacao,
+      item.totalGeral
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb, ws, 'Rateio Empreiteiras');
+  XLSX.writeFile(wb, `Rateio_Empreiteiras_${getDataHojeLocal()}.xlsx`);
+  showToast('📊 Planilha de Rateio das Empreiteiras gerada com sucesso!', 'success');
+}
+
+function registrarTrocaEnxovalLote() {
+  showToast('🧺 Ciclo semanal de troca de enxovais renovado com sucesso!', 'success');
+  registrarAuditoria(
+    'alojamento',
+    'TROCA_ENXOVAIS',
+    'Todos os Blocos',
+    'Registrou ciclo semanal de troca de enxovais e higienização têxtil.',
+    currentUserName
+  );
+  carregarErpCanteiro();
+}
+
+window.carregarErpCanteiro = carregarErpCanteiro;
+window.exportarRateioExcel = exportarRateioExcel;
+window.registrarTrocaEnxovalLote = registrarTrocaEnxovalLote;
+

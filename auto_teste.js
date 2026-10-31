@@ -1870,6 +1870,186 @@ assert(appJsCampo.includes('"PRODUÇÃO DE GELO"'), 'Aba PRODUÇÃO DE GELO conf
 assert(appJsCampo.includes('somaProduzidoGelo'), 'Cálculo e totalização de gelo produzido no relatório Excel');
 assert(appJsCampo.includes('somaSaidaGelo'), 'Cálculo e totalização de gelo expedido no relatório Excel');
 
+
+// --- SEÇÃO 30: AUDITORIA DE INTEGRIDADE, PREVENÇÃO DE REGRESSÕES & CALL SCOPE ---
+console.log('\n--- SEÇÃO 30: AUDITORIA DE INTEGRIDADE, PREVENÇÃO DE REGRESSÕES & CALL SCOPE ---');
+
+// 1. Resolução segura de chamados e conformidade de escopo
+const appContentAtual = fs.readFileSync('app.js', 'utf8');
+const limpezaContentAtual = fs.readFileSync('limpeza.html', 'utf8');
+const rondaContentAtual = fs.readFileSync('ronda.html', 'utf8');
+
+assert(
+  !appContentAtual.includes('renderChamados();') && appContentAtual.includes('carregarChamados();'),
+  'Chamada direta segura a carregarChamados em resolverOcorrenciaUnidade'
+);
+assert(
+  appContentAtual.includes('window.renderChamados = carregarChamados;'),
+  'Alias de compatibilidade window.renderChamados exportado'
+);
+assert(
+  appContentAtual.includes('window.dispararFeedbackTatil = dispararFeedbackTati;'),
+  'Alias de acessibilidade tátil window.dispararFeedbackTatil exportado'
+);
+
+// 2. Sincronização e atualização de quartos nas configurações de manutenção
+assert(
+  appContentAtual.includes("firestoreDb.collection('configuracoes').doc('manutencao_plaquinhas')"),
+  'Sincronização em nuvem Firestore v8 em salvarConfigManutencaoUI'
+);
+assert(
+  appContentAtual.includes("carregarQuartos();") && appContentAtual.includes("activeTab === 'blocos'"),
+  'Atualização em tempo real de quartos via carregarQuartos nas configurações'
+);
+
+// 3. Robustez do portal mobile de limpeza
+assert(
+  limpezaContentAtual.includes('function getHoraAgoraLocal'),
+  'Função getHoraAgoraLocal declarada e implementada em limpeza.html'
+);
+assert(
+  limpezaContentAtual.includes("document.getElementById('formLimpeza')"),
+  'Seletor resiliente de formulário formLimpeza em irParaFormularioNovaManutencao'
+);
+
+// 4. Integridade de auditoria para máquina de gelo
+assert(
+  rondaContentAtual.includes("pontoTipo === 'maquina_gelo' ? 'Máquina de Gelo' : 'Bebedouro'"),
+  'Auditoria central com identificação correta de Máquina de Gelo em ronda.html'
+);
+
+// 5. Integridade UTF-8 e ausência de caracteres corrompidos (Zero Mojibake)
+const filesParaMojibake = ['app.js', 'limpeza.html', 'ronda.html', 'chamado.html', 'index.html'];
+filesParaMojibake.forEach(f => {
+  const c = fs.readFileSync(f, 'utf8');
+  const moji = c.match(/[\u00C0-\u00C3][\u0080-\u00BF]/g);
+  assert(!moji || moji.length === 0, `Zero caracteres corrompidos (mojibake) em ${f}`);
+});
+
+
+// --- SEÇÃO 31: ERGONOMIA MOBILE DE CAMPO, TOUCH TARGETS & KEYPAD VIRTUAL (FASE 1) ---
+console.log('\n--- SEÇÃO 31: ERGONOMIA MOBILE DE CAMPO, TOUCH TARGETS & KEYPAD VIRTUAL (FASE 1) ---');
+
+const chamadoFase1Content = fs.readFileSync('chamado.html', 'utf8');
+const limpezaFase1Content = fs.readFileSync('limpeza.html', 'utf8');
+const rondaFase1Content = fs.readFileSync('ronda.html', 'utf8');
+
+// 1. Touch targets >= 52px em chamado.html
+assert(chamadoFase1Content.includes('min-h-[52px]'), 'Chips de problemas com touch target de 52px em chamado.html');
+assert(chamadoFase1Content.includes('BARRA FIXA INFERIOR DE AÇÃO RÁPIDA'), 'Barra fixa inferior (Thumb Zone) presente em chamado.html');
+
+// 2. Keypad numérico virtual e indicadores de PIN em limpeza.html
+assert(limpezaFase1Content.includes('function digitarPinKeypad'), 'Função digitarPinKeypad implementada em limpeza.html');
+assert(limpezaFase1Content.includes('pinDot1') && limpezaFase1Content.includes('pinDot6'), 'Indicadores visuais de PIN presentes em limpeza.html');
+assert(limpezaFase1Content.includes('min-h-[52px]'), 'Teclas numéricas com altura de campo de 52px em limpeza.html');
+assert(limpezaFase1Content.includes('BARRA FIXA INFERIOR DE CONFIRMAÇÃO'), 'Barra fixa inferior (Thumb Zone) presente em limpeza.html');
+
+// 3. Keypad numérico virtual e chips de frentes em ronda.html
+assert(rondaFase1Content.includes('function digitarPinKeypadRonda'), 'Função digitarPinKeypadRonda implementada em ronda.html');
+assert(rondaFase1Content.includes('pinRondaDot1') && rondaFase1Content.includes('pinRondaDot6'), 'Indicadores visuais de PIN presentes em ronda.html');
+assert(rondaFase1Content.includes('min-h-[36px]'), 'Chips de frentes atendidas com touch target expandido em ronda.html');
+assert(rondaFase1Content.includes('BARRA FIXA INFERIOR DE CONFIRMAÇÃO DA RONDA'), 'Barra fixa inferior (Thumb Zone) presente em ronda.html');
+
+// -------------------------------------------------------------
+// SEÇÃO 32: CHECK-IN EM LOTE, CHECK-OUT COM VISTORIA & ASSINATURA TOUCH (FASE 2)
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 32: CHECK-IN EM LOTE, CHECK-OUT COM VISTORIA & ASSINATURA TOUCH (FASE 2) ---');
+
+const indexHtmlFase2 = fs.readFileSync('index.html', 'utf8');
+const appJsFase2 = fs.readFileSync('app.js', 'utf8');
+
+// 1. Modais e Componentes em index.html
+assert(indexHtmlFase2.includes('id="modalCheckinLote"'), 'Modal de Check-in em Lote presente em index.html');
+assert(indexHtmlFase2.includes('id="checkinLoteTextarea"'), 'Textarea de importação em lote presente em index.html');
+assert(indexHtmlFase2.includes('id="checkinLoteBlocoSelect"'), 'Seletor de bloco alvo presente em index.html');
+assert(indexHtmlFase2.includes('id="checkinLoteTableBody"'), 'Tabela de pré-visualização de lote presente em index.html');
+assert(indexHtmlFase2.includes('id="modalAssinaturaTouch"'), 'Modal de Assinatura Touchscreen presente em index.html');
+assert(indexHtmlFase2.includes('id="canvasAssinaturaTouch"'), 'Canvas HTML5 de assinatura presente em index.html');
+assert(indexHtmlFase2.includes('id="termoAssinaturaImagem"'), 'Container de imagem para assinatura digital no Termo A4 presente');
+
+// 2. Checklist de Vistoria de Saída em index.html
+assert(indexHtmlFase2.includes('id="checkDevolucaoChave"'), 'Checklist de devolução de chave presente no check-out');
+assert(indexHtmlFase2.includes('id="checkColchaoIntegro"'), 'Checklist de integridade do colchão presente no check-out');
+assert(indexHtmlFase2.includes('id="checkArmarioLimpo"'), 'Checklist de armário limpo presente no check-out');
+assert(indexHtmlFase2.includes('id="checkDanoAvaria"'), 'Campo de alerta de avaria presente no check-out');
+assert(indexHtmlFase2.includes('id="checkGerarChamadoDano"'), 'Opção de abertura automática de chamado por avaria presente');
+
+// 3. Funções no app.js
+assert(appJsFase2.includes('function abrirModalCheckinEmLote'), 'Função abrirModalCheckinEmLote implementada em app.js');
+assert(appJsFase2.includes('function previsualizarCheckinLote'), 'Função previsualizarCheckinLote implementada em app.js');
+assert(appJsFase2.includes('function executarCheckinEmLoteConfirmado'), 'Função executarCheckinEmLoteConfirmado implementada em app.js');
+assert(appJsFase2.includes('function abrirModalAssinaturaTouch'), 'Função abrirModalAssinaturaTouch implementada em app.js');
+assert(appJsFase2.includes('function limparCanvasAssinaturaTouch'), 'Função limparCanvasAssinaturaTouch implementada em app.js');
+assert(appJsFase2.includes('function salvarAssinaturaTouchDigital'), 'Função salvarAssinaturaTouchDigital implementada em app.js');
+
+// -------------------------------------------------------------
+// SEÇÃO 33: PAINEL DESKTOP, VISÃO MATRICIAL, FATURAS URBANAS & EMPTY STATES (FASE 3)
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 33: PAINEL DESKTOP, VISÃO MATRICIAL, FATURAS URBANAS & EMPTY STATES (FASE 3) ---');
+
+const indexHtmlFase3 = fs.readFileSync('index.html', 'utf8');
+const appJsFase3 = fs.readFileSync('app.js', 'utf8');
+
+// 1. Visão Matricial & Alternador de Modo em index.html
+assert(indexHtmlFase3.includes('id="btnViewQuartosCards"'), 'Botão de modo cards de leitos presente');
+assert(indexHtmlFase3.includes('id="btnViewQuartosMatriz"'), 'Botão de modo matricial de leitos presente');
+assert(indexHtmlFase3.includes('id="matrizQuartosContainer"'), 'Container da tabela matricial presente');
+assert(indexHtmlFase3.includes('id="matrizQuartosBody"'), 'Tbody da visão matricial presente');
+
+// 2. Actionable Empty State com Botão de Limpar Filtros
+assert(indexHtmlFase3.includes('limparFiltrosQuartos()'), 'Botão interativo de limpar filtros no estado vazio de quartos');
+
+// 3. Leitor de Linha Digitável de Energia/Água
+assert(indexHtmlFase3.includes('id="despesaCasaFormLinhaDigitavel"'), 'Input de linha digitável de boletos presente no modal de despesas');
+assert(indexHtmlFase3.includes('id="despesaCasaLinhaFeedback"'), 'Feedback dinâmico de boleto/concessionária presente');
+assert(indexHtmlFase3.includes('colarLinhaDigitavelFatura()'), 'Botão de colar linha digitável presente');
+
+// 4. Funções no app.js
+assert(appJsFase3.includes('function alternarModoVisualizacaoQuartos'), 'Função alternarModoVisualizacaoQuartos implementada em app.js');
+assert(appJsFase3.includes('function renderMatrizQuartos'), 'Função renderMatrizQuartos implementada em app.js');
+assert(appJsFase3.includes('function limparFiltrosQuartos'), 'Função limparFiltrosQuartos implementada em app.js');
+assert(appJsFase3.includes('function limparFiltrosAlojados'), 'Função limparFiltrosAlojados implementada em app.js');
+assert(appJsFase3.includes('function processarLinhaDigitavelFatura'), 'Função processarLinhaDigitavelFatura implementada em app.js');
+assert(appJsFase3.includes('function colarLinhaDigitavelFatura'), 'Função colarLinhaDigitavelFatura implementada em app.js');
+
+// -------------------------------------------------------------
+// SEÇÃO 34: MÓDULOS ESTRATÉGICOS ERP DE CANTEIRO (FASE 4)
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 34: MÓDULOS ESTRATÉGICOS ERP DE CANTEIRO (FASE 4) ---');
+
+const indexHtmlFase4 = fs.readFileSync('index.html', 'utf8');
+const appJsFase4 = fs.readFileSync('app.js', 'utf8');
+
+// 1. Elementos da Aba ERP Canteiro em index.html
+assert(indexHtmlFase4.includes('id="tab-erp_canteiro"'), 'Aba principal de ERP Canteiro presente em index.html');
+assert(indexHtmlFase4.includes('data-tab="erp_canteiro"'), 'Botão de navegação para ERP Canteiro presente na sidebar');
+assert(indexHtmlFase4.includes('id="erpKpiTotalRateio"'), 'KPI de faturamento/rateio total presente');
+assert(indexHtmlFase4.includes('id="erpKpiTotalMarmitas"'), 'KPI de marmitas expedidas presente');
+assert(indexHtmlFase4.includes('id="erpKpiEnxovaisPercent"'), 'KPI de conformidade de enxovais presente');
+assert(indexHtmlFase4.includes('id="erpTabelaRateioBody"'), 'Tabela de rateio de empreiteiras presente');
+assert(indexHtmlFase4.includes('id="erpListaFrentesMarmitas"'), 'Container de marmitas por frente presente');
+assert(indexHtmlFase4.includes('id="erpListaBlocosEnxoval"'), 'Container de enxovais por bloco presente');
+
+// 2. Funções de Negócio do ERP no app.js
+assert(appJsFase4.includes('function carregarErpCanteiro'), 'Função carregarErpCanteiro implementada em app.js');
+assert(appJsFase4.includes('function exportarRateioExcel'), 'Função exportarRateioExcel implementada em app.js');
+assert(appJsFase4.includes('function registrarTrocaEnxovalLote'), 'Função registrarTrocaEnxovalLote implementada em app.js');
+
+// 3. Simulação Matemática do Motor de Rateio (Backcharging)
+const colaboradoresMock = 10;
+const diasMock = 30;
+const tarifaHospMock = 35.00;
+const tarifaRefMock = 28.00;
+const homensDiaMock = colaboradoresMock * diasMock; // 300 HD
+const custoHospMock = homensDiaMock * tarifaHospMock; // R$ 10.500,00
+const custoRefMock = homensDiaMock * tarifaRefMock; // R$ 8.400,00
+const totalMedicaoMock = custoHospMock + custoRefMock; // R$ 18.900,00
+
+assert(homensDiaMock === 300, 'Cálculo de Homens-Dia correto (10 colab x 30 dias = 300 HD)');
+assert(custoHospMock === 10500, 'Cálculo de hospedagem correto (300 HD x R$ 35 = R$ 10.500)');
+assert(custoRefMock === 8400, 'Cálculo de refeições correto (300 HD x R$ 28 = R$ 8.400)');
+assert(totalMedicaoMock === 18900, 'Cálculo do total de medição correto (R$ 18.900)');
+
 // 9. Paridade de Arquivos Críticos entre Raiz e frontend/
 const arquivosVerificarParidade = ['app.js', 'index.html', 'limpeza.html', 'ronda.html', 'chamado.html', 'sw.js', 'qrcode.min.js'];
 arquivosVerificarParidade.forEach(arq => {

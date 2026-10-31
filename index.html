@@ -314,17 +314,16 @@
         </div>
 
         <!-- Botão Instalar App (PWA) no Celular e PC -->
-        <button id="btnInstalarAppHeader" onclick="iniciarInstalacaoApp()" class="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Instalar aplicativo no celular ou computador">
+        <!-- Botão Instalar App (PWA) - Oculto no celular para evitar sobreposição, acessível em Configurações -->
+        <button id="btnInstalarAppHeader" onclick="iniciarInstalacaoApp()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Instalar aplicativo no computador">
           <i class="fa-solid fa-download text-xs"></i>
-          <span class="hidden sm:inline">Baixar App</span>
-          <span class="sm:hidden text-[11px]">App</span>
+          <span>Baixar App</span>
         </button>
 
-        <!-- Botão Sincronizar Nuvem (PC e Celular) -->
-        <button id="btnSyncNuvemHeader" onclick="sincronizarComNuvemHeader()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Sincronizar com a Nuvem (Atualizar Celular e PC)">
+        <!-- Botão Sincronizar Nuvem (Desktop) -->
+        <button id="btnSyncNuvemHeader" onclick="sincronizarComNuvemHeader()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-bold text-xs shadow-sm transition transform active:scale-95 cursor-pointer flex-shrink-0" title="Sincronizar com a Nuvem (Atualizar Celular e PC)">
           <i class="fa-solid fa-cloud-arrow-down text-xs" id="iconSyncNuvemHeader"></i>
-          <span class="hidden sm:inline">Sincronizar Nuvem</span>
-          <span class="sm:hidden text-[11px]">Nuvem</span>
+          <span>Sincronizar Nuvem</span>
         </button>
 
         <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original (Desktop) -->
@@ -446,6 +445,12 @@
           <i class="fa-solid fa-boxes-stacked w-5 text-teal-400"></i>
           <span>Estoque & Almoxarifado</span>
           <span id="sideCountEstoque" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
+        </button>
+
+        <button onclick="switchTab('erp_canteiro')" data-tab="erp_canteiro" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-file-invoice-dollar w-5 text-emerald-400"></i>
+          <span>Rateio & Canteiro ERP</span>
+          <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase">Pro</span>
         </button>
 
         <div class="px-3 pt-4 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -866,7 +871,16 @@
               <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Com Vagas</span>
               <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Quase Cheio</span>
               <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Lotado</span>
-            </div>
+            
+            <!-- Alternador de Modo de Visualização (Fase 3) -->
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button type="button" id="btnViewQuartosCards" onclick="alternarModoVisualizacaoQuartos('cards')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs" title="Visualização em Cards">
+                <i class="fa-solid fa-grip"></i> <span class="hidden sm:inline">Cards</span>
+              </button>
+              <button type="button" id="btnViewQuartosMatriz" onclick="alternarModoVisualizacaoQuartos('matriz')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900" title="Visualização Matricial Compacta (Lista)">
+                <i class="fa-solid fa-table-list"></i> <span class="hidden sm:inline">Matriz</span>
+              </button>
+            </div></div>
           </div>
         </div>
 
@@ -875,13 +889,41 @@
           <!-- Populado via Javascript -->
         </div>
 
-        <!-- Estado Vazio -->
-        <div id="quartosVazio" class="hidden bg-white p-12 rounded-xl text-center border border-slate-200">
-          <i class="fa-solid fa-magnifying-glass text-4xl text-slate-300 mb-3"></i>
-          <h3 class="text-base font-bold text-slate-700">Nenhum quarto encontrado</h3>
-          <p class="text-xs text-slate-400 mt-1">Tente ajustar seus termos de busca ou filtros de bloco acima.</p>
+        <!-- Visão Matricial Compacta dos Leitos (Fase 3: Alta Densidade de Informação) -->
+        <div id="matrizQuartosContainer" class="hidden bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900 text-white uppercase text-[11px] tracking-wider sticky top-0">
+                <tr>
+                  <th class="p-3">Bloco & Quarto</th>
+                  <th class="p-3">Ocupação / Vagas</th>
+                  <th class="p-3">Moradores Alocados</th>
+                  <th class="p-3 text-center">Higienização</th>
+                  <th class="p-3 text-center">Ar-Condicionado</th>
+                  <th class="p-3 text-right">Ações Rápidas</th>
+                </tr>
+              </thead>
+              <tbody id="matrizQuartosBody" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
         </div>
 
+        <!-- Estado Vazio -->
+        <div id="quartosVazio" class="hidden bg-white p-10 sm:p-12 rounded-2xl text-center border border-slate-200 shadow-xs">
+          <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-2xl mb-3 border border-amber-200">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Nenhum leito ou quarto encontrado</h3>
+          <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Não encontramos quartos que correspondam aos filtros ou termo pesquisado.</p>
+          <div class="mt-4 flex items-center justify-center gap-2">
+            <button type="button" onclick="limparFiltrosQuartos()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5">
+              <i class="fa-solid fa-rotate-left"></i> Limpar Filtros
+            </button>
+            <button type="button" onclick="openModalNovoQuarto()" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition flex items-center gap-1.5">
+              <i class="fa-solid fa-plus"></i> Novo Quarto
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- ================= TAB 3: GESTÃO DE ALOJADOS ================= -->
@@ -2209,6 +2251,29 @@
               <i class="fa-solid fa-file-excel"></i> Exportar Planilha Oficial
             </button>
           </div>
+        </div>
+
+        
+        <!-- CARD OFICIAL DE INSTALAÇÃO DO APP (PWA) EM CONFIGURAÇÕES -->
+        <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 sm:p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-2xl flex-shrink-0">
+              <i class="fa-solid fa-mobile-screen-button"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="font-bold text-white text-base">Instalar Aplicativo Oficial no Dispositivo (PWA)</h3>
+                <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold uppercase">Celular & PC</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-1 max-w-xl">
+                Instale o sistema como aplicativo nativo no celular Android/iOS ou computador. Permite acesso em 1 toque pela tela inicial, tela cheia e funcionamento offline para uso nas frentes de canteiro.
+              </p>
+            </div>
+          </div>
+          <button type="button" onclick="iniciarInstalacaoApp()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 active:scale-95 text-slate-950 font-extrabold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer">
+            <i class="fa-solid fa-download"></i>
+            <span>Instalar Aplicativo Oficial</span>
+          </button>
         </div>
 
         <!-- SEÇÃO: BACKUP COMPLETO & RESTAURAÇÃO SEGURA (1 CLIQUE) -->
@@ -3595,6 +3660,131 @@ service cloud.firestore {
           <span>Criado por Eullon</span>
         </div>
       </footer>
+    
+      <!-- ================= TAB: ERP CANTEIRO & RATEIO (FASE 4) ================= -->
+      <div id="tab-erp_canteiro" class="tab-content hidden space-y-6">
+        
+        <!-- Header & Ações -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
+                <i class="fa-solid fa-calculator text-emerald-600 mr-1"></i> ERP Canteiro Pro
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Rateio Financeiro, Refeitório & Lavanderia</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Controle avançado de backcharging para medições de empreiteiras, expedição de marmitas de campo e ciclo semanal de enxovais.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="exportarRateioExcel()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-file-excel"></i> Exportar Rateio Excel
+            </button>
+            <button onclick="carregarErpCanteiro()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-rotate"></i> Recalcular
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 KPIs Estratégicos do ERP -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Faturamento Estimado / Rateio</span>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="erpKpiTotalRateio" class="text-2xl font-black text-emerald-700">R$ --</span>
+              <span class="text-xs text-slate-400">no mês corrente</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">Hospedagem + Alimentação calculados por Homem-Dia</p>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Marmitas Expedidas Hoje</span>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="erpKpiTotalMarmitas" class="text-2xl font-black text-amber-600">--</span>
+              <span class="text-xs text-slate-400">marmitas</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">Frentes de Serviço (KM 10, KM 14, Britagem)</p>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Enxovais em Conformidade</span>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="erpKpiEnxovaisPercent" class="text-2xl font-black text-sky-700">--%</span>
+              <span class="text-xs text-slate-400">dos quartos</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">Troca semanal de roupas de cama e banho</p>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 1: MOTOR DE RATEIO FINANCEIRO (BACKCHARGING DE PARCEIRAS) -->
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+          <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <i class="fa-solid fa-file-invoice-dollar text-emerald-400 text-lg"></i>
+              <div>
+                <h3 class="text-sm font-bold">Motor de Rateio Financeiro das Empreiteiras</h3>
+                <p class="text-xs text-slate-400">Cálculo de diárias de alojamento e alimentação para medição contratual</p>
+              </div>
+            </div>
+            <div class="text-xs text-slate-300 font-mono">Tarifa Base: R$ 35/dia Hosp. | R$ 28/dia Ref.</div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-700 border-b border-slate-200 text-[11px] uppercase tracking-wider">
+                <tr>
+                  <th class="p-3">Empresa Parceira</th>
+                  <th class="p-3 text-center">Colaboradores</th>
+                  <th class="p-3 text-center">Homens-Dia (30d)</th>
+                  <th class="p-3 text-right">Diárias Leito (R$)</th>
+                  <th class="p-3 text-right">Alimentação (R$)</th>
+                  <th class="p-3 text-right font-black text-emerald-900">Total a Medir / Descontar</th>
+                </tr>
+              </thead>
+              <tbody id="erpTabelaRateioBody" class="divide-y divide-slate-100 font-medium">
+                <!-- Populado via Javascript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2 & 3: REFEITÓRIO, MARMITAS & LAVANDERIA INDUSTRIAL -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-utensils text-amber-500"></i>
+                <h3 class="text-sm font-bold text-slate-900">Marmitas de Campo por Frente de Serviço</h3>
+              </div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800">Hoje</span>
+            </div>
+
+            <div class="space-y-3 text-xs" id="erpListaFrentesMarmitas">
+              <!-- Populado via Javascript -->
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-shirt text-sky-500"></i>
+                <h3 class="text-sm font-bold text-slate-900">Ciclo Semanal de Enxovais por Bloco</h3>
+              </div>
+              <button onclick="registrarTrocaEnxovalLote()" class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold transition">
+                <i class="fa-solid fa-check-double mr-1"></i> Renovar Semana
+              </button>
+            </div>
+
+            <div class="space-y-2.5 text-xs" id="erpListaBlocosEnxoval">
+              <!-- Populado via Javascript -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
     </main>
   </div>
 
@@ -3788,6 +3978,9 @@ service cloud.firestore {
           <div class="pt-4 border-t-2 border-slate-800">
             <div class="grid grid-cols-2 gap-8 text-center text-[10px]">
               <div>
+                <div id="termoContainerAssinaturaDigital" class="h-12 w-48 mx-auto flex items-center justify-center mb-0.5">
+                    <img id="termoAssinaturaImagem" src="" alt="Assinatura Digital" class="max-h-12 max-w-full object-contain hidden">
+                  </div>
                 <div class="border-b border-slate-900 pb-1 mb-1 mx-4"></div>
                 <p class="font-bold text-slate-900 uppercase" id="termoAssinaturaMorador">Assinatura do Colaborador</p>
                 <p class="text-[9px] text-slate-500" id="termoDocMorador">CPF / Matrícula</p>
@@ -3810,6 +4003,9 @@ service cloud.firestore {
       <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between no-print flex-shrink-0">
         <span class="text-xs text-slate-500">Pressione <b>Imprimir</b> para gerar a folha física ou salvar em PDF.</span>
         <div class="flex items-center gap-2">
+          <button type="button" onclick="abrirModalAssinaturaTouch()" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs">
+            <i class="fa-solid fa-signature"></i> Assinar na Tela (Touch)
+          </button>
           <button onclick="imprimirTermoResponsabilidadeAtual()" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition shadow-xs">
             <i class="fa-solid fa-print"></i> Imprimir Documento A4
           </button>
@@ -4179,29 +4375,80 @@ service cloud.firestore {
         </button>
       </div>
 
-      <form id="formDesligar" onsubmit="confirmarDesligamento(event)" class="p-6 space-y-4">
+      <form id="formDesligar" onsubmit="confirmarDesligamento(event)" class="p-5 space-y-3.5">
         <input type="hidden" id="desligarAlojadoId">
         
-        <p class="text-xs text-slate-600">
-          Ao registrar a saída de <b id="desligarNome" class="text-slate-900">--</b>, a vaga ocupada será <b class="text-emerald-700">liberada imediatamente</b> e o histórico do colaborador será mantido para consultas.
-        </p>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
+          <p class="text-slate-700">Colaborador: <b id="desligarNome" class="text-slate-900 text-sm">--</b></p>
+          <p class="text-[11px] text-slate-500">A vaga ocupada será <b class="text-emerald-700">liberada imediatamente</b> no mapa de leitos.</p>
+        </div>
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-700">Data de Saída *</label>
-          <input type="date" id="desligarData" required class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Data de Saída *</label>
+            <input type="date" id="desligarData" required class="w-full py-2 px-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 font-semibold">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Motivo da Saída</label>
+            <select id="desligarMotivoSelect" onchange="document.getElementById('desligarMotivo').value = this.value" class="w-full py-2 px-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 font-medium">
+              <option value="Conclusão de atividades no canteiro">Conclusão de atividades</option>
+              <option value="Transferência de canteiro / obra">Transferência de obra</option>
+              <option value="Desligamento da empresa parceira">Desligamento de parceira</option>
+              <option value="Solicitação do morador">Solicitação própria</option>
+              <option value="Outro motivo">Outro motivo</option>
+            </select>
+          </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700">Motivo da Saída</label>
-          <input type="text" id="desligarMotivo" placeholder="Ex: Conclusão de contrato, transferência de obra..." class="w-full py-2 px-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+          <input type="text" id="desligarMotivo" placeholder="Detalhes do motivo (opcional)..." class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500">
         </div>
 
-        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200">
-          <button type="button" onclick="fecharModal('modalDesligar')" class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
+        <!-- Checklist Obrigatório de Vistoria de Saída / Check-out -->
+        <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 space-y-2">
+          <span class="block text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+            <i class="fa-solid fa-clipboard-check text-amber-600"></i> Checklist de Vistoria de Saída
+          </span>
+          <div class="space-y-1.5 text-xs text-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" id="checkDevolucaoChave" checked class="w-4 h-4 rounded text-emerald-600 accent-emerald-600">
+              <span>Chave do armário / quarto devolvida</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" id="checkColchaoIntegro" checked class="w-4 h-4 rounded text-emerald-600 accent-emerald-600">
+              <span>Colchão íntegro e sem avarias</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" id="checkArmarioLimpo" checked class="w-4 h-4 rounded text-emerald-600 accent-emerald-600">
+              <span>Armário desocupado e limpo</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Houve Dano / Avaria -->
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-xs font-bold text-rose-700 cursor-pointer select-none">
+            <input type="checkbox" id="checkDanoAvaria" onchange="document.getElementById('boxDetalhesDanoDesligar').classList.toggle('hidden', !this.checked)" class="w-4 h-4 rounded text-rose-600 accent-rose-600">
+            <span>⚠️ Houve Dano / Avaria no Leito ou Quarto?</span>
+          </label>
+          <div id="boxDetalhesDanoDesligar" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 space-y-2 text-xs">
+            <div>
+              <label class="block font-bold text-rose-900 mb-1">Descrição do Dano / Item Avariado:</label>
+              <input type="text" id="desligarDescricaoDano" placeholder="Ex: Fechadura do armário quebrada, colchão rasgado..." class="w-full py-1.5 px-3 border border-rose-300 rounded-lg text-slate-800 focus:outline-none">
+            </div>
+            <label class="flex items-center gap-2 text-rose-900 font-semibold cursor-pointer select-none">
+              <input type="checkbox" id="checkGerarChamadoDano" checked class="w-4 h-4 accent-rose-600">
+              <span>Gerar chamado urgente de reparo para desconto/medição da parceira</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="fecharModal('modalDesligar')" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition">
             Cancelar
           </button>
-          <button type="submit" class="btn-prefeito px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition">
-            Liberar Vaga e Desligar
+          <button type="submit" class="btn-prefeito px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5">
+            <i class="fa-solid fa-person-walking-arrow-right"></i> Concluir Saída & Liberar
           </button>
         </div>
       </form>
@@ -5757,6 +6004,36 @@ service cloud.firestore {
         <!-- Box Dinâmico da Concessionária (Água / Luz - 2ª Via & UC) -->
         <div id="boxInfoConcessionariaDespesa" class="hidden p-3 rounded-xl bg-amber-50/70 border border-amber-300 transition-all text-xs">
           <!-- Populado via atualizarInfoConcessionariaDespesaForm() -->
+        </div>
+
+        <!-- Leitor / Formatador de Linha Digitável de Fatura / Boleto (Fase 3) -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <i class="fa-solid fa-barcode text-amber-600"></i> Código de Barras / Linha Digitável
+            </label>
+            <span class="text-[10px] text-slate-500 font-medium">Extrai valor e vencimento</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <input 
+              type="text" 
+              id="despesaCasaFormLinhaDigitavel" 
+              oninput="processarLinhaDigitavelFatura(this.value)" 
+              placeholder="Cole a linha digitável do boleto ou conta de luz/água..." 
+              class="w-full py-2 px-3 text-xs font-mono border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+            >
+            <button 
+              type="button" 
+              onclick="colarLinhaDigitavelFatura()" 
+              class="px-2.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 flex-shrink-0" 
+              title="Colar da área de transferência"
+            >
+              <i class="fa-solid fa-paste"></i> Colar
+            </button>
+          </div>
+          <p id="despesaCasaLinhaFeedback" class="text-[11px] text-emerald-700 font-semibold hidden flex items-center gap-1">
+            <i class="fa-solid fa-circle-check"></i> <span>Linha digitável reconhecida com sucesso!</span>
+          </p>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -7799,5 +8076,137 @@ service cloud.firestore {
 
   <!-- Script da Aplicação -->
   <script src="app.js?v=4.9"></script>
+
+  <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
+  <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg border border-teal-500/30">
+            <i class="fa-solid fa-users-gear"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Check-in Rápido em Lote</h3>
+            <p class="text-xs text-slate-400">Alocação automática e consecutiva de vários colaboradores</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalCheckinLote')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Bloco de Alojamento Alvo</label>
+            <select id="checkinLoteBlocoSelect" class="w-full py-2 px-3 bg-white border border-slate-300 rounded-xl font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="">Automático (Primeiras Vagas Livres da Obra)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Empresa Padrão (se não informada na lista)</label>
+            <select id="checkinLoteEmpresaSelect" class="w-full py-2 px-3 bg-white border border-slate-300 rounded-xl font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="GEL">GEL</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="font-bold text-slate-800">Cole a lista de colaboradores (ou digite uma linha por pessoa):</label>
+            <span class="text-[11px] text-slate-500 font-normal">Formato: <b>Nome; Matrícula; Função; Empresa</b></span>
+          </div>
+          <textarea 
+            id="checkinLoteTextarea" 
+            rows="6" 
+            placeholder="Exemplo de preenchimento:&#10;João Carlos da Silva; 10425; Pedreiro; GEL&#10;Antônio Marcos Souza; 10426; Ajudante Prático; FJ TERRAPLANAGEM&#10;Carlos Eduardo Lima; 10427; Eletricista; GEL" 
+            class="w-full p-3 font-mono text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 bg-slate-900 text-teal-300"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center justify-between text-slate-600 pt-1">
+          <p class="text-[11px]">Dica: Você pode copiar direto do Excel (colunas Nome, Matrícula, Função, Empresa) e colar acima.</p>
+          <button type="button" onclick="previsualizarCheckinLote()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-list-check"></i> Pré-visualizar Alocação
+          </button>
+        </div>
+
+        <div id="checkinLotePreviewContainer" class="hidden border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div class="bg-teal-50 px-3.5 py-2 border-b border-teal-100 flex items-center justify-between text-xs font-bold text-teal-900">
+            <span>Pré-visualização das Vagas Reservadas (<span id="checkinLoteQtdPreview">0</span> colaboradores)</span>
+            <span class="text-teal-700 font-normal text-[11px]">Conferir antes de confirmar</span>
+          </div>
+          <div class="max-h-44 overflow-y-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-700 border-b border-slate-200 sticky top-0 text-[11px]">
+                <tr>
+                  <th class="p-2">Colaborador</th>
+                  <th class="p-2">Matrícula</th>
+                  <th class="p-2">Função</th>
+                  <th class="p-2">Empresa</th>
+                  <th class="p-2 text-teal-800">Vaga Atribuída</th>
+                </tr>
+              </thead>
+              <tbody id="checkinLoteTableBody" class="divide-y divide-slate-100 text-[11px]"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+        <button type="button" onclick="fecharModal('modalCheckinLote')" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-xs transition">
+          Cancelar
+        </button>
+        <button type="button" id="btnConfirmarCheckinLote" onclick="executarCheckinEmLoteConfirmado()" class="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-black text-xs flex items-center gap-2 shadow-md transition">
+          <i class="fa-solid fa-user-check"></i>
+          <span>Confirmar Check-in de Todos</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE ASSINATURA TOUCHSCREEN DIGITAL (FASE 2) -->
+  <div id="modalAssinaturaTouch" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg border border-teal-500/30">
+            <i class="fa-solid fa-signature"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Assinatura Digital no Touch</h3>
+            <p class="text-xs text-slate-400">Assine com o dedo ou caneta stylus na área abaixo</p>
+          </div>
+        </div>
+        <button onclick="fecharModal('modalAssinaturaTouch')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-3 text-center">
+        <div class="border-2 border-dashed border-teal-500/80 rounded-2xl p-1 bg-slate-50 relative">
+          <canvas id="canvasAssinaturaTouch" width="460" height="180" class="w-full h-44 bg-white rounded-xl cursor-crosshair touch-none"></canvas>
+          <span class="absolute bottom-2 right-3 text-[10px] text-slate-400 select-none pointer-events-none">Assine sobre a linha</span>
+        </div>
+
+        <div class="flex items-center justify-between text-xs pt-1">
+          <span class="text-slate-500 text-[11px]"><i class="fa-solid fa-shield-halved text-emerald-600 mr-1"></i> A assinatura será incorporada ao Termo A4 oficial.</span>
+          <button type="button" onclick="limparCanvasAssinaturaTouch()" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition flex items-center gap-1">
+            <i class="fa-solid fa-eraser"></i> Limpar
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button type="button" onclick="fecharModal('modalAssinaturaTouch')" class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-xs transition">
+          Cancelar
+        </button>
+        <button type="button" onclick="salvarAssinaturaTouchDigital()" class="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition">
+          <i class="fa-solid fa-check"></i> Salvar Assinatura
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
