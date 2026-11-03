@@ -8272,7 +8272,7 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=5.2"></script>
+  <script src="app.js?v=5.3"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
@@ -8416,7 +8416,7 @@ service cloud.firestore {
             <i class="fa-solid fa-shield-halved text-base"></i>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-white">Cadastrar Ponto de Ronda</h3>
+            <h3 id="modalPontoVigilanciaTitulo" class="text-sm font-bold text-white">Cadastrar Ponto de Ronda</h3>
             <p class="text-[11px] text-slate-400">Segurança Patrimonial & Ronda Noturna</p>
           </div>
         </div>
@@ -8426,6 +8426,7 @@ service cloud.firestore {
       </div>
 
       <form onsubmit="salvarNovoPontoVigilancia(event)" class="p-5 space-y-4 text-xs">
+        <input type="hidden" id="inputIdPontoVigilancia">
         <div>
           <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
             Nome do Local / Ponto *
@@ -8452,7 +8453,7 @@ service cloud.firestore {
             Cancelar
           </button>
           <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-sm flex items-center gap-1.5">
-            <i class="fa-solid fa-check"></i> Salvar Ponto
+            <i class="fa-solid fa-check"></i> <span id="labelSalvarPontoVigilancia">Salvar Ponto</span>
           </button>
         </div>
       </form>

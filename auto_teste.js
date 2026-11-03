@@ -2084,6 +2084,7 @@ assert(indexHtml.includes('id="modalNovoPontoVigilancia"'), 'Modal de novo ponto
 assert(indexHtml.includes('id="modalPlaquinhasA4Vigilancia"'), 'Modal de impressão de plaquinhas A4 presente');
 assert(indexHtml.includes('id="inputNomePontoVigilancia"'), 'Campo inputNomePontoVigilancia presente');
 assert(indexHtml.includes('id="inputRefPontoVigilancia"'), 'Campo inputRefPontoVigilancia presente');
+assert(indexHtml.includes('id="inputIdPontoVigilancia"'), 'Campo inputIdPontoVigilancia para edição presente');
 
 // 2. Validações do Aplicativo Mobile do Vigilante (guarda.html)
 assert(guardaHtml.includes('id="cameraGuardaQR"'), 'Elemento da câmera html5-qrcode presente em guarda.html');
@@ -2098,6 +2099,7 @@ assert(guardaHtml.includes('anti_fraude_'), 'Trava anti-fraude implementada em g
 // 3. Funções no app.js
 assert(appJs.includes('function carregarRondaVigilancia()'), 'Função carregarRondaVigilancia implementada');
 assert(appJs.includes('function abrirModalNovoPontoVigilancia()'), 'Função abrirModalNovoPontoVigilancia implementada');
+assert(appJs.includes('function abrirModalEditarPontoVigilancia('), 'Função abrirModalEditarPontoVigilancia implementada');
 assert(appJs.includes('function salvarNovoPontoVigilancia('), 'Função salvarNovoPontoVigilancia implementada');
 assert(appJs.includes('function excluirPontoVigilancia('), 'Função excluirPontoVigilancia implementada');
 assert(appJs.includes('function imprimirPlaquinhaVigilancia('), 'Função imprimirPlaquinhaVigilancia implementada');

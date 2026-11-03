@@ -10229,7 +10229,7 @@ if ('serviceWorker' in navigator) {
     }
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=5.2')
+    navigator.serviceWorker.register('./sw.js?v=5.3')
       .then(reg => {
         console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
         // Garante que o novo service worker seja verificado imediatamente
@@ -21242,22 +21242,25 @@ function renderizarGridPontosVigilancia() {
   grid.innerHTML = listaPontosVigilancia.map((p, idx) => {
     const cod = p.id || `PNT-${String(idx + 1).padStart(2, '0')}`;
     return `
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-indigo-300 transition flex flex-col justify-between">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:border-indigo-400 hover:shadow-md transition flex flex-col justify-between group">
         <div>
           <div class="flex items-center justify-between mb-2">
-            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-bold text-[11px] border border-indigo-200">${escapeHTML(cod)}</span>
-            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">Ativo</span>
+            <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-bold text-[11px] border border-indigo-200">${escapeHTML(cod)}</span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">Ativo</span>
           </div>
-          <h5 class="text-sm font-bold text-slate-900">${escapeHTML(p.nome)}</h5>
-          <p class="text-xs text-slate-500 mt-1">${escapeHTML(p.referencia || 'Sem referência informada')}</p>
+          <h5 class="text-sm font-bold text-slate-900 group-hover:text-indigo-900 transition">${escapeHTML(p.nome)}</h5>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHTML(p.referencia || 'Sem referência informada')}</p>
         </div>
 
-        <div class="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
-          <button type="button" onclick="imprimirPlaquinhaVigilancia('${p.id}')" class="flex-1 py-1.5 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 transition">
-            <i class="fa-solid fa-print"></i> Plaquinha A4
+        <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100">
+          <button type="button" onclick="imprimirPlaquinhaVigilancia('${p.id}')" class="py-2 px-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 text-[11px] font-bold flex items-center justify-center gap-1 transition shadow-2xs" title="Imprimir Plaquinha A4 com QR Code">
+            <i class="fa-solid fa-print"></i> <span>A4</span>
           </button>
-          <button type="button" onclick="excluirPontoVigilancia('${p.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Excluir Ponto">
-            <i class="fa-regular fa-trash-can"></i>
+          <button type="button" onclick="abrirModalEditarPontoVigilancia('${p.id}')" class="py-2 px-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-800 text-[11px] font-bold flex items-center justify-center gap-1 transition border border-amber-200/60 shadow-2xs" title="Editar Nome ou Referência deste Ponto">
+            <i class="fa-solid fa-pen-to-square text-amber-600"></i> <span>Editar</span>
+          </button>
+          <button type="button" onclick="excluirPontoVigilancia('${p.id}')" class="py-2 px-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 text-[11px] font-bold flex items-center justify-center gap-1 transition border border-rose-200/60 shadow-2xs" title="Excluir Definitivamente este Ponto">
+            <i class="fa-regular fa-trash-can text-rose-600"></i> <span>Apagar</span>
           </button>
         </div>
       </div>
@@ -21267,18 +21270,53 @@ function renderizarGridPontosVigilancia() {
 
 // Modal e cadastro de novo ponto
 function abrirModalNovoPontoVigilancia() {
+  const inId = document.getElementById('inputIdPontoVigilancia');
   const inNome = document.getElementById('inputNomePontoVigilancia');
   const inRef = document.getElementById('inputRefPontoVigilancia');
+  const tit = document.getElementById('modalPontoVigilanciaTitulo');
+  const btnTxt = document.getElementById('labelSalvarPontoVigilancia');
+
+  if (inId) inId.value = '';
   if (inNome) inNome.value = '';
   if (inRef) inRef.value = '';
+  if (tit) tit.textContent = 'Cadastrar Novo Ponto de Ronda';
+  if (btnTxt) btnTxt.textContent = 'Salvar Ponto';
+
+  abrirModal('modalNovoPontoVigilancia');
+  setTimeout(() => document.getElementById('inputNomePontoVigilancia')?.focus(), 150);
+}
+
+// Modal de edição de ponto existente
+function abrirModalEditarPontoVigilancia(id) {
+  const ponto = listaPontosVigilancia.find(p => p.id === id);
+  if (!ponto) {
+    showToast('Ponto de ronda não localizado.', 'warning');
+    return;
+  }
+
+  const inId = document.getElementById('inputIdPontoVigilancia');
+  const inNome = document.getElementById('inputNomePontoVigilancia');
+  const inRef = document.getElementById('inputRefPontoVigilancia');
+  const tit = document.getElementById('modalPontoVigilanciaTitulo');
+  const btnTxt = document.getElementById('labelSalvarPontoVigilancia');
+
+  if (inId) inId.value = ponto.id;
+  if (inNome) inNome.value = ponto.nome || '';
+  if (inRef) inRef.value = ponto.referencia || '';
+  if (tit) tit.textContent = 'Editar Ponto de Ronda';
+  if (btnTxt) btnTxt.textContent = 'Salvar Alterações';
+
   abrirModal('modalNovoPontoVigilancia');
   setTimeout(() => document.getElementById('inputNomePontoVigilancia')?.focus(), 150);
 }
 
 function salvarNovoPontoVigilancia(e) {
   if (e && e.preventDefault) e.preventDefault();
+  const inId = document.getElementById('inputIdPontoVigilancia');
   const inNome = document.getElementById('inputNomePontoVigilancia');
   const inRef = document.getElementById('inputRefPontoVigilancia');
+  
+  const idExistente = inId ? inId.value.trim() : '';
   const nome = inNome ? inNome.value.trim() : '';
 
   if (!nome) {
@@ -21287,6 +21325,35 @@ function salvarNovoPontoVigilancia(e) {
   }
 
   const ref = inRef ? inRef.value.trim() : '';
+
+  // CASO 1: EDIÇÃO DE PONTO EXISTENTE (Preserva o ID para não quebrar QR Codes já impressos!)
+  if (idExistente) {
+    const idx = listaPontosVigilancia.findIndex(p => p.id === idExistente);
+    if (idx !== -1) {
+      listaPontosVigilancia[idx].nome = nome;
+      listaPontosVigilancia[idx].referencia = ref;
+      listaPontosVigilancia[idx].atualizado_em = new Date().toISOString();
+
+      localStorage.setItem('ronda_vigilancia_pontos', JSON.stringify(listaPontosVigilancia));
+
+      if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+        firestoreDb.collection('pontos_vigilancia').doc(idExistente).update({
+          nome: nome,
+          referencia: ref,
+          atualizado_em: new Date().toISOString()
+        })
+        .then(() => console.log('[FIRESTORE] Ponto de vigilância atualizado'))
+        .catch(err => console.warn('[FIRESTORE] Erro ao atualizar no Firestore:', err));
+      }
+
+      fecharModal('modalNovoPontoVigilancia');
+      showToast(`Ponto "${nome}" atualizado com sucesso!`, 'success');
+      renderizarRondaVigilanciaUI();
+      return;
+    }
+  }
+
+  // CASO 2: NOVO PONTO CADASTRADO
   const seq = listaPontosVigilancia.length + 1;
   const novoId = 'PNT-' + String(seq).padStart(2, '0') + '-' + Date.now().toString().slice(-4);
 
@@ -21316,7 +21383,8 @@ function excluirPontoVigilancia(id) {
   const ponto = listaPontosVigilancia.find(p => p.id === id);
   if (!ponto) return;
 
-  if (!confirm(`Deseja realmente remover o ponto "${ponto.nome}"?`)) return;
+  const confirmar = confirm(`⚠️ ATENÇÃO:\n\nDeseja realmente APAGAR o ponto de ronda "${ponto.nome}"?\n\nEsta ação removerá o ponto da lista de verificação.`);
+  if (!confirmar) return;
 
   listaPontosVigilancia = listaPontosVigilancia.filter(p => p.id !== id);
   localStorage.setItem('ronda_vigilancia_pontos', JSON.stringify(listaPontosVigilancia));
@@ -21327,7 +21395,7 @@ function excluirPontoVigilancia(id) {
       .catch(err => console.warn('[FIRESTORE] Excluído offline:', err));
   }
 
-  showToast('Ponto de ronda excluído com sucesso.', 'info');
+  showToast(`Ponto "${ponto.nome}" apagado com sucesso!`, 'info');
   renderizarRondaVigilanciaUI();
 }
 
@@ -21516,6 +21584,7 @@ window.renderizarRondaVigilanciaUI = renderizarRondaVigilanciaUI;
 window.alternarSubAbaVigilancia = alternarSubAbaVigilancia;
 window.renderizarGridPontosVigilancia = renderizarGridPontosVigilancia;
 window.abrirModalNovoPontoVigilancia = abrirModalNovoPontoVigilancia;
+window.abrirModalEditarPontoVigilancia = abrirModalEditarPontoVigilancia;
 window.salvarNovoPontoVigilancia = salvarNovoPontoVigilancia;
 window.excluirPontoVigilancia = excluirPontoVigilancia;
 window.imprimirPlaquinhaVigilancia = imprimirPlaquinhaVigilancia;
