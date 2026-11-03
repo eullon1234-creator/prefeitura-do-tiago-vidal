@@ -28,6 +28,12 @@ function escapeHTML(str) {
     .replace(/'/g, '&#39;');
 }
 
+const escapeHtml = escapeHTML;
+if (typeof window !== 'undefined') {
+  window.escapeHTML = escapeHTML;
+  window.escapeHtml = escapeHTML;
+}
+
 // Cache de Dados
 let globalStats = null;
 let globalBlocos = [];
@@ -21157,7 +21163,7 @@ function renderizarRondaVigilanciaUI() {
         const hora = b.data_hora ? b.data_hora.split(' ')[1] || b.data_hora : '--:--';
         const temOc = b.tem_ocorrencia;
         const statusHtml = temOc 
-          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1 w-fit"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(b.tipo_ocorrencia || 'Alerta')}</span><div class="text-[11px] text-rose-700 mt-1">${escapeHtml(b.detalhes_ocorrencia || '')}</div>`
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1 w-fit"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHTML(b.tipo_ocorrencia || 'Alerta')}</span><div class="text-[11px] text-rose-700 mt-1">${escapeHTML(b.detalhes_ocorrencia || '')}</div>`
           : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 w-fit"><i class="fa-solid fa-check"></i> Normal</span>`;
 
         const gpsHtml = (b.latitude && b.longitude)
@@ -21170,18 +21176,18 @@ function renderizarRondaVigilanciaUI() {
               <i class="fa-regular fa-clock text-slate-400 mr-1"></i> ${hora}
             </td>
             <td class="py-2.5 px-3">
-              <div class="font-bold text-slate-900">${escapeHtml(b.ponto_nome || b.ponto_id)}</div>
-              <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(b.ponto_id)}</div>
+              <div class="font-bold text-slate-900">${escapeHTML(b.ponto_nome || b.ponto_id)}</div>
+              <div class="text-[10px] text-slate-400 font-mono">${escapeHTML(b.ponto_id)}</div>
             </td>
             <td class="py-2.5 px-3 whitespace-nowrap">
               <div class="font-bold text-slate-800 flex items-center gap-1.5">
                 <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-black text-[10px] flex items-center justify-center">${(b.guarda_nome || 'G')[0]}</div>
-                ${escapeHtml(b.guarda_nome || 'Vigilante')}
+                ${escapeHTML(b.guarda_nome || 'Vigilante')}
               </div>
-              <div class="text-[10px] text-slate-400 ml-7.5">Matrícula: ${escapeHtml(b.guarda_matricula || '---')}</div>
+              <div class="text-[10px] text-slate-400 ml-7.5">Matrícula: ${escapeHTML(b.guarda_matricula || '---')}</div>
             </td>
             <td class="py-2.5 px-3 whitespace-nowrap text-slate-600 font-medium">
-              ${escapeHtml(b.guarda_empresa || 'GEL')}
+              ${escapeHTML(b.guarda_empresa || 'GEL')}
             </td>
             <td class="py-2.5 px-3">
               ${statusHtml}
@@ -21239,11 +21245,11 @@ function renderizarGridPontosVigilancia() {
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-indigo-300 transition flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between mb-2">
-            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-bold text-[11px] border border-indigo-200">${escapeHtml(cod)}</span>
+            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-bold text-[11px] border border-indigo-200">${escapeHTML(cod)}</span>
             <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">Ativo</span>
           </div>
-          <h5 class="text-sm font-bold text-slate-900">${escapeHtml(p.nome)}</h5>
-          <p class="text-xs text-slate-500 mt-1">${escapeHtml(p.referencia || 'Sem referência informada')}</p>
+          <h5 class="text-sm font-bold text-slate-900">${escapeHTML(p.nome)}</h5>
+          <p class="text-xs text-slate-500 mt-1">${escapeHTML(p.referencia || 'Sem referência informada')}</p>
         </div>
 
         <div class="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
@@ -21358,13 +21364,13 @@ function gerarHtmlPlaquinhaA4(ponto, idx) {
       <!-- Informações do Local -->
       <div class="mb-5">
         <span class="inline-block px-3 py-1 rounded-md bg-indigo-100 text-indigo-900 font-mono font-black text-xs mb-2">
-          CÓDIGO: ${escapeHtml(cod)}
+          CÓDIGO: ${escapeHTML(cod)}
         </span>
         <h1 class="text-2xl sm:text-3xl font-black uppercase text-slate-950 tracking-tight leading-tight">
-          ${escapeHtml(ponto.nome)}
+          ${escapeHTML(ponto.nome)}
         </h1>
         <p class="text-sm font-semibold text-slate-600 mt-1">
-          ${escapeHtml(ponto.referencia || 'Fixar em local visível e desobstruído')}
+          ${escapeHTML(ponto.referencia || 'Fixar em local visível e desobstruído')}
         </p>
       </div>
 

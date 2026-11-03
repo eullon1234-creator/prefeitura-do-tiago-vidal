@@ -2105,6 +2105,8 @@ assert(appJs.includes('function imprimirTodasPlaquinhasVigilancia()'), 'Função
 assert(appJs.includes('function exportarRelatorioTurnoVigilanciaExcel()'), 'Função exportarRelatorioTurnoVigilanciaExcel implementada');
 assert(appJs.includes('function getQRCodeUrlVigilancia('), 'Função getQRCodeUrlVigilancia implementada');
 assert(appJs.includes('function obterInfoTurnoNoturno('), 'Função obterInfoTurnoNoturno implementada');
+assert(appJs.includes('function escapeHTML('), 'Função de sanitização escapeHTML implementada');
+assert(appJs.includes('escapeHtml = escapeHTML'), 'Alias resiliente escapeHtml implementada');
 
 // 4. Testes de Regra de Negócio: Cálculo de Janela do Turno Noturno (18h-06h)
 function simularTurno(dataSimulada) {
