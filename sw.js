@@ -1,13 +1,14 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v5.1';
+const CACHE_NAME = 'prefeitura-pwa-v5.2';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
   'chamado.html',
   'limpeza.html',
   'ronda.html',
+  'guarda.html',
   'app.js',
   'qrcode.min.js',
   'xlsx.bundle.js',

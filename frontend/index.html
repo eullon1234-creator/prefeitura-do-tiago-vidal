@@ -441,6 +441,12 @@
           <span id="sideCountRonda" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
         </button>
 
+        <button onclick="switchTab('ronda_vigilancia')" data-tab="ronda_vigilancia" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-shield-halved w-5 text-indigo-400"></i>
+          <span>Ronda de Vigilância</span>
+          <span id="sideCountRondaVigilancia" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
+        </button>
+
         <button onclick="switchTab('estoque')" data-tab="estoque" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
           <i class="fa-solid fa-boxes-stacked w-5 text-teal-400"></i>
           <span>Estoque & Almoxarifado</span>
@@ -3382,6 +3388,197 @@ service cloud.firestore {
           </button>
         </div>
 
+      </div>
+
+      <!-- ================= TAB: RONDA DE VIGILÂNCIA NOTURNA ================= -->
+      <div id="tab-ronda_vigilancia" class="tab-content hidden space-y-6">
+        <!-- Topo da Aba -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                <i class="fa-solid fa-shield-halved text-indigo-600 mr-1"></i> Segurança Patrimonial & Vigilância Noturna
+              </span>
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-900 text-amber-300">
+                <i class="fa-solid fa-moon mr-1"></i> Turno 18h às 06h
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Ronda de Vigilância</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Controle de presença dos vigilantes por QR Code com trava anti-fraude de 10 min, registro de ocorrências e relatório noturno completo.
+            </p>
+          </div>
+
+          <!-- Ações Rápidas no Topo -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <a href="guarda.html" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-mobile-screen-button text-indigo-400"></i>
+              <span>Abrir App do Guarda</span>
+            </a>
+
+            <button type="button" onclick="imprimirTodasPlaquinhasVigilancia()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-print text-slate-600"></i>
+              <span>Imprimir Todos (A4)</span>
+            </button>
+
+            <button type="button" onclick="exportarRelatorioTurnoVigilanciaExcel()" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>Exportar Turno (Excel)</span>
+            </button>
+
+            <button type="button" onclick="abrirModalNovoPontoVigilancia()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i>
+              <span>Novo Ponto de Ronda</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Seletor de Turno & Filtro de Data -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <i class="fa-regular fa-calendar text-indigo-600"></i> Data do Turno:
+            </label>
+            <input type="date" id="inputDataTurnoVigilancia" onchange="aoMudarDataTurnoVigilancia()" class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500">
+            <span id="labelTurnoVigilanciaInfo" class="text-xs text-indigo-700 font-bold bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">
+              Plantão Noturno: --
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="definirTurnoHojeVigilancia()" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition">
+              Plantão Atual
+            </button>
+            <button type="button" onclick="carregarRondaVigilancia()" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition" title="Recarregar Dados">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 KPIs do Turno -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-qrcode"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total de Bipes</p>
+              <h3 id="kpiVigilanciaBipes" class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">0</h3>
+              <p class="text-[10px] text-slate-500 truncate">Escaneamentos no turno</p>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-location-dot"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pontos Cobertos</p>
+              <h3 id="kpiVigilanciaCobertura" class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">0 / 0</h3>
+              <p id="kpiVigilanciaPct" class="text-[10px] text-emerald-600 font-bold truncate">0% de cobertura</p>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-user-shield"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Vigilantes</p>
+              <h3 id="kpiVigilanciaGuardas" class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">0</h3>
+              <p class="text-[10px] text-slate-500 truncate">Identificados em ronda</p>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ocorrências</p>
+              <h3 id="kpiVigilanciaOcorrencias" class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">0</h3>
+              <p class="text-[10px] text-slate-500 truncate">Alertas registrados</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Abas Internas: Cronologia vs Pontos Cadastrados -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="flex border-b border-slate-200 bg-slate-50/50 p-2 gap-2">
+            <button type="button" id="tabBtnVigilanciaTurno" onclick="alternarSubAbaVigilancia('turno')" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-indigo-700 shadow-xs border border-slate-200">
+              <i class="fa-solid fa-list-check mr-1.5"></i> Relatório Cronológico do Turno
+            </button>
+            <button type="button" id="tabBtnVigilanciaPontos" onclick="alternarSubAbaVigilancia('pontos')" class="px-4 py-2 rounded-xl text-xs font-bold transition text-slate-600 hover:text-slate-900">
+              <i class="fa-solid fa-map-pin mr-1.5"></i> Pontos de Ronda Cadastrados (<span id="contagemPontosVigilancia">0</span>)
+            </button>
+          </div>
+
+          <!-- Sub-aba 1: Cronologia de Bipes -->
+          <div id="subAbaVigilanciaTurno" class="p-4 sm:p-5">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                    <th class="py-2.5 px-3">Horário</th>
+                    <th class="py-2.5 px-3">Ponto / Local</th>
+                    <th class="py-2.5 px-3">Vigilante</th>
+                    <th class="py-2.5 px-3">Empresa</th>
+                    <th class="py-2.5 px-3">Status / Ocorrência</th>
+                    <th class="py-2.5 px-3 text-right">GPS</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyCronologiaVigilancia" class="divide-y divide-slate-100 font-medium text-slate-700">
+                  <!-- Linhas preenchidas via JavaScript -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Estado Vazio da Cronologia -->
+            <div id="vazioCronologiaVigilancia" class="py-12 flex flex-col items-center justify-center text-center">
+              <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-2xl mb-3">
+                <i class="fa-solid fa-moon"></i>
+              </div>
+              <h4 class="text-sm font-bold text-slate-800">Nenhum bip registrado neste turno</h4>
+              <p class="text-xs text-slate-500 max-w-sm mt-1">
+                Os escaneamentos feitos pelos guardas com o celular no plantão das 18h às 06h aparecerão aqui em tempo real.
+              </p>
+              <a href="guarda.html" target="_blank" class="mt-4 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-2 hover:bg-black transition">
+                <i class="fa-solid fa-mobile-screen-button text-indigo-400"></i> Abrir Leitor do Vigilante
+              </a>
+            </div>
+          </div>
+
+          <!-- Sub-aba 2: Gerenciamento dos Pontos Cadastrados -->
+          <div id="subAbaVigilanciaPontos" class="p-4 sm:p-5 hidden">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h4 class="text-sm font-bold text-slate-800">Locais de Passagem Obrigatória</h4>
+                <p class="text-xs text-slate-500">Imprima a plaquinha com QR Code de cada local para fixar nas paredes ou portas.</p>
+              </div>
+              <button type="button" onclick="abrirModalNovoPontoVigilancia()" class="btn-prefeito px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-plus"></i> Novo Ponto
+              </button>
+            </div>
+
+            <div id="gridPontosVigilancia" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <!-- Cards de pontos preenchidos via JS -->
+            </div>
+
+            <!-- Estado Vazio de Pontos -->
+            <div id="vazioPontosVigilancia" class="py-12 flex flex-col items-center justify-center text-center">
+              <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mb-3">
+                <i class="fa-solid fa-qrcode"></i>
+              </div>
+              <h4 class="text-sm font-bold text-slate-800">Nenhum ponto de ronda cadastrado ainda</h4>
+              <p class="text-xs text-slate-500 max-w-sm mt-1">
+                Cadastre os pavilhões, quartos, portarias e áreas estratégicas onde os guardas devem bater a ronda noturna.
+              </p>
+              <button type="button" onclick="abrirModalNovoPontoVigilancia()" class="btn-prefeito mt-4 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition">
+                <i class="fa-solid fa-plus"></i> Cadastrar Primeiro Ponto
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ================= TAB: ESTOQUE & ALMOXARIFADO ================= -->
@@ -8208,5 +8405,90 @@ service cloud.firestore {
     </div>
   </div>
 
+
+
+  <!-- ================= MODAL NOVO PONTO DE RONDA DE VIGILÂNCIA ================= -->
+  <div id="modalNovoPontoVigilancia" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[80] flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-700">
+      <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+            <i class="fa-solid fa-shield-halved text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Cadastrar Ponto de Ronda</h3>
+            <p class="text-[11px] text-slate-400">Segurança Patrimonial & Ronda Noturna</p>
+          </div>
+        </div>
+        <button type="button" onclick="fecharModal('modalNovoPontoVigilancia')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="salvarNovoPontoVigilancia(event)" class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Nome do Local / Ponto *
+          </label>
+          <input type="text" id="inputNomePontoVigilancia" required placeholder="Ex: Pavilhão A - Quarto 100, Portaria Principal, Almoxarifado" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-semibold text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-xs">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Ponto de Referência / Instrução
+          </label>
+          <input type="text" id="inputRefPontoVigilancia" placeholder="Ex: Fixar na porta de entrada ao lado do extintor" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-normal text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 text-xs">
+        </div>
+
+        <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 flex items-start gap-2.5">
+          <i class="fa-solid fa-shield-halved text-indigo-600 mt-0.5 flex-shrink-0"></i>
+          <p class="text-[11px] leading-relaxed">
+            Ao salvar, o sistema gera instantaneamente o QR Code exclusivo com URL oficial e trava anti-fraude de 10 minutos.
+          </p>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" onclick="fecharModal('modalNovoPontoVigilancia')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-sm flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Salvar Ponto
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL PLAQUINHAS A4 DE VIGILÂNCIA NOTURNA (IMPRESSÃO) ================= -->
+  <div id="modalPlaquinhasA4Vigilancia" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[85] flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      <!-- Topbar não-imprimível -->
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between flex-shrink-0 print:hidden">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+            <i class="fa-solid fa-print text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Impressão de Placas com QR Code • Vigilância Noturna</h3>
+            <p class="text-[11px] text-slate-400">Padrão A4 • Canteiro PCH Taboca 2 • GEL Engenharia</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="window.print()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-print"></i> Imprimir Placas
+          </button>
+          <button type="button" onclick="fecharModal('modalPlaquinhasA4Vigilancia')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Área rolável de impressão com as placas -->
+      <div id="containerPlaquinhasA4Vigilancia" class="p-6 overflow-y-auto flex-1 space-y-8 bg-slate-100 print:bg-white print:p-0 print:m-0">
+        <!-- Placas injetadas dinamicamente via JavaScript -->
+      </div>
+    </div>
+  </div>
 </body>
 </html>

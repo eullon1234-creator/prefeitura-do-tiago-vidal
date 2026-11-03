@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vigilância Noturna • Ronda de Segurança GEL</title>
+  <meta name="theme-color" content="#020617">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="icon-192.png">
+
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Leitor QR Code Nativo & Leve -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <style>
+    body {
+      background-color: #020617;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      touch-action: manipulation;
+    }
+    .scanner-target {
+      box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.7);
+    }
+    @keyframes pulse-scan {
+      0%, 100% { transform: translateY(0); opacity: 0.8; }
+      50% { transform: translateY(180px); opacity: 0.3; }
+    }
+    .scan-line {
+      animation: pulse-scan 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+  <!-- ================= TOPBAR ================= -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 p-3 sm:p-4 sticky top-0 z-30">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="h-9 px-2 py-0.5 rounded-xl bg-white flex items-center justify-center shadow-xs">
+          <img src="logo_gel_cropped.png" alt="Logo GEL" class="h-6 w-auto object-contain">
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-xs sm:text-sm font-black tracking-tight text-white uppercase">Vigilância Noturna</h1>
+            <span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Taboca 2</span>
+          </div>
+          <p class="text-[10px] text-slate-400 font-medium">Controle Oficial de Ronda Patrimonial</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <button id="btnTrocarGuarda" onclick="abrirModalIdentificacaoGuarda()" class="hidden px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition" title="Trocar Vigilante / Turno">
+          <i class="fa-solid fa-user-shield text-indigo-400 mr-1"></i>
+          <span id="labelNomeGuardaHeader" class="max-w-[80px] truncate inline-block align-bottom text-[11px]">Vigilante</span>
+        </button>
+        <a href="index.html" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" title="Ir para Painel Geral">
+          <i class="fa-solid fa-house text-sm"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= CONTEÚDO PRINCIPAL ================= -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+
+    <!-- TELA 1: IDENTIFICAÇÃO DO VIGILANTE (INÍCIO DE PLANTÃO) -->
+    <div id="cardIdentificacaoGuarda" class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+      <div class="text-center space-y-2">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-3xl shadow-lg">
+          <i class="fa-solid fa-person-military-pointing"></i>
+        </div>
+        <h2 class="text-lg font-black text-white">Início de Plantão Noturno</h2>
+        <p class="text-xs text-slate-400">Identifique-se uma única vez para registrar as rondas desta noite (Turno 18h às 06h).</p>
+      </div>
+
+      <form id="formIdentificacaoGuarda" onsubmit="confirmarIdentificacaoGuarda(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">Nome Completo do Vigilante *</label>
+          <input type="text" id="inputNomeGuarda" required placeholder="Ex: Francisco dos Santos" class="w-full py-3 px-4 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-600">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Matrícula / ID</label>
+            <input type="text" id="inputMatriculaGuarda" placeholder="Ex: VIG-104" class="w-full py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-600">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Empresa</label>
+            <input type="text" id="inputEmpresaGuarda" value="GEL" placeholder="Empresa de Segurança" class="w-full py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-sm shadow-lg transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Confirmar e Iniciar Ronda</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- TELA 2: SCANNER ATIVO DE RONDA (QUANDO IDENTIFICADO) -->
+    <div id="cardScannerRonda" class="hidden space-y-4">
+
+      <!-- Barra de Status do Turno -->
+      <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <div>
+            <span class="text-slate-400 block text-[10px] leading-tight">VIGILANTE DE PLANTÃO</span>
+            <span id="labelNomeGuardaAtivo" class="font-bold text-white text-xs truncate max-w-[160px] block">--</span>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-slate-400 block text-[10px] leading-tight">TURNO NOTURNO</span>
+          <span id="labelTurnoAtual" class="font-bold text-indigo-300 text-xs font-mono">18h às 06h</span>
+        </div>
+      </div>
+
+      <!-- Área do Scanner de Câmera -->
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl relative">
+        <div class="p-3 bg-slate-950 flex items-center justify-between border-b border-slate-800/80">
+          <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-qrcode text-indigo-400"></i> Aponte para o QR Code do Ponto
+          </span>
+          <button type="button" id="btnLanterna" onclick="alternarLanternaCamera()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold flex items-center gap-1 transition">
+            <i class="fa-solid fa-bolt"></i>
+            <span id="labelLanterna">Lanterna</span>
+          </button>
+        </div>
+
+        <div class="relative w-full aspect-square bg-black overflow-hidden flex items-center justify-center">
+          <div id="cameraGuardaQR" class="w-full h-full object-cover"></div>
+          
+          <!-- Mira Visual Central -->
+          <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div class="w-56 h-56 border-2 border-indigo-500/80 rounded-2xl relative scanner-target">
+              <div class="w-full h-0.5 bg-indigo-400 shadow-md scan-line"></div>
+              <div class="absolute top-1 left-2 text-[10px] font-mono text-indigo-300/80 uppercase">Área do Ponto</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <label for="inputUploadQrGuarda" class="cursor-pointer text-indigo-400 hover:text-indigo-300 text-[11px] font-semibold flex items-center gap-1.5">
+            <i class="fa-solid fa-image"></i> Carregar da Galeria
+          </label>
+          <input type="file" id="inputUploadQrGuarda" accept="image/*" class="hidden" onchange="escanearArquivoFotoGuarda(this)">
+          
+          <span id="statusConexaoNuvem" class="text-[10px] text-emerald-400 flex items-center gap-1">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Conectado
+          </span>
+        </div>
+      </div>
+
+      <!-- Feedback e Mensagem de Sucesso ou Bloqueio Anti-Fraude -->
+      <div id="boxFeedbackScan" class="hidden p-4 rounded-2xl text-xs font-semibold transition-all">
+        <!-- Populado dinamicamente -->
+      </div>
+
+      <!-- Ocorrência Opcional do Ponto -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" id="checkRegistrarOcorrencia" onchange="alternarBoxOcorrencia(this.checked)" class="w-4 h-4 rounded text-rose-600 accent-rose-600">
+          <span class="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-triangle-exclamation"></i> Registrar Anomalia / Ocorrência neste Ponto
+          </span>
+        </label>
+
+        <div id="boxCamposOcorrencia" class="hidden space-y-3 pt-2 border-t border-slate-800 text-xs">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">Tipo de Ocorrência:</label>
+            <select id="selectTipoOcorrencia" class="w-full py-2 px-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-rose-500">
+              <option value="Porta destrancada / Aberta">🚪 Porta destrancada / Aberta</option>
+              <option value="Luz apagada / Falha de iluminação">💡 Luz apagada / Falha de iluminação</option>
+              <option value="Cadeado rompido / Danificado">🔒 Cadeado rompido / Danificado</option>
+              <option value="Vazamento de água visível">💧 Vazamento de água visível</option>
+              <option value="Indivíduo suspeito avistado">👤 Indivíduo suspeito avistado</option>
+              <option value="Outra anormalidade">⚠️ Outra anormalidade</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">Detalhes da Ocorrência:</label>
+            <input type="text" id="inputDetalhesOcorrencia" placeholder="Ex: Janela dos fundos estava entreaberta..." class="w-full py-2 px-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-1 focus:ring-rose-500">
+          </div>
+        </div>
+      </div>
+
+      <!-- Histórico dos Bipes Realizados Nesta Noite -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <span class="text-xs font-black uppercase text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> Seus Bipes Desta Noite
+          </span>
+          <span id="badgeQtdBipesTurno" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">0 pontos</span>
+        </div>
+        <div id="listaBipesTurno" class="space-y-2 max-h-52 overflow-y-auto text-xs text-slate-400">
+          <p class="text-center py-4 text-slate-500 italic">Nenhum ponto registrado neste turno ainda.</p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ================= RODAPÉ ================= -->
+  <footer class="bg-slate-950/80 border-t border-slate-900 p-3 text-center text-[10px] text-slate-500 select-none">
+    <span>Prefeitura de Canteiro • Taboca 2 • Segurança Patrimonial GEL S.A.</span>
+  </footer>
+
+  <!-- SCRIPT DE OPERAÇÃO MOBILE DA RONDA DO GUARDA -->
+  <script>
+    // Configurações do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-TABOCA2-PREFEITURA-CANTEIRO",
+      authDomain: "prefeitura-taboca2.firebaseapp.com",
+      projectId: "prefeitura-taboca2",
+      storageBucket: "prefeitura-taboca2.appspot.com",
+      messagingSenderId: "1029384756",
+      appId: "1:1029384756:web:abcd1234efgh5678"
+    };
+
+    let firestoreDb = null;
+    try {
+      if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+        firestoreDb = firebase.firestore();
+        firestoreDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+      }
+    } catch(e) {
+      console.warn("Firestore offline:", e);
+    }
+
+    let guardaAtual = null;
+    let scannerCamera = null;
+    let lanternaAtiva = false;
+    let trackVideo = null;
+    let audioContext = null;
+    let processandoScan = false;
+
+    // Inicialização ao carregar
+    window.addEventListener('DOMContentLoaded', () => {
+      // Verificar se já há guarda identificado para este turno
+      const salvo = localStorage.getItem('guarda_ativo_turno');
+      if (salvo) {
+        try {
+          guardaAtual = JSON.parse(salvo);
+          iniciarPainelScanner();
+        } catch(e) {
+          localStorage.removeItem('guarda_ativo_turno');
+        }
+      }
+
+      // Checar se a página foi aberta com parâmetros de URL (ex: scan por câmera nativa)
+      verificarParametrosUrl();
+    });
+
+    function obterInfoTurnoNoturno(d = new Date()) {
+      const hora = d.getHours();
+      let dataBase = new Date(d);
+      if (hora < 12) {
+        dataBase.setDate(dataBase.getDate() - 1);
+      }
+      const yyyy = dataBase.getFullYear();
+      const mm = String(dataBase.getMonth() + 1).padStart(2, '0');
+      const dd = String(dataBase.getDate()).padStart(2, '0');
+      const dataTurno = `${yyyy}-${mm}-${dd}`;
+      
+      const dataSeguinte = new Date(dataBase);
+      dataSeguinte.setDate(dataSeguinte.getDate() + 1);
+      const ddSeg = String(dataSeguinte.getDate()).padStart(2, '0');
+      const mmSeg = String(dataSeguinte.getMonth() + 1).padStart(2, '0');
+      
+      return {
+        idTurno: `TURNO-${dataTurno}`,
+        dataTurno: dataTurno,
+        labelTurno: `${dd}/${mm} a ${ddSeg}/${mmSeg} (18h-06h)`
+      };
+    }
+
+    function confirmarIdentificacaoGuarda(e) {
+      e.preventDefault();
+      const nome = document.getElementById('inputNomeGuarda').value.trim();
+      if (!nome) return;
+
+      const matricula = document.getElementById('inputMatriculaGuarda').value.trim() || 'VIG-GERAL';
+      const empresa = document.getElementById('inputEmpresaGuarda').value.trim() || 'GEL';
+      const turnoInfo = obterInfoTurnoNoturno();
+
+      guardaAtual = {
+        nome,
+        matricula,
+        empresa,
+        idTurno: turnoInfo.idTurno,
+        dataTurno: turnoInfo.dataTurno,
+        inicioEm: new Date().toISOString()
+      };
+
+      localStorage.setItem('guarda_ativo_turno', JSON.stringify(guardaAtual));
+      iniciarPainelScanner();
+    }
+
+    function abrirModalIdentificacaoGuarda() {
+      if (confirm('Deseja encerrar o plantão do vigilante atual e trocar de usuário?')) {
+        pararCamera();
+        localStorage.removeItem('guarda_ativo_turno');
+        guardaAtual = null;
+        document.getElementById('cardScannerRonda').classList.add('hidden');
+        document.getElementById('cardIdentificacaoGuarda').classList.remove('hidden');
+        document.getElementById('btnTrocarGuarda').classList.add('hidden');
+      }
+    }
+
+    function iniciarPainelScanner() {
+      document.getElementById('cardIdentificacaoGuarda').classList.add('hidden');
+      document.getElementById('cardScannerRonda').classList.remove('hidden');
+      document.getElementById('btnTrocarGuarda').classList.remove('hidden');
+
+      document.getElementById('labelNomeGuardaHeader').textContent = guardaAtual.nome.split(' ')[0];
+      document.getElementById('labelNomeGuardaAtivo').textContent = guardaAtual.nome;
+      
+      const turnoInfo = obterInfoTurnoNoturno();
+      document.getElementById('labelTurnoAtual').textContent = turnoInfo.labelTurno;
+
+      atualizarListaBipesTurno();
+      iniciarCameraScanner();
+    }
+
+    function alternarBoxOcorrencia(marcado) {
+      const box = document.getElementById('boxCamposOcorrencia');
+      if (box) box.classList.toggle('hidden', !marcado);
+    }
+
+    // -------------------------------------------------------------
+    // CONTROLE DE CÂMERA & LANTERNA
+    // -------------------------------------------------------------
+    function iniciarCameraScanner() {
+      if (typeof Html5Qrcode === 'undefined') {
+        console.warn('Biblioteca Html5Qrcode não encontrada');
+        return;
+      }
+
+      const cameraEl = document.getElementById('cameraGuardaQR');
+      if (!cameraEl) return;
+
+      if (scannerCamera) {
+        pararCamera();
+      }
+
+      scannerCamera = new Html5Qrcode("cameraGuardaQR");
+      const config = { fps: 12, qrbox: { width: 230, height: 230 } };
+
+      scannerCamera.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          processarLeituraPonto(decodedText);
+        },
+        (error) => {}
+      ).then(() => {
+        // Tentar obter track para controle de lanterna
+        try {
+          const videoEl = document.querySelector('#cameraGuardaQR video');
+          if (videoEl && videoEl.srcObject) {
+            trackVideo = videoEl.srcObject.getVideoTracks()[0];
+          }
+        } catch(e) {}
+      }).catch(err => {
+        console.warn("Erro ao iniciar câmera de ronda:", err);
+      });
+    }
+
+    function pararCamera() {
+      if (scannerCamera) {
+        try {
+          scannerCamera.stop().then(() => {
+            scannerCamera.clear();
+            scannerCamera = null;
+          }).catch(() => {});
+        } catch(e) {}
+      }
+    }
+
+    function alternarLanternaCamera() {
+      if (!trackVideo) {
+        alert('Lanterna não disponível nesta câmera ou navegador.');
+        return;
+      }
+
+      try {
+        lanternaAtiva = !lanternaAtiva;
+        trackVideo.applyConstraints({
+          advanced: [{ torch: lanternaAtiva }]
+        });
+        document.getElementById('labelLanterna').textContent = lanternaAtiva ? 'Desligar' : 'Lanterna';
+      } catch(err) {
+        alert('Seu dispositivo não permite controle da lanterna via web.');
+      }
+    }
+
+    function escanearArquivoFotoGuarda(input) {
+      if (!input.files || input.files.length === 0) return;
+      const file = input.files[0];
+      if (!scannerCamera) {
+        scannerCamera = new Html5Qrcode("cameraGuardaQR");
+      }
+      scannerCamera.scanFile(file, true)
+        .then(decodedText => {
+          processarLeituraPonto(decodedText);
+        })
+        .catch(err => {
+          alert('Não foi possível identificar um QR Code válido na foto.');
+        });
+    }
+
+    // -------------------------------------------------------------
+    // PROCESSAMENTO DO PONTO & TRAVA ANTI-FRAUDE (10 MINUTOS)
+    // -------------------------------------------------------------
+    async function processarLeituraPonto(rawText) {
+      if (processandoScan) return;
+      processandoScan = true;
+
+      try {
+        let pontoId = '';
+        let pontoNome = '';
+
+        // Tentar parse de JSON ou URL
+        if (rawText.includes('{') && rawText.includes('}')) {
+          try {
+            const parsed = JSON.parse(rawText);
+            pontoId = parsed.id || parsed.ponto_id || '';
+            pontoNome = parsed.nome || parsed.ponto_nome || '';
+          } catch(e) {}
+        } else if (rawText.includes('ponto_id=')) {
+          const params = new URLSearchParams(rawText.split('?')[1] || rawText);
+          pontoId = params.get('ponto_id') || '';
+          pontoNome = params.get('ponto_nome') || pontoId;
+        } else {
+          // Texto simples (ex: "PNT-01 - Pavilhão A")
+          pontoNome = rawText.trim();
+          pontoId = pontoNome.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        }
+
+        if (!pontoNome) {
+          pontoNome = rawText.slice(0, 40);
+          pontoId = 'PNT-' + Date.now();
+        }
+
+        const agora = Date.now();
+        const chaveAntiFraude = `anti_fraude_${pontoId}`;
+        const ultimoScan = parseInt(localStorage.getItem(chaveAntiFraude) || '0', 10);
+        const intervaloMinutos = 10;
+        const diferencaMs = agora - ultimoScan;
+
+        // TRAVA ANTI-FRAUDE: Menos de 10 minutos
+        if (diferencaMs < intervaloMinutos * 60 * 1000) {
+          const restanteMin = Math.ceil((intervaloMinutos * 60 * 1000 - diferencaMs) / 60000);
+          tocarSomAviso();
+          vibrarFeedback([200, 100, 200]);
+          exibirFeedback(
+            'bloqueio',
+            `⚠️ Intervalo Anti-Fraude Ativo!`,
+            `O ponto "${pontoNome}" já foi escaneado há poucos minutos. Aguarde ${restanteMin} minuto(s) para registrar a próxima ronda nesta área.`
+          );
+          setTimeout(() => { processandoScan = false; }, 3000);
+          return;
+        }
+
+        // Scan Aprovado!
+        localStorage.setItem(chaveAntiFraude, String(agora));
+        tocarSomSucesso();
+        vibrarFeedback([120, 80, 120]);
+
+        // Verificar se houve ocorrência marcada
+        const temOcorrencia = document.getElementById('checkRegistrarOcorrencia').checked;
+        const tipoOcorrencia = temOcorrencia ? document.getElementById('selectTipoOcorrencia').value : null;
+        const detalhesOcorrencia = temOcorrencia ? document.getElementById('inputDetalhesOcorrencia').value.trim() : null;
+
+        // Obter GPS se disponível
+        const gps = await obterGps();
+        const turnoInfo = obterInfoTurnoNoturno();
+
+        const registro = {
+          id: 'RND-' + Date.now(),
+          ponto_id: pontoId,
+          ponto_nome: pontoNome,
+          guarda_nome: guardaAtual.nome,
+          guarda_matricula: guardaAtual.matricula,
+          guarda_empresa: guardaAtual.empresa,
+          turno_id: turnoInfo.idTurno,
+          data_turno: turnoInfo.dataTurno,
+          data_hora: new Date().toLocaleString('pt-BR'),
+          timestamp: agora,
+          tem_ocorrencia: temOcorrencia,
+          tipo_ocorrencia: tipoOcorrencia,
+          detalhes_ocorrencia: detalhesOcorrencia,
+          latitude: gps ? gps.lat : null,
+          longitude: gps ? gps.lng : null
+        };
+
+        // Salvar localmente
+        salvarRegistroLocal(registro);
+
+        // Salvar no Firestore se online
+        if (firestoreDb) {
+          firestoreDb.collection('ronda_vigilancia_registros').doc(registro.id).set(registro)
+            .then(() => console.log('[FIRESTORE] Ponto registrado com sucesso'))
+            .catch(err => console.warn('[FIRESTORE] Salvo offline:', err));
+        }
+
+        // Limpar campos de ocorrência
+        document.getElementById('checkRegistrarOcorrencia').checked = false;
+        alternarBoxOcorrencia(false);
+        document.getElementById('inputDetalhesOcorrencia').value = '';
+
+        exibirFeedback(
+          'sucesso',
+          `✅ Ponto Registrado com Sucesso!`,
+          `Área: <b>${pontoNome}</b> • Horário: ${new Date().toLocaleTimeString('pt-BR')}${temOcorrencia ? ' (Com Ocorrência)' : ''}`
+        );
+
+        atualizarListaBipesTurno();
+        setTimeout(() => { processandoScan = false; }, 3500);
+
+      } catch(err) {
+        console.error('Erro no scan:', err);
+        processandoScan = false;
+      }
+    }
+
+    function salvarRegistroLocal(reg) {
+      const chave = `ronda_registros_${reg.turno_id}`;
+      const lista = JSON.parse(localStorage.getItem(chave) || '[]');
+      lista.unshift(reg);
+      localStorage.setItem(chave, JSON.stringify(lista));
+    }
+
+    function atualizarListaBipesTurno() {
+      if (!guardaAtual) return;
+      const chave = `ronda_registros_${guardaAtual.idTurno}`;
+      const lista = JSON.parse(localStorage.getItem(chave) || '[]');
+      
+      document.getElementById('badgeQtdBipesTurno').textContent = `${lista.length} ponto(s)`;
+      const container = document.getElementById('listaBipesTurno');
+      
+      if (!container) return;
+
+      if (lista.length === 0) {
+        container.innerHTML = '<p class="text-center py-4 text-slate-500 italic">Nenhum ponto registrado neste turno ainda.</p>';
+        return;
+      }
+
+      container.innerHTML = lista.slice(0, 15).map(item => `
+        <div class="p-2.5 rounded-xl bg-slate-950 border ${item.tem_ocorrencia ? 'border-rose-800/80 bg-rose-950/20' : 'border-slate-800'} flex items-center justify-between">
+          <div>
+            <span class="font-bold text-slate-200 block">${item.ponto_nome}</span>
+            <span class="text-[10px] text-slate-500 font-mono">${item.data_hora}</span>
+            ${item.tem_ocorrencia ? `<span class="text-[10px] text-rose-400 font-semibold block mt-0.5">⚠️ ${item.tipo_ocorrencia}</span>` : ''}
+          </div>
+          <span class="px-2 py-0.5 rounded text-[9px] font-bold ${item.tem_ocorrencia ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}">
+            ${item.tem_ocorrencia ? 'Ocorrência' : 'OK'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function exibirFeedback(tipo, titulo, msg) {
+      const box = document.getElementById('boxFeedbackScan');
+      if (!box) return;
+
+      box.classList.remove('hidden', 'bg-emerald-950/90', 'border-emerald-600', 'text-emerald-300', 'bg-amber-950/90', 'border-amber-600', 'text-amber-300');
+
+      if (tipo === 'sucesso') {
+        box.classList.add('bg-emerald-950/90', 'border', 'border-emerald-600', 'text-emerald-200');
+      } else {
+        box.classList.add('bg-amber-950/90', 'border', 'border-amber-600', 'text-amber-200');
+      }
+
+      box.innerHTML = `
+        <div class="flex items-start gap-2.5">
+          <i class="fa-solid ${tipo === 'sucesso' ? 'fa-circle-check text-emerald-400 text-base' : 'fa-triangle-exclamation text-amber-400 text-base'} mt-0.5"></i>
+          <div>
+            <span class="font-bold block text-sm">${titulo}</span>
+            <p class="text-xs mt-0.5 leading-relaxed">${msg}</p>
+          </div>
+        </div>
+      `;
+
+      setTimeout(() => {
+        box.classList.add('hidden');
+      }, 6000);
+    }
+
+    function vibrarFeedback(pattern) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch(e) {}
+      }
+    }
+
+    function tocarSomSucesso() {
+      try {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioContext.currentTime); // Nota Lá (A5)
+        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.18);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.2);
+      } catch(e) {}
+    }
+
+    function tocarSomAviso() {
+      try {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(320, audioContext.currentTime);
+        gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.32);
+      } catch(e) {}
+    }
+
+    function obterGps() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { timeout: 3500, maximumAge: 15000 }
+        );
+      });
+    }
+
+    function verificarParametrosUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('ponto_id') || urlParams.has('ponto_nome')) {
+        const pontoNome = urlParams.get('ponto_nome') || urlParams.get('ponto_id');
+        setTimeout(() => {
+          if (guardaAtual) {
+            processarLeituraPonto(pontoNome);
+          } else {
+            alert(`Ponto identificado: "${pontoNome}". Por favor, confirme seu nome de vigilante para validar o bipe.`);
+          }
+        }, 600);
+      }
+    }
+  </script>
+</body>
+</html>

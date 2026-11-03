@@ -3150,6 +3150,8 @@ function switchTab(tabId) {
     carregarCasasCidade();
   } else if (tabId === 'ronda') {
     carregarRondaCanteiro();
+  } else if (tabId === 'ronda_vigilancia') {
+    carregarRondaVigilancia();
   } else if (tabId === 'estoque') {
     carregarEstoque();
   } else if (tabId === 'gestao_cadastros') {
@@ -10221,7 +10223,7 @@ if ('serviceWorker' in navigator) {
     }
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=5.1')
+    navigator.serviceWorker.register('./sw.js?v=5.2')
       .then(reg => {
         console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
         // Garante que o novo service worker seja verificado imediatamente
@@ -20972,3 +20974,544 @@ window.carregarErpCanteiro = carregarErpCanteiro;
 window.exportarRateioExcel = exportarRateioExcel;
 window.registrarTrocaEnxovalLote = registrarTrocaEnxovalLote;
 
+
+
+// ==========================================================================
+// MÓDULO: RONDA DE VIGILÂNCIA NOTURNA (SEGURANÇA PATRIMONIAL & QR CODE)
+// ==========================================================================
+
+let listaPontosVigilancia = [];
+let listaRegistrosVigilancia = [];
+let listenerVigilanciaIniciado = false;
+
+// Cálculo da janela do Turno Noturno (18h às 06h)
+// Se for antes das 12h do dia, ainda pertence ao turno iniciado no dia anterior às 18h
+function obterInfoTurnoNoturno(d = new Date()) {
+  const hora = d.getHours();
+  let dataBase = new Date(d);
+  if (hora < 12) {
+    dataBase.setDate(dataBase.getDate() - 1);
+  }
+  const yyyy = dataBase.getFullYear();
+  const mm = String(dataBase.getMonth() + 1).padStart(2, '0');
+  const dd = String(dataBase.getDate()).padStart(2, '0');
+  const dataTurno = `${yyyy}-${mm}-${dd}`;
+  
+  const dataSeguinte = new Date(dataBase);
+  dataSeguinte.setDate(dataSeguinte.getDate() + 1);
+  const ddSeg = String(dataSeguinte.getDate()).padStart(2, '0');
+  const mmSeg = String(dataSeguinte.getMonth() + 1).padStart(2, '0');
+  
+  return {
+    idTurno: `TURNO-${dataTurno}`,
+    dataTurno: dataTurno,
+    labelTurno: `${dd}/${mm} a ${ddSeg}/${mmSeg} (18h-06h)`
+  };
+}
+
+// Obter URL pública do ponto para o QR Code
+function getQRCodeUrlVigilancia(pontoId, pontoNome) {
+  const baseUrl = getCleanSystemUrl('guarda.html');
+  return `${baseUrl}?ponto_id=${encodeURIComponent(pontoId)}&ponto_nome=${encodeURIComponent(pontoNome || pontoId)}`;
+}
+
+// Inicializar armazenamento local e sincronizar com Firestore
+function inicializarRondaVigilancia() {
+  try {
+    const cachedPontos = localStorage.getItem('ronda_vigilancia_pontos');
+    if (cachedPontos) {
+      listaPontosVigilancia = JSON.parse(cachedPontos);
+    }
+  } catch (e) {
+    listaPontosVigilancia = [];
+  }
+
+  try {
+    const cachedRegs = localStorage.getItem('ronda_vigilancia_registros');
+    if (cachedRegs) {
+      listaRegistrosVigilancia = JSON.parse(cachedRegs);
+    }
+  } catch (e) {
+    listaRegistrosVigilancia = [];
+  }
+
+  iniciarListenerVigilancia();
+}
+
+function iniciarListenerVigilancia() {
+  if (listenerVigilanciaIniciado) return;
+  if (typeof firestoreDb === 'undefined' || !firestoreDb) return;
+  listenerVigilanciaIniciado = true;
+
+  // Sincronização em tempo real de pontos de ronda
+  firestoreDb.collection('pontos_vigilancia').onSnapshot(snapshot => {
+    const remotas = [];
+    snapshot.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+    listaPontosVigilancia = remotas;
+    localStorage.setItem('ronda_vigilancia_pontos', JSON.stringify(listaPontosVigilancia));
+    if (activeTab === 'ronda_vigilancia') {
+      renderizarRondaVigilanciaUI();
+    }
+  }, err => console.warn('[FIRESTORE] Erro listener pontos_vigilancia:', err));
+
+  // Sincronização em tempo real de bipes/registros dos guardas
+  firestoreDb.collection('ronda_vigilancia_registros').onSnapshot(snapshot => {
+    const remotas = [];
+    snapshot.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+    listaRegistrosVigilancia = remotas;
+    localStorage.setItem('ronda_vigilancia_registros', JSON.stringify(listaRegistrosVigilancia));
+    if (activeTab === 'ronda_vigilancia') {
+      renderizarRondaVigilanciaUI();
+    }
+  }, err => console.warn('[FIRESTORE] Erro listener ronda_vigilancia_registros:', err));
+}
+
+// Carregar Aba de Ronda de Vigilância
+function carregarRondaVigilancia() {
+  inicializarRondaVigilancia();
+  const inputData = document.getElementById('inputDataTurnoVigilancia');
+  if (inputData && !inputData.value) {
+    const turno = obterInfoTurnoNoturno();
+    inputData.value = turno.dataTurno;
+  }
+  renderizarRondaVigilanciaUI();
+}
+
+function definirTurnoHojeVigilancia() {
+  const inputData = document.getElementById('inputDataTurnoVigilancia');
+  if (inputData) {
+    inputData.value = obterInfoTurnoNoturno().dataTurno;
+    aoMudarDataTurnoVigilancia();
+  }
+}
+
+function aoMudarDataTurnoVigilancia() {
+  renderizarRondaVigilanciaUI();
+}
+
+// Renderização Principal da Interface da Ronda
+function renderizarRondaVigilanciaUI() {
+  const inputData = document.getElementById('inputDataTurnoVigilancia');
+  const dataTurno = inputData?.value || obterInfoTurnoNoturno().dataTurno;
+
+  // Formatar label do turno (ex: 03/11 a 04/11 (18h-06h))
+  const partes = (dataTurno || '').split('-');
+  let labelTurno = dataTurno;
+  if (partes.length === 3) {
+    const dt = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]));
+    const dtSeg = new Date(dt);
+    dtSeg.setDate(dtSeg.getDate() + 1);
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const ddSeg = String(dtSeg.getDate()).padStart(2, '0');
+    const mmSeg = String(dtSeg.getMonth() + 1).padStart(2, '0');
+    labelTurno = `${dd}/${mm} a ${ddSeg}/${mmSeg} (18h-06h)`;
+  }
+  const labelEl = document.getElementById('labelTurnoVigilanciaInfo');
+  if (labelEl) labelEl.textContent = `Plantão Noturno: ${labelTurno}`;
+
+  // Filtrar bipes deste turno
+  const bipesDoTurno = (listaRegistrosVigilancia || []).filter(r => r.data_turno === dataTurno || r.turno_id === `TURNO-${dataTurno}`);
+
+  // Ordenar mais recentes primeiro para exibição na tabela cronológica
+  bipesDoTurno.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  // KPIs
+  const totalBipes = bipesDoTurno.length;
+  const pontosCobertosSet = new Set(bipesDoTurno.map(b => b.ponto_id));
+  const totalPontosCadastrados = listaPontosVigilancia.length;
+  const guardasSet = new Set(bipesDoTurno.map(b => b.guarda_matricula || b.guarda_nome).filter(Boolean));
+  const totalOcorrencias = bipesDoTurno.filter(b => b.tem_ocorrencia).length;
+  const pct = totalPontosCadastrados > 0 ? Math.round((pontosCobertosSet.size / totalPontosCadastrados) * 100) : 0;
+
+  const kpiBipesEl = document.getElementById('kpiVigilanciaBipes');
+  const kpiCobEl = document.getElementById('kpiVigilanciaCobertura');
+  const kpiPctEl = document.getElementById('kpiVigilanciaPct');
+  const kpiGuarEl = document.getElementById('kpiVigilanciaGuardas');
+  const kpiOcsEl = document.getElementById('kpiVigilanciaOcorrencias');
+  const countPontosEl = document.getElementById('contagemPontosVigilancia');
+  const sideCountEl = document.getElementById('sideCountRondaVigilancia');
+
+  if (kpiBipesEl) kpiBipesEl.textContent = totalBipes;
+  if (kpiCobEl) kpiCobEl.textContent = `${pontosCobertosSet.size} / ${totalPontosCadastrados}`;
+  if (kpiPctEl) kpiPctEl.textContent = `${pct}% de cobertura`;
+  if (kpiGuarEl) kpiGuarEl.textContent = guardasSet.size;
+  if (kpiOcsEl) kpiOcsEl.textContent = totalOcorrencias;
+  if (countPontosEl) countPontosEl.textContent = totalPontosCadastrados;
+  if (sideCountEl) {
+    sideCountEl.textContent = totalBipes;
+    sideCountEl.classList.toggle('hidden', totalBipes === 0);
+  }
+
+  // Renderizar Tabela de Cronologia
+  const tbody = document.getElementById('tbodyCronologiaVigilancia');
+  const vazioCron = document.getElementById('vazioCronologiaVigilancia');
+
+  if (tbody) {
+    if (bipesDoTurno.length === 0) {
+      tbody.innerHTML = '';
+      if (vazioCron) vazioCron.classList.remove('hidden');
+    } else {
+      if (vazioCron) vazioCron.classList.add('hidden');
+      tbody.innerHTML = bipesDoTurno.map(b => {
+        const hora = b.data_hora ? b.data_hora.split(' ')[1] || b.data_hora : '--:--';
+        const temOc = b.tem_ocorrencia;
+        const statusHtml = temOc 
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1 w-fit"><i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(b.tipo_ocorrencia || 'Alerta')}</span><div class="text-[11px] text-rose-700 mt-1">${escapeHtml(b.detalhes_ocorrencia || '')}</div>`
+          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 w-fit"><i class="fa-solid fa-check"></i> Normal</span>`;
+
+        const gpsHtml = (b.latitude && b.longitude)
+          ? `<a href="https://maps.google.com/?q=${b.latitude},${b.longitude}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline flex items-center gap-1 justify-end font-semibold text-[11px]"><i class="fa-solid fa-location-crosshairs"></i> Ver GPS</a>`
+          : `<span class="text-slate-400 text-[11px]">Sem GPS</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="py-2.5 px-3 whitespace-nowrap font-bold text-slate-800">
+              <i class="fa-regular fa-clock text-slate-400 mr-1"></i> ${hora}
+            </td>
+            <td class="py-2.5 px-3">
+              <div class="font-bold text-slate-900">${escapeHtml(b.ponto_nome || b.ponto_id)}</div>
+              <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(b.ponto_id)}</div>
+            </td>
+            <td class="py-2.5 px-3 whitespace-nowrap">
+              <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-black text-[10px] flex items-center justify-center">${(b.guarda_nome || 'G')[0]}</div>
+                ${escapeHtml(b.guarda_nome || 'Vigilante')}
+              </div>
+              <div class="text-[10px] text-slate-400 ml-7.5">Matrícula: ${escapeHtml(b.guarda_matricula || '---')}</div>
+            </td>
+            <td class="py-2.5 px-3 whitespace-nowrap text-slate-600 font-medium">
+              ${escapeHtml(b.guarda_empresa || 'GEL')}
+            </td>
+            <td class="py-2.5 px-3">
+              ${statusHtml}
+            </td>
+            <td class="py-2.5 px-3 text-right whitespace-nowrap">
+              ${gpsHtml}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // Renderizar Grid de Pontos Cadastrados
+  renderizarGridPontosVigilancia();
+}
+
+// Alternar entre sub-abas (Cronologia vs Pontos)
+function alternarSubAbaVigilancia(subAba) {
+  const btnTurno = document.getElementById('tabBtnVigilanciaTurno');
+  const btnPontos = document.getElementById('tabBtnVigilanciaPontos');
+  const abaTurno = document.getElementById('subAbaVigilanciaTurno');
+  const abaPontos = document.getElementById('subAbaVigilanciaPontos');
+
+  if (subAba === 'turno') {
+    if (btnTurno) btnTurno.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-indigo-700 shadow-xs border border-slate-200';
+    if (btnPontos) btnPontos.className = 'px-4 py-2 rounded-xl text-xs font-bold transition text-slate-600 hover:text-slate-900';
+    if (abaTurno) abaTurno.classList.remove('hidden');
+    if (abaPontos) abaPontos.classList.add('hidden');
+  } else {
+    if (btnPontos) btnPontos.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-indigo-700 shadow-xs border border-slate-200';
+    if (btnTurno) btnTurno.className = 'px-4 py-2 rounded-xl text-xs font-bold transition text-slate-600 hover:text-slate-900';
+    if (abaPontos) abaPontos.classList.remove('hidden');
+    if (abaTurno) abaTurno.classList.add('hidden');
+  }
+}
+
+// Renderizar lista dos pontos de ronda cadastrados
+function renderizarGridPontosVigilancia() {
+  const grid = document.getElementById('gridPontosVigilancia');
+  const vazio = document.getElementById('vazioPontosVigilancia');
+  if (!grid) return;
+
+  if (listaPontosVigilancia.length === 0) {
+    grid.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+
+  if (vazio) vazio.classList.add('hidden');
+
+  grid.innerHTML = listaPontosVigilancia.map((p, idx) => {
+    const cod = p.id || `PNT-${String(idx + 1).padStart(2, '0')}`;
+    return `
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-indigo-300 transition flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-bold text-[11px] border border-indigo-200">${escapeHtml(cod)}</span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">Ativo</span>
+          </div>
+          <h5 class="text-sm font-bold text-slate-900">${escapeHtml(p.nome)}</h5>
+          <p class="text-xs text-slate-500 mt-1">${escapeHtml(p.referencia || 'Sem referência informada')}</p>
+        </div>
+
+        <div class="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+          <button type="button" onclick="imprimirPlaquinhaVigilancia('${p.id}')" class="flex-1 py-1.5 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-print"></i> Plaquinha A4
+          </button>
+          <button type="button" onclick="excluirPontoVigilancia('${p.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Excluir Ponto">
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Modal e cadastro de novo ponto
+function abrirModalNovoPontoVigilancia() {
+  const inNome = document.getElementById('inputNomePontoVigilancia');
+  const inRef = document.getElementById('inputRefPontoVigilancia');
+  if (inNome) inNome.value = '';
+  if (inRef) inRef.value = '';
+  abrirModal('modalNovoPontoVigilancia');
+  setTimeout(() => document.getElementById('inputNomePontoVigilancia')?.focus(), 150);
+}
+
+function salvarNovoPontoVigilancia(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const inNome = document.getElementById('inputNomePontoVigilancia');
+  const inRef = document.getElementById('inputRefPontoVigilancia');
+  const nome = inNome ? inNome.value.trim() : '';
+
+  if (!nome) {
+    showToast('Informe o nome do ponto de ronda.', 'warning');
+    return;
+  }
+
+  const ref = inRef ? inRef.value.trim() : '';
+  const seq = listaPontosVigilancia.length + 1;
+  const novoId = 'PNT-' + String(seq).padStart(2, '0') + '-' + Date.now().toString().slice(-4);
+
+  const novoPonto = {
+    id: novoId,
+    nome: nome,
+    referencia: ref,
+    ativo: true,
+    criado_em: new Date().toISOString()
+  };
+
+  listaPontosVigilancia.push(novoPonto);
+  localStorage.setItem('ronda_vigilancia_pontos', JSON.stringify(listaPontosVigilancia));
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    firestoreDb.collection('pontos_vigilancia').doc(novoId).set(novoPonto)
+      .then(() => console.log('[FIRESTORE] Ponto de vigilância salvo'))
+      .catch(err => console.warn('[FIRESTORE] Ponto salvo em cache local:', err));
+  }
+
+  fecharModal('modalNovoPontoVigilancia');
+  showToast(`Ponto "${nome}" cadastrado com sucesso!`, 'success');
+  renderizarRondaVigilanciaUI();
+}
+
+function excluirPontoVigilancia(id) {
+  const ponto = listaPontosVigilancia.find(p => p.id === id);
+  if (!ponto) return;
+
+  if (!confirm(`Deseja realmente remover o ponto "${ponto.nome}"?`)) return;
+
+  listaPontosVigilancia = listaPontosVigilancia.filter(p => p.id !== id);
+  localStorage.setItem('ronda_vigilancia_pontos', JSON.stringify(listaPontosVigilancia));
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    firestoreDb.collection('pontos_vigilancia').doc(id).delete()
+      .then(() => console.log('[FIRESTORE] Ponto excluído'))
+      .catch(err => console.warn('[FIRESTORE] Excluído offline:', err));
+  }
+
+  showToast('Ponto de ronda excluído com sucesso.', 'info');
+  renderizarRondaVigilanciaUI();
+}
+
+// Geração do HTML de Plaquinha A4 com QR Code
+function gerarHtmlPlaquinhaA4(ponto, idx) {
+  const cod = ponto.id || `PNT-${String(idx + 1).padStart(2, '0')}`;
+  const qrUrl = getQRCodeUrlVigilancia(cod, ponto.nome);
+  const imgId = `imgQrPlaquinhaVig_${cod.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+  setTimeout(() => {
+    const imgEl = document.getElementById(imgId);
+    if (imgEl) renderizarQRCodeEmImagem(imgEl, qrUrl, 380);
+  }, 100);
+
+  return `
+    <div class="bg-white p-8 rounded-2xl border-4 border-slate-900 shadow-xl max-w-xl mx-auto break-after-page text-center text-slate-900 my-6">
+      <!-- Cabeçalho Oficial GEL Engenharia -->
+      <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
+        <img src="logo_gel_cropped.png" alt="GEL Engenharia" class="h-10 object-contain">
+        <div class="text-right">
+          <h3 class="text-xs font-black uppercase tracking-wider text-indigo-900">GEL • Goetze Lobato Engenharia S.A.</h3>
+          <p class="text-[11px] font-bold text-slate-600">Obra PCH Taboca 2 • Canteiro & Alojamentos</p>
+        </div>
+      </div>
+
+      <!-- Título da Plaqueta -->
+      <div class="bg-slate-900 text-white py-2 px-4 rounded-xl mb-6">
+        <h2 class="text-base sm:text-lg font-black uppercase tracking-wider flex items-center justify-center gap-2">
+          <i class="fa-solid fa-shield-halved text-amber-400"></i> Ponto Oficial de Ronda Noturna
+        </h2>
+        <p class="text-[11px] text-slate-300">Vigilância Patrimonial • Passagem Obrigatória (18h às 06h)</p>
+      </div>
+
+      <!-- Informações do Local -->
+      <div class="mb-5">
+        <span class="inline-block px-3 py-1 rounded-md bg-indigo-100 text-indigo-900 font-mono font-black text-xs mb-2">
+          CÓDIGO: ${escapeHtml(cod)}
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-black uppercase text-slate-950 tracking-tight leading-tight">
+          ${escapeHtml(ponto.nome)}
+        </h1>
+        <p class="text-sm font-semibold text-slate-600 mt-1">
+          ${escapeHtml(ponto.referencia || 'Fixar em local visível e desobstruído')}
+        </p>
+      </div>
+
+      <!-- QR Code em Alta Resolução -->
+      <div class="p-4 bg-white rounded-2xl border-2 border-slate-300 inline-block mx-auto my-3 shadow-inner">
+        <img id="${imgId}" src="" alt="QR Code Ponto de Ronda" class="w-64 h-64 sm:w-72 sm:h-72 object-contain mx-auto">
+      </div>
+
+      <!-- Instruções de Escaneamento -->
+      <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 mt-5 text-indigo-950 text-xs text-left">
+        <div class="flex items-center gap-2 font-bold mb-1">
+          <i class="fa-solid fa-mobile-screen-button text-indigo-600"></i> INSTRUÇÕES PARA O VIGILANTE:
+        </div>
+        <ol class="list-decimal list-inside space-y-0.5 text-[11px] text-indigo-900">
+          <li>Abra o aplicativo de <b>Vigilância Noturna</b> no celular do plantão.</li>
+          <li>Aponte a câmera para o QR Code acima até emitir o bipe de confirmação.</li>
+          <li>Em caso de porta aberta ou avaria, marque <b>Registrar Ocorrência</b>.</li>
+          <li>Trava de segurança: escaneamentos repetidos no mesmo ponto exigem 10 minutos de intervalo.</li>
+        </ol>
+      </div>
+
+      <!-- Rodapé da Plaqueta -->
+      <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+        <span>PREFEITURA DE CANTEIRO GEL</span>
+        <span>SISTEMA DE CONTROLE PATRIMONIAL</span>
+      </div>
+    </div>
+  `;
+}
+
+function imprimirPlaquinhaVigilancia(id) {
+  const ponto = listaPontosVigilancia.find(p => p.id === id);
+  if (!ponto) {
+    showToast('Ponto não encontrado.', 'warning');
+    return;
+  }
+
+  const container = document.getElementById('containerPlaquinhasA4Vigilancia');
+  if (!container) return;
+
+  container.innerHTML = gerarHtmlPlaquinhaA4(ponto, 0);
+  abrirModal('modalPlaquinhasA4Vigilancia');
+}
+
+function imprimirTodasPlaquinhasVigilancia() {
+  if (listaPontosVigilancia.length === 0) {
+    showToast('Nenhum ponto de ronda cadastrado para imprimir.', 'warning');
+    return;
+  }
+
+  const container = document.getElementById('containerPlaquinhasA4Vigilancia');
+  if (!container) return;
+
+  container.innerHTML = listaPontosVigilancia.map((p, idx) => gerarHtmlPlaquinhaA4(p, idx)).join('');
+  abrirModal('modalPlaquinhasA4Vigilancia');
+}
+
+// Exportação em Formato Excel (XLSX / CSV)
+function exportarRelatorioTurnoVigilanciaExcel() {
+  const inputData = document.getElementById('inputDataTurnoVigilancia');
+  const dataTurno = inputData?.value || obterInfoTurnoNoturno().dataTurno;
+
+  const bipesDoTurno = (listaRegistrosVigilancia || []).filter(r => r.data_turno === dataTurno || r.turno_id === `TURNO-${dataTurno}`);
+
+  if (bipesDoTurno.length === 0) {
+    showToast('Não há registros de ronda no turno selecionado para exportar.', 'warning');
+    return;
+  }
+
+  bipesDoTurno.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  if (typeof XLSX !== 'undefined') {
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+      ['RELATÓRIO OFICIAL DE RONDA DE VIGILÂNCIA NOTURNA - GEL ENGENHARIA'],
+      [`Obra: PCH TABOCA 2`, `Turno: ${dataTurno} (18h às 06h)`, `Emitido em: ${new Date().toLocaleString('pt-BR')}`],
+      [],
+      ['Horário', 'Código Ponto', 'Local / Ponto', 'Vigilante', 'Matrícula', 'Empresa', 'Status', 'Tipo Ocorrência', 'Detalhes Ocorrência', 'Latitude', 'Longitude']
+    ];
+
+    bipesDoTurno.forEach(b => {
+      wsData.push([
+        b.data_hora || '--',
+        b.ponto_id || '',
+        b.ponto_nome || '',
+        b.guarda_nome || '',
+        b.guarda_matricula || '',
+        b.guarda_empresa || 'GEL',
+        b.tem_ocorrencia ? 'ALERTA / ANOMALIA' : 'NORMAL / CONFORME',
+        b.tipo_ocorrencia || '',
+        b.detalhes_ocorrencia || '',
+        b.latitude || '',
+        b.longitude || ''
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Ronda Noturna');
+    XLSX.writeFile(wb, `Relatorio_Ronda_Noturna_${dataTurno}.xlsx`);
+    showToast('📊 Relatório do turno exportado em Excel (.xlsx) com sucesso!', 'success');
+  } else {
+    // Fallback CSV com UTF-8 BOM
+    let csvContent = '﻿';
+    csvContent += 'RELATÓRIO OFICIAL DE RONDA DE VIGILÂNCIA NOTURNA - GEL ENGENHARIA\n';
+    csvContent += `Obra: PCH TABOCA 2;Turno: ${dataTurno} (18h às 06h);Emitido em: ${new Date().toLocaleString('pt-BR')}\n\n`;
+    csvContent += 'Horário;Código Ponto;Local / Ponto;Vigilante;Matrícula;Empresa;Status;Tipo Ocorrência;Detalhes Ocorrência;Latitude;Longitude\n';
+
+    bipesDoTurno.forEach(b => {
+      const hora = b.data_hora || '--';
+      const pId = b.ponto_id || '';
+      const pNome = (b.ponto_nome || '').replace(/;/g, ' - ');
+      const gNome = (b.guarda_nome || '').replace(/;/g, ' - ');
+      const gMat = b.guarda_matricula || '';
+      const gEmp = b.guarda_empresa || 'GEL';
+      const status = b.tem_ocorrencia ? 'ALERTA / ANOMALIA' : 'NORMAL / CONFORME';
+      const tipoOc = (b.tipo_ocorrencia || '').replace(/;/g, ' - ');
+      const detOc = (b.detalhes_ocorrencia || '').replace(/;/g, ' - ').replace(/\n/g, ' ');
+      const lat = b.latitude || '';
+      const lng = b.longitude || '';
+      csvContent += `"${hora}";"${pId}";"${pNome}";"${gNome}";"${gMat}";"${gEmp}";"${status}";"${tipoOc}";"${detOc}";"${lat}";"${lng}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Relatorio_Ronda_Noturna_${dataTurno}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('📊 Relatório do turno exportado em CSV com sucesso!', 'success');
+  }
+}
+
+// Exportações Globais para Handlers do HTML
+window.obterInfoTurnoNoturno = obterInfoTurnoNoturno;
+window.getQRCodeUrlVigilancia = getQRCodeUrlVigilancia;
+window.carregarRondaVigilancia = carregarRondaVigilancia;
+window.definirTurnoHojeVigilancia = definirTurnoHojeVigilancia;
+window.aoMudarDataTurnoVigilancia = aoMudarDataTurnoVigilancia;
+window.renderizarRondaVigilanciaUI = renderizarRondaVigilanciaUI;
+window.alternarSubAbaVigilancia = alternarSubAbaVigilancia;
+window.renderizarGridPontosVigilancia = renderizarGridPontosVigilancia;
+window.abrirModalNovoPontoVigilancia = abrirModalNovoPontoVigilancia;
+window.salvarNovoPontoVigilancia = salvarNovoPontoVigilancia;
+window.excluirPontoVigilancia = excluirPontoVigilancia;
+window.imprimirPlaquinhaVigilancia = imprimirPlaquinhaVigilancia;
+window.imprimirTodasPlaquinhasVigilancia = imprimirTodasPlaquinhasVigilancia;
+window.exportarRelatorioTurnoVigilanciaExcel = exportarRelatorioTurnoVigilanciaExcel;

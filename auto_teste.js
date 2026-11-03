@@ -53,7 +53,7 @@ jsFiles.forEach(file => {
 });
 
 // Verificação de Sintaxe em Scripts Inline dos Arquivos HTML
-const htmlScriptFiles = ['ronda.html', 'frontend/ronda.html', 'limpeza.html', 'frontend/limpeza.html', 'chamado.html', 'frontend/chamado.html', 'index.html', 'frontend/index.html'];
+const htmlScriptFiles = ['guarda.html', 'frontend/guarda.html', 'ronda.html', 'frontend/ronda.html', 'limpeza.html', 'frontend/limpeza.html', 'chamado.html', 'frontend/chamado.html', 'index.html', 'frontend/index.html'];
 htmlScriptFiles.forEach(file => {
   if (fs.existsSync(file)) {
     try {
@@ -101,6 +101,7 @@ const parityPairs = [
   ['chamado.html', 'frontend/chamado.html'],
   ['limpeza.html', 'frontend/limpeza.html'],
   ['ronda.html', 'frontend/ronda.html'],
+  ['guarda.html', 'frontend/guarda.html'],
   ['dados_iniciais_taboca.json', 'frontend/dados_iniciais_taboca.json'],
   ['manifest.json', 'frontend/manifest.json']
 ];
@@ -1537,7 +1538,7 @@ assert(limpezaHtmlAtual.includes('carregarHistoricoPlaquinhaLimpeza(c.id, null, 
 console.log('\n--- SEÇÃO 24: AUDITORIA E BLINDAGEM DE TODOS OS QR CODES ---');
 
 // 1. Motor de QR Code Offline Local (pure JS)
-assert(fs.existsSync('qrcode.min.js'), 'Biblioteca qrcode.min.js presente na raiz');
+assert(fs.existsSync('qrcode.min.js', 'guarda.html'), 'Biblioteca qrcode.min.js presente na raiz');
 assert(fs.existsSync('frontend/qrcode.min.js'), 'Biblioteca qrcode.min.js presente em frontend/');
 const qrcodeRaiz = fs.readFileSync('qrcode.min.js', 'utf8');
 const qrcodeFrontend = fs.readFileSync('frontend/qrcode.min.js', 'utf8');
@@ -2057,6 +2058,100 @@ arquivosVerificarParidade.forEach(arq => {
   const cFront = fs.readFileSync(`frontend/${arq}`, 'utf8');
   assert(cRaiz === cFront, `Paridade estrita de 100% no arquivo ${arq}`);
 });
+
+// -------------------------------------------------------------
+
+// -------------------------------------------------------------
+// SEÇÃO 35: RONDA DE VIGILÂNCIA NOTURNA COM QR CODE & ANTI-FRAUDE
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 35: RONDA DE VIGILÂNCIA NOTURNA COM QR CODE & ANTI-FRAUDE ---');
+
+const indexHtml = fs.readFileSync('index.html', 'utf8');
+const appJs = fs.readFileSync('app.js', 'utf8');
+const guardaHtml = fs.readFileSync('guarda.html', 'utf8');
+
+// 1. Validações de DOM no index.html
+assert(indexHtml.includes('id="tab-ronda_vigilancia"'), 'Aba tab-ronda_vigilancia presente em index.html');
+assert(indexHtml.includes('data-tab="ronda_vigilancia"'), 'Botão nav data-tab="ronda_vigilancia" presente na sidebar');
+assert(indexHtml.includes('id="inputDataTurnoVigilancia"'), 'Seletor de data de turno presente');
+assert(indexHtml.includes('id="kpiVigilanciaBipes"'), 'KPI Total de Bipes presente');
+assert(indexHtml.includes('id="kpiVigilanciaCobertura"'), 'KPI Pontos Cobertos presente');
+assert(indexHtml.includes('id="kpiVigilanciaGuardas"'), 'KPI Vigilantes Ativos presente');
+assert(indexHtml.includes('id="kpiVigilanciaOcorrencias"'), 'KPI Ocorrências presente');
+assert(indexHtml.includes('id="tbodyCronologiaVigilancia"'), 'Tabela de cronologia do turno presente');
+assert(indexHtml.includes('id="gridPontosVigilancia"'), 'Grid de pontos de ronda cadastrados presente');
+assert(indexHtml.includes('id="modalNovoPontoVigilancia"'), 'Modal de novo ponto de vigilância presente');
+assert(indexHtml.includes('id="modalPlaquinhasA4Vigilancia"'), 'Modal de impressão de plaquinhas A4 presente');
+assert(indexHtml.includes('id="inputNomePontoVigilancia"'), 'Campo inputNomePontoVigilancia presente');
+assert(indexHtml.includes('id="inputRefPontoVigilancia"'), 'Campo inputRefPontoVigilancia presente');
+
+// 2. Validações do Aplicativo Mobile do Vigilante (guarda.html)
+assert(guardaHtml.includes('id="cameraGuardaQR"'), 'Elemento da câmera html5-qrcode presente em guarda.html');
+assert(guardaHtml.includes('id="formIdentificacaoGuarda"'), 'Formulário de identificação única presente em guarda.html');
+assert(guardaHtml.includes('id="btnTrocarGuarda"'), 'Botão de troca de vigilante presente em guarda.html');
+assert(guardaHtml.includes('id="btnLanterna"'), 'Controle de lanterna presente em guarda.html');
+assert(guardaHtml.includes('id="checkRegistrarOcorrencia"'), 'Check de ocorrência presente em guarda.html');
+assert(guardaHtml.includes('id="selectTipoOcorrencia"'), 'Seletor de tipo de ocorrência presente em guarda.html');
+assert(guardaHtml.includes('id="inputDetalhesOcorrencia"'), 'Campo de detalhes de anomalia presente em guarda.html');
+assert(guardaHtml.includes('anti_fraude_'), 'Trava anti-fraude implementada em guarda.html');
+
+// 3. Funções no app.js
+assert(appJs.includes('function carregarRondaVigilancia()'), 'Função carregarRondaVigilancia implementada');
+assert(appJs.includes('function abrirModalNovoPontoVigilancia()'), 'Função abrirModalNovoPontoVigilancia implementada');
+assert(appJs.includes('function salvarNovoPontoVigilancia('), 'Função salvarNovoPontoVigilancia implementada');
+assert(appJs.includes('function excluirPontoVigilancia('), 'Função excluirPontoVigilancia implementada');
+assert(appJs.includes('function imprimirPlaquinhaVigilancia('), 'Função imprimirPlaquinhaVigilancia implementada');
+assert(appJs.includes('function imprimirTodasPlaquinhasVigilancia()'), 'Função imprimirTodasPlaquinhasVigilancia implementada');
+assert(appJs.includes('function exportarRelatorioTurnoVigilanciaExcel()'), 'Função exportarRelatorioTurnoVigilanciaExcel implementada');
+assert(appJs.includes('function getQRCodeUrlVigilancia('), 'Função getQRCodeUrlVigilancia implementada');
+assert(appJs.includes('function obterInfoTurnoNoturno('), 'Função obterInfoTurnoNoturno implementada');
+
+// 4. Testes de Regra de Negócio: Cálculo de Janela do Turno Noturno (18h-06h)
+function simularTurno(dataSimulada) {
+  const hora = dataSimulada.getHours();
+  let dataBase = new Date(dataSimulada);
+  if (hora < 12) {
+    dataBase.setDate(dataBase.getDate() - 1);
+  }
+  const yyyy = dataBase.getFullYear();
+  const mm = String(dataBase.getMonth() + 1).padStart(2, '0');
+  const dd = String(dataBase.getDate()).padStart(2, '0');
+  return `TURNO-${yyyy}-${mm}-${dd}`;
+}
+
+// Caso A: Guarda bipando às 23:30 do dia 03/11 -> Turno 03/11
+const turnoNoite = simularTurno(new Date(2026, 10, 3, 23, 30));
+assert(turnoNoite === 'TURNO-2026-11-03', 'Horário 23:30 pertence ao Turno Noturno do dia corrente (TURNO-2026-11-03)');
+
+// Caso B: Guarda bipando às 03:45 da madrugada do dia 04/11 -> Turno ainda é 03/11
+const turnoMadrugada = simularTurno(new Date(2026, 10, 4, 3, 45));
+assert(turnoMadrugada === 'TURNO-2026-11-03', 'Horário 03:45 da madrugada pertence ao Turno iniciado às 18h de ontem (TURNO-2026-11-03)');
+
+// Caso C: Guarda bipando às 05:59 do dia 04/11 -> Turno ainda é 03/11
+const turnoAmanhecer = simularTurno(new Date(2026, 10, 4, 5, 59));
+assert(turnoAmanhecer === 'TURNO-2026-11-03', 'Horário 05:59 do amanhecer pertence ao Turno 03/11');
+
+// Caso D: Turno da noite seguinte às 19:00 do dia 04/11 -> Turno 04/11
+const turnoNoiteSeguinte = simularTurno(new Date(2026, 10, 4, 19, 0));
+assert(turnoNoiteSeguinte === 'TURNO-2026-11-04', 'Horário 19:00 pertence ao novo Turno Noturno (TURNO-2026-11-04)');
+
+// 5. Testes de Regra de Negócio: Trava Anti-Fraude de 10 Minutos no Mesmo Ponto
+function simularAntiFraude(ultimoScanMs, agoraMs) {
+  const intervaloMinutos = 10;
+  const diferencaMs = agoraMs - ultimoScanMs;
+  return diferencaMs >= intervaloMinutos * 60 * 1000;
+}
+
+const t0 = 1700000000000;
+const t5min = t0 + 5 * 60 * 1000;
+const t9min = t0 + 9 * 60 * 1000 + 50000;
+const t10min = t0 + 10 * 60 * 1000;
+const t15min = t0 + 15 * 60 * 1000;
+
+assert(simularAntiFraude(t0, t5min) === false, 'Trava Anti-Fraude: bipe 5 min após o primeiro é BLOQUEADO');
+assert(simularAntiFraude(t0, t9min) === false, 'Trava Anti-Fraude: bipe 9 min e 50s após o primeiro é BLOQUEADO');
+assert(simularAntiFraude(t0, t10min) === true, 'Trava Anti-Fraude: bipe aos 10 min exatos é AUTORIZADO');
+assert(simularAntiFraude(t0, t15min) === true, 'Trava Anti-Fraude: bipe aos 15 min é AUTORIZADO');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
