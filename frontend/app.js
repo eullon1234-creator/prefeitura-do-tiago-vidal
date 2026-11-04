@@ -1836,6 +1836,7 @@ function iniciarListenerTempoRealFirebase() {
   listenerTempoRealAtivo = true;
 
   console.log("🔥 [FIREBASE] Iniciando listener em tempo real entre celular e PC...");
+  if (typeof iniciarListenerVigilancia === 'function') iniciarListenerVigilancia();
 
   // Ouvir alterações em tempo real na coleção de alojados (fotos, check-in, realocação, status)
   firestoreDb.collection('alojados').onSnapshot(async (snapshot) => {
@@ -10229,7 +10230,7 @@ if ('serviceWorker' in navigator) {
     }
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=5.3')
+    navigator.serviceWorker.register('./sw.js?v=5.4')
       .then(reg => {
         console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
         // Garante que o novo service worker seja verificado imediatamente
@@ -21022,6 +21023,35 @@ function getQRCodeUrlVigilancia(pontoId, pontoNome) {
 }
 
 // Inicializar armazenamento local e sincronizar com Firestore
+// Sincronização explícita via get() para garantir dados imediatos
+function sincronizarRondaVigilanciaNuvem() {
+  if (typeof firestoreDb === 'undefined' || !firestoreDb) return;
+
+  firestoreDb.collection('pontos_vigilancia').get().then(snapshot => {
+    if (!snapshot.empty) {
+      const remotas = [];
+      snapshot.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+      listaPontosVigilancia = remotas;
+      localStorage.setItem('ronda_vigilancia_pontos', JSON.stringify(listaPontosVigilancia));
+      if (activeTab === 'ronda_vigilancia') {
+        renderizarRondaVigilanciaUI();
+      }
+    }
+  }).catch(e => console.warn('[FIRESTORE] get pontos_vigilancia:', e));
+
+  firestoreDb.collection('ronda_vigilancia_registros').get().then(snapshot => {
+    if (!snapshot.empty) {
+      const remotas = [];
+      snapshot.forEach(doc => remotas.push({ id: doc.id, ...doc.data() }));
+      listaRegistrosVigilancia = remotas;
+      localStorage.setItem('ronda_vigilancia_registros', JSON.stringify(listaRegistrosVigilancia));
+      if (activeTab === 'ronda_vigilancia') {
+        renderizarRondaVigilanciaUI();
+      }
+    }
+  }).catch(e => console.warn('[FIRESTORE] get ronda_vigilancia_registros:', e));
+}
+
 function inicializarRondaVigilancia() {
   try {
     const cachedPontos = localStorage.getItem('ronda_vigilancia_pontos');
@@ -21045,9 +21075,25 @@ function inicializarRondaVigilancia() {
 }
 
 function iniciarListenerVigilancia() {
+  // Listener de armazenamento local para testes na mesma máquina
+  if (typeof window !== 'undefined' && !window._listenerStorageVigilanciaAtivo) {
+    window._listenerStorageVigilanciaAtivo = true;
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'ronda_vigilancia_registros' || e.key === 'ronda_vigilancia_pontos') {
+        inicializarRondaVigilancia();
+        if (activeTab === 'ronda_vigilancia') {
+          renderizarRondaVigilanciaUI();
+        }
+      }
+    });
+  }
+
   if (listenerVigilanciaIniciado) return;
   if (typeof firestoreDb === 'undefined' || !firestoreDb) return;
   listenerVigilanciaIniciado = true;
+
+  // Puxar imediatamente da nuvem
+  sincronizarRondaVigilanciaNuvem();
 
   // Sincronização em tempo real de pontos de ronda
   firestoreDb.collection('pontos_vigilancia').onSnapshot(snapshot => {
@@ -21080,6 +21126,7 @@ function carregarRondaVigilancia() {
     const turno = obterInfoTurnoNoturno();
     inputData.value = turno.dataTurno;
   }
+  sincronizarRondaVigilanciaNuvem();
   renderizarRondaVigilanciaUI();
 }
 
@@ -21117,7 +21164,13 @@ function renderizarRondaVigilanciaUI() {
   if (labelEl) labelEl.textContent = `Plantão Noturno: ${labelTurno}`;
 
   // Filtrar bipes deste turno
-  const bipesDoTurno = (listaRegistrosVigilancia || []).filter(r => r.data_turno === dataTurno || r.turno_id === `TURNO-${dataTurno}`);
+  const agora = Date.now();
+  const bipesDoTurno = (listaRegistrosVigilancia || []).filter(r => {
+    if (r.data_turno === dataTurno || r.turno_id === `TURNO-${dataTurno}`) return true;
+    // Tolerância para testes e bipes recentes (últimas 14 horas da noite)
+    if (r.timestamp && (agora - r.timestamp) >= 0 && (agora - r.timestamp) <= 14 * 60 * 60 * 1000) return true;
+    return false;
+  });
 
   // Ordenar mais recentes primeiro para exibição na tabela cronológica
   bipesDoTurno.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -21578,6 +21631,7 @@ function exportarRelatorioTurnoVigilanciaExcel() {
 window.obterInfoTurnoNoturno = obterInfoTurnoNoturno;
 window.getQRCodeUrlVigilancia = getQRCodeUrlVigilancia;
 window.carregarRondaVigilancia = carregarRondaVigilancia;
+window.sincronizarRondaVigilanciaNuvem = sincronizarRondaVigilanciaNuvem;
 window.definirTurnoHojeVigilancia = definirTurnoHojeVigilancia;
 window.aoMudarDataTurnoVigilancia = aoMudarDataTurnoVigilancia;
 window.renderizarRondaVigilanciaUI = renderizarRondaVigilanciaUI;

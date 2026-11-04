@@ -82,6 +82,8 @@
         <p class="text-xs text-slate-400">Identifique-se uma única vez para registrar as rondas desta noite (Turno 18h às 06h).</p>
       </div>
 
+      <div id="avisoPontoPendenteUrl" class="hidden p-3.5 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-200 text-xs flex items-center gap-2.5 mb-4 animate-pulse"></div>
+
       <form id="formIdentificacaoGuarda" onsubmit="confirmarIdentificacaoGuarda(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-1">Nome Completo do Vigilante *</label>
@@ -217,14 +219,15 @@
 
   <!-- SCRIPT DE OPERAÇÃO MOBILE DA RONDA DO GUARDA -->
   <script>
-    // Configurações do Firebase
+        // Configurações Oficiais do Firebase (Canteiro Taboca 2)
     const firebaseConfig = {
-      apiKey: "AIzaSyD-TABOCA2-PREFEITURA-CANTEIRO",
-      authDomain: "prefeitura-taboca2.firebaseapp.com",
-      projectId: "prefeitura-taboca2",
-      storageBucket: "prefeitura-taboca2.appspot.com",
-      messagingSenderId: "1029384756",
-      appId: "1:1029384756:web:abcd1234efgh5678"
+      apiKey: "AIzaSyCd1Uu_dRx8k4EcgifWUmsmfeqnAcB4PHw",
+      authDomain: "prefeitura-cc71b.firebaseapp.com",
+      projectId: "prefeitura-cc71b",
+      storageBucket: "prefeitura-cc71b.firebasestorage.app",
+      messagingSenderId: "395936672533",
+      appId: "1:395936672533:web:d7d17537d2c38c47bc971c",
+      measurementId: "G-YYXMDWCM4Q"
     };
 
     let firestoreDb = null;
@@ -239,6 +242,7 @@
     }
 
     let guardaAtual = null;
+    let urlPontoPendente = null;
     let scannerCamera = null;
     let lanternaAtiva = false;
     let trackVideo = null;
@@ -305,6 +309,15 @@
 
       localStorage.setItem('guarda_ativo_turno', JSON.stringify(guardaAtual));
       iniciarPainelScanner();
+
+      // Se havia um QR Code pendente lido pela câmera do celular, registra-o agora imediatamente!
+      if (urlPontoPendente) {
+        const urlParaProcessar = urlPontoPendente;
+        urlPontoPendente = null;
+        setTimeout(() => {
+          processarLeituraPonto(urlParaProcessar);
+        }, 900);
+      }
     }
 
     function abrirModalIdentificacaoGuarda() {
@@ -536,6 +549,14 @@
     }
 
     function salvarRegistroLocal(reg) {
+      // 1. Chave global para sincronização entre abas do mesmo navegador
+      try {
+        const todos = JSON.parse(localStorage.getItem('ronda_vigilancia_registros') || '[]');
+        todos.unshift(reg);
+        localStorage.setItem('ronda_vigilancia_registros', JSON.stringify(todos));
+      } catch(e) {}
+
+      // 2. Chave local do turno do guarda
       const chave = `ronda_registros_${reg.turno_id}`;
       const lista = JSON.parse(localStorage.getItem(chave) || '[]');
       lista.unshift(reg);
@@ -650,14 +671,24 @@
     function verificarParametrosUrl() {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.has('ponto_id') || urlParams.has('ponto_nome')) {
+        urlPontoPendente = window.location.href;
         const pontoNome = urlParams.get('ponto_nome') || urlParams.get('ponto_id');
-        setTimeout(() => {
-          if (guardaAtual) {
-            processarLeituraPonto(pontoNome);
-          } else {
-            alert(`Ponto identificado: "${pontoNome}". Por favor, confirme seu nome de vigilante para validar o bipe.`);
+        
+        if (guardaAtual) {
+          setTimeout(() => {
+            if (urlPontoPendente) {
+              processarLeituraPonto(urlPontoPendente);
+              urlPontoPendente = null;
+            }
+          }, 800);
+        } else {
+          // Mostrar banner chamativo para o usuário saber que o ponto já foi capturado pelo QR Code
+          const avisoEl = document.getElementById('avisoPontoPendenteUrl');
+          if (avisoEl) {
+            avisoEl.innerHTML = `<i class="fa-solid fa-qrcode text-amber-400 text-lg flex-shrink-0"></i> <div>Ponto Detectado: <b class="text-white">${pontoNome}</b>.<br><span class="text-indigo-300 text-[11px]">Digite seu nome abaixo para confirmar e registrar este bipe instantaneamente!</span></div>`;
+            avisoEl.classList.remove('hidden');
           }
-        }, 600);
+        }
       }
     }
   </script>
