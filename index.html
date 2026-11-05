@@ -3588,30 +3588,33 @@ service cloud.firestore {
       </div>
 
       <!-- ================= TAB: PORTAL DO ALOJADO (GESTÃO DO PREFEITO) ================= -->
-      <div id="tab-portal_alojado" class="tab-content hidden space-y-6">
+      <div id="tab-portal_alojado" class="tab-content hidden space-y-5">
         <!-- Cabeçalho da Aba -->
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div>
             <div class="flex items-center gap-2 flex-wrap">
               <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                <i class="fa-solid fa-id-card-clip text-amber-600 mr-1"></i> Comunicação & Autoatendimento
+                <i class="fa-solid fa-id-card-clip text-amber-600 mr-1"></i> Painel de Controle do App Mobile
               </span>
               <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <i class="fa-solid fa-leaf mr-1"></i> Documento Único (Economia 98% Firebase)
+                <i class="fa-solid fa-bolt mr-1"></i> Atualização Imediata (1 Leitura Única)
               </span>
-              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Portal do Alojado & Colaborador</h1>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Editor Completo do App do Alojado</h1>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 mt-1">
-              Publique o Cardápio do Refeitório, Avisos Oficiais no Mural Digital e a Escala de Lavanderia/Ônibus para todos os celulares da obra.
+              Edite todas as informações do aplicativo dos colaboradores: Textos da Tela Inicial, Lista de Moradores, Cardápio & Horários, Mural de Avisos, Lavanderia, Ônibus, Regras e Contatos.
             </p>
           </div>
 
           <div class="flex items-center gap-2 flex-wrap">
             <a href="alojado.html" target="_blank" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
-              <i class="fa-solid fa-mobile-screen-button text-amber-400"></i> Abrir App do Alojado
+              <i class="fa-solid fa-mobile-screen-button text-amber-400"></i> Ver App do Celular
             </a>
+            <button type="button" onclick="sincronizarListaAlojadosComPortal(true)" class="btn-prefeito px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition" title="Envia a lista atualizada de moradores, quartos e camas para o App do Celular">
+              <i class="fa-solid fa-users-rays"></i> Sincronizar Moradores
+            </button>
             <button type="button" onclick="imprimirCartazPortalAlojadoA4()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
-              <i class="fa-solid fa-qrcode"></i> Imprimir Cartaz A4 (QR Code)
+              <i class="fa-solid fa-qrcode"></i> Imprimir Cartaz A4
             </button>
             <button type="button" onclick="salvarTudoPortalAlojadoAdmin()" class="btn-prefeito px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
               <i class="fa-solid fa-cloud-arrow-up"></i> Publicar Tudo no App
@@ -3619,79 +3622,234 @@ service cloud.firestore {
           </div>
         </div>
 
-        <!-- Grid Principal: Cardápio do Dia + Mural de Avisos -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          <!-- Coluna 1: Cardápio do Refeitório -->
+        <!-- Barra de Sub-Abas de Edição (As 5 Áreas do App Mobile) -->
+        <div class="bg-white p-2 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-1.5 overflow-x-auto">
+          <button type="button" id="btnSubPortal_identidade" onclick="alternarSubAbaPortalAlojado('identidade')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap bg-slate-900 text-white shadow-xs">
+            <i class="fa-solid fa-mobile-screen text-amber-400"></i>
+            <span>1. Tela Inicial & Moradores</span>
+          </button>
+          <button type="button" id="btnSubPortal_cardapio" onclick="alternarSubAbaPortalAlojado('cardapio')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
+            <i class="fa-solid fa-utensils text-emerald-600"></i>
+            <span>2. Cardápio & Horários</span>
+          </button>
+          <button type="button" id="btnSubPortal_mural" onclick="alternarSubAbaPortalAlojado('mural')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
+            <i class="fa-solid fa-bullhorn text-indigo-600"></i>
+            <span>3. Mural de Avisos</span>
+            <span id="badgeCountAvisosSubAba" class="px-1.5 py-0.5 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-black">1</span>
+          </button>
+          <button type="button" id="btnSubPortal_escalas" onclick="alternarSubAbaPortalAlojado('escalas')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
+            <i class="fa-solid fa-calendar-check text-teal-600"></i>
+            <span>4. Lavanderia & Ônibus</span>
+          </button>
+          <button type="button" id="btnSubPortal_regras" onclick="alternarSubAbaPortalAlojado('regras')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
+            <i class="fa-solid fa-scale-balanced text-rose-600"></i>
+            <span>5. Regras & Contatos</span>
+          </button>
+        </div>
+
+        <!-- ================= SUB-ABA 1: IDENTIDADE DO APP & SINCRONIZAÇÃO DE MORADORES ================= -->
+        <div id="subPortal_identidade" class="sub-portal-panel grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Card 1: Personalização dos Textos e Títulos do App -->
           <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <i class="fa-solid fa-pen-ruler"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Textos & Identidade Visual do App</h3>
+                  <p class="text-[11px] text-slate-400">Personalize o cabeçalho e a mensagem de boas-vindas da tela inicial</p>
+                </div>
+              </div>
+            </div>
+
+            <form id="formIdentidadePortal" onsubmit="salvarIdentidadePortalAlojado(event)" class="p-5 space-y-4 flex-1 flex flex-col justify-between text-xs">
+              <div class="space-y-3.5">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div class="sm:col-span-2">
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Nome / Título do Aplicativo *</label>
+                    <input type="text" id="inputPortalTituloApp" required placeholder="Ex: Portal do Alojado" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Selo da Obra *</label>
+                    <input type="text" id="inputPortalBadgeObra" required placeholder="Ex: Taboca 2" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Subtítulo do Topo (Abaixo do Nome do App) *</label>
+                  <input type="text" id="inputPortalSubtituloTopo" required placeholder="Ex: Bem-vindo ao Canteiro GEL Engenharia" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Título de Boas-Vindas (Tela de Entrada) *</label>
+                  <input type="text" id="inputPortalTituloBoasVindas" required placeholder="Ex: Acesse seu Espaço no Canteiro" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Mensagem Explicativa da Tela Inicial *</label>
+                  <textarea id="inputPortalTextoBoasVindas" rows="2" required placeholder="Ex: Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital e peça manutenções rápidas." class="w-full px-3 py-2.5 border border-slate-300 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
+                <button type="submit" class="btn-prefeito px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
+                  <i class="fa-solid fa-floppy-disk"></i> Salvar Textos da Tela Inicial
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Card 2: Sincronização de Moradores, Quartos e Colegas de Quarto -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+            <div>
+              <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center border border-sky-500/30">
+                    <i class="fa-solid fa-users-gear"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-bold text-white">Base de Moradores & Quartos no Celular</h3>
+                    <p class="text-[11px] text-slate-400">Mantém a busca por Nome/Matrícula do celular igual ao painel do Prefeito</p>
+                  </div>
+                </div>
+                <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Auto-Sync Ativo</span>
+              </div>
+
+              <div class="p-5 space-y-4 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Alojados Sincronizados</span>
+                    <span id="kpiTotalAlojadosSyncPortal" class="text-2xl font-black text-slate-900 mt-0.5 block">387</span>
+                    <span class="text-[11px] text-emerald-600 font-semibold">Prontos para busca no celular</span>
+                  </div>
+                  <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Última Sincronização</span>
+                    <span id="statusUltimoSyncAlojadosPortal" class="text-sm font-black text-sky-700 mt-1 block">Sincronizado</span>
+                    <span class="text-[11px] text-slate-500">Atualiza ao mudar quartos</span>
+                  </div>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 space-y-1.5">
+                  <div class="font-bold flex items-center gap-1.5 text-sky-900">
+                    <i class="fa-solid fa-circle-info text-sky-600"></i>
+                    <span>Como funciona para o colaborador no celular?</span>
+                  </div>
+                  <p class="text-[11px] leading-relaxed text-sky-800">
+                    Sempre que você cadastrar um novo colaborador, trocar alguém de cama/quarto ou der baixa no sistema principal, a lista é enviada automaticamente para o documento único do app. Você também pode forçar o envio clicando abaixo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+              <span class="text-[11px] text-slate-500">Envia Nome, Matrícula, Empresa, Bloco, Quarto e Cama:</span>
+              <button type="button" onclick="sincronizarListaAlojadosComPortal(true)" class="btn-prefeito px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-rotate"></i> Sincronizar Moradores & Quartos Agora
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= SUB-ABA 2: CARDÁPIO DO REFEITÓRIO & HORÁRIOS ================= -->
+        <div id="subPortal_cardapio" class="sub-portal-panel hidden">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
                   <i class="fa-solid fa-utensils"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white">Cardápio do Refeitório</h3>
-                  <p class="text-[11px] text-slate-400">Atualizado em: <span id="statusUltimaAtualizacaoCardapio" class="text-amber-300 font-semibold">Hoje</span></p>
+                  <h3 class="text-sm font-bold text-white">Editor de Cardápio & Horários das Refeições</h3>
+                  <p class="text-[11px] text-slate-400">Última atualização: <span id="statusUltimaAtualizacaoCardapio" class="text-amber-300 font-semibold">Hoje</span></p>
                 </div>
               </div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Visível no App</span>
+              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Refeitório Central</span>
             </div>
 
-            <form id="formCardapioPortal" onsubmit="salvarCardapioPortalAlojado(event)" class="p-5 space-y-4 flex-1 flex flex-col justify-between text-xs">
-              <div class="space-y-3.5">
-                <div>
-                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-mug-hot text-amber-600 mr-1"></i> Café da Manhã (05h30 às 07h00)
-                  </label>
-                  <input type="text" id="inputCardapioCafe" required placeholder="Ex: Pão na chapa, ovos mexidos, cuscuz com carne seca, café, leite e frutas" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <form id="formCardapioPortal" onsubmit="salvarCardapioPortalAlojado(event)" class="p-5 space-y-4 text-xs">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Café da Manhã -->
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <label class="font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <i class="fa-solid fa-mug-hot text-amber-600"></i> 1. Café da Manhã
+                    </label>
+                    <input type="text" id="inputHorarioCafePortal" placeholder="05h30 às 07h00" class="w-36 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-[11px] font-bold text-amber-700 text-center">
+                  </div>
+                  <textarea id="inputCardapioCafe" rows="2" required placeholder="Ex: Pão na chapa, ovos mexidos, cuscuz com carne seca, café, leite e frutas" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
                 </div>
 
-                <div>
-                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-drumstick-bite text-emerald-600 mr-1"></i> Almoço no Canteiro (11h00 às 13h30)
-                  </label>
-                  <input type="text" id="inputCardapioAlmoco" required placeholder="Ex: Frango assado, carne de panela, arroz, feijão tropeiro, macarrão e salada" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <!-- Almoço no Canteiro -->
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <label class="font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <i class="fa-solid fa-drumstick-bite text-emerald-600"></i> 2. Almoço no Canteiro
+                    </label>
+                    <input type="text" id="inputHorarioAlmocoPortal" placeholder="11h00 às 13h30" class="w-36 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-[11px] font-bold text-emerald-700 text-center">
+                  </div>
+                  <textarea id="inputCardapioAlmoco" rows="2" required placeholder="Ex: Frango assado, carne de panela, arroz, feijão tropeiro, macarrão e salada" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
                 </div>
 
-                <div>
-                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-box-open text-teal-600 mr-1"></i> Marmita Térmica / Frentes de Serviço
-                  </label>
-                  <input type="text" id="inputCardapioMarmita" required placeholder="Ex: Iscas bovinas aceboladas ou filé de frango grelhado + guarnição completa" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <!-- Marmita de Trecho -->
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <label class="font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <i class="fa-solid fa-box-open text-teal-600"></i> 3. Marmita Térmica / Trecho
+                    </label>
+                    <input type="text" id="inputHorarioMarmitaPortal" placeholder="Frentes de Serviço" class="w-36 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-[11px] font-bold text-teal-700 text-center">
+                  </div>
+                  <textarea id="inputCardapioMarmita" rows="2" required placeholder="Ex: Iscas bovinas aceboladas ou filé de frango grelhado + guarnição completa" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
                 </div>
 
-                <div>
-                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-bowl-food text-indigo-600 mr-1"></i> Jantar no Alojamento (18h30 às 20h30)
-                  </label>
-                  <input type="text" id="inputCardapioJantar" required placeholder="Ex: Sopa de legumes com carne, arroz branco, feijão carioca e carne grelhada" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <!-- Jantar no Alojamento -->
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <label class="font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <i class="fa-solid fa-bowl-food text-indigo-600"></i> 4. Jantar no Alojamento
+                    </label>
+                    <input type="text" id="inputHorarioJantarPortal" placeholder="18h00 às 20h30" class="w-36 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-[11px] font-bold text-indigo-700 text-center">
+                  </div>
+                  <textarea id="inputCardapioJantar" rows="2" required placeholder="Ex: Sopa de legumes com carne, arroz branco, feijão carioca e carne grelhada" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
                 </div>
               </div>
 
               <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
-                <button type="submit" class="btn-prefeito px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
-                  <i class="fa-solid fa-floppy-disk"></i> Salvar & Publicar Cardápio
+                <button type="submit" class="btn-prefeito px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
+                  <i class="fa-solid fa-floppy-disk"></i> Salvar & Publicar Cardápio e Horários
                 </button>
               </div>
             </form>
           </div>
+        </div>
 
-          <!-- Coluna 2: Mural Digital de Avisos do Prefeito -->
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <!-- ================= SUB-ABA 3: MURAL DIGITAL DE AVISOS (CRIAR, EDITAR E APAGAR) ================= -->
+        <div id="subPortal_mural" class="sub-portal-panel hidden">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
                   <i class="fa-solid fa-bullhorn"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white">Mural Digital de Avisos</h3>
-                  <p class="text-[11px] text-slate-400">Comunicados sobre água, energia, dedetização, ônibus e avisos gerais</p>
+                  <h3 class="text-sm font-bold text-white">Mural Digital de Avisos da Prefeitura</h3>
+                  <p class="text-[11px] text-slate-400">Publique novos avisos, edite textos já publicados ou remova comunicados antigos</p>
                 </div>
               </div>
             </div>
 
-            <div class="p-5 space-y-4 flex-1 flex flex-col justify-between text-xs">
-              <form id="formNovoAvisoMural" onsubmit="publicarAvisoMuralAlojado(event)" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div class="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
+              <form id="formNovoAvisoMural" onsubmit="publicarAvisoMuralAlojado(event)" class="space-y-3.5 bg-slate-50 p-4 rounded-2xl border border-slate-200 h-fit">
+                <input type="hidden" id="inputIdAvisoEditando" value="">
+                <div class="flex items-center justify-between">
+                  <h4 id="tituloFormAvisoMural" class="font-black text-slate-800 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus-circle text-indigo-600"></i> Novo Comunicado para o Mural
+                  </h4>
+                  <button type="button" id="btnCancelarEdicaoAviso" onclick="cancelarEdicaoAvisoMural()" class="hidden px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px]">
+                    Cancelar Edição
+                  </button>
+                </div>
+
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div class="sm:col-span-2">
                     <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Título do Comunicado *</label>
@@ -3709,106 +3867,252 @@ service cloud.firestore {
 
                 <div>
                   <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Mensagem para os Moradores *</label>
-                  <textarea id="inputAvisoMensagem" rows="2" required placeholder="Escreva a orientação clara para os colaboradores..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                  <textarea id="inputAvisoMensagem" rows="3" required placeholder="Escreva a orientação clara para os colaboradores..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                 </div>
 
-                <div class="flex items-center justify-between pt-1">
+                <div class="flex items-center justify-between pt-1 flex-wrap gap-2">
                   <div class="flex items-center gap-2">
-                    <label class="font-bold text-slate-600">Público:</label>
+                    <label class="font-bold text-slate-600">Público-Alvo:</label>
                     <select id="selectAvisoBloco" class="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800">
                       <option value="Todos">Todos os Alojamentos</option>
+                      <option value="Bloco 1">Apenas Bloco 1</option>
+                      <option value="Bloco 2">Apenas Bloco 2</option>
                       <option value="Bloco A">Apenas Bloco A</option>
                       <option value="Bloco B">Apenas Bloco B</option>
                       <option value="Bloco C">Apenas Bloco C</option>
                       <option value="Bloco D">Apenas Bloco D</option>
                       <option value="Bloco E">Apenas Bloco E</option>
                       <option value="Bloco F">Apenas Bloco F</option>
+                      <option value="Bloco G">Apenas Bloco G</option>
+                      <option value="Bloco H">Apenas Bloco H</option>
                       <option value="Casas">Casas na Cidade</option>
                     </select>
                   </div>
-                  <button type="submit" class="btn-prefeito px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
-                    <i class="fa-solid fa-paper-plane"></i> Publicar no Mural
+                  <button type="submit" id="btnSubmitAvisoMural" class="btn-prefeito px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-paper-plane"></i> <span id="labelBtnSubmitAvisoMural">Publicar no Mural</span>
                   </button>
                 </div>
               </form>
 
               <div>
                 <div class="flex items-center justify-between mb-2">
-                  <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Avisos Ativos no App</h4>
-                  <span class="text-[11px] text-slate-400">Máximo de 10 avisos recentes</span>
+                  <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Comunicados Ativos no App (Clique no lápis para editar)</h4>
+                  <span class="text-[11px] text-slate-400">Visíveis na aba Mural</span>
                 </div>
-                <div id="listaAvisosPortalAdmin" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div id="listaAvisosPortalAdmin" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                  <!-- Preenchido via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= SUB-ABA 4: ESCALA DE LAVANDERIA & HORÁRIOS DE ÔNIBUS ================= -->
+        <div id="subPortal_escalas" class="sub-portal-panel hidden">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
+                  <i class="fa-solid fa-calendar-check"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Escala Semanal de Lavanderia & Horários de Ônibus</h3>
+                  <p class="text-[11px] text-slate-400">O app calcula automaticamente o dia de lavanderia de cada morador com base no bloco dele</p>
+                </div>
+              </div>
+            </div>
+
+            <form id="formEscalasPortal" onsubmit="salvarEscalasPortalAlojado(event)" class="p-5 space-y-4 text-xs">
+              <div>
+                <h4 class="font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-shirt text-teal-600"></i> Dias de Coleta / Troca de Enxoval por Bloco
+                </h4>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Segunda-feira</label>
+                    <input type="text" id="inputEscalaSeg" placeholder="Blocos A e B" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Terça-feira</label>
+                    <input type="text" id="inputEscalaTer" placeholder="Blocos C e D" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Quarta-feira</label>
+                    <input type="text" id="inputEscalaQua" placeholder="Blocos E, F e G" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Quinta-feira</label>
+                    <input type="text" id="inputEscalaQui" placeholder="Blocos A, B e H" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Sexta-feira</label>
+                    <input type="text" id="inputEscalaSex" placeholder="Blocos C, D e I" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Sábado</label>
+                    <input type="text" id="inputEscalaSab" placeholder="Roupas de Cama / Geral" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div class="md:col-span-2">
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-bus text-amber-600 mr-1"></i> Quadro de Horários de Ônibus / Transporte Canteiro
+                  </label>
+                  <textarea id="inputHorariosOnibusTexto" rows="3" placeholder="Ex: Saída Alojamento -> Frente de Obra: 06h30 e 06h45&#10;Retorno Almoço: 11h30 | Retorno Final de Turno: 17h15" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium"></textarea>
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> WhatsApp Principal da Prefeitura (com DDD)
+                  </label>
+                  <input type="text" id="inputWhatsappPrefeitoPortal" placeholder="Ex: 5594999999999" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-mono font-bold">
+                  <p class="text-[11px] text-slate-400 mt-1.5">Você também pode cadastrar vários contatos extras (Ambulatório, Portaria, etc.) na aba 5.</p>
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
+                <button type="submit" class="btn-prefeito px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                  <i class="fa-solid fa-check"></i> Salvar Escalas & Transporte
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ================= SUB-ABA 5: REGRAS DO ALOJAMENTO & CONTATOS DE APOIO (DINÂMICO) ================= -->
+        <div id="subPortal_regras" class="sub-portal-panel hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Coluna 1: Editor Dinâmico das Regras de Ouro -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <i class="fa-solid fa-scale-balanced"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Regras de Ouro do Alojamento</h3>
+                  <p class="text-[11px] text-slate-400">Adicione, edite ou apague normas de convivência que aparecem no celular</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-5 space-y-4 flex-1 text-xs">
+              <form id="formRegraPortal" onsubmit="salvarRegraPortalAlojado(event)" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <input type="hidden" id="inputIdRegraEditando" value="">
+                <div class="flex items-center justify-between">
+                  <h4 id="tituloFormRegraPortal" class="font-black text-slate-800 uppercase tracking-wider text-xs">Adicionar Nova Regra</h4>
+                  <button type="button" id="btnCancelarEdicaoRegra" onclick="cancelarEdicaoRegraPortal()" class="hidden px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px]">
+                    Cancelar Edição
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div class="sm:col-span-2">
+                    <label class="block font-bold text-slate-700 uppercase mb-1">Título da Regra *</label>
+                    <input type="text" id="inputRegraTitulo" required placeholder="Ex: Horário de Silêncio (22h às 06h)" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 uppercase mb-1">Ícone / Tema</label>
+                    <select id="selectRegraIcone" class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
+                      <option value="fa-volume-xmark|amber">Silêncio (Amarelo)</option>
+                      <option value="fa-ban|rose">Proibição / Alerta (Vermelho)</option>
+                      <option value="fa-snowflake|sky">Ar-Condicionado / Energia (Azul)</option>
+                      <option value="fa-lock|emerald">Patrimônio / Quarto (Verde)</option>
+                      <option value="fa-broom|teal">Limpeza / Higiene (Turquesa)</option>
+                      <option value="fa-id-badge|indigo">Identificação / Portaria (Roxo)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase mb-1">Descrição da Norma *</label>
+                  <textarea id="inputRegraDescricao" rows="2" required placeholder="Ex: Respeite o descanso dos colegas de turno. Uso de som alto é proibido." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800"></textarea>
+                </div>
+
+                <div class="flex justify-end">
+                  <button type="submit" class="btn-prefeito px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-check"></i> <span id="labelBtnSalvarRegra">Adicionar Regra</span>
+                  </button>
+                </div>
+              </form>
+
+              <div>
+                <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-2">Regras Ativas no App</h4>
+                <div id="listaRegrasPortalAdmin" class="space-y-2 max-h-72 overflow-y-auto pr-1">
                   <!-- Preenchido via JS -->
                 </div>
               </div>
             </div>
           </div>
 
-        </div>
-
-        <!-- Linha Inferior: Escala de Lavanderia, Horários de Ônibus & Contato do Prefeito -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
-            <div class="flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
-                <i class="fa-solid fa-calendar-check"></i>
+          <!-- Coluna 2: Editor Dinâmico de Contatos Úteis / Emergência / WhatsApp -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <i class="fa-brands fa-whatsapp"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Contatos de Apoio & Emergência</h3>
+                  <p class="text-[11px] text-slate-400">Botões de WhatsApp/Telefone (Prefeitura, Ambulatório, Portaria, Transporte)</p>
+                </div>
               </div>
+            </div>
+
+            <div class="p-5 space-y-4 flex-1 text-xs">
+              <form id="formContatoPortal" onsubmit="salvarContatoPortalAlojado(event)" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <input type="hidden" id="inputIdContatoEditando" value="">
+                <div class="flex items-center justify-between">
+                  <h4 id="tituloFormContatoPortal" class="font-black text-slate-800 uppercase tracking-wider text-xs">Adicionar Novo Contato</h4>
+                  <button type="button" id="btnCancelarEdicaoContato" onclick="cancelarEdicaoContatoPortal()" class="hidden px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px]">
+                    Cancelar Edição
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label class="block font-bold text-slate-700 uppercase mb-1">Setor / Nome do Contato *</label>
+                    <input type="text" id="inputContatoNome" required placeholder="Ex: Prefeitura de Canteiro" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone (com DDD) *</label>
+                    <input type="text" id="inputContatoTelefone" required placeholder="Ex: 5594991000000" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono font-bold text-slate-800">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div class="sm:col-span-2">
+                    <label class="block font-bold text-slate-700 uppercase mb-1">Descrição / Horário de Atendimento</label>
+                    <input type="text" id="inputContatoCargo" placeholder="Ex: Atendimento Alojamentos e Manutenção" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 uppercase mb-1">Cor do Botão</label>
+                    <select id="selectContatoCor" class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
+                      <option value="emerald">Verde (WhatsApp)</option>
+                      <option value="rose">Vermelho (Emergência)</option>
+                      <option value="indigo">Azul/Roxo (Portaria)</option>
+                      <option value="amber">Amarelo (Transporte)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="flex justify-end">
+                  <button type="submit" class="btn-prefeito px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-plus"></i> <span id="labelBtnSalvarContato">Salvar Contato</span>
+                  </button>
+                </div>
+              </form>
+
               <div>
-                <h3 class="text-sm font-bold text-white">Escala Semanal de Lavanderia, Transporte & WhatsApp da Administração</h3>
-                <p class="text-[11px] text-slate-400">Esses dados aparecem automaticamente no cartão "Meu Quarto" de cada colaborador</p>
+                <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-2">Contatos Ativos no App</h4>
+                <div id="listaContatosPortalAdmin" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  <!-- Preenchido via JS -->
+                </div>
               </div>
             </div>
           </div>
 
-          <form id="formEscalasPortal" onsubmit="salvarEscalasPortalAlojado(event)" class="p-5 space-y-4 text-xs">
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div>
-                <label class="block font-bold text-slate-700 mb-1">Segunda-feira</label>
-                <input type="text" id="inputEscalaSeg" placeholder="Blocos A e B" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-              </div>
-              <div>
-                <label class="block font-bold text-slate-700 mb-1">Terça-feira</label>
-                <input type="text" id="inputEscalaTer" placeholder="Blocos C e D" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-              </div>
-              <div>
-                <label class="block font-bold text-slate-700 mb-1">Quarta-feira</label>
-                <input type="text" id="inputEscalaQua" placeholder="Blocos E, F e G" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-              </div>
-              <div>
-                <label class="block font-bold text-slate-700 mb-1">Quinta-feira</label>
-                <input type="text" id="inputEscalaQui" placeholder="Blocos A, B e H" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-              </div>
-              <div>
-                <label class="block font-bold text-slate-700 mb-1">Sexta-feira</label>
-                <input type="text" id="inputEscalaSex" placeholder="Blocos C, D e I" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-              </div>
-              <div>
-                <label class="block font-bold text-slate-700 mb-1">Sábado</label>
-                <input type="text" id="inputEscalaSab" placeholder="Roupas de Cama / Geral" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div class="md:col-span-2">
-                <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  <i class="fa-solid fa-bus text-amber-600 mr-1"></i> Horários de Ônibus / Transporte Canteiro
-                </label>
-                <input type="text" id="inputHorariosOnibusTexto" placeholder="Ex: Saída Alojamento -> Frente de Obra: 06h30 e 06h45 | Retorno Almoço: 11h30 | Retorno Tarde: 17h15" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium">
-              </div>
-              <div>
-                <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> WhatsApp da Prefeitura (com DDD)
-                </label>
-                <input type="text" id="inputWhatsappPrefeitoPortal" placeholder="Ex: 5594999999999" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-mono font-bold">
-              </div>
-            </div>
-
-            <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
-              <button type="submit" class="btn-prefeito px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
-                <i class="fa-solid fa-check"></i> Salvar Escalas & Transporte
-              </button>
-            </div>
-          </form>
         </div>
       </div>
 
@@ -8503,7 +8807,7 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=5.5"></script>
+  <script src="app.js?v=5.6"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">

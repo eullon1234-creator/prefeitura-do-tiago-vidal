@@ -228,6 +228,7 @@ const StaticApiEngine = {
   saveToStorage() {
     try {
       localStorage.setItem('prefeitura_taboca_snapshot', JSON.stringify(this.dbState));
+      if (typeof agendarSyncAutomaticoAlojadosPortal === 'function') agendarSyncAutomaticoAlojadosPortal();
     } catch(e) {
       console.warn("Storage quota excedida ou erro ao salvar snapshot:", e);
     }
@@ -10232,7 +10233,7 @@ if ('serviceWorker' in navigator) {
     }
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=5.5')
+    navigator.serviceWorker.register('./sw.js?v=5.6')
       .then(reg => {
         console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
         // Garante que o novo service worker seja verificado imediatamente
@@ -21649,13 +21650,24 @@ window.exportarRelatorioTurnoVigilanciaExcel = exportarRelatorioTurnoVigilanciaE
 
 
 // ========================================================
-// MÓDULO: GESTÃO DO PORTAL DO ALOJADO & COLABORADOR (DOCUMENTO ÚNICO)
+// MÓDULO: GESTÃO DO PORTAL DO ALOJADO & COLABORADOR (DOCUMENTO ÚNICO v5.6)
 // ========================================================
 let estadoPortalMoradorAdmin = {
+  identidade: {
+    titulo_app: 'Portal do Alojado',
+    badge_obra: 'Taboca 2',
+    subtitulo_topo: 'Bem-vindo ao Canteiro GEL',
+    titulo_boas_vindas: 'Acesse seu Espaço no Canteiro',
+    texto_boas_vindas: 'Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital e peça manutenções rápidas.'
+  },
   cardapio: {
+    horario_cafe: '05h30 às 07h00',
     cafe: 'Pão francês na chapa, ovos mexidos, cuscuz com carne, café preto, leite e frutas da estação',
+    horario_almoco: '11h00 às 13h30',
     almoco: 'Frango assado dourado, carne de panela ao molho, arroz branco, feijão tropeiro, macarrão e salada fresca',
+    horario_marmita: 'Frentes de Serviço',
     marmita: 'Iscas bovinas aceboladas ou filé de frango grelhado + guarnição completa em embalagem térmica',
+    horario_jantar: '18h00 às 20h30',
     jantar: 'Sopa nutritiva de legumes com carne, arroz, feijão carioca, proteína grelhada e suco natural',
     atualizado_em: new Date().toLocaleDateString('pt-BR')
   },
@@ -21666,22 +21678,144 @@ let estadoPortalMoradorAdmin = {
       mensagem: 'Consulte aqui o cardápio diário do refeitório, seu dia de lavanderia, colegas de quarto e abra chamados de manutenção em 3 toques.',
       tipo: 'informativo',
       bloco_alvo: 'Todos',
+      bloco: 'Todos',
       data: new Date().toLocaleDateString('pt-BR'),
       autor: 'Prefeitura de Canteiro'
     }
   ],
   lavanderia: {
-    seg: 'Blocos A e B',
-    ter: 'Blocos C e D',
-    qua: 'Blocos E, F e G',
-    qui: 'Blocos A, B e H',
-    sex: 'Blocos C, D e I',
-    sab: 'Roupas de Cama / Geral'
+    seg: 'Bloco 1 e Bloco 2',
+    ter: 'Bloco A e Bloco B',
+    qua: 'Bloco C e Bloco D',
+    qui: 'Bloco E e Bloco F',
+    sex: 'Bloco G e Bloco H',
+    sab: 'Casas na Cidade / Reposição'
   },
   horarios_onibus: 'Saída Alojamento -> Frente de Obra: 06h30 e 06h45 | Retorno Almoço: 11h30 | Retorno Tarde: 17h15',
   whatsapp_prefeito: '5594991000000',
+  regras: [
+    {
+      id: 'REG-01',
+      titulo: 'Horário de Silêncio (22h às 06h)',
+      descricao: 'Respeite o descanso dos colegas de turno. Uso de som alto é estritamente proibido.',
+      icone: 'fa-volume-xmark',
+      cor: 'amber'
+    },
+    {
+      id: 'REG-02',
+      titulo: 'Tolerância Zero para Álcool e Drogas',
+      descricao: 'É proibido portar ou consumir bebidas alcoólicas ou substâncias ilícitas nos alojamentos.',
+      icone: 'fa-ban',
+      cor: 'rose'
+    },
+    {
+      id: 'REG-03',
+      titulo: 'Uso Consciente do Ar-Condicionado',
+      descricao: 'Ao sair do quarto para a frente de obra, desligue o aparelho e mantenha janelas e portas fechadas.',
+      icone: 'fa-snowflake',
+      cor: 'sky'
+    },
+    {
+      id: 'REG-04',
+      titulo: 'Zelo pelo Patrimônio',
+      descricao: 'Não troque de cama ou quarto sem autorização prévia da Prefeitura de Canteiro.',
+      icone: 'fa-lock',
+      cor: 'emerald'
+    }
+  ],
+  contatos: [
+    {
+      id: 'CONT-01',
+      nome: 'Prefeitura de Canteiro (Administração)',
+      cargo: 'Atendimento Alojamentos, Vagas e Manutenção',
+      telefone: '5594991000000',
+      cor: 'emerald'
+    },
+    {
+      id: 'CONT-02',
+      nome: 'Ambulatório / Emergência Médica',
+      cargo: 'Plantão de Saúde e Primeiros Socorros no Canteiro',
+      telefone: '5594991000000',
+      cor: 'rose'
+    },
+    {
+      id: 'CONT-03',
+      nome: 'Portaria & Vigilância Patrimonial',
+      cargo: 'Controle de Acesso e Ronda 24h',
+      telefone: '5594991000000',
+      cor: 'indigo'
+    }
+  ],
+  alojados_sincronizados: [],
+  ultimo_sync_alojados: '',
   atualizado_timestamp: Date.now()
 };
+
+let timerSyncAutoAlojadosPortal = null;
+
+function alternarSubAbaPortalAlojado(aba) {
+  const abas = ['identidade', 'cardapio', 'mural', 'escalas', 'regras'];
+  abas.forEach(nome => {
+    const panel = document.getElementById('subPortal_' + nome);
+    const btn = document.getElementById('btnSubPortal_' + nome);
+    if (panel) {
+      if (nome === aba) panel.classList.remove('hidden');
+      else panel.classList.add('hidden');
+    }
+    if (btn) {
+      if (nome === aba) {
+        btn.className = 'sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap bg-slate-900 text-white shadow-xs';
+      } else {
+        btn.className = 'sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100';
+      }
+    }
+  });
+}
+
+function extrairResumoAlojadosAtivosParaPortal() {
+  const lista = (window.StaticApiEngine && window.StaticApiEngine.dbState && Array.isArray(window.StaticApiEngine.dbState.alojados))
+    ? window.StaticApiEngine.dbState.alojados
+    : [];
+
+  return lista
+    .filter(a => a && a.nome_completo && a.status !== 'inativo' && !a.excluido)
+    .map(a => ({
+      id: a.id,
+      nome_completo: a.nome_completo,
+      matricula: a.matricula || '',
+      funcao: a.funcao || 'Colaborador',
+      empresa_nome: a.empresa_nome || 'GEL ENGENHARIA',
+      bloco_nome: a.bloco_nome || 'Bloco A',
+      quarto_numero: a.quarto_numero || '--',
+      numero_cama: a.numero_cama || 1
+    }));
+}
+
+function agendarSyncAutomaticoAlojadosPortal() {
+  if (timerSyncAutoAlojadosPortal) clearTimeout(timerSyncAutoAlojadosPortal);
+  timerSyncAutoAlojadosPortal = setTimeout(() => {
+    sincronizarListaAlojadosComPortal(false);
+  }, 2000);
+}
+
+async function sincronizarListaAlojadosComPortal(mostrarToast = false) {
+  obterEstadoPortalLocal();
+  const resumo = extrairResumoAlojadosAtivosParaPortal();
+  const agora = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  estadoPortalMoradorAdmin.alojados_sincronizados = resumo;
+  estadoPortalMoradorAdmin.ultimo_sync_alojados = agora;
+
+  const kpiEl = document.getElementById('kpiTotalAlojadosSyncPortal');
+  if (kpiEl) kpiEl.textContent = String(resumo.length);
+  const statusEl = document.getElementById('statusUltimoSyncAlojadosPortal');
+  if (statusEl) statusEl.textContent = agora;
+
+  await persistirDocumentoUnicoPortal(
+    mostrarToast ? `👥 ${resumo.length} moradores e quartos sincronizados com o App do Celular!` : null,
+    !mostrarToast
+  );
+}
 
 function obterEstadoPortalLocal() {
   try {
@@ -21690,6 +21824,15 @@ function obterEstadoPortalLocal() {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         estadoPortalMoradorAdmin = Object.assign({}, estadoPortalMoradorAdmin, parsed);
+        if (parsed.identidade) {
+          estadoPortalMoradorAdmin.identidade = Object.assign({}, estadoPortalMoradorAdmin.identidade, parsed.identidade);
+        }
+        if (parsed.cardapio) {
+          estadoPortalMoradorAdmin.cardapio = Object.assign({}, estadoPortalMoradorAdmin.cardapio, parsed.cardapio);
+        }
+        if (parsed.lavanderia) {
+          estadoPortalMoradorAdmin.lavanderia = Object.assign({}, estadoPortalMoradorAdmin.lavanderia, parsed.lavanderia);
+        }
       }
     }
   } catch (e) {
@@ -21700,6 +21843,7 @@ function obterEstadoPortalLocal() {
 
 function preencherFormularioPortalAdmin() {
   const est = estadoPortalMoradorAdmin;
+  const ident = est.identidade || {};
   const c = est.cardapio || {};
   const l = est.lavanderia || {};
 
@@ -21708,14 +21852,35 @@ function preencherFormularioPortalAdmin() {
     if (el) el.value = val || '';
   };
 
+  // Sub-aba 1: Identidade & Sync
+  setVal('inputPortalTituloApp', ident.titulo_app || 'Portal do Alojado');
+  setVal('inputPortalBadgeObra', ident.badge_obra || 'Taboca 2');
+  setVal('inputPortalSubtituloTopo', ident.subtitulo_topo || 'Bem-vindo ao Canteiro GEL');
+  setVal('inputPortalTituloBoasVindas', ident.titulo_boas_vindas || 'Acesse seu Espaço no Canteiro');
+  setVal('inputPortalTextoBoasVindas', ident.texto_boas_vindas || 'Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital e peça manutenções rápidas.');
+
+  const resumoAtual = Array.isArray(est.alojados_sincronizados) && est.alojados_sincronizados.length > 0
+    ? est.alojados_sincronizados
+    : extrairResumoAlojadosAtivosParaPortal();
+  const kpiEl = document.getElementById('kpiTotalAlojadosSyncPortal');
+  if (kpiEl) kpiEl.textContent = String(resumoAtual.length);
+  const statusSyncEl = document.getElementById('statusUltimoSyncAlojadosPortal');
+  if (statusSyncEl) statusSyncEl.textContent = est.ultimo_sync_alojados || 'Sincronizado';
+
+  // Sub-aba 2: Cardápio & Horários
+  setVal('inputHorarioCafePortal', c.horario_cafe || '05h30 às 07h00');
   setVal('inputCardapioCafe', c.cafe);
+  setVal('inputHorarioAlmocoPortal', c.horario_almoco || '11h00 às 13h30');
   setVal('inputCardapioAlmoco', c.almoco);
+  setVal('inputHorarioMarmitaPortal', c.horario_marmita || 'Frentes de Serviço');
   setVal('inputCardapioMarmita', c.marmita);
+  setVal('inputHorarioJantarPortal', c.horario_jantar || '18h00 às 20h30');
   setVal('inputCardapioJantar', c.jantar);
 
   const statusCardapio = document.getElementById('statusUltimaAtualizacaoCardapio');
   if (statusCardapio) statusCardapio.textContent = c.atualizado_em || 'Hoje';
 
+  // Sub-aba 4: Escalas & Ônibus
   setVal('inputEscalaSeg', l.seg);
   setVal('inputEscalaTer', l.ter);
   setVal('inputEscalaQua', l.qua);
@@ -21727,17 +21892,21 @@ function preencherFormularioPortalAdmin() {
   setVal('inputWhatsappPrefeitoPortal', est.whatsapp_prefeito);
 
   renderizarListaAvisosPortalAdmin();
+  renderizarListaRegrasPortalAdmin();
+  renderizarListaContatosPortalAdmin();
 }
 
 function renderizarListaAvisosPortalAdmin() {
   const container = document.getElementById('listaAvisosPortalAdmin');
+  const badgeCount = document.getElementById('badgeCountAvisosSubAba');
+  const avisos = Array.isArray(estadoPortalMoradorAdmin.avisos) ? estadoPortalMoradorAdmin.avisos : [];
+  if (badgeCount) badgeCount.textContent = String(avisos.length);
   if (!container) return;
 
-  const avisos = Array.isArray(estadoPortalMoradorAdmin.avisos) ? estadoPortalMoradorAdmin.avisos : [];
   if (avisos.length === 0) {
     container.innerHTML = `
       <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-slate-400 text-xs">
-        Nenhum comunicado ativo no mural. Publique um aviso acima.
+        Nenhum comunicado ativo no mural. Publique um aviso ao lado.
       </div>
     `;
     return;
@@ -21749,24 +21918,105 @@ function renderizarListaAvisosPortalAdmin() {
       : av.tipo === 'importante'
         ? 'bg-amber-100 text-amber-800 border-amber-200'
         : 'bg-sky-100 text-sky-800 border-sky-200';
+    const publicoAlvo = av.bloco_alvo || av.bloco || 'Todos';
 
     return `
-      <div class="p-3 rounded-xl bg-white border border-slate-200 shadow-xs flex items-start justify-between gap-3">
+      <div class="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs flex items-start justify-between gap-3">
         <div class="space-y-1">
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${badgeCor}">${escapeHTML(av.tipo || 'informativo')}</span>
-            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">${escapeHTML(av.bloco_alvo || 'Todos')}</span>
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">${escapeHTML(publicoAlvo)}</span>
             <span class="text-[10px] text-slate-400">${escapeHTML(av.data || '')}</span>
           </div>
           <h5 class="text-xs font-bold text-slate-900">${escapeHTML(av.titulo || '')}</h5>
           <p class="text-[11px] text-slate-600 leading-relaxed">${escapeHTML(av.mensagem || '')}</p>
         </div>
-        <button type="button" onclick="excluirAvisoMuralAlojado('${escapeHTML(av.id)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0" title="Remover Aviso">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          <button type="button" onclick="editarAvisoMuralAlojado('${escapeHTML(av.id)}')" class="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Editar Comunicado">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button type="button" onclick="excluirAvisoMuralAlojado('${escapeHTML(av.id)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition" title="Remover Aviso">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
       </div>
     `;
   }).join('');
+}
+
+function renderizarListaRegrasPortalAdmin() {
+  const container = document.getElementById('listaRegrasPortalAdmin');
+  if (!container) return;
+
+  const regras = Array.isArray(estadoPortalMoradorAdmin.regras) ? estadoPortalMoradorAdmin.regras : [];
+  if (regras.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-slate-400 text-xs">
+        Nenhuma regra cadastrada. Adicione acima.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = regras.map(r => `
+    <div class="p-3 rounded-xl bg-white border border-slate-200 shadow-xs flex items-start justify-between gap-3">
+      <div class="flex items-start gap-2.5">
+        <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <i class="fa-solid ${escapeHTML(r.icone || 'fa-scale-balanced')}"></i>
+        </div>
+        <div>
+          <h5 class="text-xs font-bold text-slate-900">${escapeHTML(r.titulo || '')}</h5>
+          <p class="text-[11px] text-slate-600 leading-relaxed">${escapeHTML(r.descricao || '')}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button type="button" onclick="editarRegraPortalAlojado('${escapeHTML(r.id)}')" class="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition" title="Editar Regra">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </button>
+        <button type="button" onclick="excluirRegraPortalAlojado('${escapeHTML(r.id)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition" title="Apagar Regra">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderizarListaContatosPortalAdmin() {
+  const container = document.getElementById('listaContatosPortalAdmin');
+  if (!container) return;
+
+  const contatos = Array.isArray(estadoPortalMoradorAdmin.contatos) ? estadoPortalMoradorAdmin.contatos : [];
+  if (contatos.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-slate-400 text-xs">
+        Nenhum contato cadastrado. Adicione acima.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = contatos.map(ct => `
+    <div class="p-3 rounded-xl bg-white border border-slate-200 shadow-xs flex items-start justify-between gap-3">
+      <div class="flex items-start gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <i class="fa-brands fa-whatsapp text-sm"></i>
+        </div>
+        <div>
+          <h5 class="text-xs font-bold text-slate-900">${escapeHTML(ct.nome || '')}</h5>
+          <p class="text-[11px] text-slate-500">${escapeHTML(ct.cargo || '')}</p>
+          <span class="text-[10px] font-mono font-bold text-emerald-700 block mt-0.5"><i class="fa-solid fa-phone text-[9px] mr-1"></i>${escapeHTML(ct.telefone || '')}</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button type="button" onclick="editarContatoPortalAlojado('${escapeHTML(ct.id)}')" class="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition" title="Editar Contato">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </button>
+        <button type="button" onclick="excluirContatoPortalAlojado('${escapeHTML(ct.id)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition" title="Apagar Contato">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
 }
 
 async function carregarPortalAlojadoAdmin() {
@@ -21789,22 +22039,43 @@ async function carregarPortalAlojadoAdmin() {
   }
 }
 
-async function persistirDocumentoUnicoPortal(mensagemSucesso) {
+async function persistirDocumentoUnicoPortal(mensagemSucesso, silencioso = false) {
   estadoPortalMoradorAdmin.atualizado_timestamp = Date.now();
+  // Sempre garante que a lista resumida de alojados esteja atualizada no pacote único
+  const resumoAlojados = extrairResumoAlojadosAtivosParaPortal();
+  if (resumoAlojados.length > 0) {
+    estadoPortalMoradorAdmin.alojados_sincronizados = resumoAlojados;
+  }
+
   localStorage.setItem('portal_morador_doc_cache', JSON.stringify(estadoPortalMoradorAdmin));
   localStorage.setItem('portal_morador_doc_ts', String(Date.now()));
 
   if (typeof firestoreDb !== 'undefined' && firestoreDb) {
     try {
       await firestoreDb.collection('config_sistema').doc('portal_morador').set(estadoPortalMoradorAdmin, { merge: true });
-      showToast(mensagemSucesso || 'Portal do Alojado atualizado na nuvem!', 'success');
+      if (!silencioso && mensagemSucesso) showToast(mensagemSucesso, 'success');
     } catch (err) {
       console.warn('[PORTAL ADMIN] Salvo localmente (offline):', err);
-      showToast('Salvo no aparelho (sincronizará quando conectar)', 'info');
+      if (!silencioso) showToast('Salvo no aparelho (sincronizará quando conectar)', 'info');
     }
   } else {
-    showToast(mensagemSucesso || 'Portal do Alojado atualizado!', 'success');
+    if (!silencioso && mensagemSucesso) showToast(mensagemSucesso, 'success');
   }
+}
+
+function salvarIdentidadePortalAlojado(event) {
+  if (event) event.preventDefault();
+  const getVal = (id) => (document.getElementById(id)?.value || '').trim();
+
+  estadoPortalMoradorAdmin.identidade = {
+    titulo_app: getVal('inputPortalTituloApp') || 'Portal do Alojado',
+    badge_obra: getVal('inputPortalBadgeObra') || 'Taboca 2',
+    subtitulo_topo: getVal('inputPortalSubtituloTopo') || 'Bem-vindo ao Canteiro GEL',
+    titulo_boas_vindas: getVal('inputPortalTituloBoasVindas') || 'Acesse seu Espaço no Canteiro',
+    texto_boas_vindas: getVal('inputPortalTextoBoasVindas') || 'Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital e peça manutenções rápidas.'
+  };
+
+  persistirDocumentoUnicoPortal('✨ Textos e identidade da tela inicial publicados no App!');
 }
 
 function salvarCardapioPortalAlojado(event) {
@@ -21813,9 +22084,13 @@ function salvarCardapioPortalAlojado(event) {
   const agora = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   estadoPortalMoradorAdmin.cardapio = {
+    horario_cafe: getVal('inputHorarioCafePortal') || '05h30 às 07h00',
     cafe: getVal('inputCardapioCafe'),
+    horario_almoco: getVal('inputHorarioAlmocoPortal') || '11h00 às 13h30',
     almoco: getVal('inputCardapioAlmoco'),
+    horario_marmita: getVal('inputHorarioMarmitaPortal') || 'Frentes de Serviço',
     marmita: getVal('inputCardapioMarmita'),
+    horario_jantar: getVal('inputHorarioJantarPortal') || '18h00 às 20h30',
     jantar: getVal('inputCardapioJantar'),
     atualizado_em: agora
   };
@@ -21823,11 +22098,12 @@ function salvarCardapioPortalAlojado(event) {
   const statusCardapio = document.getElementById('statusUltimaAtualizacaoCardapio');
   if (statusCardapio) statusCardapio.textContent = agora;
 
-  persistirDocumentoUnicoPortal('🍽️ Cardápio do dia publicado no App do Alojado!');
+  persistirDocumentoUnicoPortal('🍽️ Cardápio e horários publicados no App do Alojado!');
 }
 
 function publicarAvisoMuralAlojado(event) {
   if (event) event.preventDefault();
+  const idEditando = (document.getElementById('inputIdAvisoEditando')?.value || '').trim();
   const titulo = (document.getElementById('inputAvisoTitulo')?.value || '').trim();
   const mensagem = (document.getElementById('inputAvisoMensagem')?.value || '').trim();
   const tipo = document.getElementById('selectAvisoTipo')?.value || 'informativo';
@@ -21838,31 +22114,92 @@ function publicarAvisoMuralAlojado(event) {
     return;
   }
 
+  if (!Array.isArray(estadoPortalMoradorAdmin.avisos)) {
+    estadoPortalMoradorAdmin.avisos = [];
+  }
+
+  const dataStr = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  if (idEditando) {
+    const idx = estadoPortalMoradorAdmin.avisos.findIndex(a => a.id === idEditando);
+    if (idx !== -1) {
+      estadoPortalMoradorAdmin.avisos[idx] = Object.assign({}, estadoPortalMoradorAdmin.avisos[idx], {
+        titulo,
+        mensagem,
+        tipo,
+        bloco_alvo,
+        bloco: bloco_alvo,
+        data: dataStr + ' (Editado)'
+      });
+    }
+    cancelarEdicaoAvisoMural();
+    renderizarListaAvisosPortalAdmin();
+    persistirDocumentoUnicoPortal('✏️ Comunicado atualizado no Mural do Alojado!');
+    return;
+  }
+
   const novoAviso = {
     id: 'AV-' + Date.now(),
     titulo,
     mensagem,
     tipo,
     bloco_alvo,
-    data: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    bloco: bloco_alvo,
+    data: dataStr,
     autor: 'Prefeitura de Canteiro'
   };
 
-  if (!Array.isArray(estadoPortalMoradorAdmin.avisos)) {
-    estadoPortalMoradorAdmin.avisos = [];
-  }
   estadoPortalMoradorAdmin.avisos.unshift(novoAviso);
-  if (estadoPortalMoradorAdmin.avisos.length > 10) {
-    estadoPortalMoradorAdmin.avisos = estadoPortalMoradorAdmin.avisos.slice(0, 10);
+  if (estadoPortalMoradorAdmin.avisos.length > 15) {
+    estadoPortalMoradorAdmin.avisos = estadoPortalMoradorAdmin.avisos.slice(0, 15);
   }
 
-  const inputTitulo = document.getElementById('inputAvisoTitulo');
-  const inputMensagem = document.getElementById('inputAvisoMensagem');
-  if (inputTitulo) inputTitulo.value = '';
-  if (inputMensagem) inputMensagem.value = '';
-
+  cancelarEdicaoAvisoMural();
   renderizarListaAvisosPortalAdmin();
   persistirDocumentoUnicoPortal('📢 Comunicado publicado no Mural do Alojado!');
+}
+
+function editarAvisoMuralAlojado(id) {
+  const avisos = Array.isArray(estadoPortalMoradorAdmin.avisos) ? estadoPortalMoradorAdmin.avisos : [];
+  const av = avisos.find(a => a.id === id);
+  if (!av) return;
+
+  const setVal = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (el) el.value = val || '';
+  };
+
+  setVal('inputIdAvisoEditando', av.id);
+  setVal('inputAvisoTitulo', av.titulo);
+  setVal('inputAvisoMensagem', av.mensagem);
+  setVal('selectAvisoTipo', av.tipo || 'informativo');
+  setVal('selectAvisoBloco', av.bloco_alvo || av.bloco || 'Todos');
+
+  const tituloForm = document.getElementById('tituloFormAvisoMural');
+  if (tituloForm) tituloForm.innerHTML = '<i class="fa-solid fa-pen-to-square text-amber-500"></i> Editando Comunicado Selecionado';
+  const labelBtn = document.getElementById('labelBtnSubmitAvisoMural');
+  if (labelBtn) labelBtn.textContent = 'Salvar Alterações';
+  const btnCancel = document.getElementById('btnCancelarEdicaoAviso');
+  if (btnCancel) btnCancel.classList.remove('hidden');
+}
+
+function cancelarEdicaoAvisoMural() {
+  const setVal = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (el) el.value = val || '';
+  };
+  setVal('inputIdAvisoEditando', '');
+  setVal('inputAvisoTitulo', '');
+  setVal('inputAvisoMensagem', '');
+  setVal('selectAvisoTipo', 'informativo');
+  setVal('selectAvisoBloco', 'Todos');
+
+  const tituloForm = document.getElementById('tituloFormAvisoMural');
+  if (tituloForm) tituloForm.innerHTML = '<i class="fa-solid fa-plus-circle text-indigo-600"></i> Novo Comunicado para o Mural';
+  const labelBtn = document.getElementById('labelBtnSubmitAvisoMural');
+  if (labelBtn) labelBtn.textContent = 'Publicar no Mural';
+  const btnCancel = document.getElementById('btnCancelarEdicaoAviso');
+  if (btnCancel) btnCancel.classList.add('hidden');
 }
 
 function excluirAvisoMuralAlojado(id) {
@@ -21877,22 +22214,238 @@ function salvarEscalasPortalAlojado(event) {
   const getVal = (id) => (document.getElementById(id)?.value || '').trim();
 
   estadoPortalMoradorAdmin.lavanderia = {
-    seg: getVal('inputEscalaSeg') || 'Blocos A e B',
-    ter: getVal('inputEscalaTer') || 'Blocos C e D',
-    qua: getVal('inputEscalaQua') || 'Blocos E, F e G',
-    qui: getVal('inputEscalaQui') || 'Blocos A, B e H',
-    sex: getVal('inputEscalaSex') || 'Blocos C, D e I',
-    sab: getVal('inputEscalaSab') || 'Roupas de Cama / Geral'
+    seg: getVal('inputEscalaSeg') || 'Bloco 1 e Bloco 2',
+    ter: getVal('inputEscalaTer') || 'Bloco A e Bloco B',
+    qua: getVal('inputEscalaQua') || 'Bloco C e Bloco D',
+    qui: getVal('inputEscalaQui') || 'Bloco E e Bloco F',
+    sex: getVal('inputEscalaSex') || 'Bloco G e Bloco H',
+    sab: getVal('inputEscalaSab') || 'Casas na Cidade / Geral'
   };
   estadoPortalMoradorAdmin.horarios_onibus = getVal('inputHorariosOnibusTexto');
-  estadoPortalMoradorAdmin.whatsapp_prefeito = getVal('inputWhatsappPrefeitoPortal').replace(/\D/g, '');
+  const zapPrincipal = getVal('inputWhatsappPrefeitoPortal').replace(/\D/g, '');
+  if (zapPrincipal) {
+    estadoPortalMoradorAdmin.whatsapp_prefeito = zapPrincipal;
+  }
 
   persistirDocumentoUnicoPortal('🧺 Escalas de Lavanderia e Ônibus publicadas no App!');
 }
 
-function salvarTudoPortalAlojadoAdmin() {
-  salvarCardapioPortalAlojado(null);
-  salvarEscalasPortalAlojado(null);
+function salvarRegraPortalAlojado(event) {
+  if (event) event.preventDefault();
+  const idEdit = (document.getElementById('inputIdRegraEditando')?.value || '').trim();
+  const titulo = (document.getElementById('inputRegraTitulo')?.value || '').trim();
+  const descricao = (document.getElementById('inputRegraDescricao')?.value || '').trim();
+  const iconeRaw = document.getElementById('selectRegraIcone')?.value || 'fa-scale-balanced|amber';
+  const [icone, cor] = iconeRaw.split('|');
+
+  if (!titulo || !descricao) return;
+
+  if (!Array.isArray(estadoPortalMoradorAdmin.regras)) {
+    estadoPortalMoradorAdmin.regras = [];
+  }
+
+  if (idEdit) {
+    const idx = estadoPortalMoradorAdmin.regras.findIndex(r => r.id === idEdit);
+    if (idx !== -1) {
+      estadoPortalMoradorAdmin.regras[idx] = { id: idEdit, titulo, descricao, icone: icone || 'fa-scale-balanced', cor: cor || 'amber' };
+    }
+    cancelarEdicaoRegraPortal();
+    renderizarListaRegrasPortalAdmin();
+    persistirDocumentoUnicoPortal('✏️ Regra do alojamento atualizada no App!');
+    return;
+  }
+
+  estadoPortalMoradorAdmin.regras.push({
+    id: 'REG-' + Date.now(),
+    titulo,
+    descricao,
+    icone: icone || 'fa-scale-balanced',
+    cor: cor || 'amber'
+  });
+
+  cancelarEdicaoRegraPortal();
+  renderizarListaRegrasPortalAdmin();
+  persistirDocumentoUnicoPortal('⚖️ Nova regra adicionada ao App do Alojado!');
+}
+
+function editarRegraPortalAlojado(id) {
+  const regras = Array.isArray(estadoPortalMoradorAdmin.regras) ? estadoPortalMoradorAdmin.regras : [];
+  const r = regras.find(x => x.id === id);
+  if (!r) return;
+
+  const setVal = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (el) el.value = val || '';
+  };
+  setVal('inputIdRegraEditando', r.id);
+  setVal('inputRegraTitulo', r.titulo);
+  setVal('inputRegraDescricao', r.descricao);
+  setVal('selectRegraIcone', `${r.icone || 'fa-volume-xmark'}|${r.cor || 'amber'}`);
+
+  const tit = document.getElementById('tituloFormRegraPortal');
+  if (tit) tit.textContent = 'Editando Regra Selecionada';
+  const lbl = document.getElementById('labelBtnSalvarRegra');
+  if (lbl) lbl.textContent = 'Salvar Alteração';
+  const btnC = document.getElementById('btnCancelarEdicaoRegra');
+  if (btnC) btnC.classList.remove('hidden');
+}
+
+function cancelarEdicaoRegraPortal() {
+  const setVal = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (el) el.value = val || '';
+  };
+  setVal('inputIdRegraEditando', '');
+  setVal('inputRegraTitulo', '');
+  setVal('inputRegraDescricao', '');
+  const tit = document.getElementById('tituloFormRegraPortal');
+  if (tit) tit.textContent = 'Adicionar Nova Regra';
+  const lbl = document.getElementById('labelBtnSalvarRegra');
+  if (lbl) lbl.textContent = 'Adicionar Regra';
+  const btnC = document.getElementById('btnCancelarEdicaoRegra');
+  if (btnC) btnC.classList.add('hidden');
+}
+
+function excluirRegraPortalAlojado(id) {
+  if (!Array.isArray(estadoPortalMoradorAdmin.regras)) return;
+  estadoPortalMoradorAdmin.regras = estadoPortalMoradorAdmin.regras.filter(r => r.id !== id);
+  renderizarListaRegrasPortalAdmin();
+  persistirDocumentoUnicoPortal('Regra removida do App.');
+}
+
+function salvarContatoPortalAlojado(event) {
+  if (event) event.preventDefault();
+  const idEdit = (document.getElementById('inputIdContatoEditando')?.value || '').trim();
+  const nome = (document.getElementById('inputContatoNome')?.value || '').trim();
+  const telefone = (document.getElementById('inputContatoTelefone')?.value || '').replace(/\D/g, '');
+  const cargo = (document.getElementById('inputContatoCargo')?.value || '').trim();
+  const cor = document.getElementById('selectContatoCor')?.value || 'emerald';
+
+  if (!nome || !telefone) return;
+
+  if (!Array.isArray(estadoPortalMoradorAdmin.contatos)) {
+    estadoPortalMoradorAdmin.contatos = [];
+  }
+
+  if (idEdit) {
+    const idx = estadoPortalMoradorAdmin.contatos.findIndex(c => c.id === idEdit);
+    if (idx !== -1) {
+      estadoPortalMoradorAdmin.contatos[idx] = { id: idEdit, nome, telefone, cargo, cor };
+    }
+    cancelarEdicaoContatoPortal();
+    renderizarListaContatosPortalAdmin();
+    persistirDocumentoUnicoPortal('✏️ Contato atualizado no App do Alojado!');
+    return;
+  }
+
+  estadoPortalMoradorAdmin.contatos.push({
+    id: 'CONT-' + Date.now(),
+    nome,
+    telefone,
+    cargo,
+    cor
+  });
+
+  // Mantém o primeiro contato sincronizado como whatsapp_prefeito principal
+  if (estadoPortalMoradorAdmin.contatos.length === 1) {
+    estadoPortalMoradorAdmin.whatsapp_prefeito = telefone;
+  }
+
+  cancelarEdicaoContatoPortal();
+  renderizarListaContatosPortalAdmin();
+  persistirDocumentoUnicoPortal('📲 Contato adicionado ao App do Alojado!');
+}
+
+function editarContatoPortalAlojado(id) {
+  const contatos = Array.isArray(estadoPortalMoradorAdmin.contatos) ? estadoPortalMoradorAdmin.contatos : [];
+  const ct = contatos.find(x => x.id === id);
+  if (!ct) return;
+
+  const setVal = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (el) el.value = val || '';
+  };
+  setVal('inputIdContatoEditando', ct.id);
+  setVal('inputContatoNome', ct.nome);
+  setVal('inputContatoTelefone', ct.telefone);
+  setVal('inputContatoCargo', ct.cargo);
+  setVal('selectContatoCor', ct.cor || 'emerald');
+
+  const tit = document.getElementById('tituloFormContatoPortal');
+  if (tit) tit.textContent = 'Editando Contato Selecionado';
+  const lbl = document.getElementById('labelBtnSalvarContato');
+  if (lbl) lbl.textContent = 'Salvar Alteração';
+  const btnC = document.getElementById('btnCancelarEdicaoContato');
+  if (btnC) btnC.classList.remove('hidden');
+}
+
+function cancelarEdicaoContatoPortal() {
+  const setVal = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (el) el.value = val || '';
+  };
+  setVal('inputIdContatoEditando', '');
+  setVal('inputContatoNome', '');
+  setVal('inputContatoTelefone', '');
+  setVal('inputContatoCargo', '');
+  setVal('selectContatoCor', 'emerald');
+
+  const tit = document.getElementById('tituloFormContatoPortal');
+  if (tit) tit.textContent = 'Adicionar Novo Contato';
+  const lbl = document.getElementById('labelBtnSalvarContato');
+  if (lbl) lbl.textContent = 'Salvar Contato';
+  const btnC = document.getElementById('btnCancelarEdicaoContato');
+  if (btnC) btnC.classList.add('hidden');
+}
+
+function excluirContatoPortalAlojado(id) {
+  if (!Array.isArray(estadoPortalMoradorAdmin.contatos)) return;
+  estadoPortalMoradorAdmin.contatos = estadoPortalMoradorAdmin.contatos.filter(c => c.id !== id);
+  renderizarListaContatosPortalAdmin();
+  persistirDocumentoUnicoPortal('Contato removido do App.');
+}
+
+async function salvarTudoPortalAlojadoAdmin() {
+  const getVal = (id) => (document.getElementById(id)?.value || '').trim();
+  const agora = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  estadoPortalMoradorAdmin.identidade = {
+    titulo_app: getVal('inputPortalTituloApp') || 'Portal do Alojado',
+    badge_obra: getVal('inputPortalBadgeObra') || 'Taboca 2',
+    subtitulo_topo: getVal('inputPortalSubtituloTopo') || 'Bem-vindo ao Canteiro GEL',
+    titulo_boas_vindas: getVal('inputPortalTituloBoasVindas') || 'Acesse seu Espaço no Canteiro',
+    texto_boas_vindas: getVal('inputPortalTextoBoasVindas') || 'Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital e peça manutenções rápidas.'
+  };
+
+  estadoPortalMoradorAdmin.cardapio = {
+    horario_cafe: getVal('inputHorarioCafePortal') || '05h30 às 07h00',
+    cafe: getVal('inputCardapioCafe'),
+    horario_almoco: getVal('inputHorarioAlmocoPortal') || '11h00 às 13h30',
+    almoco: getVal('inputCardapioAlmoco'),
+    horario_marmita: getVal('inputHorarioMarmitaPortal') || 'Frentes de Serviço',
+    marmita: getVal('inputCardapioMarmita'),
+    horario_jantar: getVal('inputHorarioJantarPortal') || '18h00 às 20h30',
+    jantar: getVal('inputCardapioJantar'),
+    atualizado_em: agora
+  };
+
+  estadoPortalMoradorAdmin.lavanderia = {
+    seg: getVal('inputEscalaSeg') || 'Bloco 1 e Bloco 2',
+    ter: getVal('inputEscalaTer') || 'Bloco A e Bloco B',
+    qua: getVal('inputEscalaQua') || 'Bloco C e Bloco D',
+    qui: getVal('inputEscalaQui') || 'Bloco E e Bloco F',
+    sex: getVal('inputEscalaSex') || 'Bloco G e Bloco H',
+    sab: getVal('inputEscalaSab') || 'Casas na Cidade / Geral'
+  };
+  estadoPortalMoradorAdmin.horarios_onibus = getVal('inputHorariosOnibusTexto');
+  const zapPrincipal = getVal('inputWhatsappPrefeitoPortal').replace(/\D/g, '');
+  if (zapPrincipal) estadoPortalMoradorAdmin.whatsapp_prefeito = zapPrincipal;
+
+  estadoPortalMoradorAdmin.alojados_sincronizados = extrairResumoAlojadosAtivosParaPortal();
+  estadoPortalMoradorAdmin.ultimo_sync_alojados = agora;
+
+  await persistirDocumentoUnicoPortal('🚀 Todas as informações e lista de moradores foram publicadas no App do Celular!');
+  preencherFormularioPortalAdmin();
 }
 
 function getQRCodeUrlPortalAlojado() {
@@ -21971,10 +22524,24 @@ function imprimirCartazPortalAlojadoA4() {
   }, 100);
 }
 
+window.alternarSubAbaPortalAlojado = alternarSubAbaPortalAlojado;
 window.carregarPortalAlojadoAdmin = carregarPortalAlojadoAdmin;
+window.salvarIdentidadePortalAlojado = salvarIdentidadePortalAlojado;
+window.sincronizarListaAlojadosComPortal = sincronizarListaAlojadosComPortal;
+window.agendarSyncAutomaticoAlojadosPortal = agendarSyncAutomaticoAlojadosPortal;
 window.salvarCardapioPortalAlojado = salvarCardapioPortalAlojado;
 window.publicarAvisoMuralAlojado = publicarAvisoMuralAlojado;
+window.editarAvisoMuralAlojado = editarAvisoMuralAlojado;
+window.cancelarEdicaoAvisoMural = cancelarEdicaoAvisoMural;
 window.excluirAvisoMuralAlojado = excluirAvisoMuralAlojado;
 window.salvarEscalasPortalAlojado = salvarEscalasPortalAlojado;
+window.salvarRegraPortalAlojado = salvarRegraPortalAlojado;
+window.editarRegraPortalAlojado = editarRegraPortalAlojado;
+window.cancelarEdicaoRegraPortal = cancelarEdicaoRegraPortal;
+window.excluirRegraPortalAlojado = excluirRegraPortalAlojado;
+window.salvarContatoPortalAlojado = salvarContatoPortalAlojado;
+window.editarContatoPortalAlojado = editarContatoPortalAlojado;
+window.cancelarEdicaoContatoPortal = cancelarEdicaoContatoPortal;
+window.excluirContatoPortalAlojado = excluirContatoPortalAlojado;
 window.salvarTudoPortalAlojadoAdmin = salvarTudoPortalAlojadoAdmin;
 window.imprimirCartazPortalAlojadoA4 = imprimirCartazPortalAlojadoA4;

@@ -2186,24 +2186,42 @@ assert(alojadoHtml.includes('id="abaMoradorManutencao"'), 'Aba Manutenção & Me
 assert(alojadoHtml.includes('id="abaMoradorRegras"'), 'Aba Regras de Ouro & Apoio presente em alojado.html');
 assert(alojadoHtml.includes('id="imgQrCodeCrachaMorador"'), 'Crachá Digital QR Code de Alojado presente em alojado.html');
 
-// 4. Integração com chamado.html e Service Worker v5.5
+// 4. Integração com chamado.html e Service Worker v5.6
 assert(chamadoHtmlPortal.includes('alojado.html'), 'Banner de acesso rápido ao Portal do Alojado presente em chamado.html');
-assert(swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.5'"), 'Service Worker atualizado para prefeitura-pwa-v5.5');
+assert(swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.6'"), 'Service Worker atualizado para prefeitura-pwa-v5.6');
 assert(swJsPortal.includes("'alojado.html'"), 'alojado.html incluído no cache offline do Service Worker');
 
-// 5. Painel do Prefeito (index.html + app.js)
+// 5. Painel do Prefeito (index.html + app.js - 5 Sub-Abas de Edição Completa)
 assert(indexHtml.includes('id="tab-portal_alojado"'), 'Aba tab-portal_alojado presente em index.html');
 assert(indexHtml.includes('data-tab="portal_alojado"'), 'Botão data-tab="portal_alojado" presente na sidebar de index.html');
+assert(indexHtml.includes('id="subPortal_identidade"'), 'Sub-aba 1 (Identidade & Sync de Moradores) presente em index.html');
+assert(indexHtml.includes('id="subPortal_cardapio"'), 'Sub-aba 2 (Cardápio & Horários) presente em index.html');
+assert(indexHtml.includes('id="subPortal_mural"'), 'Sub-aba 3 (Mural de Avisos) presente em index.html');
+assert(indexHtml.includes('id="subPortal_escalas"'), 'Sub-aba 4 (Lavanderia & Ônibus) presente em index.html');
+assert(indexHtml.includes('id="subPortal_regras"'), 'Sub-aba 5 (Regras & Contatos) presente em index.html');
+assert(indexHtml.includes('id="formIdentidadePortal"'), 'Formulário de Identidade da Tela Inicial presente em index.html');
 assert(indexHtml.includes('id="formCardapioPortal"'), 'Formulário de Cardápio do Refeitório presente em index.html');
 assert(indexHtml.includes('id="formNovoAvisoMural"'), 'Formulário do Mural Digital de Avisos presente em index.html');
 assert(indexHtml.includes('id="formEscalasPortal"'), 'Formulário de Escala de Lavanderia e Ônibus presente em index.html');
+assert(indexHtml.includes('id="formRegraPortal"'), 'Formulário de Regras de Ouro presente em index.html');
+assert(indexHtml.includes('id="formContatoPortal"'), 'Formulário de Contatos de Apoio e Emergência presente em index.html');
 assert(indexHtml.includes('id="modalCartazPortalAlojadoA4"'), 'Modal de impressão do Cartaz A4 com QR Code do Portal presente em index.html');
 
 assert(appJs.includes('function carregarPortalAlojadoAdmin('), 'Função carregarPortalAlojadoAdmin implementada em app.js');
+assert(appJs.includes('function alternarSubAbaPortalAlojado('), 'Função alternarSubAbaPortalAlojado implementada em app.js');
+assert(appJs.includes('function salvarIdentidadePortalAlojado('), 'Função salvarIdentidadePortalAlojado implementada em app.js');
+assert(appJs.includes('function sincronizarListaAlojadosComPortal('), 'Função sincronizarListaAlojadosComPortal implementada em app.js');
 assert(appJs.includes('function salvarCardapioPortalAlojado('), 'Função salvarCardapioPortalAlojado implementada em app.js');
 assert(appJs.includes('function publicarAvisoMuralAlojado('), 'Função publicarAvisoMuralAlojado implementada em app.js');
+assert(appJs.includes('function editarAvisoMuralAlojado('), 'Função editarAvisoMuralAlojado implementada em app.js');
 assert(appJs.includes('function excluirAvisoMuralAlojado('), 'Função excluirAvisoMuralAlojado implementada em app.js');
 assert(appJs.includes('function salvarEscalasPortalAlojado('), 'Função salvarEscalasPortalAlojado implementada em app.js');
+assert(appJs.includes('function salvarRegraPortalAlojado('), 'Função salvarRegraPortalAlojado implementada em app.js');
+assert(appJs.includes('function editarRegraPortalAlojado('), 'Função editarRegraPortalAlojado implementada em app.js');
+assert(appJs.includes('function excluirRegraPortalAlojado('), 'Função excluirRegraPortalAlojado implementada em app.js');
+assert(appJs.includes('function salvarContatoPortalAlojado('), 'Função salvarContatoPortalAlojado implementada em app.js');
+assert(appJs.includes('function editarContatoPortalAlojado('), 'Função editarContatoPortalAlojado implementada em app.js');
+assert(appJs.includes('function excluirContatoPortalAlojado('), 'Função excluirContatoPortalAlojado implementada em app.js');
 assert(appJs.includes('function imprimirCartazPortalAlojadoA4('), 'Função imprimirCartazPortalAlojadoA4 implementada em app.js');
 
 // -------------------------------------------------------------

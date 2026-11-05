@@ -62,8 +62,8 @@
         </div>
         <div>
           <div class="flex items-center gap-1.5">
-            <h1 class="text-xs sm:text-sm font-black text-white uppercase tracking-tight">Portal do Alojado</h1>
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
+            <h1 id="tituloHeaderAppMorador" class="text-xs sm:text-sm font-black text-white uppercase tracking-tight">Portal do Alojado</h1>
+            <span id="badgeObraHeaderMorador" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
           </div>
           <p id="subtituloHeaderMorador" class="text-[11px] text-slate-400 font-medium truncate max-w-[190px]">Bem-vindo ao Canteiro GEL</p>
         </div>
@@ -90,8 +90,8 @@
         <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-2xl shadow-md">
           <i class="fa-solid fa-id-card-clip"></i>
         </div>
-        <h2 class="text-lg font-black text-white">Acesse seu Espaço no Canteiro</h2>
-        <p class="text-xs text-slate-400 leading-relaxed">
+        <h2 id="tituloBoasVindasLoginMorador" class="text-lg font-black text-white">Acesse seu Espaço no Canteiro</h2>
+        <p id="textoBoasVindasLoginMorador" class="text-xs text-slate-400 leading-relaxed">
           Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital e peça manutenções rápidas.
         </p>
       </div>
@@ -256,7 +256,7 @@
                 <i class="fa-solid fa-mug-saucer"></i>
               </div>
               <div>
-                <span class="text-[10px] font-bold text-amber-400 uppercase block">Café da Manhã (05h30 às 07h00)</span>
+                <span id="labelHorarioCafeMorador" class="text-[10px] font-bold text-amber-400 uppercase block">Café da Manhã (05h30 às 07h00)</span>
                 <p id="cardapioCafeMorador" class="text-slate-200 font-medium mt-0.5">Pão francês, ovos mexidos, cuscuz, frutas, café e leite.</p>
               </div>
             </div>
@@ -266,7 +266,7 @@
                 <i class="fa-solid fa-bowl-rice"></i>
               </div>
               <div>
-                <span class="text-[10px] font-bold text-emerald-400 uppercase block">Almoço no Canteiro (11h00 às 13h30)</span>
+                <span id="labelHorarioAlmocoMorador" class="text-[10px] font-bold text-emerald-400 uppercase block">Almoço no Canteiro (11h00 às 13h30)</span>
                 <p id="cardapioAlmocoMorador" class="text-slate-200 font-medium mt-0.5">Arroz, feijão tropeiro, carne assada, frango grelhado, macarrão e salada.</p>
               </div>
             </div>
@@ -276,7 +276,7 @@
                 <i class="fa-solid fa-box-open"></i>
               </div>
               <div>
-                <span class="text-[10px] font-bold text-sky-400 uppercase block">Marmita de Trecho / Frente de Obra</span>
+                <span id="labelHorarioMarmitaMorador" class="text-[10px] font-bold text-sky-400 uppercase block">Marmita de Trecho (Frentes de Serviço)</span>
                 <p id="cardapioMarmitaMorador" class="text-slate-200 font-medium mt-0.5">Padrão térmico balanceado + fruta + suco individual.</p>
               </div>
             </div>
@@ -286,7 +286,7 @@
                 <i class="fa-solid fa-cloud-moon"></i>
               </div>
               <div>
-                <span class="text-[10px] font-bold text-indigo-400 uppercase block">Jantar (18h00 às 20h30)</span>
+                <span id="labelHorarioJantarMorador" class="text-[10px] font-bold text-indigo-400 uppercase block">Jantar (18h00 às 20h30)</span>
                 <p id="cardapioJantarMorador" class="text-slate-200 font-medium mt-0.5">Arroz, feijão, iscas bovinas, sopa de legumes, salada e sobremesa.</p>
               </div>
             </div>
@@ -393,7 +393,7 @@
             <span>Regras de Ouro do Alojamento GEL</span>
           </h3>
 
-          <ul class="space-y-3 text-xs text-slate-300 leading-relaxed">
+          <ul id="listaRegrasOuroMorador" class="space-y-3 text-xs text-slate-300 leading-relaxed">
             <li class="flex items-start gap-2.5">
               <i class="fa-solid fa-volume-xmark text-amber-400 mt-1 flex-shrink-0"></i>
               <span><strong class="text-white">Horário de Silêncio (22h às 06h):</strong> Respeite o descanso dos colegas de turno. Uso de som alto é estritamente proibido.</span>
@@ -415,7 +415,8 @@
 
         <!-- Linha Direta WhatsApp Prefeito -->
         <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3 shadow-lg">
-          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Canal Direto com a Administração</h3>
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Canais Diretos de Apoio & Emergência</h3>
+          <div id="listaContatosApoioMorador" class="space-y-2.5"></div>
           <a id="linkWhatsappPrefeitoMorador" href="https://wa.me/5500000000000" target="_blank" rel="noopener noreferrer" class="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg transition">
             <i class="fa-brands fa-whatsapp text-lg"></i>
             <span>Falar com o Prefeito no WhatsApp</span>
@@ -534,18 +535,19 @@
       };
     }
 
-    // Carregar Base Estática do GitHub Pages (0 Leituras no Firebase!)
+    // Carregar Base Estática do GitHub Pages + Snapshot Local (0 Leituras extras no Firebase!)
     async function carregarBaseEstaticaAlojados() {
       try {
-        // Se estiver no mesmo navegador que o sistema principal, aproveita o estado atualizado
-        const localDb = localStorage.getItem('prefeitura_taboca_db_v3');
-        if (localDb) {
-          const parsed = JSON.parse(localDb);
-          if (parsed && Array.isArray(parsed.alojados)) {
+        // 1. Se estiver no mesmo aparelho que o painel do Prefeito, lê o snapshot atualizado
+        const localSnap = localStorage.getItem('prefeitura_taboca_snapshot') || localStorage.getItem('prefeitura_taboca_db_v3');
+        if (localSnap) {
+          const parsed = JSON.parse(localSnap);
+          if (parsed && Array.isArray(parsed.alojados) && parsed.alojados.length > 0) {
             baseEstaticaObra = parsed;
             return;
           }
         }
+        // 2. Fallback para o JSON estático inicial
         const resp = await fetch('dados_iniciais_taboca.json');
         if (resp.ok) {
           baseEstaticaObra = await resp.json();
@@ -606,7 +608,7 @@
       const ultimoTs = Number(localStorage.getItem(CACHE_PORTAL_TS_KEY) || 0);
       const precisaForcar = (Date.now() - ultimoTs) > 2 * 60 * 1000; // Cooldown de 2 min
 
-      await carregarDadosPortalMorador(precisaForcar);
+      await carregarDadosPortalMorador(true);
       setTimeout(() => {
         if (icone) icone.classList.remove('fa-spin');
       }, 600);
@@ -779,9 +781,52 @@
       `).join('');
     }
 
+    function aplicarAlojadosSincronizadosDoPortal(portal) {
+      if (portal && Array.isArray(portal.alojados_sincronizados) && portal.alojados_sincronizados.length > 0) {
+        baseEstaticaObra.alojados = portal.alojados_sincronizados;
+        // Se o morador já estiver logado pelo ID, atualiza automaticamente seu bloco/quarto/cama caso o Prefeito tenha mudado!
+        if (perfilMoradorAtivo && perfilMoradorAtivo.id) {
+          const atualizado = portal.alojados_sincronizados.find(x => String(x.id) === String(perfilMoradorAtivo.id));
+          if (atualizado) {
+            perfilMoradorAtivo.nome = atualizado.nome_completo || perfilMoradorAtivo.nome;
+            perfilMoradorAtivo.empresa = atualizado.empresa_nome || perfilMoradorAtivo.empresa;
+            perfilMoradorAtivo.funcao = atualizado.funcao || perfilMoradorAtivo.funcao;
+            perfilMoradorAtivo.bloco = atualizado.bloco_nome || perfilMoradorAtivo.bloco;
+            perfilMoradorAtivo.quarto = String(atualizado.quarto_numero || perfilMoradorAtivo.quarto);
+            perfilMoradorAtivo.cama = atualizado.numero_cama ? 'Cama ' + atualizado.numero_cama : perfilMoradorAtivo.cama;
+            localStorage.setItem('alojado_perfil_ativo', JSON.stringify(perfilMoradorAtivo));
+          }
+        }
+      }
+    }
+
     function renderizarMuralECardapioMorador() {
       const portal = dadosPortalMorador || getDadosPortalPadrao();
+      aplicarAlojadosSincronizadosDoPortal(portal);
+
+      // 1. Identidade Visual & Textos da Tela Inicial
+      const ident = portal.identidade || {};
+      const elTitApp = document.getElementById('tituloHeaderAppMorador');
+      if (elTitApp && ident.titulo_app) elTitApp.textContent = ident.titulo_app;
+      const elBadgeObra = document.getElementById('badgeObraHeaderMorador');
+      if (elBadgeObra && ident.badge_obra) elBadgeObra.textContent = ident.badge_obra;
+      const elSubTopo = document.getElementById('subtituloHeaderMorador');
+      if (elSubTopo && !perfilMoradorAtivo && ident.subtitulo_topo) elSubTopo.textContent = ident.subtitulo_topo;
+      const elTitBV = document.getElementById('tituloBoasVindasLoginMorador');
+      if (elTitBV && ident.titulo_boas_vindas) elTitBV.textContent = ident.titulo_boas_vindas;
+      const elTxtBV = document.getElementById('textoBoasVindasLoginMorador');
+      if (elTxtBV && ident.texto_boas_vindas) elTxtBV.textContent = ident.texto_boas_vindas;
+
+      // 2. Cardápio e Horários das Refeições
       const cardapio = portal.cardapio || {};
+      const lblCafe = document.getElementById('labelHorarioCafeMorador');
+      if (lblCafe) lblCafe.textContent = `Café da Manhã (${cardapio.horario_cafe || '05h30 às 07h00'})`;
+      const lblAlmoco = document.getElementById('labelHorarioAlmocoMorador');
+      if (lblAlmoco) lblAlmoco.textContent = `Almoço no Canteiro (${cardapio.horario_almoco || '11h00 às 13h30'})`;
+      const lblMarmita = document.getElementById('labelHorarioMarmitaMorador');
+      if (lblMarmita) lblMarmita.textContent = `Marmita Térmica (${cardapio.horario_marmita || 'Frentes de Serviço'})`;
+      const lblJantar = document.getElementById('labelHorarioJantarMorador');
+      if (lblJantar) lblJantar.textContent = `Jantar (${cardapio.horario_jantar || '18h00 às 20h30'})`;
 
       document.getElementById('cardapioCafeMorador').textContent = cardapio.cafe || '--';
       document.getElementById('cardapioAlmocoMorador').textContent = cardapio.almoco || '--';
@@ -789,37 +834,38 @@
       document.getElementById('cardapioJantarMorador').textContent = cardapio.jantar || '--';
       document.getElementById('dataAtualizacaoCardapioMorador').textContent = cardapio.atualizado_em || 'Hoje';
 
-      // Avisos do Mural
+      // 3. Avisos do Mural (suporta bloco_alvo e bloco)
       const avisos = Array.isArray(portal.avisos) ? portal.avisos : [];
       document.getElementById('badgeContagemAvisosMorador').textContent = `${avisos.length} aviso(s)`;
       const containerAvisos = document.getElementById('containerAvisosMuralMorador');
       if (containerAvisos) {
         if (avisos.length === 0) {
-          containerAvisos.innerHTML = `<p class="text-xs text-slate-500 text-center py-3">Nenhum comunicado urgente no momento.</p>`;
+          containerAvisos.innerHTML = `<p class="text-xs text-slate-500 text-center py-3">Nenhum comunicado no mural no momento.</p>`;
         } else {
           containerAvisos.innerHTML = avisos.map(av => {
             const isUrgente = av.tipo === 'urgente';
-            const isAtencao = av.tipo === 'atencao';
+            const isImportante = av.tipo === 'importante' || av.tipo === 'atencao';
             const badgeCls = isUrgente
               ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-              : (isAtencao ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40');
+              : (isImportante ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40');
+            const publico = av.bloco_alvo || av.bloco || 'Todos';
             return `
               <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${badgeCls}">
-                    ${escapeHTML(av.tipo || 'Informativo')} • ${escapeHTML(av.bloco || 'Todos')}
+                    ${escapeHTML(av.tipo || 'Informativo')} • ${escapeHTML(publico)}
                   </span>
                   <span class="text-[10px] text-slate-500">${escapeHTML(av.data || '')}</span>
                 </div>
                 <h4 class="text-xs font-black text-white">${escapeHTML(av.titulo)}</h4>
-                <p class="text-xs text-slate-300 leading-relaxed">${escapeHTML(av.mensagem)}</p>
+                <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">${escapeHTML(av.mensagem)}</p>
               </div>
             `;
           }).join('');
         }
       }
 
-      // Horários de Ônibus e Escala Lavanderia
+      // 4. Horários de Ônibus e Escala Lavanderia
       document.getElementById('textoHorariosOnibusMorador').textContent = portal.horarios_onibus || 'Consulte a portaria.';
       const lav = portal.lavanderia || {};
       const dias = [
@@ -840,7 +886,7 @@
         `).join('');
       }
 
-      // Atualizar dia de lavanderia específico do bloco do morador
+      // Atualizar dia de lavanderia e colegas de quarto se logado
       if (perfilMoradorAtivo) {
         const meuBloco = (perfilMoradorAtivo.bloco || '').toLowerCase();
         const diaEncontrado = dias.find(d => String(lav[d.k] || '').toLowerCase().includes(meuBloco));
@@ -850,13 +896,64 @@
             ? `${diaEncontrado.l} (${lav[diaEncontrado.k]})`
             : 'Conforme escala semanal do seu bloco';
         }
+        renderizarColegasDeQuarto();
       }
 
-      // WhatsApp do Prefeito
-      const fone = (portal.whatsapp_prefeito || '').replace(/\D/g, '');
-      const linkZap = document.getElementById('linkWhatsappPrefeitoMorador');
-      if (linkZap && fone) {
-        linkZap.href = `https://wa.me/${fone}?text=${encodeURIComponent('Olá Prefeito, sou morador do alojamento e gostaria de tirar uma dúvida.')}`;
+      // 5. Regras de Ouro Dinâmicas (Aba 4)
+      const ulRegras = document.getElementById('listaRegrasOuroMorador');
+      if (ulRegras && Array.isArray(portal.regras) && portal.regras.length > 0) {
+        const mapaCorIcone = {
+          amber: 'text-amber-400',
+          rose: 'text-rose-400',
+          sky: 'text-sky-400',
+          emerald: 'text-emerald-400',
+          teal: 'text-teal-400',
+          indigo: 'text-indigo-400'
+        };
+        ulRegras.innerHTML = portal.regras.map(r => {
+          const corCls = mapaCorIcone[r.cor] || 'text-amber-400';
+          return `
+            <li class="flex items-start gap-2.5">
+              <i class="fa-solid ${escapeHTML(r.icone || 'fa-scale-balanced')} ${corCls} mt-1 flex-shrink-0"></i>
+              <span><strong class="text-white">${escapeHTML(r.titulo)}:</strong> ${escapeHTML(r.descricao)}</span>
+            </li>
+          `;
+        }).join('');
+      }
+
+      // 6. Contatos de Apoio e Emergência Dinâmicos (Aba 4)
+      const boxContatos = document.getElementById('listaContatosApoioMorador');
+      const linkZapPadrao = document.getElementById('linkWhatsappPrefeitoMorador');
+      const fonePadrao = (portal.whatsapp_prefeito || '').replace(/\D/g, '');
+      if (linkZapPadrao && fonePadrao) {
+        linkZapPadrao.href = `https://wa.me/${fonePadrao}?text=${encodeURIComponent('Olá Prefeito, sou morador do alojamento e gostaria de tirar uma dúvida.')}`;
+      }
+
+      if (boxContatos && Array.isArray(portal.contatos) && portal.contatos.length > 0) {
+        if (linkZapPadrao) linkZapPadrao.classList.add('hidden');
+        const mapaBtnCor = {
+          emerald: 'bg-emerald-600 hover:bg-emerald-500 text-white',
+          rose: 'bg-rose-600 hover:bg-rose-500 text-white',
+          indigo: 'bg-indigo-600 hover:bg-indigo-500 text-white',
+          amber: 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+        };
+        boxContatos.innerHTML = portal.contatos.map(ct => {
+          const num = String(ct.telefone || '').replace(/\D/g, '');
+          const btnCls = mapaBtnCor[ct.cor] || mapaBtnCor.emerald;
+          const urlZap = `https://wa.me/${num}?text=${encodeURIComponent('Olá, sou colaborador alojado no Canteiro Taboca 2 e preciso de atendimento (' + (ct.nome || '') + ').')}`;
+          return `
+            <a href="${urlZap}" target="_blank" rel="noopener noreferrer" class="w-full py-3 px-4 rounded-2xl ${btnCls} font-black text-xs flex items-center justify-between gap-3 shadow-md transition">
+              <div class="flex items-center gap-2.5 text-left">
+                <i class="fa-brands fa-whatsapp text-xl flex-shrink-0"></i>
+                <div>
+                  <div class="leading-tight">${escapeHTML(ct.nome || 'Atendimento')}</div>
+                  ${ct.cargo ? `<div class="text-[10px] font-medium opacity-90">${escapeHTML(ct.cargo)}</div>` : ''}
+                </div>
+              </div>
+              <i class="fa-solid fa-chevron-right text-xs opacity-80"></i>
+            </a>
+          `;
+        }).join('');
       }
     }
 
@@ -1021,7 +1118,7 @@
     // Inicialização na abertura do app
     window.addEventListener('DOMContentLoaded', async () => {
       await carregarBaseEstaticaAlojados();
-      await carregarDadosPortalMorador(false);
+      await carregarDadosPortalMorador(true);
 
       // Verificar parâmetros de URL (caso venha do QR Code da porta do quarto)
       const params = new URLSearchParams(window.location.search);
