@@ -3159,6 +3159,8 @@ function switchTab(tabId) {
     carregarRondaCanteiro();
   } else if (tabId === 'ronda_vigilancia') {
     carregarRondaVigilancia();
+  } else if (tabId === 'portal_alojado') {
+    carregarPortalAlojadoAdmin();
   } else if (tabId === 'estoque') {
     carregarEstoque();
   } else if (tabId === 'gestao_cadastros') {
@@ -10230,7 +10232,7 @@ if ('serviceWorker' in navigator) {
     }
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=5.4')
+    navigator.serviceWorker.register('./sw.js?v=5.5')
       .then(reg => {
         console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
         // Garante que o novo service worker seja verificado imediatamente
@@ -21644,3 +21646,335 @@ window.excluirPontoVigilancia = excluirPontoVigilancia;
 window.imprimirPlaquinhaVigilancia = imprimirPlaquinhaVigilancia;
 window.imprimirTodasPlaquinhasVigilancia = imprimirTodasPlaquinhasVigilancia;
 window.exportarRelatorioTurnoVigilanciaExcel = exportarRelatorioTurnoVigilanciaExcel;
+
+
+// ========================================================
+// MÓDULO: GESTÃO DO PORTAL DO ALOJADO & COLABORADOR (DOCUMENTO ÚNICO)
+// ========================================================
+let estadoPortalMoradorAdmin = {
+  cardapio: {
+    cafe: 'Pão francês na chapa, ovos mexidos, cuscuz com carne, café preto, leite e frutas da estação',
+    almoco: 'Frango assado dourado, carne de panela ao molho, arroz branco, feijão tropeiro, macarrão e salada fresca',
+    marmita: 'Iscas bovinas aceboladas ou filé de frango grelhado + guarnição completa em embalagem térmica',
+    jantar: 'Sopa nutritiva de legumes com carne, arroz, feijão carioca, proteína grelhada e suco natural',
+    atualizado_em: new Date().toLocaleDateString('pt-BR')
+  },
+  avisos: [
+    {
+      id: 'AV-INICIAL-01',
+      titulo: 'Bem-vindo ao Portal Digital do Alojado!',
+      mensagem: 'Consulte aqui o cardápio diário do refeitório, seu dia de lavanderia, colegas de quarto e abra chamados de manutenção em 3 toques.',
+      tipo: 'informativo',
+      bloco_alvo: 'Todos',
+      data: new Date().toLocaleDateString('pt-BR'),
+      autor: 'Prefeitura de Canteiro'
+    }
+  ],
+  lavanderia: {
+    seg: 'Blocos A e B',
+    ter: 'Blocos C e D',
+    qua: 'Blocos E, F e G',
+    qui: 'Blocos A, B e H',
+    sex: 'Blocos C, D e I',
+    sab: 'Roupas de Cama / Geral'
+  },
+  horarios_onibus: 'Saída Alojamento -> Frente de Obra: 06h30 e 06h45 | Retorno Almoço: 11h30 | Retorno Tarde: 17h15',
+  whatsapp_prefeito: '5594991000000',
+  atualizado_timestamp: Date.now()
+};
+
+function obterEstadoPortalLocal() {
+  try {
+    const raw = localStorage.getItem('portal_morador_doc_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        estadoPortalMoradorAdmin = Object.assign({}, estadoPortalMoradorAdmin, parsed);
+      }
+    }
+  } catch (e) {
+    console.warn('[PORTAL ADMIN] Erro ao ler cache local:', e);
+  }
+  return estadoPortalMoradorAdmin;
+}
+
+function preencherFormularioPortalAdmin() {
+  const est = estadoPortalMoradorAdmin;
+  const c = est.cardapio || {};
+  const l = est.lavanderia || {};
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val || '';
+  };
+
+  setVal('inputCardapioCafe', c.cafe);
+  setVal('inputCardapioAlmoco', c.almoco);
+  setVal('inputCardapioMarmita', c.marmita);
+  setVal('inputCardapioJantar', c.jantar);
+
+  const statusCardapio = document.getElementById('statusUltimaAtualizacaoCardapio');
+  if (statusCardapio) statusCardapio.textContent = c.atualizado_em || 'Hoje';
+
+  setVal('inputEscalaSeg', l.seg);
+  setVal('inputEscalaTer', l.ter);
+  setVal('inputEscalaQua', l.qua);
+  setVal('inputEscalaQui', l.qui);
+  setVal('inputEscalaSex', l.sex);
+  setVal('inputEscalaSab', l.sab);
+
+  setVal('inputHorariosOnibusTexto', est.horarios_onibus);
+  setVal('inputWhatsappPrefeitoPortal', est.whatsapp_prefeito);
+
+  renderizarListaAvisosPortalAdmin();
+}
+
+function renderizarListaAvisosPortalAdmin() {
+  const container = document.getElementById('listaAvisosPortalAdmin');
+  if (!container) return;
+
+  const avisos = Array.isArray(estadoPortalMoradorAdmin.avisos) ? estadoPortalMoradorAdmin.avisos : [];
+  if (avisos.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-slate-400 text-xs">
+        Nenhum comunicado ativo no mural. Publique um aviso acima.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = avisos.map(av => {
+    const badgeCor = av.tipo === 'urgente'
+      ? 'bg-red-100 text-red-800 border-red-200'
+      : av.tipo === 'importante'
+        ? 'bg-amber-100 text-amber-800 border-amber-200'
+        : 'bg-sky-100 text-sky-800 border-sky-200';
+
+    return `
+      <div class="p-3 rounded-xl bg-white border border-slate-200 shadow-xs flex items-start justify-between gap-3">
+        <div class="space-y-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${badgeCor}">${escapeHTML(av.tipo || 'informativo')}</span>
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">${escapeHTML(av.bloco_alvo || 'Todos')}</span>
+            <span class="text-[10px] text-slate-400">${escapeHTML(av.data || '')}</span>
+          </div>
+          <h5 class="text-xs font-bold text-slate-900">${escapeHTML(av.titulo || '')}</h5>
+          <p class="text-[11px] text-slate-600 leading-relaxed">${escapeHTML(av.mensagem || '')}</p>
+        </div>
+        <button type="button" onclick="excluirAvisoMuralAlojado('${escapeHTML(av.id)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0" title="Remover Aviso">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function carregarPortalAlojadoAdmin() {
+  obterEstadoPortalLocal();
+  preencherFormularioPortalAdmin();
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      const snap = await firestoreDb.collection('config_sistema').doc('portal_morador').get();
+      if (snap && snap.exists) {
+        const dadosNuvem = snap.data();
+        estadoPortalMoradorAdmin = Object.assign({}, estadoPortalMoradorAdmin, dadosNuvem);
+        localStorage.setItem('portal_morador_doc_cache', JSON.stringify(estadoPortalMoradorAdmin));
+        localStorage.setItem('portal_morador_doc_ts', String(Date.now()));
+        preencherFormularioPortalAdmin();
+      }
+    } catch (err) {
+      console.warn('[PORTAL ADMIN] Usando cache local do Portal do Alojado:', err);
+    }
+  }
+}
+
+async function persistirDocumentoUnicoPortal(mensagemSucesso) {
+  estadoPortalMoradorAdmin.atualizado_timestamp = Date.now();
+  localStorage.setItem('portal_morador_doc_cache', JSON.stringify(estadoPortalMoradorAdmin));
+  localStorage.setItem('portal_morador_doc_ts', String(Date.now()));
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      await firestoreDb.collection('config_sistema').doc('portal_morador').set(estadoPortalMoradorAdmin, { merge: true });
+      showToast(mensagemSucesso || 'Portal do Alojado atualizado na nuvem!', 'success');
+    } catch (err) {
+      console.warn('[PORTAL ADMIN] Salvo localmente (offline):', err);
+      showToast('Salvo no aparelho (sincronizará quando conectar)', 'info');
+    }
+  } else {
+    showToast(mensagemSucesso || 'Portal do Alojado atualizado!', 'success');
+  }
+}
+
+function salvarCardapioPortalAlojado(event) {
+  if (event) event.preventDefault();
+  const getVal = (id) => (document.getElementById(id)?.value || '').trim();
+  const agora = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  estadoPortalMoradorAdmin.cardapio = {
+    cafe: getVal('inputCardapioCafe'),
+    almoco: getVal('inputCardapioAlmoco'),
+    marmita: getVal('inputCardapioMarmita'),
+    jantar: getVal('inputCardapioJantar'),
+    atualizado_em: agora
+  };
+
+  const statusCardapio = document.getElementById('statusUltimaAtualizacaoCardapio');
+  if (statusCardapio) statusCardapio.textContent = agora;
+
+  persistirDocumentoUnicoPortal('🍽️ Cardápio do dia publicado no App do Alojado!');
+}
+
+function publicarAvisoMuralAlojado(event) {
+  if (event) event.preventDefault();
+  const titulo = (document.getElementById('inputAvisoTitulo')?.value || '').trim();
+  const mensagem = (document.getElementById('inputAvisoMensagem')?.value || '').trim();
+  const tipo = document.getElementById('selectAvisoTipo')?.value || 'informativo';
+  const bloco_alvo = document.getElementById('selectAvisoBloco')?.value || 'Todos';
+
+  if (!titulo || !mensagem) {
+    showToast('Preencha o título e a mensagem do comunicado.', 'warning');
+    return;
+  }
+
+  const novoAviso = {
+    id: 'AV-' + Date.now(),
+    titulo,
+    mensagem,
+    tipo,
+    bloco_alvo,
+    data: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    autor: 'Prefeitura de Canteiro'
+  };
+
+  if (!Array.isArray(estadoPortalMoradorAdmin.avisos)) {
+    estadoPortalMoradorAdmin.avisos = [];
+  }
+  estadoPortalMoradorAdmin.avisos.unshift(novoAviso);
+  if (estadoPortalMoradorAdmin.avisos.length > 10) {
+    estadoPortalMoradorAdmin.avisos = estadoPortalMoradorAdmin.avisos.slice(0, 10);
+  }
+
+  const inputTitulo = document.getElementById('inputAvisoTitulo');
+  const inputMensagem = document.getElementById('inputAvisoMensagem');
+  if (inputTitulo) inputTitulo.value = '';
+  if (inputMensagem) inputMensagem.value = '';
+
+  renderizarListaAvisosPortalAdmin();
+  persistirDocumentoUnicoPortal('📢 Comunicado publicado no Mural do Alojado!');
+}
+
+function excluirAvisoMuralAlojado(id) {
+  if (!Array.isArray(estadoPortalMoradorAdmin.avisos)) return;
+  estadoPortalMoradorAdmin.avisos = estadoPortalMoradorAdmin.avisos.filter(a => a.id !== id);
+  renderizarListaAvisosPortalAdmin();
+  persistirDocumentoUnicoPortal('Comunicado removido do mural.');
+}
+
+function salvarEscalasPortalAlojado(event) {
+  if (event) event.preventDefault();
+  const getVal = (id) => (document.getElementById(id)?.value || '').trim();
+
+  estadoPortalMoradorAdmin.lavanderia = {
+    seg: getVal('inputEscalaSeg') || 'Blocos A e B',
+    ter: getVal('inputEscalaTer') || 'Blocos C e D',
+    qua: getVal('inputEscalaQua') || 'Blocos E, F e G',
+    qui: getVal('inputEscalaQui') || 'Blocos A, B e H',
+    sex: getVal('inputEscalaSex') || 'Blocos C, D e I',
+    sab: getVal('inputEscalaSab') || 'Roupas de Cama / Geral'
+  };
+  estadoPortalMoradorAdmin.horarios_onibus = getVal('inputHorariosOnibusTexto');
+  estadoPortalMoradorAdmin.whatsapp_prefeito = getVal('inputWhatsappPrefeitoPortal').replace(/\D/g, '');
+
+  persistirDocumentoUnicoPortal('🧺 Escalas de Lavanderia e Ônibus publicadas no App!');
+}
+
+function salvarTudoPortalAlojadoAdmin() {
+  salvarCardapioPortalAlojado(null);
+  salvarEscalasPortalAlojado(null);
+}
+
+function getQRCodeUrlPortalAlojado() {
+  const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+  return base + 'alojado.html';
+}
+
+function imprimirCartazPortalAlojadoA4() {
+  const modal = document.getElementById('modalCartazPortalAlojadoA4');
+  const container = document.getElementById('containerCartazPortalAlojadoA4');
+  if (!modal || !container) return;
+
+  const qrUrl = getQRCodeUrlPortalAlojado();
+  const imgId = 'imgQrCartazPortalAlojadoOficial';
+
+  container.innerHTML = `
+    <div class="bg-white p-8 rounded-2xl border-4 border-slate-900 shadow-xl max-w-xl w-full text-center text-slate-900 my-2">
+      <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
+        <img src="logo_gel_cropped.png" alt="GEL Engenharia" class="h-10 object-contain">
+        <div class="text-right">
+          <h3 class="text-xs font-black uppercase tracking-wider text-indigo-900">GEL • Goetze Lobato Engenharia S.A.</h3>
+          <p class="text-[11px] font-bold text-slate-600">Obra PCH Taboca 2 • Prefeitura de Canteiro</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 text-white py-3 px-4 rounded-xl mb-5">
+        <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-widest mb-1">Acesso Gratuito • Sem Senha</span>
+        <h2 class="text-xl font-black uppercase tracking-wide flex items-center justify-center gap-2">
+          <i class="fa-solid fa-mobile-screen-button text-amber-400"></i> Portal Digital do Alojado
+        </h2>
+      </div>
+
+      <p class="text-xs font-semibold text-slate-600 max-w-md mx-auto mb-5">
+        Aponte a câmera do seu celular para o QR Code abaixo e consulte na hora:
+      </p>
+
+      <div class="grid grid-cols-2 gap-2.5 text-left max-w-md mx-auto mb-6 text-xs font-bold text-slate-800">
+        <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2">
+          <i class="fa-solid fa-utensils text-amber-600 text-base"></i>
+          <span>Cardápio do Dia</span>
+        </div>
+        <div class="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center gap-2">
+          <i class="fa-solid fa-bed text-indigo-600 text-base"></i>
+          <span>Meu Quarto e Vaga</span>
+        </div>
+        <div class="p-2.5 rounded-xl bg-teal-50 border border-teal-200 flex items-center gap-2">
+          <i class="fa-solid fa-shirt text-teal-600 text-base"></i>
+          <span>Dia de Lavanderia</span>
+        </div>
+        <div class="p-2.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2">
+          <i class="fa-solid fa-screwdriver-wrench text-rose-600 text-base"></i>
+          <span>Pedir Manutenção</span>
+        </div>
+      </div>
+
+      <div class="inline-block p-4 bg-white border-4 border-slate-900 rounded-2xl shadow-md mb-4">
+        <img id="${imgId}" alt="QR Code Portal do Alojado" class="w-60 h-60 mx-auto object-contain">
+      </div>
+
+      <p class="text-[11px] font-mono text-slate-500 break-all mb-4">${escapeHTML(qrUrl)}</p>
+
+      <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-[11px] font-bold text-slate-500">
+        <span>Prefeitura de Canteiro • PCH Taboca 2</span>
+        <span>Funciona em Android e iPhone</span>
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+
+  setTimeout(() => {
+    const imgEl = document.getElementById(imgId);
+    if (imgEl && typeof renderizarQRCodeEmImagem === 'function') {
+      renderizarQRCodeEmImagem(imgEl, qrUrl, 380);
+    }
+  }, 100);
+}
+
+window.carregarPortalAlojadoAdmin = carregarPortalAlojadoAdmin;
+window.salvarCardapioPortalAlojado = salvarCardapioPortalAlojado;
+window.publicarAvisoMuralAlojado = publicarAvisoMuralAlojado;
+window.excluirAvisoMuralAlojado = excluirAvisoMuralAlojado;
+window.salvarEscalasPortalAlojado = salvarEscalasPortalAlojado;
+window.salvarTudoPortalAlojadoAdmin = salvarTudoPortalAlojadoAdmin;
+window.imprimirCartazPortalAlojadoA4 = imprimirCartazPortalAlojadoA4;

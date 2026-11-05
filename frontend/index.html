@@ -447,6 +447,12 @@
           <span id="sideCountRondaVigilancia" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
         </button>
 
+        <button onclick="switchTab('portal_alojado')" data-tab="portal_alojado" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-id-card-clip w-5 text-amber-400"></i>
+          <span>App do Alojado</span>
+          <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase">Novo</span>
+        </button>
+
         <button onclick="switchTab('estoque')" data-tab="estoque" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
           <i class="fa-solid fa-boxes-stacked w-5 text-teal-400"></i>
           <span>Estoque & Almoxarifado</span>
@@ -3578,6 +3584,231 @@ service cloud.firestore {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB: PORTAL DO ALOJADO (GESTÃO DO PREFEITO) ================= -->
+      <div id="tab-portal_alojado" class="tab-content hidden space-y-6">
+        <!-- Cabeçalho da Aba -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                <i class="fa-solid fa-id-card-clip text-amber-600 mr-1"></i> Comunicação & Autoatendimento
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <i class="fa-solid fa-leaf mr-1"></i> Documento Único (Economia 98% Firebase)
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Portal do Alojado & Colaborador</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Publique o Cardápio do Refeitório, Avisos Oficiais no Mural Digital e a Escala de Lavanderia/Ônibus para todos os celulares da obra.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <a href="alojado.html" target="_blank" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-mobile-screen-button text-amber-400"></i> Abrir App do Alojado
+            </a>
+            <button type="button" onclick="imprimirCartazPortalAlojadoA4()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-qrcode"></i> Imprimir Cartaz A4 (QR Code)
+            </button>
+            <button type="button" onclick="salvarTudoPortalAlojadoAdmin()" class="btn-prefeito px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Publicar Tudo no App
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid Principal: Cardápio do Dia + Mural de Avisos -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Coluna 1: Cardápio do Refeitório -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <i class="fa-solid fa-utensils"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Cardápio do Refeitório</h3>
+                  <p class="text-[11px] text-slate-400">Atualizado em: <span id="statusUltimaAtualizacaoCardapio" class="text-amber-300 font-semibold">Hoje</span></p>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Visível no App</span>
+            </div>
+
+            <form id="formCardapioPortal" onsubmit="salvarCardapioPortalAlojado(event)" class="p-5 space-y-4 flex-1 flex flex-col justify-between text-xs">
+              <div class="space-y-3.5">
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-mug-hot text-amber-600 mr-1"></i> Café da Manhã (05h30 às 07h00)
+                  </label>
+                  <input type="text" id="inputCardapioCafe" required placeholder="Ex: Pão na chapa, ovos mexidos, cuscuz com carne seca, café, leite e frutas" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-drumstick-bite text-emerald-600 mr-1"></i> Almoço no Canteiro (11h00 às 13h30)
+                  </label>
+                  <input type="text" id="inputCardapioAlmoco" required placeholder="Ex: Frango assado, carne de panela, arroz, feijão tropeiro, macarrão e salada" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-box-open text-teal-600 mr-1"></i> Marmita Térmica / Frentes de Serviço
+                  </label>
+                  <input type="text" id="inputCardapioMarmita" required placeholder="Ex: Iscas bovinas aceboladas ou filé de frango grelhado + guarnição completa" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-bowl-food text-indigo-600 mr-1"></i> Jantar no Alojamento (18h30 às 20h30)
+                  </label>
+                  <input type="text" id="inputCardapioJantar" required placeholder="Ex: Sopa de legumes com carne, arroz branco, feijão carioca e carne grelhada" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
+                <button type="submit" class="btn-prefeito px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
+                  <i class="fa-solid fa-floppy-disk"></i> Salvar & Publicar Cardápio
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Coluna 2: Mural Digital de Avisos do Prefeito -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+                  <i class="fa-solid fa-bullhorn"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Mural Digital de Avisos</h3>
+                  <p class="text-[11px] text-slate-400">Comunicados sobre água, energia, dedetização, ônibus e avisos gerais</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-5 space-y-4 flex-1 flex flex-col justify-between text-xs">
+              <form id="formNovoAvisoMural" onsubmit="publicarAvisoMuralAlojado(event)" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div class="sm:col-span-2">
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Título do Comunicado *</label>
+                    <input type="text" id="inputAvisoTitulo" required placeholder="Ex: Dedetização no Bloco C amanhã às 09h" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Prioridade</label>
+                    <select id="selectAvisoTipo" class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      <option value="informativo">Informativo (Azul)</option>
+                      <option value="importante">Importante (Amarelo)</option>
+                      <option value="urgente">Urgente (Vermelho)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Mensagem para os Moradores *</label>
+                  <textarea id="inputAvisoMensagem" rows="2" required placeholder="Escreva a orientação clara para os colaboradores..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                  <div class="flex items-center gap-2">
+                    <label class="font-bold text-slate-600">Público:</label>
+                    <select id="selectAvisoBloco" class="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800">
+                      <option value="Todos">Todos os Alojamentos</option>
+                      <option value="Bloco A">Apenas Bloco A</option>
+                      <option value="Bloco B">Apenas Bloco B</option>
+                      <option value="Bloco C">Apenas Bloco C</option>
+                      <option value="Bloco D">Apenas Bloco D</option>
+                      <option value="Bloco E">Apenas Bloco E</option>
+                      <option value="Bloco F">Apenas Bloco F</option>
+                      <option value="Casas">Casas na Cidade</option>
+                    </select>
+                  </div>
+                  <button type="submit" class="btn-prefeito px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-paper-plane"></i> Publicar no Mural
+                  </button>
+                </div>
+              </form>
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Avisos Ativos no App</h4>
+                  <span class="text-[11px] text-slate-400">Máximo de 10 avisos recentes</span>
+                </div>
+                <div id="listaAvisosPortalAdmin" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  <!-- Preenchido via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Linha Inferior: Escala de Lavanderia, Horários de Ônibus & Contato do Prefeito -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
+                <i class="fa-solid fa-calendar-check"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white">Escala Semanal de Lavanderia, Transporte & WhatsApp da Administração</h3>
+                <p class="text-[11px] text-slate-400">Esses dados aparecem automaticamente no cartão "Meu Quarto" de cada colaborador</p>
+              </div>
+            </div>
+          </div>
+
+          <form id="formEscalasPortal" onsubmit="salvarEscalasPortalAlojado(event)" class="p-5 space-y-4 text-xs">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Segunda-feira</label>
+                <input type="text" id="inputEscalaSeg" placeholder="Blocos A e B" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Terça-feira</label>
+                <input type="text" id="inputEscalaTer" placeholder="Blocos C e D" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Quarta-feira</label>
+                <input type="text" id="inputEscalaQua" placeholder="Blocos E, F e G" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Quinta-feira</label>
+                <input type="text" id="inputEscalaQui" placeholder="Blocos A, B e H" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Sexta-feira</label>
+                <input type="text" id="inputEscalaSex" placeholder="Blocos C, D e I" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Sábado</label>
+                <input type="text" id="inputEscalaSab" placeholder="Roupas de Cama / Geral" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div class="md:col-span-2">
+                <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <i class="fa-solid fa-bus text-amber-600 mr-1"></i> Horários de Ônibus / Transporte Canteiro
+                </label>
+                <input type="text" id="inputHorariosOnibusTexto" placeholder="Ex: Saída Alojamento -> Frente de Obra: 06h30 e 06h45 | Retorno Almoço: 11h30 | Retorno Tarde: 17h15" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> WhatsApp da Prefeitura (com DDD)
+                </label>
+                <input type="text" id="inputWhatsappPrefeitoPortal" placeholder="Ex: 5594999999999" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-mono font-bold">
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
+              <button type="submit" class="btn-prefeito px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-check"></i> Salvar Escalas & Transporte
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -8272,7 +8503,7 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=5.4"></script>
+  <script src="app.js?v=5.5"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
@@ -8488,6 +8719,35 @@ service cloud.firestore {
       <!-- Área rolável de impressão com as placas -->
       <div id="containerPlaquinhasA4Vigilancia" class="p-6 overflow-y-auto flex-1 space-y-8 bg-slate-100 print:bg-white print:p-0 print:m-0">
         <!-- Placas injetadas dinamicamente via JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL CARTAZ A4 DO PORTAL DO ALOJADO (IMPRESSÃO QR CODE) ================= -->
+  <div id="modalCartazPortalAlojadoA4" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[85] flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between flex-shrink-0 print:hidden">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i class="fa-solid fa-qrcode text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Cartaz Oficial A4 • Portal do Alojado & Colaborador</h3>
+            <p class="text-[11px] text-slate-400">Fixe no Refeitório, Lavanderia, Portaria e Murais dos Blocos</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="window.print()" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-print"></i> Imprimir Cartaz A4
+          </button>
+          <button type="button" onclick="fecharModal('modalCartazPortalAlojadoA4')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="containerCartazPortalAlojadoA4" class="p-6 overflow-y-auto flex-1 bg-slate-100 print:bg-white print:p-0 print:m-0 flex justify-center">
+        <!-- Preenchido via JS -->
       </div>
     </div>
   </div>

@@ -53,7 +53,7 @@ jsFiles.forEach(file => {
 });
 
 // Verificação de Sintaxe em Scripts Inline dos Arquivos HTML
-const htmlScriptFiles = ['guarda.html', 'frontend/guarda.html', 'ronda.html', 'frontend/ronda.html', 'limpeza.html', 'frontend/limpeza.html', 'chamado.html', 'frontend/chamado.html', 'index.html', 'frontend/index.html'];
+const htmlScriptFiles = ['alojado.html', 'frontend/alojado.html', 'guarda.html', 'frontend/guarda.html', 'ronda.html', 'frontend/ronda.html', 'limpeza.html', 'frontend/limpeza.html', 'chamado.html', 'frontend/chamado.html', 'index.html', 'frontend/index.html'];
 htmlScriptFiles.forEach(file => {
   if (fs.existsSync(file)) {
     try {
@@ -102,6 +102,7 @@ const parityPairs = [
   ['limpeza.html', 'frontend/limpeza.html'],
   ['ronda.html', 'frontend/ronda.html'],
   ['guarda.html', 'frontend/guarda.html'],
+  ['alojado.html', 'frontend/alojado.html'],
   ['dados_iniciais_taboca.json', 'frontend/dados_iniciais_taboca.json'],
   ['manifest.json', 'frontend/manifest.json']
 ];
@@ -2156,6 +2157,54 @@ assert(simularAntiFraude(t0, t5min) === false, 'Trava Anti-Fraude: bipe 5 min ap
 assert(simularAntiFraude(t0, t9min) === false, 'Trava Anti-Fraude: bipe 9 min e 50s após o primeiro é BLOQUEADO');
 assert(simularAntiFraude(t0, t10min) === true, 'Trava Anti-Fraude: bipe aos 10 min exatos é AUTORIZADO');
 assert(simularAntiFraude(t0, t15min) === true, 'Trava Anti-Fraude: bipe aos 15 min é AUTORIZADO');
+
+
+// -------------------------------------------------------------
+// SEÇÃO 36: PORTAL DO ALOJADO & COLABORADOR (DOCUMENTO ÚNICO + ZERO BUGS)
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 36: PORTAL DO ALOJADO & COLABORADOR (DOCUMENTO ÚNICO + ZERO BUGS) ---');
+
+const alojadoHtml = fs.readFileSync('alojado.html', 'utf8');
+const chamadoHtmlPortal = fs.readFileSync('chamado.html', 'utf8');
+const swJsPortal = fs.readFileSync('sw.js', 'utf8');
+
+// 1. Isolamento Arquitetural (alojado.html não carrega app.js para zero risco de regressão)
+assert(!alojadoHtml.includes('src="app.js'), 'Isolamento Arquitetural: alojado.html é 100% independente e não carrega app.js');
+assert(alojadoHtml.includes('prefeitura-cc71b'), 'alojado.html conectado ao projeto oficial Firebase prefeitura-cc71b');
+assert(alojadoHtml.includes('dados_iniciais_taboca.json'), 'alojado.html consulta base local estática (0 leituras Firebase na busca de quarto/colegas)');
+
+// 2. Motor de Cache Inteligente (TTL 2h para Documento Único + Cooldown 5min para Chamados)
+assert(alojadoHtml.includes("collection('config_sistema').doc('portal_morador')"), 'alojado.html lê o Documento Único config_sistema/portal_morador');
+assert(alojadoHtml.includes('TTL_PORTAL_MS = 2 * 60 * 60 * 1000'), 'TTL de 2 horas configurado para o cache local do Portal do Morador');
+assert(alojadoHtml.includes('5 * 60 * 1000') && alojadoHtml.includes('cooldown_chamado_'), 'Cooldown de 5 minutos configurado para consulta individual de status de chamado');
+assert(!alojadoHtml.includes('.onSnapshot('), 'Zero listeners em tempo real (.onSnapshot) no app dos alojados para proteção de cota Firebase');
+
+// 3. Estrutura das 4 Abas Mobile do Colaborador em alojado.html
+assert(alojadoHtml.includes('id="abaMoradorQuarto"'), 'Aba Meu Quarto & Crachá Digital presente em alojado.html');
+assert(alojadoHtml.includes('id="abaMoradorMural"'), 'Aba Mural do Prefeito & Cardápio do Dia presente em alojado.html');
+assert(alojadoHtml.includes('id="abaMoradorManutencao"'), 'Aba Manutenção & Meus Chamados presente em alojado.html');
+assert(alojadoHtml.includes('id="abaMoradorRegras"'), 'Aba Regras de Ouro & Apoio presente em alojado.html');
+assert(alojadoHtml.includes('id="imgQrCodeCrachaMorador"'), 'Crachá Digital QR Code de Alojado presente em alojado.html');
+
+// 4. Integração com chamado.html e Service Worker v5.5
+assert(chamadoHtmlPortal.includes('alojado.html'), 'Banner de acesso rápido ao Portal do Alojado presente em chamado.html');
+assert(swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.5'"), 'Service Worker atualizado para prefeitura-pwa-v5.5');
+assert(swJsPortal.includes("'alojado.html'"), 'alojado.html incluído no cache offline do Service Worker');
+
+// 5. Painel do Prefeito (index.html + app.js)
+assert(indexHtml.includes('id="tab-portal_alojado"'), 'Aba tab-portal_alojado presente em index.html');
+assert(indexHtml.includes('data-tab="portal_alojado"'), 'Botão data-tab="portal_alojado" presente na sidebar de index.html');
+assert(indexHtml.includes('id="formCardapioPortal"'), 'Formulário de Cardápio do Refeitório presente em index.html');
+assert(indexHtml.includes('id="formNovoAvisoMural"'), 'Formulário do Mural Digital de Avisos presente em index.html');
+assert(indexHtml.includes('id="formEscalasPortal"'), 'Formulário de Escala de Lavanderia e Ônibus presente em index.html');
+assert(indexHtml.includes('id="modalCartazPortalAlojadoA4"'), 'Modal de impressão do Cartaz A4 com QR Code do Portal presente em index.html');
+
+assert(appJs.includes('function carregarPortalAlojadoAdmin('), 'Função carregarPortalAlojadoAdmin implementada em app.js');
+assert(appJs.includes('function salvarCardapioPortalAlojado('), 'Função salvarCardapioPortalAlojado implementada em app.js');
+assert(appJs.includes('function publicarAvisoMuralAlojado('), 'Função publicarAvisoMuralAlojado implementada em app.js');
+assert(appJs.includes('function excluirAvisoMuralAlojado('), 'Função excluirAvisoMuralAlojado implementada em app.js');
+assert(appJs.includes('function salvarEscalasPortalAlojado('), 'Função salvarEscalasPortalAlojado implementada em app.js');
+assert(appJs.includes('function imprimirCartazPortalAlojadoA4('), 'Função imprimirCartazPortalAlojadoA4 implementada em app.js');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

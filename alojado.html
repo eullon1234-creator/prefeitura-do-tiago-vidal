@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Portal do Alojado • Canteiro PCH Taboca 2 | GEL Engenharia</title>
+
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Firebase SDKs compat v10 -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Gerador QR Code Nativo Offline -->
+  <script src="qrcode.min.js"></script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #020617;
+      color: #f8fafc;
+    }
+    .problem-chip {
+      min-height: 54px;
+      touch-action: manipulation;
+    }
+    .problem-chip.active {
+      background-color: #d97706 !important;
+      color: #020617 !important;
+      border-color: #fbbf24 !important;
+      transform: scale(1.02);
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+    }
+    .bottom-nav-item.active {
+      color: #fbbf24;
+    }
+    .bottom-nav-item.active .nav-pill {
+      background-color: rgba(245, 158, 11, 0.2);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pb-24 selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- ================= TOPBAR ================= -->
+  <header class="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-30 px-4 py-3 shadow-lg">
+    <div class="max-w-md mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="h-10 px-2 py-1 rounded-xl bg-white flex items-center justify-center shadow-sm flex-shrink-0">
+          <img src="logo_gel_oficial.png" alt="GEL Engenharia" class="h-7 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-xs sm:text-sm font-black text-white uppercase tracking-tight">Portal do Alojado</h1>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Taboca 2</span>
+          </div>
+          <p id="subtituloHeaderMorador" class="text-[11px] text-slate-400 font-medium truncate max-w-[190px]">Bem-vindo ao Canteiro GEL</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <button type="button" id="btnAtualizarPortalTopo" onclick="sincronizarPortalManual()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition active:scale-95" title="Atualizar Cardápio e Avisos">
+          <i class="fa-solid fa-arrows-rotate" id="iconeSyncPortal"></i>
+        </button>
+        <button type="button" id="btnSairPerfilMorador" onclick="sairPerfilMorador()" class="hidden px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 text-[11px] font-bold flex items-center gap-1 transition">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Trocar</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= CONTEÚDO PRINCIPAL ================= -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+
+    <!-- TELA DE LOGIN / IDENTIFICAÇÃO RÁPIDA (SEM SENHA) -->
+    <section id="telaIdentificacaoMorador" class="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-5">
+      <div class="text-center space-y-1.5">
+        <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-2xl shadow-md">
+          <i class="fa-solid fa-id-card-clip"></i>
+        </div>
+        <h2 class="text-lg font-black text-white">Acesse seu Espaço no Canteiro</h2>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital e peça manutenções rápidas.
+        </p>
+      </div>
+
+      <!-- Busca Inteligente por Nome ou Matrícula -->
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider">
+          <i class="fa-solid fa-magnifying-glass mr-1"></i> Opção 1: Buscar pelo seu Nome ou Matrícula
+        </label>
+        <div class="relative">
+          <input type="text" id="inputBuscaAlojadoPortal" oninput="filtrarSugestoesAlojadoPortal()" placeholder="Digite seu nome ou matrícula..." class="w-full py-3 px-4 rounded-xl bg-slate-950 border border-slate-700 focus:border-amber-500 text-white text-sm font-semibold outline-none placeholder-slate-500">
+          <div id="listaSugestoesAlojadoPortal" class="hidden mt-1.5 max-h-52 overflow-y-auto rounded-xl bg-slate-950 border border-slate-700 divide-y divide-slate-800 shadow-2xl"></div>
+        </div>
+        <p class="text-[11px] text-slate-400">Ao aparecer seu nome na lista acima, basta tocar nele para entrar!</p>
+      </div>
+
+      <div class="relative flex py-1 items-center">
+        <div class="flex-grow border-t border-slate-800"></div>
+        <span class="flex-shrink mx-3 text-[10px] font-bold uppercase text-slate-500">OU ENTRE PELO SEU QUARTO</span>
+        <div class="flex-grow border-t border-slate-800"></div>
+      </div>
+
+      <!-- Entrada Manual por Quarto + Bloco -->
+      <form id="formLoginQuartoPortal" onsubmit="entrarPorQuartoManual(event)" class="space-y-3">
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Seu Bloco *</label>
+            <select id="selectBlocoLoginPortal" class="w-full py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-semibold outline-none focus:border-amber-500">
+              <option value="Bloco 1">Bloco 1</option>
+              <option value="Bloco 2">Bloco 2</option>
+              <option value="Bloco A">Bloco A</option>
+              <option value="Bloco B">Bloco B</option>
+              <option value="Bloco C">Bloco C</option>
+              <option value="Bloco D">Bloco D</option>
+              <option value="Bloco E">Bloco E</option>
+              <option value="Bloco F">Bloco F</option>
+              <option value="Bloco G">Bloco G</option>
+              <option value="Bloco H">Bloco H</option>
+              <option value="Casas na Cidade">Casa na Cidade</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Nº do Quarto *</label>
+            <input type="text" id="inputQuartoLoginPortal" required placeholder="Ex: 10, 104" class="w-full py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-bold outline-none focus:border-amber-500 placeholder-slate-600">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Seu Nome *</label>
+          <input type="text" id="inputNomeLoginPortal" required placeholder="Digite seu nome completo" class="w-full py-2.5 px-3.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs font-semibold outline-none focus:border-amber-500 placeholder-slate-600">
+        </div>
+
+        <button type="submit" class="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wide shadow-lg transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>Acessar Meu Portal</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- ================= PAINEL DO MORADOR LOGADO ================= -->
+    <div id="painelLogadoMorador" class="hidden space-y-4">
+
+      <!-- ABA 1: MEU QUARTO & CRACHÁ DIGITAL -->
+      <section id="abaMoradorQuarto" class="aba-morador-section space-y-4">
+        <!-- Card Principal de Acomodação -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/80 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div id="avatarIniciaisMorador" class="w-13 h-13 w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 font-black text-lg flex items-center justify-center shadow-md flex-shrink-0">
+                AL
+              </div>
+              <div>
+                <span id="badgeEmpresaMorador" class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 mb-0.5">GEL ENGENHARIA</span>
+                <h2 id="nomeMoradorLogado" class="text-base font-black text-white leading-tight">Colaborador</h2>
+                <p id="funcaoMatriculaMorador" class="text-xs text-slate-400">Matrícula: --</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid Bloco / Quarto / Cama -->
+          <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-center">
+            <div class="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Bloco</span>
+              <span id="cardBlocoMorador" class="text-sm font-black text-amber-400 mt-0.5 block">--</span>
+            </div>
+            <div class="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Quarto</span>
+              <span id="cardQuartoMorador" class="text-sm font-black text-white mt-0.5 block">--</span>
+            </div>
+            <div class="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Cama / Vaga</span>
+              <span id="cardCamaMorador" class="text-sm font-black text-emerald-400 mt-0.5 block">--</span>
+            </div>
+          </div>
+
+          <!-- Dia de Lavanderia / Enxoval do Bloco -->
+          <div class="bg-indigo-950/50 border border-indigo-800/50 rounded-2xl p-3 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2.5">
+              <i class="fa-solid fa-shirt text-indigo-400 text-base"></i>
+              <div>
+                <span class="text-[10px] text-indigo-300 font-bold uppercase block">Troca de Enxoval / Lavanderia</span>
+                <span id="textoDiaLavanderiaMorador" class="font-bold text-white text-xs">Consulte a escala na aba Mural</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Crachá Digital com QR Code -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 text-center space-y-3 shadow-lg">
+          <div class="flex items-center justify-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <i class="fa-solid fa-qrcode"></i>
+            <span>Meu Crachá Digital (Portaria & Refeitório)</span>
+          </div>
+          <div class="p-3 bg-white rounded-2xl inline-block mx-auto shadow-inner">
+            <img id="imgQrCodeCrachaMorador" src="" alt="QR Code Crachá" class="w-40 h-40 object-contain mx-auto">
+          </div>
+          <p id="codigoCrachaMorador" class="text-[11px] font-mono text-slate-400">ID: --</p>
+        </div>
+
+        <!-- Colegas de Quarto -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-users text-sky-400"></i>
+            <span>Ocupantes do Quarto</span>
+          </h3>
+          <div id="listaColegasQuartoMorador" class="space-y-2 text-xs">
+            <!-- Preenchido via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 2: MURAL DE AVISOS & CARDÁPIO DO REFEITÓRIO -->
+      <section id="abaMoradorMural" class="aba-morador-section hidden space-y-4">
+        <!-- Mural de Comunicados do Prefeito -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-lg">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-bullhorn"></i>
+              <span>Mural Oficial da Prefeitura</span>
+            </h3>
+            <span id="badgeContagemAvisosMorador" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">0 avisos</span>
+          </div>
+
+          <div id="containerAvisosMuralMorador" class="space-y-2.5">
+            <!-- Avisos injetados via JS -->
+          </div>
+        </div>
+
+        <!-- Cardápio do Dia -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-lg">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-utensils"></i>
+              <span>Cardápio do Refeitório</span>
+            </h3>
+            <span id="dataAtualizacaoCardapioMorador" class="text-[10px] text-slate-400">Hoje</span>
+          </div>
+
+          <div class="grid grid-cols-1 gap-2.5 text-xs">
+            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
+              <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-mug-saucer"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-amber-400 uppercase block">Café da Manhã (05h30 às 07h00)</span>
+                <p id="cardapioCafeMorador" class="text-slate-200 font-medium mt-0.5">Pão francês, ovos mexidos, cuscuz, frutas, café e leite.</p>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
+              <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-bowl-rice"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-emerald-400 uppercase block">Almoço no Canteiro (11h00 às 13h30)</span>
+                <p id="cardapioAlmocoMorador" class="text-slate-200 font-medium mt-0.5">Arroz, feijão tropeiro, carne assada, frango grelhado, macarrão e salada.</p>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
+              <div class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-box-open"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-sky-400 uppercase block">Marmita de Trecho / Frente de Obra</span>
+                <p id="cardapioMarmitaMorador" class="text-slate-200 font-medium mt-0.5">Padrão térmico balanceado + fruta + suco individual.</p>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
+              <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-cloud-moon"></i>
+              </div>
+              <div>
+                <span class="text-[10px] font-bold text-indigo-400 uppercase block">Jantar (18h00 às 20h30)</span>
+                <p id="cardapioJantarMorador" class="text-slate-200 font-medium mt-0.5">Arroz, feijão, iscas bovinas, sopa de legumes, salada e sobremesa.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Escala de Lavanderia e Horários de Ônibus -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-lg">
+          <h3 class="text-xs font-black text-sky-400 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-bus"></i>
+            <span>Transporte & Escala de Lavanderia</span>
+          </h3>
+          <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
+            <span class="text-[10px] font-bold text-slate-400 uppercase block">Horários de Ônibus / Trecho:</span>
+            <p id="textoHorariosOnibusMorador" class="text-slate-200 whitespace-pre-line leading-relaxed">Saída Alojamento: 06h15 e 06h40 | Retorno Frente de Obra: 17h15</p>
+          </div>
+          <div id="gridEscalaLavanderiaMorador" class="grid grid-cols-2 gap-2 text-[11px]">
+            <!-- Escala preenchida via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 3: MANUTENÇÃO & MEUS CHAMADOS -->
+      <section id="abaMoradorManutencao" class="aba-morador-section hidden space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-4 shadow-lg">
+          <div>
+            <h3 class="text-sm font-black text-white flex items-center gap-2">
+              <i class="fa-solid fa-screwdriver-wrench text-amber-400"></i>
+              <span>Solicitar Manutenção no Quarto</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Local vinculado: <strong id="labelQuartoChamadoMorador" class="text-amber-300">Quarto --</strong>
+            </p>
+          </div>
+
+          <!-- 6 Chips Grandes de 1 Toque -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-2">1. Toque no que precisa de reparo *</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" onclick="selecionarCatChamadoMorador('Lâmpada / Iluminação', this)" class="problem-chip flex items-center gap-2.5 p-3 rounded-2xl bg-slate-950 border border-slate-800 text-left text-xs font-bold text-white transition">
+                <i class="fa-solid fa-lightbulb text-amber-400 text-base"></i>
+                <span>Lâmpada / Luz</span>
+              </button>
+              <button type="button" onclick="selecionarCatChamadoMorador('Ar-Condicionado', this)" class="problem-chip flex items-center gap-2.5 p-3 rounded-2xl bg-slate-950 border border-slate-800 text-left text-xs font-bold text-white transition">
+                <i class="fa-solid fa-snowflake text-sky-400 text-base"></i>
+                <span>Ar-Condicionado</span>
+              </button>
+              <button type="button" onclick="selecionarCatChamadoMorador('Banheiro / Chuveiro', this)" class="problem-chip flex items-center gap-2.5 p-3 rounded-2xl bg-slate-950 border border-slate-800 text-left text-xs font-bold text-white transition">
+                <i class="fa-solid fa-shower text-cyan-400 text-base"></i>
+                <span>Chuveiro / Água</span>
+              </button>
+              <button type="button" onclick="selecionarCatChamadoMorador('Limpeza / Higienização', this)" class="problem-chip flex items-center gap-2.5 p-3 rounded-2xl bg-slate-950 border border-slate-800 text-left text-xs font-bold text-white transition">
+                <i class="fa-solid fa-broom text-emerald-400 text-base"></i>
+                <span>Limpeza / Faxina</span>
+              </button>
+              <button type="button" onclick="selecionarCatChamadoMorador('Cama / Colchão / Armário', this)" class="problem-chip flex items-center gap-2.5 p-3 rounded-2xl bg-slate-950 border border-slate-800 text-left text-xs font-bold text-white transition">
+                <i class="fa-solid fa-bed text-indigo-400 text-base"></i>
+                <span>Cama / Armário</span>
+              </button>
+              <button type="button" onclick="selecionarCatChamadoMorador('Porta / Fechadura', this)" class="problem-chip flex items-center gap-2.5 p-3 rounded-2xl bg-slate-950 border border-slate-800 text-left text-xs font-bold text-white transition">
+                <i class="fa-solid fa-key text-rose-400 text-base"></i>
+                <span>Fechadura / Porta</span>
+              </button>
+            </div>
+            <input type="hidden" id="inputCatChamadoMorador">
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">2. Detalhes do Problema *</label>
+            <textarea id="inputDescChamadoMorador" rows="2" placeholder="Ex: O chuveiro queimou a resistência hoje cedo..." class="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs outline-none focus:border-amber-500 placeholder-slate-600"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">Seu WhatsApp (Opcional)</label>
+            <input type="tel" id="inputZapChamadoMorador" placeholder="(DDD) 99999-9999" class="w-full py-2.5 px-3.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs outline-none focus:border-amber-500 placeholder-slate-600">
+          </div>
+
+          <button type="button" id="btnEnviarChamadoMorador" onclick="enviarChamadoPortalMorador()" class="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wide shadow-lg transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Enviar Solicitação para a Prefeitura</span>
+          </button>
+        </div>
+
+        <!-- Meus Chamados Abertos -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-lg">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-amber-400"></i>
+              <span>Meus Chamados Recentes</span>
+            </h3>
+            <span class="text-[10px] text-slate-500">Toque para atualizar status</span>
+          </div>
+          <div id="listaMeusChamadosMorador" class="space-y-2.5 text-xs">
+            <!-- Preenchido via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 4: REGRAS DE CONVIVÊNCIA & CONTATOS ÚTEIS -->
+      <section id="abaMoradorRegras" class="aba-morador-section hidden space-y-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-lg">
+          <h3 class="text-sm font-black text-amber-400 uppercase tracking-wide flex items-center gap-2">
+            <i class="fa-solid fa-scale-balanced"></i>
+            <span>Regras de Ouro do Alojamento GEL</span>
+          </h3>
+
+          <ul class="space-y-3 text-xs text-slate-300 leading-relaxed">
+            <li class="flex items-start gap-2.5">
+              <i class="fa-solid fa-volume-xmark text-amber-400 mt-1 flex-shrink-0"></i>
+              <span><strong class="text-white">Horário de Silêncio (22h às 06h):</strong> Respeite o descanso dos colegas de turno. Uso de som alto é estritamente proibido.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <i class="fa-solid fa-ban text-rose-400 mt-1 flex-shrink-0"></i>
+              <span><strong class="text-white">Tolerância Zero para Álcool e Drogas:</strong> É proibido portar ou consumir bebidas alcoólicas ou substâncias ilícitas nos alojamentos.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <i class="fa-solid fa-snowflake text-sky-400 mt-1 flex-shrink-0"></i>
+              <span><strong class="text-white">Uso Consciente do Ar-Condicionado:</strong> Ao sair do quarto para a frente de obra, desligue o aparelho e mantenha janelas e portas fechadas.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <i class="fa-solid fa-lock text-emerald-400 mt-1 flex-shrink-0"></i>
+              <span><strong class="text-white">Zelo pelo Patrimônio:</strong> Não troque de cama ou quarto sem autorização prévia da Prefeitura de Canteiro.</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Linha Direta WhatsApp Prefeito -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3 shadow-lg">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Canal Direto com a Administração</h3>
+          <a id="linkWhatsappPrefeitoMorador" href="https://wa.me/5500000000000" target="_blank" rel="noopener noreferrer" class="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg transition">
+            <i class="fa-brands fa-whatsapp text-lg"></i>
+            <span>Falar com o Prefeito no WhatsApp</span>
+          </a>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- ================= BARRA DE NAVEGAÇÃO INFERIOR (BOTTOM NAV) ================= -->
+  <nav id="bottomNavMorador" class="hidden fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 z-40 shadow-2xl">
+    <div class="max-w-md mx-auto grid grid-cols-4 gap-1">
+      <button type="button" onclick="alternarAbaMorador('quarto')" data-aba="quarto" class="bottom-nav-item active flex flex-col items-center justify-center py-1 text-slate-400 transition">
+        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+          <i class="fa-solid fa-bed text-sm"></i>
+        </div>
+        <span class="text-[10px] font-bold mt-0.5">Meu Quarto</span>
+      </button>
+
+      <button type="button" onclick="alternarAbaMorador('mural')" data-aba="mural" class="bottom-nav-item flex flex-col items-center justify-center py-1 text-slate-400 transition">
+        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+          <i class="fa-solid fa-utensils text-sm"></i>
+        </div>
+        <span class="text-[10px] font-bold mt-0.5">Mural & Menu</span>
+      </button>
+
+      <button type="button" onclick="alternarAbaMorador('manutencao')" data-aba="manutencao" class="bottom-nav-item flex flex-col items-center justify-center py-1 text-slate-400 transition">
+        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+          <i class="fa-solid fa-screwdriver-wrench text-sm"></i>
+        </div>
+        <span class="text-[10px] font-bold mt-0.5">Manutenção</span>
+      </button>
+
+      <button type="button" onclick="alternarAbaMorador('regras')" data-aba="regras" class="bottom-nav-item flex flex-col items-center justify-center py-1 text-slate-400 transition">
+        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+          <i class="fa-solid fa-shield-heart text-sm"></i>
+        </div>
+        <span class="text-[10px] font-bold mt-0.5">Regras & Apoio</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ================= SCRIPT STANDALONE (ZERO CONFLITO & ECONOMIA FIREBASE) ================= -->
+  <script>
+    // 1. Configuração Oficial Firebase (Apenas Leituras Pontuais com Cache TTL de 2h)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCd1Uu_dRx8k4EcgifWUmsmfeqnAcB4PHw",
+      authDomain: "prefeitura-cc71b.firebaseapp.com",
+      projectId: "prefeitura-cc71b",
+      storageBucket: "prefeitura-cc71b.firebasestorage.app",
+      messagingSenderId: "395936672533",
+      appId: "1:395936672533:web:d7d17537d2c38c47bc971c",
+      measurementId: "G-YYXMDWCM4Q"
+    };
+
+    let firestoreDb = null;
+    try {
+      if (typeof firebase !== 'undefined') {
+        const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
+        firestoreDb = app.firestore();
+      }
+    } catch (e) {
+      console.warn("Modo offline ativo:", e);
+    }
+
+    // Estado Local
+    let baseEstaticaObra = { alojados: [], quartos: [], blocos: [] };
+    let perfilMoradorAtivo = null;
+    let dadosPortalMorador = null;
+
+    const CACHE_PORTAL_KEY = 'portal_morador_doc_cache';
+    const CACHE_PORTAL_TS_KEY = 'portal_morador_doc_ts';
+    const TTL_PORTAL_MS = 2 * 60 * 60 * 1000; // 2 horas de cache para economizar 99% de leituras no Firebase!
+
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getDadosPortalPadrao() {
+      return {
+        cardapio: {
+          cafe: 'Pão francês na chapa, ovos mexidos, cuscuz, bolo caseiro, frutas da estação, café e leite.',
+          almoco: 'Arroz branco, feijão carioca, bife acebolado, frango assado, macarrão, farofa e salada mista.',
+          marmita: 'Embalagem térmica executiva: arroz, feijão, proteína dupla, guarnição, salada e fruta.',
+          jantar: 'Arroz, feijão, carne de panela com legumes, sopa revigorante, salada e sobremesa.',
+          atualizado_em: new Date().toLocaleDateString('pt-BR')
+        },
+        avisos: [
+          {
+            id: 'aviso_boas_vindas',
+            titulo: 'Bem-vindo ao Portal Oficial do Alojado!',
+            mensagem: 'Use este aplicativo para acompanhar o cardápio diário, comunicados da Prefeitura de Canteiro e solicitar reparos no seu quarto.',
+            tipo: 'informativo',
+            bloco: 'Todos',
+            data: new Date().toLocaleDateString('pt-BR')
+          }
+        ],
+        lavanderia: {
+          seg: 'Bloco 1 e Bloco 2',
+          ter: 'Bloco A e Bloco B',
+          qua: 'Bloco C e Bloco D',
+          qui: 'Bloco E e Bloco F',
+          sex: 'Bloco G e Bloco H',
+          sab: 'Casas na Cidade / Reposição'
+        },
+        horarios_onibus: 'Saída Alojamento p/ Obra: 06h15 e 06h40\nRetorno Frente de Obra: 17h15 e 18h00',
+        whatsapp_prefeito: '5500000000000'
+      };
+    }
+
+    // Carregar Base Estática do GitHub Pages (0 Leituras no Firebase!)
+    async function carregarBaseEstaticaAlojados() {
+      try {
+        // Se estiver no mesmo navegador que o sistema principal, aproveita o estado atualizado
+        const localDb = localStorage.getItem('prefeitura_taboca_db_v3');
+        if (localDb) {
+          const parsed = JSON.parse(localDb);
+          if (parsed && Array.isArray(parsed.alojados)) {
+            baseEstaticaObra = parsed;
+            return;
+          }
+        }
+        const resp = await fetch('dados_iniciais_taboca.json');
+        if (resp.ok) {
+          baseEstaticaObra = await resp.json();
+        }
+      } catch (e) {
+        console.warn('Usando cache offline de alojados:', e);
+      }
+    }
+
+    // Carregar Documento Único do Portal (Máximo 1 Leitura a cada 2 Horas!)
+    async function carregarDadosPortalMorador(forcarLeituraNuvem = false) {
+      const agora = Date.now();
+      const ultimoTs = Number(localStorage.getItem(CACHE_PORTAL_TS_KEY) || 0);
+      const cacheLocal = localStorage.getItem(CACHE_PORTAL_KEY);
+
+      // Se o cache tem menos de 2 horas e não foi forçado, retorna com ZERO leituras no Firebase!
+      if (!forcarLeituraNuvem && cacheLocal && (agora - ultimoTs < TTL_PORTAL_MS)) {
+        try {
+          dadosPortalMorador = JSON.parse(cacheLocal);
+          renderizarMuralECardapioMorador();
+          return dadosPortalMorador;
+        } catch (e) {}
+      }
+
+      if (firestoreDb && navigator.onLine) {
+        try {
+          const doc = await firestoreDb.collection('config_sistema').doc('portal_morador').get();
+          if (doc.exists) {
+            dadosPortalMorador = Object.assign(getDadosPortalPadrao(), doc.data());
+            localStorage.setItem(CACHE_PORTAL_KEY, JSON.stringify(dadosPortalMorador));
+            localStorage.setItem(CACHE_PORTAL_TS_KEY, String(agora));
+            renderizarMuralECardapioMorador();
+            return dadosPortalMorador;
+          }
+        } catch (err) {
+          console.warn('Leitura offline do portal_morador:', err);
+        }
+      }
+
+      if (cacheLocal) {
+        try {
+          dadosPortalMorador = JSON.parse(cacheLocal);
+        } catch (e) {
+          dadosPortalMorador = getDadosPortalPadrao();
+        }
+      } else {
+        dadosPortalMorador = getDadosPortalPadrao();
+      }
+      renderizarMuralECardapioMorador();
+      return dadosPortalMorador;
+    }
+
+    // Sincronização manual pelo botão do topo (com trava anti-spam de 2 minutos)
+    async function sincronizarPortalManual() {
+      const icone = document.getElementById('iconeSyncPortal');
+      if (icone) icone.classList.add('fa-spin');
+
+      const ultimoTs = Number(localStorage.getItem(CACHE_PORTAL_TS_KEY) || 0);
+      const precisaForcar = (Date.now() - ultimoTs) > 2 * 60 * 1000; // Cooldown de 2 min
+
+      await carregarDadosPortalMorador(precisaForcar);
+      setTimeout(() => {
+        if (icone) icone.classList.remove('fa-spin');
+      }, 600);
+    }
+
+    // Busca de sugestões de alojado (0 leituras no Firebase)
+    function filtrarSugestoesAlojadoPortal() {
+      const termo = (document.getElementById('inputBuscaAlojadoPortal')?.value || '').toLowerCase().trim();
+      const box = document.getElementById('listaSugestoesAlojadoPortal');
+      if (!box) return;
+
+      if (termo.length < 2) {
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+      }
+
+      const lista = (baseEstaticaObra.alojados || []).filter(a => {
+        const nome = (a.nome_completo || a.nome || '').toLowerCase();
+        const mat = String(a.matricula || '').toLowerCase();
+        return nome.includes(termo) || mat.includes(termo);
+      }).slice(0, 8);
+
+      if (lista.length === 0) {
+        box.innerHTML = `<div class="p-3 text-xs text-slate-400">Nenhum nome encontrado na lista automática. Preencha seu Quarto e Bloco logo abaixo!</div>`;
+        box.classList.remove('hidden');
+        return;
+      }
+
+      box.innerHTML = lista.map(a => `
+        <button type="button" onclick="selecionarAlojadoDaLista(${a.id})" class="w-full p-3 text-left hover:bg-slate-900 transition flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-white">${escapeHTML(a.nome_completo || a.nome)}</div>
+            <div class="text-[10px] text-slate-400">${escapeHTML(a.empresa_nome || 'GEL')} • Mat: ${escapeHTML(a.matricula || '--')}</div>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">
+            ${escapeHTML(a.bloco_nome || 'Bloco')} • Q.${escapeHTML(a.quarto_numero || '--')}
+          </span>
+        </button>
+      `).join('');
+      box.classList.remove('hidden');
+    }
+
+    function selecionarAlojadoDaLista(idAlojado) {
+      const a = (baseEstaticaObra.alojados || []).find(x => Number(x.id) === Number(idAlojado));
+      if (!a) return;
+
+      perfilMoradorAtivo = {
+        id: a.id,
+        nome: a.nome_completo || a.nome,
+        matricula: a.matricula || 'COLAB-GEL',
+        funcao: a.funcao || 'Colaborador',
+        empresa: a.empresa_nome || 'GEL ENGENHARIA',
+        bloco: a.bloco_nome || 'Bloco 1',
+        quarto: String(a.quarto_numero || '01'),
+        cama: a.numero_cama ? `Cama ${a.numero_cama}` : 'Alocado'
+      };
+
+      localStorage.setItem('alojado_perfil_ativo', JSON.stringify(perfilMoradorAtivo));
+      iniciarSessaoMoradorLogado();
+    }
+
+    function entrarPorQuartoManual(e) {
+      if (e) e.preventDefault();
+      const bloco = document.getElementById('selectBlocoLoginPortal').value;
+      const quarto = document.getElementById('inputQuartoLoginPortal').value.trim();
+      const nome = document.getElementById('inputNomeLoginPortal').value.trim();
+
+      if (!quarto || !nome) return;
+
+      perfilMoradorAtivo = {
+        id: 'MOR-' + Date.now().toString().slice(-5),
+        nome: nome,
+        matricula: 'Q-' + quarto,
+        funcao: 'Morador Alojado',
+        empresa: 'CANTEIRO TABOCA 2',
+        bloco: bloco,
+        quarto: quarto,
+        cama: 'Quarto ' + quarto
+      };
+
+      localStorage.setItem('alojado_perfil_ativo', JSON.stringify(perfilMoradorAtivo));
+      iniciarSessaoMoradorLogado();
+    }
+
+    function sairPerfilMorador() {
+      localStorage.removeItem('alojado_perfil_ativo');
+      perfilMoradorAtivo = null;
+      document.getElementById('painelLogadoMorador').classList.add('hidden');
+      document.getElementById('bottomNavMorador').classList.add('hidden');
+      document.getElementById('btnSairPerfilMorador').classList.add('hidden');
+      document.getElementById('telaIdentificacaoMorador').classList.remove('hidden');
+    }
+
+    function iniciarSessaoMoradorLogado() {
+      if (!perfilMoradorAtivo) return;
+
+      document.getElementById('telaIdentificacaoMorador').classList.add('hidden');
+      document.getElementById('painelLogadoMorador').classList.remove('hidden');
+      document.getElementById('bottomNavMorador').classList.remove('hidden');
+      document.getElementById('btnSairPerfilMorador').classList.remove('hidden');
+
+      const iniciais = (perfilMoradorAtivo.nome || 'AL').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+      document.getElementById('avatarIniciaisMorador').textContent = iniciais;
+      document.getElementById('badgeEmpresaMorador').textContent = perfilMoradorAtivo.empresa || 'GEL ENGENHARIA';
+      document.getElementById('nomeMoradorLogado').textContent = perfilMoradorAtivo.nome;
+      document.getElementById('funcaoMatriculaMorador').textContent = `${perfilMoradorAtivo.funcao || 'Colaborador'} • Mat: ${perfilMoradorAtivo.matricula || '--'}`;
+      document.getElementById('subtituloHeaderMorador').textContent = `${perfilMoradorAtivo.bloco} • Quarto ${perfilMoradorAtivo.quarto}`;
+
+      document.getElementById('cardBlocoMorador').textContent = perfilMoradorAtivo.bloco;
+      document.getElementById('cardQuartoMorador').textContent = perfilMoradorAtivo.quarto;
+      document.getElementById('cardCamaMorador').textContent = perfilMoradorAtivo.cama || 'Ativa';
+      document.getElementById('labelQuartoChamadoMorador').textContent = `${perfilMoradorAtivo.bloco} • Quarto ${perfilMoradorAtivo.quarto}`;
+
+      // Gerar QR Code do Crachá Digital
+      const textoCracha = `CRACHA-GEL|NOME:${perfilMoradorAtivo.nome}|MAT:${perfilMoradorAtivo.matricula}|BLOCO:${perfilMoradorAtivo.bloco}|QUARTO:${perfilMoradorAtivo.quarto}`;
+      document.getElementById('codigoCrachaMorador').textContent = `MATRÍCULA: ${perfilMoradorAtivo.matricula} • ${perfilMoradorAtivo.bloco} / Q.${perfilMoradorAtivo.quarto}`;
+      gerarQrCrachaOffline(textoCracha);
+
+      // Renderizar colegas de quarto
+      renderizarColegasDeQuarto();
+      renderizarMuralECardapioMorador();
+      renderizarMeusChamadosLocais();
+    }
+
+    function gerarQrCrachaOffline(texto) {
+      const imgEl = document.getElementById('imgQrCodeCrachaMorador');
+      if (!imgEl) return;
+      try {
+        if (typeof qrcode === 'function') {
+          const qr = qrcode(0, 'M');
+          qr.addData(unescape(encodeURIComponent(texto)));
+          qr.make();
+          imgEl.src = qr.createDataURL(5, 3);
+          return;
+        }
+      } catch (e) {}
+      imgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(texto)}`;
+    }
+
+    function renderizarColegasDeQuarto() {
+      const container = document.getElementById('listaColegasQuartoMorador');
+      if (!container || !perfilMoradorAtivo) return;
+
+      const colegas = (baseEstaticaObra.alojados || []).filter(a =>
+        String(a.bloco_nome || '').toLowerCase() === String(perfilMoradorAtivo.bloco || '').toLowerCase() &&
+        String(a.quarto_numero || '') === String(perfilMoradorAtivo.quarto || '')
+      );
+
+      if (colegas.length === 0) {
+        container.innerHTML = `
+          <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <span class="font-bold text-white">${escapeHTML(perfilMoradorAtivo.nome)}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Você</span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = colegas.map(c => `
+        <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="font-bold text-white">${escapeHTML(c.nome_completo || c.nome)}</div>
+            <div class="text-[10px] text-slate-400">${escapeHTML(c.funcao || 'Colaborador')} • ${escapeHTML(c.empresa_nome || 'GEL')}</div>
+          </div>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-bold">
+            Cama ${escapeHTML(c.numero_cama || '--')}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function renderizarMuralECardapioMorador() {
+      const portal = dadosPortalMorador || getDadosPortalPadrao();
+      const cardapio = portal.cardapio || {};
+
+      document.getElementById('cardapioCafeMorador').textContent = cardapio.cafe || '--';
+      document.getElementById('cardapioAlmocoMorador').textContent = cardapio.almoco || '--';
+      document.getElementById('cardapioMarmitaMorador').textContent = cardapio.marmita || '--';
+      document.getElementById('cardapioJantarMorador').textContent = cardapio.jantar || '--';
+      document.getElementById('dataAtualizacaoCardapioMorador').textContent = cardapio.atualizado_em || 'Hoje';
+
+      // Avisos do Mural
+      const avisos = Array.isArray(portal.avisos) ? portal.avisos : [];
+      document.getElementById('badgeContagemAvisosMorador').textContent = `${avisos.length} aviso(s)`;
+      const containerAvisos = document.getElementById('containerAvisosMuralMorador');
+      if (containerAvisos) {
+        if (avisos.length === 0) {
+          containerAvisos.innerHTML = `<p class="text-xs text-slate-500 text-center py-3">Nenhum comunicado urgente no momento.</p>`;
+        } else {
+          containerAvisos.innerHTML = avisos.map(av => {
+            const isUrgente = av.tipo === 'urgente';
+            const isAtencao = av.tipo === 'atencao';
+            const badgeCls = isUrgente
+              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+              : (isAtencao ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40');
+            return `
+              <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${badgeCls}">
+                    ${escapeHTML(av.tipo || 'Informativo')} • ${escapeHTML(av.bloco || 'Todos')}
+                  </span>
+                  <span class="text-[10px] text-slate-500">${escapeHTML(av.data || '')}</span>
+                </div>
+                <h4 class="text-xs font-black text-white">${escapeHTML(av.titulo)}</h4>
+                <p class="text-xs text-slate-300 leading-relaxed">${escapeHTML(av.mensagem)}</p>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Horários de Ônibus e Escala Lavanderia
+      document.getElementById('textoHorariosOnibusMorador').textContent = portal.horarios_onibus || 'Consulte a portaria.';
+      const lav = portal.lavanderia || {};
+      const dias = [
+        { k: 'seg', l: 'Segunda-feira' },
+        { k: 'ter', l: 'Terça-feira' },
+        { k: 'qua', l: 'Quarta-feira' },
+        { k: 'qui', l: 'Quinta-feira' },
+        { k: 'sex', l: 'Sexta-feira' },
+        { k: 'sab', l: 'Sábado' }
+      ];
+      const gridLav = document.getElementById('gridEscalaLavanderiaMorador');
+      if (gridLav) {
+        gridLav.innerHTML = dias.map(d => `
+          <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+            <span class="text-[10px] font-bold text-indigo-400 uppercase block">${d.l}</span>
+            <span class="text-white font-semibold">${escapeHTML(lav[d.k] || '--')}</span>
+          </div>
+        `).join('');
+      }
+
+      // Atualizar dia de lavanderia específico do bloco do morador
+      if (perfilMoradorAtivo) {
+        const meuBloco = (perfilMoradorAtivo.bloco || '').toLowerCase();
+        const diaEncontrado = dias.find(d => String(lav[d.k] || '').toLowerCase().includes(meuBloco));
+        const txtLav = document.getElementById('textoDiaLavanderiaMorador');
+        if (txtLav) {
+          txtLav.textContent = diaEncontrado
+            ? `${diaEncontrado.l} (${lav[diaEncontrado.k]})`
+            : 'Conforme escala semanal do seu bloco';
+        }
+      }
+
+      // WhatsApp do Prefeito
+      const fone = (portal.whatsapp_prefeito || '').replace(/\D/g, '');
+      const linkZap = document.getElementById('linkWhatsappPrefeitoMorador');
+      if (linkZap && fone) {
+        linkZap.href = `https://wa.me/${fone}?text=${encodeURIComponent('Olá Prefeito, sou morador do alojamento e gostaria de tirar uma dúvida.')}`;
+      }
+    }
+
+    function alternarAbaMorador(abaId) {
+      document.querySelectorAll('.aba-morador-section').forEach(sec => sec.classList.add('hidden'));
+      document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-aba') === abaId);
+      });
+
+      const mapa = {
+        quarto: 'abaMoradorQuarto',
+        mural: 'abaMoradorMural',
+        manutencao: 'abaMoradorManutencao',
+        regras: 'abaMoradorRegras'
+      };
+      const el = document.getElementById(mapa[abaId]);
+      if (el) el.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function selecionarCatChamadoMorador(categoria, btnEl) {
+      document.getElementById('inputCatChamadoMorador').value = categoria;
+      document.querySelectorAll('.problem-chip').forEach(b => b.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+    }
+
+    async function enviarChamadoPortalMorador() {
+      if (!perfilMoradorAtivo) return;
+      const categoria = document.getElementById('inputCatChamadoMorador').value.trim();
+      const descricao = document.getElementById('inputDescChamadoMorador').value.trim();
+      const whatsapp = document.getElementById('inputZapChamadoMorador').value.trim();
+
+      if (!categoria) {
+        alert('Toque em um dos botões acima para escolher o que precisa de reparo.');
+        return;
+      }
+      if (!descricao) {
+        alert('Descreva brevemente o problema para ajudar a equipe de manutenção.');
+        document.getElementById('inputDescChamadoMorador').focus();
+        return;
+      }
+
+      const btn = document.getElementById('btnEnviarChamadoMorador');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+
+      const protocolo = 'CH-' + Math.floor(100000 + Math.random() * 900000);
+      const agora = new Date();
+      const chamadoData = {
+        id: protocolo,
+        protocolo: protocolo,
+        tipo_local: 'alojamento',
+        quarto: perfilMoradorAtivo.quarto,
+        bloco: perfilMoradorAtivo.bloco,
+        local_formatado: `Quarto ${perfilMoradorAtivo.quarto} (${perfilMoradorAtivo.bloco})`,
+        nome_solicitante: perfilMoradorAtivo.nome,
+        whatsapp_solicitante: whatsapp,
+        categoria: categoria,
+        descricao: descricao,
+        status: 'pendente',
+        origem: 'Portal do Alojado (App)',
+        criado_em: agora.toISOString(),
+        data_formatada: agora.toLocaleString('pt-BR')
+      };
+
+      // Salvar localmente na lista do morador
+      const meus = JSON.parse(localStorage.getItem('meus_chamados_morador') || '[]');
+      meus.unshift(chamadoData);
+      localStorage.setItem('meus_chamados_morador', JSON.stringify(meus.slice(0, 30)));
+
+      // Salvar também no cache compartilhado de chamados_suporte
+      try {
+        const geral = JSON.parse(localStorage.getItem('chamados_suporte_cache') || '[]');
+        geral.unshift(chamadoData);
+        localStorage.setItem('chamados_suporte_cache', JSON.stringify(geral.slice(0, 150)));
+      } catch (e) {}
+
+      // Gravar no Firestore (1 Escrita)
+      if (firestoreDb && navigator.onLine) {
+        try {
+          await firestoreDb.collection('chamados_suporte').doc(protocolo).set(chamadoData);
+        } catch (err) {
+          console.warn('Gravado offline no dispositivo:', err);
+        }
+      }
+
+      document.getElementById('inputDescChamadoMorador').value = '';
+      document.getElementById('inputCatChamadoMorador').value = '';
+      document.querySelectorAll('.problem-chip').forEach(b => b.classList.remove('active'));
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Solicitação Enviada com Sucesso!';
+      setTimeout(() => {
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>Enviar Solicitação para a Prefeitura</span>';
+      }, 2500);
+
+      renderizarMeusChamadosLocais();
+    }
+
+    function renderizarMeusChamadosLocais() {
+      const container = document.getElementById('listaMeusChamadosMorador');
+      if (!container) return;
+      const meus = JSON.parse(localStorage.getItem('meus_chamados_morador') || '[]');
+
+      if (meus.length === 0) {
+        container.innerHTML = `<p class="text-slate-500 text-center py-3">Você ainda não abriu chamados de manutenção por este aparelho.</p>`;
+        return;
+      }
+
+      container.innerHTML = meus.map(ch => {
+        const st = ch.status || 'pendente';
+        const badge = st === 'concluido'
+          ? '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">✅ Resolvido</span>'
+          : (st === 'em_atendimento'
+            ? '<span class="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-bold text-[10px]">🔧 Em Atendimento</span>'
+            : '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px]">⏳ Recebido</span>');
+
+        return `
+          <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-[10px] text-slate-400">#${escapeHTML(ch.protocolo)}</span>
+                ${badge}
+              </div>
+              <div class="font-bold text-white mt-0.5">${escapeHTML(ch.categoria)}</div>
+              <div class="text-[11px] text-slate-400">${escapeHTML(ch.descricao)}</div>
+            </div>
+            <button type="button" onclick="consultarStatusChamadoUnitario('${escapeHTML(ch.protocolo)}')" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs flex-shrink-0" title="Atualizar Status">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Consulta 1 único documento pelo ID do protocolo com trava de 5 minutos (economia extrema de Firebase)
+    async function consultarStatusChamadoUnitario(protocolo) {
+      if (!firestoreDb || !navigator.onLine) return;
+      const chaveCooldown = `cooldown_chamado_${protocolo}`;
+      const ultimoCheck = Number(localStorage.getItem(chaveCooldown) || 0);
+      if (Date.now() - ultimoCheck < 5 * 60 * 1000) {
+        renderizarMeusChamadosLocais();
+        return;
+      }
+
+      try {
+        localStorage.setItem(chaveCooldown, String(Date.now()));
+        const doc = await firestoreDb.collection('chamados_suporte').doc(protocolo).get();
+        if (doc.exists) {
+          const dados = doc.data();
+          const meus = JSON.parse(localStorage.getItem('meus_chamados_morador') || '[]');
+          const idx = meus.findIndex(x => x.protocolo === protocolo);
+          if (idx !== -1) {
+            meus[idx].status = dados.status || 'pendente';
+            localStorage.setItem('meus_chamados_morador', JSON.stringify(meus));
+            renderizarMeusChamadosLocais();
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Inicialização na abertura do app
+    window.addEventListener('DOMContentLoaded', async () => {
+      await carregarBaseEstaticaAlojados();
+      await carregarDadosPortalMorador(false);
+
+      // Verificar parâmetros de URL (caso venha do QR Code da porta do quarto)
+      const params = new URLSearchParams(window.location.search);
+      const qParam = params.get('quarto') || params.get('quarto_num');
+      const bParam = params.get('bloco');
+      if (qParam) {
+        const inQ = document.getElementById('inputQuartoLoginPortal');
+        if (inQ) inQ.value = String(qParam).replace(/^quarto_/i, '');
+      }
+      if (bParam) {
+        const selB = document.getElementById('selectBlocoLoginPortal');
+        if (selB) selB.value = bParam;
+      }
+
+      const salvo = localStorage.getItem('alojado_perfil_ativo');
+      if (salvo) {
+        try {
+          perfilMoradorAtivo = JSON.parse(salvo);
+          iniciarSessaoMoradorLogado();
+        } catch (e) {}
+      }
+    });
+  </script>
+</body>
+</html>
