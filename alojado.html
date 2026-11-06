@@ -240,56 +240,205 @@
           </div>
         </div>
 
-        <!-- Cardápio do Dia -->
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-lg">
+        <!-- Cardápio Semanal & Prato do Dia -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3.5 shadow-lg">
           <div class="flex items-center justify-between">
             <h3 class="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-2">
               <i class="fa-solid fa-utensils"></i>
               <span>Cardápio do Refeitório</span>
             </h3>
-            <span id="dataAtualizacaoCardapioMorador" class="text-[10px] text-slate-400">Hoje</span>
+            <span id="dataAtualizacaoCardapioMorador" class="text-[10px] text-slate-400 font-bold bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">Hoje</span>
           </div>
 
+          <!-- Carrossel de Dias da Semana -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5 px-0.5">
+              <span class="text-[10px] font-bold uppercase text-slate-400">Ver Cardápio por Dia:</span>
+              <span id="labelDiaSelecionadoCardapioMorador" class="text-[10px] font-black text-amber-300">Hoje</span>
+            </div>
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar text-xs">
+              <button type="button" onclick="selecionarDiaCardapioMorador('seg')" id="btnDiaMorador_seg" class="btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400">
+                Seg
+              </button>
+              <button type="button" onclick="selecionarDiaCardapioMorador('ter')" id="btnDiaMorador_ter" class="btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400">
+                Ter
+              </button>
+              <button type="button" onclick="selecionarDiaCardapioMorador('qua')" id="btnDiaMorador_qua" class="btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400">
+                Qua
+              </button>
+              <button type="button" onclick="selecionarDiaCardapioMorador('qui')" id="btnDiaMorador_qui" class="btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400">
+                Qui
+              </button>
+              <button type="button" onclick="selecionarDiaCardapioMorador('sex')" id="btnDiaMorador_sex" class="btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400">
+                Sex
+              </button>
+              <button type="button" onclick="selecionarDiaCardapioMorador('sab')" id="btnDiaMorador_sab" class="btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400">
+                Sáb
+              </button>
+              <button type="button" onclick="selecionarDiaCardapioMorador('dom')" id="btnDiaMorador_dom" class="btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400">
+                Dom
+              </button>
+            </div>
+          </div>
+
+          <!-- Destaque: Prato Especial do Dia -->
+          <div class="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-amber-600/10 border-2 border-amber-500/40 shadow-md space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-crown text-amber-400 text-xs"></i> Prato Especial do Dia
+              </span>
+              <span id="tagDiaPratoEspecialMorador" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200">Hoje</span>
+            </div>
+            <p id="cardapioPratoDoDiaMorador" class="text-sm font-black text-white leading-snug">
+              Carregando prato do dia...
+            </p>
+          </div>
+
+          <!-- As 4 Refeições -->
           <div class="grid grid-cols-1 gap-2.5 text-xs">
+            <!-- Café da Manhã -->
             <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
               <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <i class="fa-solid fa-mug-saucer"></i>
               </div>
-              <div>
+              <div class="flex-1">
                 <span id="labelHorarioCafeMorador" class="text-[10px] font-bold text-amber-400 uppercase block">Café da Manhã (05h30 às 07h00)</span>
                 <p id="cardapioCafeMorador" class="text-slate-200 font-medium mt-0.5">Pão francês, ovos mexidos, cuscuz, frutas, café e leite.</p>
               </div>
             </div>
 
+            <!-- Almoço -->
             <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
               <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <i class="fa-solid fa-bowl-rice"></i>
               </div>
-              <div>
+              <div class="flex-1">
                 <span id="labelHorarioAlmocoMorador" class="text-[10px] font-bold text-emerald-400 uppercase block">Almoço no Canteiro (11h00 às 13h30)</span>
                 <p id="cardapioAlmocoMorador" class="text-slate-200 font-medium mt-0.5">Arroz, feijão tropeiro, carne assada, frango grelhado, macarrão e salada.</p>
               </div>
             </div>
 
+            <!-- Marmita de Trecho -->
             <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
               <div class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <i class="fa-solid fa-box-open"></i>
               </div>
-              <div>
+              <div class="flex-1">
                 <span id="labelHorarioMarmitaMorador" class="text-[10px] font-bold text-sky-400 uppercase block">Marmita de Trecho (Frentes de Serviço)</span>
                 <p id="cardapioMarmitaMorador" class="text-slate-200 font-medium mt-0.5">Padrão térmico balanceado + fruta + suco individual.</p>
               </div>
             </div>
 
+            <!-- Jantar -->
             <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 flex items-start gap-3">
               <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <i class="fa-solid fa-cloud-moon"></i>
               </div>
-              <div>
+              <div class="flex-1">
                 <span id="labelHorarioJantarMorador" class="text-[10px] font-bold text-indigo-400 uppercase block">Jantar (18h00 às 20h30)</span>
                 <p id="cardapioJantarMorador" class="text-slate-200 font-medium mt-0.5">Arroz, feijão, iscas bovinas, sopa de legumes, salada e sobremesa.</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- ================= CARD DE AVALIAÇÃO DA REFEIÇÃO / OUVIDORIA ================= -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border-2 border-amber-500/30 rounded-3xl p-4 space-y-3.5 shadow-xl">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-black shadow-xs">
+                <i class="fa-solid fa-star"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-black text-white uppercase tracking-wide">Avaliar Refeição de Hoje</h3>
+                <p class="text-[10px] text-slate-400">Ouvidoria direta com a Prefeitura de Canteiro</p>
+              </div>
+            </div>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              Voz do Operário
+            </span>
+          </div>
+
+          <!-- Formulário de Avaliação -->
+          <div class="space-y-3 text-xs" id="boxFormularioAvaliacaoMorador">
+            <!-- 1. Qual refeição deseja avaliar -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                1. Qual refeição você quer avaliar?
+              </label>
+              <select id="selectTipoRefeicaoAvaliacaoMorador" class="w-full py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold outline-none focus:border-amber-500">
+                <option value="Almoço">Almoço no Canteiro</option>
+                <option value="Jantar">Jantar no Alojamento</option>
+                <option value="Marmita">Marmita Térmica de Trecho</option>
+                <option value="Café">Café da Manhã</option>
+                <option value="Geral">Geral do Dia (Toda a Comida)</option>
+              </select>
+            </div>
+
+            <!-- 2. Escolha as Estrelas (1 a 5) com Sentimento -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-[11px] font-bold text-slate-300 uppercase">
+                  2. Sua Nota para a Comida *
+                </label>
+                <span id="labelSentimentoNotaMorador" class="text-xs font-black text-amber-400">
+                  Toque nas estrelas
+                </span>
+              </div>
+              <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-2xl border border-slate-800">
+                <div class="flex items-center gap-2 mx-auto" id="estrelasRatingMorador">
+                  <button type="button" onclick="selecionarNotaAvaliacaoMorador(1)" class="star-rating-btn p-2 text-2xl text-slate-600 hover:text-amber-400 transition transform active:scale-125" data-nota="1" aria-label="1 Estrela - Péssimo">
+                    <i class="fa-solid fa-star"></i>
+                  </button>
+                  <button type="button" onclick="selecionarNotaAvaliacaoMorador(2)" class="star-rating-btn p-2 text-2xl text-slate-600 hover:text-amber-400 transition transform active:scale-125" data-nota="2" aria-label="2 Estrelas - Ruim">
+                    <i class="fa-solid fa-star"></i>
+                  </button>
+                  <button type="button" onclick="selecionarNotaAvaliacaoMorador(3)" class="star-rating-btn p-2 text-2xl text-slate-600 hover:text-amber-400 transition transform active:scale-125" data-nota="3" aria-label="3 Estrelas - Regular">
+                    <i class="fa-solid fa-star"></i>
+                  </button>
+                  <button type="button" onclick="selecionarNotaAvaliacaoMorador(4)" class="star-rating-btn p-2 text-2xl text-slate-600 hover:text-amber-400 transition transform active:scale-125" data-nota="4" aria-label="4 Estrelas - Muito Bom">
+                    <i class="fa-solid fa-star"></i>
+                  </button>
+                  <button type="button" onclick="selecionarNotaAvaliacaoMorador(5)" class="star-rating-btn p-2 text-2xl text-slate-600 hover:text-amber-400 transition transform active:scale-125" data-nota="5" aria-label="5 Estrelas - Excelente">
+                    <i class="fa-solid fa-star"></i>
+                  </button>
+                </div>
+              </div>
+              <input type="hidden" id="inputNotaAvaliacaoMorador" value="0">
+            </div>
+
+            <!-- 3. Campo de Observação / Sugestão / Crítica -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-300 uppercase mb-1">
+                3. Observação, Crítica ou Elogio
+              </label>
+              <textarea id="inputObservacaoAvaliacaoMorador" rows="2" placeholder="Conte como estava o tempero, o ponto da carne, a temperatura ou o que precisa melhorar..." class="w-full p-3 rounded-2xl bg-slate-950 border border-slate-800 text-white text-xs outline-none focus:border-amber-500 placeholder-slate-600 leading-relaxed"></textarea>
+            </div>
+
+            <!-- 4. Opção de Envio Anônimo -->
+            <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 cursor-pointer select-none">
+              <input type="checkbox" id="checkAnonimoAvaliacaoMorador" class="w-4 h-4 rounded text-amber-500 bg-slate-900 border-slate-700 focus:ring-0">
+              <span class="text-[11px] text-slate-300 font-medium">
+                <strong class="text-white">Enviar anonimamente</strong> (não mostrar meu nome nem quarto para a cozinha)
+              </span>
+            </label>
+
+            <!-- Botão de Envio -->
+            <button type="button" id="btnEnviarAvaliacaoMorador" onclick="enviarAvaliacaoRefeicaoMorador()" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wide shadow-lg transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>Enviar Minha Avaliação para a Prefeitura</span>
+            </button>
+          </div>
+
+          <!-- Mensagem de Avaliação Recente Enviada -->
+          <div id="boxAvaliacaoEnviadaSucessoMorador" class="hidden p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-200 text-xs space-y-1.5">
+            <div class="flex items-center gap-2 font-bold text-emerald-300">
+              <i class="fa-solid fa-circle-check text-sm"></i>
+              <span>Avaliação enviada com sucesso!</span>
+            </div>
+            <p class="text-[11px] text-emerald-300/80 leading-relaxed" id="textoResumoUltimaAvaliacaoMorador">
+              Obrigado pela sua contribuição! O Prefeito de Canteiro e a equipe do refeitório já receberam sua avaliação para tomar providências.
+            </p>
           </div>
         </div>
 
@@ -488,10 +637,26 @@
     let baseEstaticaObra = { alojados: [], quartos: [], blocos: [] };
     let perfilMoradorAtivo = null;
     let dadosPortalMorador = null;
+    let diaCardapioMoradorAtivo = 'seg';
+
+    function getDiaSemanaHojeChave() {
+      const d = new Date().getDay(); // 0 = Dom, 1 = Seg, 2 = Ter, 3 = Qua, 4 = Qui, 5 = Sex, 6 = Sáb
+      const map = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+      return map[d] || 'seg';
+    }
 
     const CACHE_PORTAL_KEY = 'portal_morador_doc_cache';
     const CACHE_PORTAL_TS_KEY = 'portal_morador_doc_ts';
     const TTL_PORTAL_MS = 2 * 60 * 60 * 1000; // 2 horas de cache para economizar 99% de leituras no Firebase!
+
+    function getDataHojeLocal(dataObj = new Date()) {
+      const d = dataObj instanceof Date ? dataObj : new Date(dataObj);
+      if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-CA');
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
 
     function escapeHTML(str) {
       if (str === null || str === undefined) return '';
@@ -506,11 +671,67 @@
     function getDadosPortalPadrao() {
       return {
         cardapio: {
+          horario_cafe: '05h30 às 07h00',
+          horario_almoco: '11h00 às 13h30',
+          horario_marmita: 'Frentes de Serviço',
+          horario_jantar: '18h00 às 20h30',
+          prato_dia: 'Feijoada Completa Tradicional',
           cafe: 'Pão francês na chapa, ovos mexidos, cuscuz, bolo caseiro, frutas da estação, café e leite.',
           almoco: 'Arroz branco, feijão carioca, bife acebolado, frango assado, macarrão, farofa e salada mista.',
           marmita: 'Embalagem térmica executiva: arroz, feijão, proteína dupla, guarnição, salada e fruta.',
           jantar: 'Arroz, feijão, carne de panela com legumes, sopa revigorante, salada e sobremesa.',
-          atualizado_em: new Date().toLocaleDateString('pt-BR')
+          atualizado_em: new Date().toLocaleDateString('pt-BR'),
+          semanal: {
+            seg: {
+              prato_dia: 'Frango Assado Dourado com Polenta Frita',
+              cafe: 'Pão francês na chapa, ovos mexidos, cuscuz, café e leite',
+              almoco: 'Arroz branco, feijão tropeiro, frango assado, macarrão alho e óleo e salada mista',
+              marmita: 'Frango grelhado ou carne de panela com guarnição térmica balanceada',
+              jantar: 'Sopa de legumes com carne, arroz, feijão e filé de frango grelhado'
+            },
+            ter: {
+              prato_dia: 'Bife Acebolado com Purê de Batatas',
+              cafe: 'Pão com manteiga, cuscuz nordestino, ovos mexidos, café e leite',
+              almoco: 'Arroz branco, feijão carioca, bife acebolado bovino, purê de batata e legumes no vapor',
+              marmita: 'Bife bovino acebolado, arroz, feijão carioca e farofa crocante',
+              jantar: 'Iscas de carne com legumes, arroz, feijão e salada verde fresca'
+            },
+            qua: {
+              prato_dia: 'Feijoada Completa Tradicional com Couve e Farofa',
+              cafe: 'Pão caseiro, ovos, frutas da estação, café quente e leite',
+              almoco: 'Feijoada tradicional completa, arroz branco, couve refogada, farofa de bacon e laranja',
+              marmita: 'Feijoada executiva completa, arroz branco, couve e farofa especial',
+              jantar: 'Caldo de feijão especial, arroz, bife grelhado e salada'
+            },
+            qui: {
+              prato_dia: 'Carne Assada de Panela com Mandioca Cozida',
+              cafe: 'Pão na chapa, ovos mexidos, bolo caseiro fofinho, café e leite',
+              almoco: 'Carne bovina de panela com mandioca suculenta, arroz branco, feijão carioca e salada',
+              marmita: 'Carne assada suculenta com mandioca, arroz e feijão',
+              jantar: 'Frango à passarinho crocante, arroz, feijão carioca e salada mista'
+            },
+            sex: {
+              prato_dia: 'Peixe Frito Crocante / Iscas com Molho Tártaro',
+              cafe: 'Pão francês, cuscuz com manteiga, ovos, café preto e leite',
+              almoco: 'Iscas de peixe crocante ou filé grelhado, arroz, feijão, pirão e vinagrete especial',
+              marmita: 'Peixe frito crocante ou bife acebolado com guarnição completa',
+              jantar: 'Lasanha à bolonhesa ou arroz com carne grelhada e salada verde'
+            },
+            sab: {
+              prato_dia: 'Churrasco Misto do Canteiro com Farofa de Bacon',
+              cafe: 'Pão na chapa, ovos mexidos, frutas da estação, café e leite',
+              almoco: 'Churrasco de carnes nobres grelhadas, arroz, feijão tropeiro, vinagrete e maionese',
+              marmita: 'Churrasco misto com farofa, vinagrete, arroz e feijão tropeiro',
+              jantar: 'Hambúrguer artesanal ou arroz com carne de panela e salada mista'
+            },
+            dom: {
+              prato_dia: 'Frango Especial de Domingo & Macarronada',
+              cafe: 'Café da manhã reforçado com frutas, bolos caseiros, ovos e sucos',
+              almoco: 'Frango assado especial de domingo, macarronada italiana, arroz e maionese de batatas',
+              marmita: 'Refeição especial de domingo com sobremesa balanceada',
+              jantar: 'Sopa com torradas, arroz, feijão e proteína grelhada'
+            }
+          }
         },
         avisos: [
           {
@@ -818,21 +1039,10 @@
       if (elTxtBV && ident.texto_boas_vindas) elTxtBV.textContent = ident.texto_boas_vindas;
 
       // 2. Cardápio e Horários das Refeições
-      const cardapio = portal.cardapio || {};
-      const lblCafe = document.getElementById('labelHorarioCafeMorador');
-      if (lblCafe) lblCafe.textContent = `Café da Manhã (${cardapio.horario_cafe || '05h30 às 07h00'})`;
-      const lblAlmoco = document.getElementById('labelHorarioAlmocoMorador');
-      if (lblAlmoco) lblAlmoco.textContent = `Almoço no Canteiro (${cardapio.horario_almoco || '11h00 às 13h30'})`;
-      const lblMarmita = document.getElementById('labelHorarioMarmitaMorador');
-      if (lblMarmita) lblMarmita.textContent = `Marmita Térmica (${cardapio.horario_marmita || 'Frentes de Serviço'})`;
-      const lblJantar = document.getElementById('labelHorarioJantarMorador');
-      if (lblJantar) lblJantar.textContent = `Jantar (${cardapio.horario_jantar || '18h00 às 20h30'})`;
-
-      document.getElementById('cardapioCafeMorador').textContent = cardapio.cafe || '--';
-      document.getElementById('cardapioAlmocoMorador').textContent = cardapio.almoco || '--';
-      document.getElementById('cardapioMarmitaMorador').textContent = cardapio.marmita || '--';
-      document.getElementById('cardapioJantarMorador').textContent = cardapio.jantar || '--';
-      document.getElementById('dataAtualizacaoCardapioMorador').textContent = cardapio.atualizado_em || 'Hoje';
+      const hojeChave = getDiaSemanaHojeChave();
+      if (!diaCardapioMoradorAtivo) diaCardapioMoradorAtivo = hojeChave;
+      renderizarCardapioDiaMorador(diaCardapioMoradorAtivo);
+      verificarAvaliacaoHojeMorador();
 
       // 3. Avisos do Mural (suporta bloco_alvo e bloco)
       const avisos = Array.isArray(portal.avisos) ? portal.avisos : [];
@@ -954,6 +1164,201 @@
             </a>
           `;
         }).join('');
+      }
+    }
+
+    function selecionarDiaCardapioMorador(diaKey) {
+      diaCardapioMoradorAtivo = diaKey;
+      renderizarCardapioDiaMorador(diaKey);
+    }
+
+    function renderizarCardapioDiaMorador(diaKey) {
+      const portal = dadosPortalMorador || getDadosPortalPadrao();
+      const cardapio = portal.cardapio || {};
+      const semanal = cardapio.semanal || {};
+      const dadosDia = semanal[diaKey] || cardapio;
+
+      const nomesDias = {
+        seg: 'Segunda-feira',
+        ter: 'Terça-feira',
+        qua: 'Quarta-feira',
+        qui: 'Quinta-feira',
+        sex: 'Sexta-feira',
+        sab: 'Sábado',
+        dom: 'Domingo'
+      };
+
+      const hojeChave = getDiaSemanaHojeChave();
+      const isHoje = (diaKey === hojeChave);
+
+      // Atualizar botões dos dias
+      ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'].forEach(k => {
+        const btn = document.getElementById(`btnDiaMorador_${k}`);
+        if (btn) {
+          if (k === diaKey) {
+            btn.className = 'btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-amber-500 text-slate-950 border-amber-400 shadow-md scale-105';
+          } else if (k === hojeChave) {
+            btn.className = 'btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-900 border-amber-500/50 text-amber-300';
+          } else {
+            btn.className = 'btn-dia-morador flex-shrink-0 px-3 py-2 rounded-xl font-black text-[11px] uppercase transition border bg-slate-950 border-slate-800 text-slate-400';
+          }
+        }
+      });
+
+      // Atualizar rótulos
+      const lblDia = document.getElementById('labelDiaSelecionadoCardapioMorador');
+      if (lblDia) {
+        lblDia.textContent = isHoje ? `Hoje (${nomesDias[diaKey]})` : nomesDias[diaKey];
+      }
+
+      const tagPrato = document.getElementById('tagDiaPratoEspecialMorador');
+      if (tagPrato) {
+        tagPrato.textContent = isHoje ? 'Hoje' : nomesDias[diaKey];
+      }
+
+      // Prato do Dia
+      const elPrato = document.getElementById('cardapioPratoDoDiaMorador');
+      if (elPrato) {
+        elPrato.textContent = dadosDia.prato_dia || cardapio.prato_dia || 'Cardápio Especial Balanceado';
+      }
+
+      // Horários & Refeições
+      const lblCafe = document.getElementById('labelHorarioCafeMorador');
+      if (lblCafe) lblCafe.textContent = `Café da Manhã (${dadosDia.horario_cafe || cardapio.horario_cafe || '05h30 às 07h00'})`;
+      const lblAlmoco = document.getElementById('labelHorarioAlmocoMorador');
+      if (lblAlmoco) lblAlmoco.textContent = `Almoço no Canteiro (${dadosDia.horario_almoco || cardapio.horario_almoco || '11h00 às 13h30'})`;
+      const lblMarmita = document.getElementById('labelHorarioMarmitaMorador');
+      if (lblMarmita) lblMarmita.textContent = `Marmita Térmica (${dadosDia.horario_marmita || cardapio.horario_marmita || 'Frentes de Serviço'})`;
+      const lblJantar = document.getElementById('labelHorarioJantarMorador');
+      if (lblJantar) lblJantar.textContent = `Jantar (${dadosDia.horario_jantar || cardapio.horario_jantar || '18h00 às 20h30'})`;
+
+      document.getElementById('cardapioCafeMorador').textContent = dadosDia.cafe || cardapio.cafe || '--';
+      document.getElementById('cardapioAlmocoMorador').textContent = dadosDia.almoco || cardapio.almoco || '--';
+      document.getElementById('cardapioMarmitaMorador').textContent = dadosDia.marmita || cardapio.marmita || '--';
+      document.getElementById('cardapioJantarMorador').textContent = dadosDia.jantar || cardapio.jantar || '--';
+      document.getElementById('dataAtualizacaoCardapioMorador').textContent = cardapio.atualizado_em || 'Hoje';
+    }
+
+    function selecionarNotaAvaliacaoMorador(nota) {
+      const inputNota = document.getElementById('inputNotaAvaliacaoMorador');
+      if (inputNota) inputNota.value = String(nota);
+
+      const sentimentos = {
+        1: '😡 1 Estrela • Péssimo',
+        2: '🙁 2 Estrelas • Ruim',
+        3: '😐 3 Estrelas • Regular',
+        4: '😊 4 Estrelas • Muito Bom',
+        5: '🤩 5 Estrelas • Excelente!'
+      };
+
+      const lblSentimento = document.getElementById('labelSentimentoNotaMorador');
+      if (lblSentimento) {
+        lblSentimento.textContent = sentimentos[nota] || `${nota} Estrelas`;
+        if (nota <= 2) lblSentimento.className = 'text-xs font-black text-rose-400';
+        else if (nota === 3) lblSentimento.className = 'text-xs font-black text-amber-400';
+        else lblSentimento.className = 'text-xs font-black text-emerald-400';
+      }
+
+      document.querySelectorAll('#estrelasRatingMorador .star-rating-btn').forEach(btn => {
+        const btnNota = Number(btn.getAttribute('data-nota') || 0);
+        if (btnNota <= nota) {
+          btn.className = 'star-rating-btn p-2 text-2xl text-amber-400 transition transform scale-110';
+        } else {
+          btn.className = 'star-rating-btn p-2 text-2xl text-slate-700 hover:text-amber-500/50 transition';
+        }
+      });
+    }
+
+    async function enviarAvaliacaoRefeicaoMorador() {
+      const nota = Number(document.getElementById('inputNotaAvaliacaoMorador')?.value || 0);
+      const tipoRefeicao = document.getElementById('selectTipoRefeicaoAvaliacaoMorador')?.value || 'Almoço';
+      const observacao = (document.getElementById('inputObservacaoAvaliacaoMorador')?.value || '').trim();
+      const anonimo = document.getElementById('checkAnonimoAvaliacaoMorador')?.checked || false;
+
+      if (!nota || nota < 1 || nota > 5) {
+        alert('Por favor, toque nas estrelas para dar uma nota de 1 a 5 para a refeição.');
+        return;
+      }
+
+      const btn = document.getElementById('btnEnviarAvaliacaoMorador');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+      }
+
+      const agora = new Date();
+      const idAvaliacao = 'AVAL-' + Date.now();
+      const dadosAvaliacao = {
+        id: idAvaliacao,
+        data: getDataHojeLocal(agora),
+        timestamp: agora.getTime(),
+        data_formatada: agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        refeicao: tipoRefeicao,
+        nota: nota,
+        sentimento: nota === 5 ? 'Excelente' : (nota === 4 ? 'Muito Bom' : (nota === 3 ? 'Regular' : (nota === 2 ? 'Ruim' : 'Péssimo'))),
+        observacao: observacao,
+        anonimo: anonimo,
+        morador_id: (perfilMoradorAtivo && !anonimo) ? perfilMoradorAtivo.id : 'anonimo',
+        morador_nome: (perfilMoradorAtivo && !anonimo) ? perfilMoradorAtivo.nome : 'Colaborador Anônimo',
+        matricula: (perfilMoradorAtivo && !anonimo) ? perfilMoradorAtivo.matricula : '--',
+        bloco: (perfilMoradorAtivo && !anonimo) ? perfilMoradorAtivo.bloco : '--',
+        quarto: (perfilMoradorAtivo && !anonimo) ? perfilMoradorAtivo.quarto : '--',
+        status: 'pendente'
+      };
+
+      // 1. Salvar no cache local do morador
+      try {
+        const historico = JSON.parse(localStorage.getItem('minhas_avaliacoes_refeicoes') || '[]');
+        historico.unshift(dadosAvaliacao);
+        localStorage.setItem('minhas_avaliacoes_refeicoes', JSON.stringify(historico.slice(0, 30)));
+        localStorage.setItem('ultima_avaliacao_refeicao_data', dadosAvaliacao.data);
+      } catch (e) {}
+
+      // 2. Salvar no cache global de avaliações se mesmo dispositivo
+      try {
+        const geral = JSON.parse(localStorage.getItem('avaliacoes_refeicoes_cache') || '[]');
+        geral.unshift(dadosAvaliacao);
+        localStorage.setItem('avaliacoes_refeicoes_cache', JSON.stringify(geral.slice(0, 200)));
+      } catch (e) {}
+
+      // 3. Salvar no Firebase Firestore (1 Escrita simples)
+      if (firestoreDb && navigator.onLine) {
+        try {
+          await firestoreDb.collection('avaliacoes_refeicoes').doc(idAvaliacao).set(dadosAvaliacao);
+        } catch (err) {
+          console.warn('[AVALIAÇÃO COZINHA] Salvo offline localmente:', err);
+        }
+      }
+
+      // Feedback de Sucesso
+      const boxSucesso = document.getElementById('boxAvaliacaoEnviadaSucessoMorador');
+      const txtResumo = document.getElementById('textoResumoUltimaAvaliacaoMorador');
+      if (boxSucesso) {
+        boxSucesso.classList.remove('hidden');
+        if (txtResumo) {
+          txtResumo.textContent = `Você avaliou o ${tipoRefeicao} com nota ${nota}★ (${dadosAvaliacao.sentimento})! Sua opinião foi encaminhada diretamente para a Prefeitura de Canteiro e a equipe do refeitório.`;
+        }
+      }
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Avaliação Enviada com Sucesso!';
+        setTimeout(() => {
+          btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>Enviar Nova Avaliação</span>';
+        }, 3000);
+      }
+
+      // Limpar campos
+      const inObs = document.getElementById('inputObservacaoAvaliacaoMorador');
+      if (inObs) inObs.value = '';
+    }
+
+    function verificarAvaliacaoHojeMorador() {
+      const dataHoje = getDataHojeLocal();
+      const dataUltima = localStorage.getItem('ultima_avaliacao_refeicao_data');
+      if (dataUltima === dataHoje) {
+        const boxSucesso = document.getElementById('boxAvaliacaoEnviadaSucessoMorador');
+        if (boxSucesso) boxSucesso.classList.remove('hidden');
       }
     }
 

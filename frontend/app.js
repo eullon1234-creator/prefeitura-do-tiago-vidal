@@ -21662,14 +21662,66 @@ let estadoPortalMoradorAdmin = {
   },
   cardapio: {
     horario_cafe: '05h30 às 07h00',
-    cafe: 'Pão francês na chapa, ovos mexidos, cuscuz com carne, café preto, leite e frutas da estação',
     horario_almoco: '11h00 às 13h30',
-    almoco: 'Frango assado dourado, carne de panela ao molho, arroz branco, feijão tropeiro, macarrão e salada fresca',
     horario_marmita: 'Frentes de Serviço',
-    marmita: 'Iscas bovinas aceboladas ou filé de frango grelhado + guarnição completa em embalagem térmica',
     horario_jantar: '18h00 às 20h30',
+    prato_dia: 'Feijoada Completa Tradicional',
+    cafe: 'Pão francês na chapa, ovos mexidos, cuscuz com carne, café preto, leite e frutas da estação',
+    almoco: 'Frango assado dourado, carne de panela ao molho, arroz branco, feijão tropeiro, macarrão e salada fresca',
+    marmita: 'Iscas bovinas aceboladas ou filé de frango grelhado + guarnição completa em embalagem térmica',
     jantar: 'Sopa nutritiva de legumes com carne, arroz, feijão carioca, proteína grelhada e suco natural',
-    atualizado_em: new Date().toLocaleDateString('pt-BR')
+    atualizado_em: new Date().toLocaleDateString('pt-BR'),
+    semanal: {
+      seg: {
+        prato_dia: 'Frango Assado Dourado com Polenta Frita',
+        cafe: 'Pão francês na chapa, ovos mexidos, cuscuz com carne, café preto, leite e frutas da estação',
+        almoco: 'Frango assado dourado, carne de panela ao molho, arroz branco, feijão tropeiro, macarrão e salada fresca',
+        marmita: 'Frango grelhado ou carne de panela com guarnição térmica balanceada',
+        jantar: 'Sopa nutritiva de legumes com carne, arroz, feijão carioca e filé grelhado'
+      },
+      ter: {
+        prato_dia: 'Bife Acebolado com Purê de Batatas',
+        cafe: 'Pão com manteiga, cuscuz nordestino, ovos mexidos, café e leite',
+        almoco: 'Arroz branco, feijão carioca, bife acebolado bovino, purê de batata cremoso e legumes no vapor',
+        marmita: 'Bife bovino acebolado, arroz, feijão carioca e farofa crocante',
+        jantar: 'Iscas de carne com legumes, arroz, feijão e salada verde fresca'
+      },
+      qua: {
+        prato_dia: 'Feijoada Completa Tradicional com Couve e Farofa',
+        cafe: 'Pão caseiro, ovos mexidos, frutas da estação, café quente e leite',
+        almoco: 'Feijoada tradicional completa, arroz branco, couve refogada, farofa de bacon e laranja fresca',
+        marmita: 'Feijoada executiva completa, arroz branco, couve e farofa especial',
+        jantar: 'Caldo de feijão especial revigorante, arroz, bife grelhado e salada'
+      },
+      qui: {
+        prato_dia: 'Carne Assada de Panela com Mandioca Cozida',
+        cafe: 'Pão na chapa, ovos mexidos, bolo caseiro fofinho, café e leite',
+        almoco: 'Carne bovina de panela com mandioca suculenta, arroz branco, feijão carioca e salada',
+        marmita: 'Carne assada suculenta com mandioca, arroz e feijão',
+        jantar: 'Frango à passarinho crocante, arroz, feijão carioca e salada mista'
+      },
+      sex: {
+        prato_dia: 'Peixe Frito Crocante / Iscas com Molho Tártaro',
+        cafe: 'Pão francês, cuscuz com manteiga, ovos, café preto e leite',
+        almoco: 'Iscas de peixe crocante ou filé grelhado, arroz, feijão, pirão e vinagrete especial',
+        marmita: 'Peixe frito crocante ou bife acebolado com guarnição completa',
+        jantar: 'Lasanha à bolonhesa ou arroz com carne grelhada e salada verde'
+      },
+      sab: {
+        prato_dia: 'Churrasco Misto do Canteiro com Farofa de Bacon',
+        cafe: 'Pão na chapa, ovos mexidos, frutas da estação, café e leite',
+        almoco: 'Churrasco de carnes nobres grelhadas, arroz, feijão tropeiro, vinagrete e maionese',
+        marmita: 'Churrasco misto com farofa, vinagrete, arroz e feijão tropeiro',
+        jantar: 'Hambúrguer artesanal ou arroz com carne de panela e salada mista'
+      },
+      dom: {
+        prato_dia: 'Frango Especial de Domingo & Macarronada',
+        cafe: 'Café da manhã reforçado com frutas, bolos caseiros, ovos e sucos',
+        almoco: 'Frango assado especial de domingo, macarronada italiana, arroz e maionese de batatas',
+        marmita: 'Refeição especial de domingo com sobremesa balanceada',
+        jantar: 'Sopa com torradas, arroz, feijão e proteína grelhada'
+      }
+    }
   },
   avisos: [
     {
@@ -21751,10 +21803,11 @@ let estadoPortalMoradorAdmin = {
   atualizado_timestamp: Date.now()
 };
 
+let diaCardapioAdminAtivo = 'seg';
 let timerSyncAutoAlojadosPortal = null;
 
 function alternarSubAbaPortalAlojado(aba) {
-  const abas = ['identidade', 'cardapio', 'mural', 'escalas', 'regras'];
+  const abas = ['identidade', 'cardapio', 'mural', 'escalas', 'regras', 'avaliacoes'];
   abas.forEach(nome => {
     const panel = document.getElementById('subPortal_' + nome);
     const btn = document.getElementById('btnSubPortal_' + nome);
@@ -21770,6 +21823,10 @@ function alternarSubAbaPortalAlojado(aba) {
       }
     }
   });
+
+  if (aba === 'avaliacoes') {
+    carregarAvaliacoesRefeicoesAdmin();
+  }
 }
 
 function extrairResumoAlojadosAtivosParaPortal() {
@@ -21867,18 +21924,8 @@ function preencherFormularioPortalAdmin() {
   const statusSyncEl = document.getElementById('statusUltimoSyncAlojadosPortal');
   if (statusSyncEl) statusSyncEl.textContent = est.ultimo_sync_alojados || 'Sincronizado';
 
-  // Sub-aba 2: Cardápio & Horários
-  setVal('inputHorarioCafePortal', c.horario_cafe || '05h30 às 07h00');
-  setVal('inputCardapioCafe', c.cafe);
-  setVal('inputHorarioAlmocoPortal', c.horario_almoco || '11h00 às 13h30');
-  setVal('inputCardapioAlmoco', c.almoco);
-  setVal('inputHorarioMarmitaPortal', c.horario_marmita || 'Frentes de Serviço');
-  setVal('inputCardapioMarmita', c.marmita);
-  setVal('inputHorarioJantarPortal', c.horario_jantar || '18h00 às 20h30');
-  setVal('inputCardapioJantar', c.jantar);
-
-  const statusCardapio = document.getElementById('statusUltimaAtualizacaoCardapio');
-  if (statusCardapio) statusCardapio.textContent = c.atualizado_em || 'Hoje';
+  // Sub-aba 2: Cardápio & Horários (Grade Semanal e Prato do Dia)
+  selecionarDiaCardapioAdmin(diaCardapioAdminAtivo || 'seg');
 
   // Sub-aba 4: Escalas & Ônibus
   setVal('inputEscalaSeg', l.seg);
@@ -22078,12 +22125,71 @@ function salvarIdentidadePortalAlojado(event) {
   persistirDocumentoUnicoPortal('✨ Textos e identidade da tela inicial publicados no App!');
 }
 
-function salvarCardapioPortalAlojado(event) {
-  if (event) event.preventDefault();
-  const getVal = (id) => (document.getElementById(id)?.value || '').trim();
-  const agora = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function selecionarDiaCardapioAdmin(diaKey) {
+  // Salvar valores atuais em memória antes de trocar
+  if (diaCardapioAdminAtivo && diaCardapioAdminAtivo !== diaKey) {
+    salvarValoresFormularioCardapioDiaAtivo(diaCardapioAdminAtivo);
+  }
 
-  estadoPortalMoradorAdmin.cardapio = {
+  diaCardapioAdminAtivo = diaKey || 'seg';
+
+  const nomes = {
+    seg: 'Segunda-feira',
+    ter: 'Terça-feira',
+    qua: 'Quarta-feira',
+    qui: 'Quinta-feira',
+    sex: 'Sexta-feira',
+    sab: 'Sábado',
+    dom: 'Domingo'
+  };
+
+  const lblDia = document.getElementById('labelDiaEditandoCardapio');
+  if (lblDia) lblDia.textContent = nomes[diaCardapioAdminAtivo] || 'Segunda-feira';
+
+  // Atualizar visual dos botões de dia
+  ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'].forEach(k => {
+    const btn = document.getElementById(`btnDiaCardapio_${k}`);
+    if (btn) {
+      if (k === diaCardapioAdminAtivo) {
+        btn.className = 'btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-slate-900 text-white border-slate-900 shadow-xs scale-105';
+      } else {
+        btn.className = 'btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-white text-slate-700 border-slate-300 hover:bg-slate-100';
+      }
+    }
+  });
+
+  const c = estadoPortalMoradorAdmin.cardapio || {};
+  const semanal = c.semanal || {};
+  const dados = semanal[diaCardapioAdminAtivo] || c;
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val || '';
+  };
+
+  setVal('inputCardapioPratoDoDia', dados.prato_dia || c.prato_dia || '');
+  setVal('inputHorarioCafePortal', dados.horario_cafe || c.horario_cafe || '05h30 às 07h00');
+  setVal('inputCardapioCafe', dados.cafe || c.cafe || '');
+  setVal('inputHorarioAlmocoPortal', dados.horario_almoco || c.horario_almoco || '11h00 às 13h30');
+  setVal('inputCardapioAlmoco', dados.almoco || c.almoco || '');
+  setVal('inputHorarioMarmitaPortal', dados.horario_marmita || c.horario_marmita || 'Frentes de Serviço');
+  setVal('inputCardapioMarmita', dados.marmita || c.marmita || '');
+  setVal('inputHorarioJantarPortal', dados.horario_jantar || c.horario_jantar || '18h00 às 20h30');
+  setVal('inputCardapioJantar', dados.jantar || c.jantar || '');
+
+  const statusCardapio = document.getElementById('statusUltimaAtualizacaoCardapio');
+  if (statusCardapio) statusCardapio.textContent = c.atualizado_em || 'Hoje';
+}
+
+function salvarValoresFormularioCardapioDiaAtivo(diaKey) {
+  if (!diaKey) return;
+  const getVal = (id) => (document.getElementById(id)?.value || '').trim();
+
+  if (!estadoPortalMoradorAdmin.cardapio) estadoPortalMoradorAdmin.cardapio = {};
+  if (!estadoPortalMoradorAdmin.cardapio.semanal) estadoPortalMoradorAdmin.cardapio.semanal = {};
+
+  estadoPortalMoradorAdmin.cardapio.semanal[diaKey] = {
+    prato_dia: getVal('inputCardapioPratoDoDia'),
     horario_cafe: getVal('inputHorarioCafePortal') || '05h30 às 07h00',
     cafe: getVal('inputCardapioCafe'),
     horario_almoco: getVal('inputHorarioAlmocoPortal') || '11h00 às 13h30',
@@ -22091,14 +22197,84 @@ function salvarCardapioPortalAlojado(event) {
     horario_marmita: getVal('inputHorarioMarmitaPortal') || 'Frentes de Serviço',
     marmita: getVal('inputCardapioMarmita'),
     horario_jantar: getVal('inputHorarioJantarPortal') || '18h00 às 20h30',
-    jantar: getVal('inputCardapioJantar'),
-    atualizado_em: agora
+    jantar: getVal('inputCardapioJantar')
   };
+}
+
+function copiarCardapioDiaAdmin() {
+  salvarValoresFormularioCardapioDiaAtivo(diaCardapioAdminAtivo);
+  const dias = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+  const nomes = { seg: 'Segunda', ter: 'Terça', qua: 'Quarta', qui: 'Quinta', sex: 'Sexta', sab: 'Sábado', dom: 'Domingo' };
+  const idx = dias.indexOf(diaCardapioAdminAtivo);
+  const proximoDia = dias[(idx + 1) % dias.length];
+
+  const atual = estadoPortalMoradorAdmin.cardapio.semanal[diaCardapioAdminAtivo];
+  estadoPortalMoradorAdmin.cardapio.semanal[proximoDia] = Object.assign({}, atual);
+
+  selecionarDiaCardapioAdmin(proximoDia);
+  showToast(`📋 Cardápio copiado de ${nomes[diaCardapioAdminAtivo]} para ${nomes[proximoDia]}!`, 'info');
+}
+
+function compartilharCardapioWhatsAppAdmin() {
+  salvarValoresFormularioCardapioDiaAtivo(diaCardapioAdminAtivo);
+  const c = estadoPortalMoradorAdmin.cardapio || {};
+  const semanal = c.semanal || {};
+  const d = semanal[diaCardapioAdminAtivo] || c;
+
+  const nomes = {
+    seg: 'Segunda-feira',
+    ter: 'Terça-feira',
+    qua: 'Quarta-feira',
+    qui: 'Quinta-feira',
+    sex: 'Sexta-feira',
+    sab: 'Sábado',
+    dom: 'Domingo'
+  };
+
+  const texto = `*🍽️ CARDÁPIO DO DIA • PCH TABOCA 2 (GEL ENGENHARIA)*\n` +
+    `📅 *${nomes[diaCardapioAdminAtivo] || 'Hoje'}*\n\n` +
+    (d.prato_dia ? `👑 *PRATO ESPECIAL DO DIA:*\n${d.prato_dia}\n\n` : '') +
+    `☕ *Café da Manhã (${d.horario_cafe || '05h30 às 07h00'}):*\n${d.cafe || '--'}\n\n` +
+    `🍲 *Almoço no Canteiro (${d.horario_almoco || '11h00 às 13h30'}):*\n${d.almoco || '--'}\n\n` +
+    `📦 *Marmita Térmica (${d.horario_marmita || 'Frentes'}):*\n${d.marmita || '--'}\n\n` +
+    `🌙 *Jantar (${d.horario_jantar || '18h00 às 20h30'}):*\n${d.jantar || '--'}\n\n` +
+    `_Prefeitura de Canteiro • Bom apetite a todos!_`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(() => {
+      showToast('📋 Cardápio formatado copiado! Cole no WhatsApp da Obra.', 'success');
+    }).catch(() => {
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, '_blank');
+    });
+  } else {
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, '_blank');
+  }
+}
+
+function salvarCardapioPortalAlojado(event) {
+  if (event) event.preventDefault();
+  salvarValoresFormularioCardapioDiaAtivo(diaCardapioAdminAtivo);
+
+  const agora = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const c = estadoPortalMoradorAdmin.cardapio || {};
+  const ativo = (c.semanal && c.semanal[diaCardapioAdminAtivo]) ? c.semanal[diaCardapioAdminAtivo] : {};
+
+  // Mantém também na raiz do cardapio para retrocompatibilidade
+  c.prato_dia = ativo.prato_dia || c.prato_dia || '';
+  c.cafe = ativo.cafe || c.cafe || '';
+  c.almoco = ativo.almoco || c.almoco || '';
+  c.marmita = ativo.marmita || c.marmita || '';
+  c.jantar = ativo.jantar || c.jantar || '';
+  c.horario_cafe = ativo.horario_cafe || c.horario_cafe || '05h30 às 07h00';
+  c.horario_almoco = ativo.horario_almoco || c.horario_almoco || '11h00 às 13h30';
+  c.horario_marmita = ativo.horario_marmita || c.horario_marmita || 'Frentes de Serviço';
+  c.horario_jantar = ativo.horario_jantar || c.horario_jantar || '18h00 às 20h30';
+  c.atualizado_em = agora;
 
   const statusCardapio = document.getElementById('statusUltimaAtualizacaoCardapio');
   if (statusCardapio) statusCardapio.textContent = agora;
 
-  persistirDocumentoUnicoPortal('🍽️ Cardápio e horários publicados no App do Alojado!');
+  persistirDocumentoUnicoPortal('🍽️ Cardápio Semanal e Prato do Dia publicados com sucesso no App!');
 }
 
 function publicarAvisoMuralAlojado(event) {
@@ -22524,12 +22700,385 @@ function imprimirCartazPortalAlojadoA4() {
   }, 100);
 }
 
+// ========================================================
+// MÓDULO: GESTÃO DAS AVALIAÇÕES DA COZINHA & OUVIDORIA (PREFEITO)
+// ========================================================
+let listaAvaliacoesRefeicoesAdmin = [];
+
+async function carregarAvaliacoesRefeicoesAdmin(forcar = false) {
+  const icone = document.getElementById('iconeSyncAvaliacoesAdmin');
+  if (icone) icone.classList.add('fa-spin');
+
+  // 1. Ler do cache local primeiro para resposta instantânea
+  try {
+    const salvo = localStorage.getItem('avaliacoes_refeicoes_cache');
+    if (salvo) {
+      listaAvaliacoesRefeicoesAdmin = JSON.parse(salvo);
+    }
+  } catch (e) {}
+
+  // 2. Se a lista estiver vazia, criar avaliações iniciais demonstrativas de canteiro
+  if (listaAvaliacoesRefeicoesAdmin.length === 0) {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const hojeIso = getDataHojeLocal();
+    listaAvaliacoesRefeicoesAdmin = [
+      {
+        id: 'AVAL-DEMO-01',
+        data: hojeIso,
+        timestamp: Date.now() - 3600000,
+        data_formatada: hoje + ' às 12:45',
+        refeicao: 'Almoço',
+        nota: 5,
+        sentimento: 'Excelente',
+        observacao: 'A feijoada e a farofa de bacon hoje estavam sensacionais! Parabéns à equipe da cozinha.',
+        anonimo: false,
+        morador_nome: 'Marcos Vinicius Silva',
+        matricula: 'GEL-1048',
+        bloco: 'Bloco A',
+        quarto: '10',
+        status: 'pendente'
+      },
+      {
+        id: 'AVAL-DEMO-02',
+        data: hojeIso,
+        timestamp: Date.now() - 7200000,
+        data_formatada: hoje + ' às 11:50',
+        refeicao: 'Marmita',
+        nota: 4,
+        sentimento: 'Muito Bom',
+        observacao: 'Marmita chegou quentinha na frente de obra. Apenas colocar um pouco menos de sal no feijão.',
+        anonimo: true,
+        morador_nome: 'Colaborador Anônimo',
+        matricula: '--',
+        bloco: '--',
+        quarto: '--',
+        status: 'pendente'
+      },
+      {
+        id: 'AVAL-DEMO-03',
+        data: hojeIso,
+        timestamp: Date.now() - 86400000,
+        data_formatada: 'Ontem às 19:20',
+        refeicao: 'Jantar',
+        nota: 5,
+        sentimento: 'Excelente',
+        observacao: 'Sopa muito gostosa no jantar, ajudou muito a revigorar depois do dia puxado.',
+        anonimo: false,
+        morador_nome: 'José Ferreira de Souza',
+        matricula: 'GEL-1012',
+        bloco: 'Bloco C',
+        quarto: '04',
+        status: 'tratado'
+      }
+    ];
+    localStorage.setItem('avaliacoes_refeicoes_cache', JSON.stringify(listaAvaliacoesRefeicoesAdmin));
+  }
+
+  // 3. Buscar na nuvem Firestore se disponível
+  if (typeof firestoreDb !== 'undefined' && firestoreDb && navigator.onLine) {
+    try {
+      const snap = await firestoreDb.collection('avaliacoes_refeicoes').orderBy('timestamp', 'desc').limit(150).get();
+      if (snap && !snap.empty) {
+        const nuvem = [];
+        snap.forEach(doc => nuvem.push(doc.data()));
+        if (nuvem.length > 0) {
+          listaAvaliacoesRefeicoesAdmin = nuvem;
+          localStorage.setItem('avaliacoes_refeicoes_cache', JSON.stringify(nuvem));
+        }
+      }
+    } catch (err) {
+      console.warn('[AVALIAÇÕES ADMIN] Usando cache local:', err);
+    }
+  }
+
+  renderizarDashboardAvaliacoesAdmin();
+
+  if (icone) {
+    setTimeout(() => icone.classList.remove('fa-spin'), 600);
+  }
+}
+
+function renderizarDashboardAvaliacoesAdmin() {
+  const lista = Array.isArray(listaAvaliacoesRefeicoesAdmin) ? listaAvaliacoesRefeicoesAdmin : [];
+  const total = lista.length;
+
+  const badgeAba = document.getElementById('badgeCountAvaliacoesSubAba');
+  if (badgeAba) badgeAba.textContent = String(total);
+
+  const kpiTotal = document.getElementById('kpiTotalVotosAvaliacoes');
+  if (kpiTotal) kpiTotal.textContent = String(total);
+
+  if (total === 0) {
+    const kpiMedia = document.getElementById('kpiMediaGeralAvaliacoes');
+    if (kpiMedia) kpiMedia.textContent = '0.0';
+    const kpiPos = document.getElementById('kpiPercPositivoAvaliacoes');
+    if (kpiPos) kpiPos.textContent = '0%';
+    const kpiCrit = document.getElementById('kpiPercCriticoAvaliacoes');
+    if (kpiCrit) kpiCrit.textContent = '0%';
+    filtrarAvaliacoesRefeicoesAdmin();
+    return;
+  }
+
+  // Calcular métricas
+  const somaNotas = lista.reduce((acc, curr) => acc + Number(curr.nota || 0), 0);
+  const media = (somaNotas / total).toFixed(1);
+
+  const qtdPositiva = lista.filter(a => Number(a.nota) >= 4).length;
+  const percPositivo = Math.round((qtdPositiva / total) * 100);
+
+  const qtdCritica = lista.filter(a => Number(a.nota) <= 2).length;
+  const percCritico = Math.round((qtdCritica / total) * 100);
+
+  // Atualizar KPIs na tela
+  const kpiMedia = document.getElementById('kpiMediaGeralAvaliacoes');
+  if (kpiMedia) kpiMedia.textContent = media;
+
+  const boxEstrelas = document.getElementById('kpiEstrelasMediaGeral');
+  if (boxEstrelas) {
+    const numMedia = parseFloat(media);
+    let htmlEstrelas = '';
+    for (let i = 1; i <= 5; i++) {
+      if (numMedia >= i) {
+        htmlEstrelas += '<i class="fa-solid fa-star"></i>';
+      } else if (numMedia >= i - 0.5) {
+        htmlEstrelas += '<i class="fa-solid fa-star-half-stroke"></i>';
+      } else {
+        htmlEstrelas += '<i class="fa-regular fa-star text-slate-300"></i>';
+      }
+    }
+    boxEstrelas.innerHTML = htmlEstrelas;
+  }
+
+  const kpiPos = document.getElementById('kpiPercPositivoAvaliacoes');
+  if (kpiPos) kpiPos.textContent = `${percPositivo}%`;
+  const kpiQtdPos = document.getElementById('kpiQtdPositivaAvaliacoes');
+  if (kpiQtdPos) kpiQtdPos.textContent = `${qtdPositiva} de ${total} avaliações 4★ e 5★`;
+
+  const kpiCrit = document.getElementById('kpiPercCriticoAvaliacoes');
+  if (kpiCrit) kpiCrit.textContent = `${percCritico}%`;
+  const kpiQtdCrit = document.getElementById('kpiQtdCriticaAvaliacoes');
+  if (kpiQtdCrit) kpiQtdCrit.textContent = `${qtdCritica} de ${total} alertas (1★ e 2★)`;
+
+  filtrarAvaliacoesRefeicoesAdmin();
+}
+
+function filtrarAvaliacoesRefeicoesAdmin() {
+  const container = document.getElementById('listaAvaliacoesRefeicoesAdmin');
+  if (!container) return;
+
+  const filtroRefeicao = document.getElementById('selectFiltroRefeicaoAvaliacoes')?.value || 'todas';
+  const filtroNota = document.getElementById('selectFiltroNotaAvaliacoes')?.value || 'todas';
+  const filtroStatus = document.getElementById('selectFiltroStatusAvaliacoes')?.value || 'todos';
+  const termoBusca = (document.getElementById('inputBuscaTextoAvaliacoes')?.value || '').toLowerCase().trim();
+
+  let filtradas = (listaAvaliacoesRefeicoesAdmin || []).filter(av => {
+    // Filtro Refeição
+    if (filtroRefeicao !== 'todas') {
+      const ref = (av.refeicao || '').toLowerCase();
+      if (!ref.includes(filtroRefeicao.toLowerCase())) return false;
+    }
+
+    // Filtro Nota
+    if (filtroNota !== 'todas') {
+      const notaNum = Number(av.nota || 0);
+      if (filtroNota === 'criticas' && notaNum > 2) return false;
+      else if (filtroNota === 'elogios' && notaNum < 4) return false;
+      else if (filtroNota !== 'criticas' && filtroNota !== 'elogios' && notaNum !== Number(filtroNota)) return false;
+    }
+
+    // Filtro Status
+    if (filtroStatus !== 'todos') {
+      const st = av.status || 'pendente';
+      if (st !== filtroStatus) return false;
+    }
+
+    // Busca Livre
+    if (termoBusca) {
+      const txt = ((av.observacao || '') + ' ' + (av.morador_nome || '') + ' ' + (av.bloco || '') + ' ' + (av.refeicao || '')).toLowerCase();
+      if (!txt.includes(termoBusca)) return false;
+    }
+
+    return true;
+  });
+
+  if (filtradas.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-2">
+        <div class="w-12 h-12 mx-auto rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-filter-circle-xmark"></i>
+        </div>
+        <h5 class="text-xs font-bold text-slate-700">Nenhuma avaliação encontrada com estes filtros.</h5>
+        <p class="text-[11px] text-slate-400">Tente selecionar "Todas as Refeições" ou limpar o campo de busca.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtradas.map(av => {
+    const nota = Number(av.nota || 5);
+    const isCritica = nota <= 2;
+    const isElogio = nota >= 4;
+
+    const badgeCor = isCritica
+      ? 'bg-rose-50 text-rose-700 border-rose-200'
+      : (isElogio ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200');
+
+    let estrelasHtml = '';
+    for (let i = 1; i <= 5; i++) {
+      estrelasHtml += i <= nota
+        ? '<i class="fa-solid fa-star text-amber-400"></i>'
+        : '<i class="fa-regular fa-star text-slate-300"></i>';
+    }
+
+    const emojiSentimento = nota === 5 ? '🤩' : (nota === 4 ? '😊' : (nota === 3 ? '😐' : (nota === 2 ? '🙁' : '😡')));
+
+    const isTratado = (av.status === 'tratado');
+    const badgeStatus = isTratado
+      ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[10px] flex items-center gap-1"><i class="fa-solid fa-check-double text-[9px]"></i> Tratado com a Cozinha</span>'
+      : '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10px] flex items-center gap-1"><i class="fa-solid fa-clock text-[9px]"></i> Pendente de Análise</span>';
+
+    const autorHtml = av.anonimo
+      ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px] flex items-center gap-1"><i class="fa-solid fa-shield text-slate-500"></i> Avaliação Anônima</span>`
+      : `<span class="font-bold text-slate-800 flex items-center gap-1"><i class="fa-solid fa-user text-slate-400 text-[10px]"></i> ${escapeHTML(av.morador_nome)} <span class="text-slate-400 font-medium">(${escapeHTML(av.bloco || 'Bloco')} / Q.${escapeHTML(av.quarto || '--')})</span></span>`;
+
+    return `
+      <div class="p-4 rounded-2xl bg-white border ${isCritica ? 'border-rose-300 shadow-sm bg-rose-50/20' : 'border-slate-200 shadow-xs'} transition hover:border-slate-300 space-y-2.5">
+        <div class="flex items-start justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2.5 py-1 rounded-xl border ${badgeCor} font-black text-xs flex items-center gap-1.5 shadow-xs">
+              <span>${emojiSentimento}</span>
+              <span>${nota}.0</span>
+              <span class="flex gap-0.5 text-[11px]">${estrelasHtml}</span>
+            </span>
+            <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 font-bold text-xs">
+              <i class="fa-solid fa-utensils text-slate-500 mr-1"></i> ${escapeHTML(av.refeicao || 'Refeição')}
+            </span>
+            ${badgeStatus}
+          </div>
+          <span class="text-[11px] text-slate-400 font-semibold">${escapeHTML(av.data_formatada || av.data || '')}</span>
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-[11px] text-slate-500">Autor:</span>
+            ${autorHtml}
+          </div>
+
+          <!-- Comentário / Observação -->
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-800 leading-relaxed font-medium">
+            <i class="fa-solid fa-quote-left text-slate-300 text-xs mr-1"></i>
+            ${av.observacao ? escapeHTML(av.observacao) : '<em class="text-slate-400">Nenhum comentário por escrito (apenas nota atribuída).</em>'}
+          </div>
+        </div>
+
+        <!-- Ações do Prefeito -->
+        <div class="flex items-center justify-between pt-1 border-t border-slate-100 flex-wrap gap-2">
+          <div class="flex items-center gap-1.5">
+            ${isTratado ? `
+              <button type="button" onclick="marcarAvaliacaoTratadaAdmin('${escapeHTML(av.id)}', 'pendente')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1 transition">
+                <i class="fa-solid fa-rotate-left"></i> Reabrir como Pendente
+              </button>
+            ` : `
+              <button type="button" onclick="marcarAvaliacaoTratadaAdmin('${escapeHTML(av.id)}', 'tratado')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition">
+                <i class="fa-solid fa-check"></i> Marcar como Tratado com a Cozinha
+              </button>
+            `}
+          </div>
+
+          <button type="button" onclick="excluirAvaliacaoRefeicaoAdmin('${escapeHTML(av.id)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs transition" title="Excluir Avaliação">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function marcarAvaliacaoTratadaAdmin(id, novoStatus) {
+  const idx = listaAvaliacoesRefeicoesAdmin.findIndex(a => a.id === id);
+  if (idx !== -1) {
+    listaAvaliacoesRefeicoesAdmin[idx].status = novoStatus;
+    localStorage.setItem('avaliacoes_refeicoes_cache', JSON.stringify(listaAvaliacoesRefeicoesAdmin));
+
+    if (typeof firestoreDb !== 'undefined' && firestoreDb && navigator.onLine) {
+      try {
+        await firestoreDb.collection('avaliacoes_refeicoes').doc(id).set({ status: novoStatus }, { merge: true });
+      } catch (e) {}
+    }
+
+    renderizarDashboardAvaliacoesAdmin();
+    showToast(novoStatus === 'tratado' ? '✅ Avaliação marcada como tratada com a cozinha!' : '🔄 Avaliação reaberta!', 'success');
+  }
+}
+
+async function excluirAvaliacaoRefeicaoAdmin(id) {
+  if (!confirm('Deseja realmente remover esta avaliação do histórico?')) return;
+
+  listaAvaliacoesRefeicoesAdmin = listaAvaliacoesRefeicoesAdmin.filter(a => a.id !== id);
+  localStorage.setItem('avaliacoes_refeicoes_cache', JSON.stringify(listaAvaliacoesRefeicoesAdmin));
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb && navigator.onLine) {
+    try {
+      await firestoreDb.collection('avaliacoes_refeicoes').doc(id).delete();
+    } catch (e) {}
+  }
+
+  renderizarDashboardAvaliacoesAdmin();
+  showToast('🗑️ Avaliação removida com sucesso.', 'info');
+}
+
+function exportarAvaliacoesRefeicoesExcel() {
+  if (!listaAvaliacoesRefeicoesAdmin || listaAvaliacoesRefeicoesAdmin.length === 0) {
+    showToast('Nenhuma avaliação disponível para exportação.', 'warning');
+    return;
+  }
+
+  try {
+    const dadosExcel = listaAvaliacoesRefeicoesAdmin.map(av => ({
+      'ID Protocolo': av.id || '',
+      'Data / Hora': av.data_formatada || av.data || '',
+      'Refeição': av.refeicao || '',
+      'Nota (Estrelas)': Number(av.nota || 0),
+      'Sentimento': av.sentimento || '',
+      'Comentário / Observação': av.observacao || '',
+      'Anônimo?': av.anonimo ? 'SIM' : 'NÃO',
+      'Colaborador': av.anonimo ? 'Anônimo' : (av.morador_nome || ''),
+      'Matrícula': av.anonimo ? '--' : (av.matricula || ''),
+      'Bloco': av.anonimo ? '--' : (av.bloco || ''),
+      'Quarto': av.anonimo ? '--' : (av.quarto || ''),
+      'Status Gestão': av.status === 'tratado' ? 'Tratado com Cozinha' : 'Pendente'
+    }));
+
+    if (typeof XLSX !== 'undefined') {
+      const ws = XLSX.utils.json_to_sheet(dadosExcel);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Avaliações Cozinha');
+      XLSX.writeFile(wb, `Avaliacoes_Alimentacao_Taboca2_${getDataHojeLocal()}.xlsx`);
+      showToast('📊 Relatório de avaliações exportado em Excel!', 'success');
+    } else {
+      showToast('Biblioteca SheetJS não carregada.', 'error');
+    }
+  } catch (err) {
+    console.error('Erro ao exportar Excel de avaliações:', err);
+    showToast('Erro ao gerar arquivo Excel.', 'error');
+  }
+}
+
 window.alternarSubAbaPortalAlojado = alternarSubAbaPortalAlojado;
 window.carregarPortalAlojadoAdmin = carregarPortalAlojadoAdmin;
 window.salvarIdentidadePortalAlojado = salvarIdentidadePortalAlojado;
 window.sincronizarListaAlojadosComPortal = sincronizarListaAlojadosComPortal;
 window.agendarSyncAutomaticoAlojadosPortal = agendarSyncAutomaticoAlojadosPortal;
 window.salvarCardapioPortalAlojado = salvarCardapioPortalAlojado;
+window.selecionarDiaCardapioAdmin = selecionarDiaCardapioAdmin;
+window.copiarCardapioDiaAdmin = copiarCardapioDiaAdmin;
+window.compartilharCardapioWhatsAppAdmin = compartilharCardapioWhatsAppAdmin;
+window.carregarAvaliacoesRefeicoesAdmin = carregarAvaliacoesRefeicoesAdmin;
+window.renderizarDashboardAvaliacoesAdmin = renderizarDashboardAvaliacoesAdmin;
+window.filtrarAvaliacoesRefeicoesAdmin = filtrarAvaliacoesRefeicoesAdmin;
+window.marcarAvaliacaoTratadaAdmin = marcarAvaliacaoTratadaAdmin;
+window.excluirAvaliacaoRefeicaoAdmin = excluirAvaliacaoRefeicaoAdmin;
+window.exportarAvaliacoesRefeicoesExcel = exportarAvaliacoesRefeicoesExcel;
 window.publicarAvisoMuralAlojado = publicarAvisoMuralAlojado;
 window.editarAvisoMuralAlojado = editarAvisoMuralAlojado;
 window.cancelarEdicaoAvisoMural = cancelarEdicaoAvisoMural;

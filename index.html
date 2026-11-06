@@ -3645,6 +3645,11 @@ service cloud.firestore {
             <i class="fa-solid fa-scale-balanced text-rose-600"></i>
             <span>5. Regras & Contatos</span>
           </button>
+          <button type="button" id="btnSubPortal_avaliacoes" onclick="alternarSubAbaPortalAlojado('avaliacoes')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
+            <i class="fa-solid fa-star text-amber-500"></i>
+            <span>6. Avaliações da Cozinha</span>
+            <span id="badgeCountAvaliacoesSubAba" class="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-black">0</span>
+          </button>
         </div>
 
         <!-- ================= SUB-ABA 1: IDENTIDADE DO APP & SINCRONIZAÇÃO DE MORADORES ================= -->
@@ -3751,23 +3756,85 @@ service cloud.firestore {
           </div>
         </div>
 
-        <!-- ================= SUB-ABA 2: CARDÁPIO DO REFEITÓRIO & HORÁRIOS ================= -->
+        <!-- ================= SUB-ABA 2: CARDÁPIO SEMANAL & PRATO DO DIA ================= -->
         <div id="subPortal_cardapio" class="sub-portal-panel hidden">
           <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-3">
               <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
                   <i class="fa-solid fa-utensils"></i>
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-white">Editor de Cardápio & Horários das Refeições</h3>
-                  <p class="text-[11px] text-slate-400">Última atualização: <span id="statusUltimaAtualizacaoCardapio" class="text-amber-300 font-semibold">Hoje</span></p>
+                  <h3 class="text-sm font-bold text-white">Editor de Cardápio Semanal & Prato do Dia</h3>
+                  <p class="text-[11px] text-slate-400">Configure as refeições de cada dia da semana (Segunda a Domingo). O App exibirá automaticamente o dia correto!</p>
                 </div>
               </div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Refeitório Central</span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <i class="fa-solid fa-calendar-week mr-1"></i> 7 Dias Ativos
+                </span>
+                <span id="statusUltimaAtualizacaoCardapio" class="text-[10px] text-amber-300 font-semibold bg-slate-800 px-2 py-1 rounded-lg">Atualizado Hoje</span>
+              </div>
+            </div>
+
+            <!-- Seletor dos Dias da Semana -->
+            <div class="p-3 bg-slate-50 border-b border-slate-200">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <i class="fa-solid fa-calendar-days text-amber-500"></i> Escolha o Dia para Editar o Prato e Refeições:
+                </span>
+                <span id="labelDiaEditandoCardapio" class="text-xs font-black text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Segunda-feira
+                </span>
+              </div>
+              <div class="grid grid-cols-7 gap-1.5" id="gradeDiasCardapioAdmin">
+                <button type="button" onclick="selecionarDiaCardapioAdmin('seg')" id="btnDiaCardapio_seg" class="btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-slate-900 text-white border-slate-900 shadow-xs">
+                  <span class="block text-[10px] opacity-75 uppercase">SEG</span>
+                  <span>Segunda</span>
+                </button>
+                <button type="button" onclick="selecionarDiaCardapioAdmin('ter')" id="btnDiaCardapio_ter" class="btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">
+                  <span class="block text-[10px] opacity-75 uppercase">TER</span>
+                  <span>Terça</span>
+                </button>
+                <button type="button" onclick="selecionarDiaCardapioAdmin('qua')" id="btnDiaCardapio_qua" class="btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">
+                  <span class="block text-[10px] opacity-75 uppercase">QUA</span>
+                  <span>Quarta</span>
+                </button>
+                <button type="button" onclick="selecionarDiaCardapioAdmin('qui')" id="btnDiaCardapio_qui" class="btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">
+                  <span class="block text-[10px] opacity-75 uppercase">QUI</span>
+                  <span>Quinta</span>
+                </button>
+                <button type="button" onclick="selecionarDiaCardapioAdmin('sex')" id="btnDiaCardapio_sex" class="btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">
+                  <span class="block text-[10px] opacity-75 uppercase">SEX</span>
+                  <span>Sexta</span>
+                </button>
+                <button type="button" onclick="selecionarDiaCardapioAdmin('sab')" id="btnDiaCardapio_sab" class="btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">
+                  <span class="block text-[10px] opacity-75 uppercase">SÁB</span>
+                  <span>Sábado</span>
+                </button>
+                <button type="button" onclick="selecionarDiaCardapioAdmin('dom')" id="btnDiaCardapio_dom" class="btn-dia-cardapio p-2 rounded-xl text-center font-bold text-xs transition border bg-white text-slate-700 border-slate-300 hover:bg-slate-100">
+                  <span class="block text-[10px] opacity-75 uppercase">DOM</span>
+                  <span>Domingo</span>
+                </button>
+              </div>
             </div>
 
             <form id="formCardapioPortal" onsubmit="salvarCardapioPortalAlojado(event)" class="p-5 space-y-4 text-xs">
+              <!-- Prato Especial do Dia em Destaque -->
+              <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 shadow-xs space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <label class="font-black text-amber-900 uppercase tracking-wider flex items-center gap-2 text-xs">
+                    <i class="fa-solid fa-crown text-amber-500 text-sm"></i>
+                    <span>Prato Especial / Destaque do Dia *</span>
+                  </label>
+                  <span class="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-full">
+                    Aparece no topo do celular em destaque
+                  </span>
+                </div>
+                <input type="text" id="inputCardapioPratoDoDia" required placeholder="Ex: Feijoada Completa com Couve, Torresmo e Laranja" class="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl font-black text-amber-950 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-inner">
+              </div>
+
+              <!-- Grid com as 4 Refeições -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <!-- Café da Manhã -->
                 <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
@@ -3814,10 +3881,21 @@ service cloud.firestore {
                 </div>
               </div>
 
-              <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
-                <button type="submit" class="btn-prefeito px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
-                  <i class="fa-solid fa-floppy-disk"></i> Salvar & Publicar Cardápio e Horários
-                </button>
+              <!-- Ações do Cardápio -->
+              <div class="pt-3 border-t border-slate-200 flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="copiarCardapioDiaAdmin()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-copy text-slate-500"></i> Copiar deste dia p/ amanhã
+                  </button>
+                  <button type="button" onclick="compartilharCardapioWhatsAppAdmin()" class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1.5 transition" title="Formata o cardápio de hoje para enviar no WhatsApp da Obra">
+                    <i class="fa-brands fa-whatsapp text-emerald-600"></i> Compartilhar no WhatsApp
+                  </button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="submit" class="btn-prefeito px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-floppy-disk"></i> Salvar & Publicar Semana Toda no App
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -4113,6 +4191,150 @@ service cloud.firestore {
             </div>
           </div>
 
+        </div>
+
+        <!-- ================= SUB-ABA 6: AVALIAÇÕES DA COZINHA & OUVIDORIA ================= -->
+        <div id="subPortal_avaliacoes" class="sub-portal-panel hidden space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <!-- Header da Sub-Aba -->
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-3">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <i class="fa-solid fa-star"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Ouvidoria & Avaliações da Alimentação</h3>
+                  <p class="text-[11px] text-slate-400">Acompanhe em tempo real o que os operários e líderes estão achando do café, almoço, marmita e jantar</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="carregarAvaliacoesRefeicoesAdmin(true)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition">
+                  <i class="fa-solid fa-arrows-rotate" id="iconeSyncAvaliacoesAdmin"></i> Atualizar
+                </button>
+                <button type="button" onclick="exportarAvaliacoesRefeicoesExcel()" class="btn-prefeito px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+                  <i class="fa-solid fa-file-excel"></i> Exportar Excel
+                </button>
+              </div>
+            </div>
+
+            <!-- KPIs de Satisfação da Comida -->
+            <div class="p-5 border-b border-slate-200 bg-slate-50">
+              <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <!-- Média Geral -->
+                <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center text-xl flex-shrink-0">
+                    <i class="fa-solid fa-star-half-stroke"></i>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Média de Satisfação</span>
+                    <div class="flex items-baseline gap-1 mt-0.5">
+                      <span id="kpiMediaGeralAvaliacoes" class="text-2xl font-black text-slate-900">0.0</span>
+                      <span class="text-xs font-bold text-slate-400">/ 5.0</span>
+                    </div>
+                    <div id="kpiEstrelasMediaGeral" class="text-xs text-amber-400 mt-0.5 flex gap-0.5">
+                      <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Total de Votos -->
+                <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div class="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-600 border border-sky-500/20 flex items-center justify-center text-xl flex-shrink-0">
+                    <i class="fa-solid fa-comments"></i>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Total de Avaliações</span>
+                    <span id="kpiTotalVotosAvaliacoes" class="text-2xl font-black text-slate-900 mt-0.5 block">0</span>
+                    <span class="text-[11px] text-sky-600 font-semibold" id="kpiUltimosDiasAvaliacoes">Coleta contínua</span>
+                  </div>
+                </div>
+
+                <!-- Aprovação Positiva (4 e 5 Estrelas) -->
+                <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center justify-center text-xl flex-shrink-0">
+                    <i class="fa-solid fa-thumbs-up"></i>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Aprovação (Ótimo/Bom)</span>
+                    <div class="flex items-baseline gap-1 mt-0.5">
+                      <span id="kpiPercPositivoAvaliacoes" class="text-2xl font-black text-emerald-600">0%</span>
+                    </div>
+                    <span class="text-[11px] text-slate-500" id="kpiQtdPositivaAvaliacoes">0 avaliações 4★ e 5★</span>
+                  </div>
+                </div>
+
+                <!-- Críticas / Alertas (1 e 2 Estrelas) -->
+                <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3.5">
+                  <div class="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 border border-rose-500/20 flex items-center justify-center text-xl flex-shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                  </div>
+                  <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Críticas / Atenção</span>
+                    <div class="flex items-baseline gap-1 mt-0.5">
+                      <span id="kpiPercCriticoAvaliacoes" class="text-2xl font-black text-rose-600">0%</span>
+                    </div>
+                    <span class="text-[11px] text-slate-500" id="kpiQtdCriticaAvaliacoes">0 avaliações 1★ e 2★</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Barra de Filtros e Busca -->
+            <div class="p-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div class="flex items-center gap-2 flex-wrap">
+                <!-- Filtro por Refeição -->
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-600">Refeição:</span>
+                  <select id="selectFiltroRefeicaoAvaliacoes" onchange="filtrarAvaliacoesRefeicoesAdmin()" class="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800">
+                    <option value="todas">Todas as Refeições</option>
+                    <option value="Almoço">Almoço no Canteiro</option>
+                    <option value="Jantar">Jantar no Alojamento</option>
+                    <option value="Marmita">Marmita de Trecho</option>
+                    <option value="Café">Café da Manhã</option>
+                    <option value="Geral">Geral do Dia</option>
+                  </select>
+                </div>
+
+                <!-- Filtro por Estrelas -->
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-600">Nota:</span>
+                  <select id="selectFiltroNotaAvaliacoes" onchange="filtrarAvaliacoesRefeicoesAdmin()" class="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800">
+                    <option value="todas">Todas as Notas</option>
+                    <option value="5">5 Estrelas (Excelente)</option>
+                    <option value="4">4 Estrelas (Muito Bom)</option>
+                    <option value="3">3 Estrelas (Regular)</option>
+                    <option value="2">2 Estrelas (Ruim)</option>
+                    <option value="1">1 Estrela (Péssimo)</option>
+                    <option value="criticas">Apenas Críticas (1 e 2★)</option>
+                    <option value="elogios">Apenas Elogios (4 e 5★)</option>
+                  </select>
+                </div>
+
+                <!-- Filtro por Status de Resolução -->
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-600">Status:</span>
+                  <select id="selectFiltroStatusAvaliacoes" onchange="filtrarAvaliacoesRefeicoesAdmin()" class="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800">
+                    <option value="todos">Todos</option>
+                    <option value="pendente">Pendentes de Ação</option>
+                    <option value="tratado">Tratados com a Cozinha</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Busca rápida por texto -->
+              <div class="relative w-full sm:w-64">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" id="inputBuscaTextoAvaliacoes" oninput="filtrarAvaliacoesRefeicoesAdmin()" placeholder="Buscar colaborador ou crítica..." class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+            </div>
+
+            <!-- Lista de Feedbacks e Observações -->
+            <div class="p-5">
+              <div id="listaAvaliacoesRefeicoesAdmin" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                <!-- Preenchido via JS -->
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
