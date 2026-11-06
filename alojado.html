@@ -186,17 +186,6 @@
               <span id="cardCamaMorador" class="text-sm font-black text-emerald-400 mt-0.5 block">--</span>
             </div>
           </div>
-
-          <!-- Dia de Lavanderia / Enxoval do Bloco -->
-          <div class="bg-indigo-950/50 border border-indigo-800/50 rounded-2xl p-3 flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2.5">
-              <i class="fa-solid fa-shirt text-indigo-400 text-base"></i>
-              <div>
-                <span class="text-[10px] text-indigo-300 font-bold uppercase block">Troca de Enxoval / Lavanderia</span>
-                <span id="textoDiaLavanderiaMorador" class="font-bold text-white text-xs">Consulte a escala na aba Mural</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Crachá Digital com QR Code -->
@@ -439,21 +428,6 @@
             <p class="text-[11px] text-emerald-300/80 leading-relaxed" id="textoResumoUltimaAvaliacaoMorador">
               Obrigado pela sua contribuição! O Prefeito de Canteiro e a equipe do refeitório já receberam sua avaliação para tomar providências.
             </p>
-          </div>
-        </div>
-
-        <!-- Escala de Lavanderia e Horários de Ônibus -->
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-lg">
-          <h3 class="text-xs font-black text-sky-400 uppercase tracking-wider flex items-center gap-2">
-            <i class="fa-solid fa-bus"></i>
-            <span>Transporte & Escala de Lavanderia</span>
-          </h3>
-          <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
-            <span class="text-[10px] font-bold text-slate-400 uppercase block">Horários de Ônibus / Trecho:</span>
-            <p id="textoHorariosOnibusMorador" class="text-slate-200 whitespace-pre-line leading-relaxed">Saída Alojamento: 06h15 e 06h40 | Retorno Frente de Obra: 17h15</p>
-          </div>
-          <div id="gridEscalaLavanderiaMorador" class="grid grid-cols-2 gap-2 text-[11px]">
-            <!-- Escala preenchida via JS -->
           </div>
         </div>
       </section>
@@ -743,15 +717,6 @@
             data: new Date().toLocaleDateString('pt-BR')
           }
         ],
-        lavanderia: {
-          seg: 'Bloco 1 e Bloco 2',
-          ter: 'Bloco A e Bloco B',
-          qua: 'Bloco C e Bloco D',
-          qui: 'Bloco E e Bloco F',
-          sex: 'Bloco G e Bloco H',
-          sab: 'Casas na Cidade / Reposição'
-        },
-        horarios_onibus: 'Saída Alojamento p/ Obra: 06h15 e 06h40\nRetorno Frente de Obra: 17h15 e 18h00',
         whatsapp_prefeito: '5500000000000'
       };
     }
@@ -1075,37 +1040,8 @@
         }
       }
 
-      // 4. Horários de Ônibus e Escala Lavanderia
-      document.getElementById('textoHorariosOnibusMorador').textContent = portal.horarios_onibus || 'Consulte a portaria.';
-      const lav = portal.lavanderia || {};
-      const dias = [
-        { k: 'seg', l: 'Segunda-feira' },
-        { k: 'ter', l: 'Terça-feira' },
-        { k: 'qua', l: 'Quarta-feira' },
-        { k: 'qui', l: 'Quinta-feira' },
-        { k: 'sex', l: 'Sexta-feira' },
-        { k: 'sab', l: 'Sábado' }
-      ];
-      const gridLav = document.getElementById('gridEscalaLavanderiaMorador');
-      if (gridLav) {
-        gridLav.innerHTML = dias.map(d => `
-          <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-            <span class="text-[10px] font-bold text-indigo-400 uppercase block">${d.l}</span>
-            <span class="text-white font-semibold">${escapeHTML(lav[d.k] || '--')}</span>
-          </div>
-        `).join('');
-      }
-
-      // Atualizar dia de lavanderia e colegas de quarto se logado
+      // 4. Atualizar colegas de quarto se logado
       if (perfilMoradorAtivo) {
-        const meuBloco = (perfilMoradorAtivo.bloco || '').toLowerCase();
-        const diaEncontrado = dias.find(d => String(lav[d.k] || '').toLowerCase().includes(meuBloco));
-        const txtLav = document.getElementById('textoDiaLavanderiaMorador');
-        if (txtLav) {
-          txtLav.textContent = diaEncontrado
-            ? `${diaEncontrado.l} (${lav[diaEncontrado.k]})`
-            : 'Conforme escala semanal do seu bloco';
-        }
         renderizarColegasDeQuarto();
       }
 

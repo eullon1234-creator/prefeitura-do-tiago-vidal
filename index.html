@@ -3602,7 +3602,7 @@ service cloud.firestore {
               <h1 class="text-xl md:text-2xl font-bold text-slate-900">Editor Completo do App do Alojado</h1>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 mt-1">
-              Edite todas as informações do aplicativo dos colaboradores: Textos da Tela Inicial, Lista de Moradores, Cardápio & Horários, Mural de Avisos, Lavanderia, Ônibus, Regras e Contatos.
+              Edite todas as informações do aplicativo dos colaboradores: Textos da Tela Inicial, Lista de Moradores, Cardápio Semanal & Prato do Dia, Mural de Avisos, Regras e Avaliações da Cozinha.
             </p>
           </div>
 
@@ -3630,24 +3630,20 @@ service cloud.firestore {
           </button>
           <button type="button" id="btnSubPortal_cardapio" onclick="alternarSubAbaPortalAlojado('cardapio')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
             <i class="fa-solid fa-utensils text-emerald-600"></i>
-            <span>2. Cardápio & Horários</span>
+            <span>2. Cardápio Semanal & Prato do Dia</span>
           </button>
           <button type="button" id="btnSubPortal_mural" onclick="alternarSubAbaPortalAlojado('mural')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
             <i class="fa-solid fa-bullhorn text-indigo-600"></i>
             <span>3. Mural de Avisos</span>
             <span id="badgeCountAvisosSubAba" class="px-1.5 py-0.5 rounded-full text-[10px] bg-indigo-100 text-indigo-800 font-black">1</span>
           </button>
-          <button type="button" id="btnSubPortal_escalas" onclick="alternarSubAbaPortalAlojado('escalas')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
-            <i class="fa-solid fa-calendar-check text-teal-600"></i>
-            <span>4. Lavanderia & Ônibus</span>
-          </button>
           <button type="button" id="btnSubPortal_regras" onclick="alternarSubAbaPortalAlojado('regras')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
             <i class="fa-solid fa-scale-balanced text-rose-600"></i>
-            <span>5. Regras & Contatos</span>
+            <span>4. Regras & Contatos</span>
           </button>
           <button type="button" id="btnSubPortal_avaliacoes" onclick="alternarSubAbaPortalAlojado('avaliacoes')" class="sub-portal-btn px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition whitespace-nowrap text-slate-600 hover:bg-slate-100">
             <i class="fa-solid fa-star text-amber-500"></i>
-            <span>6. Avaliações da Cozinha</span>
+            <span>5. Avaliações da Cozinha</span>
             <span id="badgeCountAvaliacoesSubAba" class="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-black">0</span>
           </button>
         </div>
@@ -3985,80 +3981,7 @@ service cloud.firestore {
           </div>
         </div>
 
-        <!-- ================= SUB-ABA 4: ESCALA DE LAVANDERIA & HORÁRIOS DE ÔNIBUS ================= -->
-        <div id="subPortal_escalas" class="sub-portal-panel hidden">
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
-              <div class="flex items-center gap-2.5">
-                <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
-                  <i class="fa-solid fa-calendar-check"></i>
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-white">Escala Semanal de Lavanderia & Horários de Ônibus</h3>
-                  <p class="text-[11px] text-slate-400">O app calcula automaticamente o dia de lavanderia de cada morador com base no bloco dele</p>
-                </div>
-              </div>
-            </div>
-
-            <form id="formEscalasPortal" onsubmit="salvarEscalasPortalAlojado(event)" class="p-5 space-y-4 text-xs">
-              <div>
-                <h4 class="font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <i class="fa-solid fa-shirt text-teal-600"></i> Dias de Coleta / Troca de Enxoval por Bloco
-                </h4>
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div>
-                    <label class="block font-bold text-slate-700 mb-1">Segunda-feira</label>
-                    <input type="text" id="inputEscalaSeg" placeholder="Blocos A e B" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-                  </div>
-                  <div>
-                    <label class="block font-bold text-slate-700 mb-1">Terça-feira</label>
-                    <input type="text" id="inputEscalaTer" placeholder="Blocos C e D" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-                  </div>
-                  <div>
-                    <label class="block font-bold text-slate-700 mb-1">Quarta-feira</label>
-                    <input type="text" id="inputEscalaQua" placeholder="Blocos E, F e G" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-                  </div>
-                  <div>
-                    <label class="block font-bold text-slate-700 mb-1">Quinta-feira</label>
-                    <input type="text" id="inputEscalaQui" placeholder="Blocos A, B e H" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-                  </div>
-                  <div>
-                    <label class="block font-bold text-slate-700 mb-1">Sexta-feira</label>
-                    <input type="text" id="inputEscalaSex" placeholder="Blocos C, D e I" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-                  </div>
-                  <div>
-                    <label class="block font-bold text-slate-700 mb-1">Sábado</label>
-                    <input type="text" id="inputEscalaSab" placeholder="Roupas de Cama / Geral" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800">
-                  </div>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                <div class="md:col-span-2">
-                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    <i class="fa-solid fa-bus text-amber-600 mr-1"></i> Quadro de Horários de Ônibus / Transporte Canteiro
-                  </label>
-                  <textarea id="inputHorariosOnibusTexto" rows="3" placeholder="Ex: Saída Alojamento -> Frente de Obra: 06h30 e 06h45&#10;Retorno Almoço: 11h30 | Retorno Final de Turno: 17h15" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-medium"></textarea>
-                </div>
-                <div>
-                  <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> WhatsApp Principal da Prefeitura (com DDD)
-                  </label>
-                  <input type="text" id="inputWhatsappPrefeitoPortal" placeholder="Ex: 5594999999999" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-slate-800 font-mono font-bold">
-                  <p class="text-[11px] text-slate-400 mt-1.5">Você também pode cadastrar vários contatos extras (Ambulatório, Portaria, etc.) na aba 5.</p>
-                </div>
-              </div>
-
-              <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
-                <button type="submit" class="btn-prefeito px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
-                  <i class="fa-solid fa-check"></i> Salvar Escalas & Transporte
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- ================= SUB-ABA 5: REGRAS DO ALOJAMENTO & CONTATOS DE APOIO (DINÂMICO) ================= -->
+        <!-- ================= SUB-ABA 4: REGRAS DO ALOJAMENTO & CONTATOS DE APOIO (DINÂMICO) ================= -->
         <div id="subPortal_regras" class="sub-portal-panel hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           <!-- Coluna 1: Editor Dinâmico das Regras de Ouro -->
@@ -4139,6 +4062,20 @@ service cloud.firestore {
             </div>
 
             <div class="p-5 space-y-4 flex-1 text-xs">
+              <!-- WhatsApp Principal da Prefeitura -->
+              <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200">
+                <label class="block font-bold text-slate-800 uppercase tracking-wider mb-1">
+                  <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> WhatsApp Principal da Prefeitura (com DDD)
+                </label>
+                <div class="flex gap-2">
+                  <input type="text" id="inputWhatsappPrefeitoPortal" placeholder="Ex: 5594999999999" class="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-slate-800 font-mono font-bold">
+                  <button type="button" onclick="salvarWhatsappPrincipalPortal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition whitespace-nowrap">
+                    Salvar
+                  </button>
+                </div>
+                <p class="text-[11px] text-emerald-700 mt-1">Este número é usado como contato padrão de plantão no app do alojado.</p>
+              </div>
+
               <form id="formContatoPortal" onsubmit="salvarContatoPortalAlojado(event)" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 <input type="hidden" id="inputIdContatoEditando" value="">
                 <div class="flex items-center justify-between">
@@ -4193,7 +4130,7 @@ service cloud.firestore {
 
         </div>
 
-        <!-- ================= SUB-ABA 6: AVALIAÇÕES DA COZINHA & OUVIDORIA ================= -->
+        <!-- ================= SUB-ABA 5: AVALIAÇÕES DA COZINHA & OUVIDORIA ================= -->
         <div id="subPortal_avaliacoes" class="sub-portal-panel hidden space-y-4">
           <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <!-- Header da Sub-Aba -->
@@ -9259,7 +9196,7 @@ service cloud.firestore {
           </div>
           <div>
             <h3 class="text-sm font-bold text-white">Cartaz Oficial A4 • Portal do Alojado & Colaborador</h3>
-            <p class="text-[11px] text-slate-400">Fixe no Refeitório, Lavanderia, Portaria e Murais dos Blocos</p>
+            <p class="text-[11px] text-slate-400">Fixe no Refeitório, Portaria e Murais dos Blocos</p>
           </div>
         </div>
         <div class="flex items-center gap-2">

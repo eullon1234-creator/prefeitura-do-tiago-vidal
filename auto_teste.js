@@ -2197,14 +2197,16 @@ assert(indexHtml.includes('data-tab="portal_alojado"'), 'Botão data-tab="portal
 assert(indexHtml.includes('id="subPortal_identidade"'), 'Sub-aba 1 (Identidade & Sync de Moradores) presente em index.html');
 assert(indexHtml.includes('id="subPortal_cardapio"'), 'Sub-aba 2 (Cardápio & Horários) presente em index.html');
 assert(indexHtml.includes('id="subPortal_mural"'), 'Sub-aba 3 (Mural de Avisos) presente em index.html');
-assert(indexHtml.includes('id="subPortal_escalas"'), 'Sub-aba 4 (Lavanderia & Ônibus) presente em index.html');
-assert(indexHtml.includes('id="subPortal_regras"'), 'Sub-aba 5 (Regras & Contatos) presente em index.html');
+assert(indexHtml.includes('id="subPortal_regras"'), 'Sub-aba 4 (Regras & Contatos) presente em index.html');
+assert(indexHtml.includes('id="subPortal_avaliacoes"'), 'Sub-aba 5 (Avaliações da Cozinha) presente em index.html');
+assert(!indexHtml.includes('id="subPortal_escalas"'), 'Sub-aba de Lavanderia & Ônibus removida com sucesso de index.html');
 assert(indexHtml.includes('id="formIdentidadePortal"'), 'Formulário de Identidade da Tela Inicial presente em index.html');
 assert(indexHtml.includes('id="formCardapioPortal"'), 'Formulário de Cardápio do Refeitório presente em index.html');
 assert(indexHtml.includes('id="formNovoAvisoMural"'), 'Formulário do Mural Digital de Avisos presente em index.html');
-assert(indexHtml.includes('id="formEscalasPortal"'), 'Formulário de Escala de Lavanderia e Ônibus presente em index.html');
+assert(!indexHtml.includes('id="formEscalasPortal"'), 'Formulário de Escala de Lavanderia e Ônibus removido de index.html');
 assert(indexHtml.includes('id="formRegraPortal"'), 'Formulário de Regras de Ouro presente em index.html');
 assert(indexHtml.includes('id="formContatoPortal"'), 'Formulário de Contatos de Apoio e Emergência presente em index.html');
+assert(indexHtml.includes('id="inputWhatsappPrefeitoPortal"'), 'Campo de WhatsApp Principal da Prefeitura presente em index.html');
 assert(indexHtml.includes('id="modalCartazPortalAlojadoA4"'), 'Modal de impressão do Cartaz A4 com QR Code do Portal presente em index.html');
 
 assert(appJs.includes('function carregarPortalAlojadoAdmin('), 'Função carregarPortalAlojadoAdmin implementada em app.js');
@@ -2215,6 +2217,7 @@ assert(appJs.includes('function salvarCardapioPortalAlojado('), 'Função salvar
 assert(appJs.includes('function publicarAvisoMuralAlojado('), 'Função publicarAvisoMuralAlojado implementada em app.js');
 assert(appJs.includes('function editarAvisoMuralAlojado('), 'Função editarAvisoMuralAlojado implementada em app.js');
 assert(appJs.includes('function excluirAvisoMuralAlojado('), 'Função excluirAvisoMuralAlojado implementada em app.js');
+assert(appJs.includes('function salvarWhatsappPrincipalPortal('), 'Função salvarWhatsappPrincipalPortal implementada em app.js');
 assert(appJs.includes('function salvarEscalasPortalAlojado('), 'Função salvarEscalasPortalAlojado implementada em app.js');
 assert(appJs.includes('function salvarRegraPortalAlojado('), 'Função salvarRegraPortalAlojado implementada em app.js');
 assert(appJs.includes('function editarRegraPortalAlojado('), 'Função editarRegraPortalAlojado implementada em app.js');

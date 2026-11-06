@@ -21807,7 +21807,7 @@ let diaCardapioAdminAtivo = 'seg';
 let timerSyncAutoAlojadosPortal = null;
 
 function alternarSubAbaPortalAlojado(aba) {
-  const abas = ['identidade', 'cardapio', 'mural', 'escalas', 'regras', 'avaliacoes'];
+  const abas = ['identidade', 'cardapio', 'mural', 'regras', 'avaliacoes'];
   abas.forEach(nome => {
     const panel = document.getElementById('subPortal_' + nome);
     const btn = document.getElementById('btnSubPortal_' + nome);
@@ -21927,15 +21927,7 @@ function preencherFormularioPortalAdmin() {
   // Sub-aba 2: Cardápio & Horários (Grade Semanal e Prato do Dia)
   selecionarDiaCardapioAdmin(diaCardapioAdminAtivo || 'seg');
 
-  // Sub-aba 4: Escalas & Ônibus
-  setVal('inputEscalaSeg', l.seg);
-  setVal('inputEscalaTer', l.ter);
-  setVal('inputEscalaQua', l.qua);
-  setVal('inputEscalaQui', l.qui);
-  setVal('inputEscalaSex', l.sex);
-  setVal('inputEscalaSab', l.sab);
-
-  setVal('inputHorariosOnibusTexto', est.horarios_onibus);
+  // Sub-aba 4: Regras & Contatos (WhatsApp de Apoio)
   setVal('inputWhatsappPrefeitoPortal', est.whatsapp_prefeito);
 
   renderizarListaAvisosPortalAdmin();
@@ -22385,25 +22377,17 @@ function excluirAvisoMuralAlojado(id) {
   persistirDocumentoUnicoPortal('Comunicado removido do mural.');
 }
 
-function salvarEscalasPortalAlojado(event) {
-  if (event) event.preventDefault();
+function salvarWhatsappPrincipalPortal() {
   const getVal = (id) => (document.getElementById(id)?.value || '').trim();
-
-  estadoPortalMoradorAdmin.lavanderia = {
-    seg: getVal('inputEscalaSeg') || 'Bloco 1 e Bloco 2',
-    ter: getVal('inputEscalaTer') || 'Bloco A e Bloco B',
-    qua: getVal('inputEscalaQua') || 'Bloco C e Bloco D',
-    qui: getVal('inputEscalaQui') || 'Bloco E e Bloco F',
-    sex: getVal('inputEscalaSex') || 'Bloco G e Bloco H',
-    sab: getVal('inputEscalaSab') || 'Casas na Cidade / Geral'
-  };
-  estadoPortalMoradorAdmin.horarios_onibus = getVal('inputHorariosOnibusTexto');
   const zapPrincipal = getVal('inputWhatsappPrefeitoPortal').replace(/\D/g, '');
   if (zapPrincipal) {
     estadoPortalMoradorAdmin.whatsapp_prefeito = zapPrincipal;
+    persistirDocumentoUnicoPortal('📲 WhatsApp Principal da Prefeitura atualizado!');
   }
+}
 
-  persistirDocumentoUnicoPortal('🧺 Escalas de Lavanderia e Ônibus publicadas no App!');
+function salvarEscalasPortalAlojado(event) {
+  if (event) event.preventDefault();
 }
 
 function salvarRegraPortalAlojado(event) {
@@ -22605,15 +22589,6 @@ async function salvarTudoPortalAlojadoAdmin() {
     atualizado_em: agora
   };
 
-  estadoPortalMoradorAdmin.lavanderia = {
-    seg: getVal('inputEscalaSeg') || 'Bloco 1 e Bloco 2',
-    ter: getVal('inputEscalaTer') || 'Bloco A e Bloco B',
-    qua: getVal('inputEscalaQua') || 'Bloco C e Bloco D',
-    qui: getVal('inputEscalaQui') || 'Bloco E e Bloco F',
-    sex: getVal('inputEscalaSex') || 'Bloco G e Bloco H',
-    sab: getVal('inputEscalaSab') || 'Casas na Cidade / Geral'
-  };
-  estadoPortalMoradorAdmin.horarios_onibus = getVal('inputHorariosOnibusTexto');
   const zapPrincipal = getVal('inputWhatsappPrefeitoPortal').replace(/\D/g, '');
   if (zapPrincipal) estadoPortalMoradorAdmin.whatsapp_prefeito = zapPrincipal;
 
@@ -22667,9 +22642,9 @@ function imprimirCartazPortalAlojadoA4() {
           <i class="fa-solid fa-bed text-indigo-600 text-base"></i>
           <span>Meu Quarto e Vaga</span>
         </div>
-        <div class="p-2.5 rounded-xl bg-teal-50 border border-teal-200 flex items-center gap-2">
-          <i class="fa-solid fa-shirt text-teal-600 text-base"></i>
-          <span>Dia de Lavanderia</span>
+        <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2">
+          <i class="fa-solid fa-star text-emerald-600 text-base"></i>
+          <span>Avaliar Refeição</span>
         </div>
         <div class="p-2.5 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2">
           <i class="fa-solid fa-screwdriver-wrench text-rose-600 text-base"></i>
@@ -23084,6 +23059,7 @@ window.editarAvisoMuralAlojado = editarAvisoMuralAlojado;
 window.cancelarEdicaoAvisoMural = cancelarEdicaoAvisoMural;
 window.excluirAvisoMuralAlojado = excluirAvisoMuralAlojado;
 window.salvarEscalasPortalAlojado = salvarEscalasPortalAlojado;
+window.salvarWhatsappPrincipalPortal = salvarWhatsappPrincipalPortal;
 window.salvarRegraPortalAlojado = salvarRegraPortalAlojado;
 window.editarRegraPortalAlojado = editarRegraPortalAlojado;
 window.cancelarEdicaoRegraPortal = cancelarEdicaoRegraPortal;
