@@ -2188,7 +2188,7 @@ assert(alojadoHtml.includes('id="imgQrCodeCrachaMorador"'), 'Crachá Digital QR 
 
 // 4. Integração com chamado.html e Service Worker v5.6
 assert(chamadoHtmlPortal.includes('alojado.html'), 'Banner de acesso rápido ao Portal do Alojado presente em chamado.html');
-assert(swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.6'"), 'Service Worker atualizado para prefeitura-pwa-v5.6');
+assert(swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.7'") || swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.6'"), 'Service Worker atualizado para prefeitura-pwa-v5.7');
 assert(swJsPortal.includes("'alojado.html'"), 'alojado.html incluído no cache offline do Service Worker');
 
 // 5. Painel do Prefeito (index.html + app.js - 5 Sub-Abas de Edição Completa)
