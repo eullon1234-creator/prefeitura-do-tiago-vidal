@@ -23563,6 +23563,7 @@ function carregarMaquinaGelo() {
 
   calcularPrevisaoSaldoGelo();
   filtrarHistoricoGeloUI();
+  atualizarGraficosGelo();
 }
 
 function filtrarHistoricoGeloUI() {
@@ -24006,6 +24007,556 @@ function imprimirPlaquetaGeloA4() {
   }
 }
 
+// ========================================================
+// RELATÓRIO GRÁFICO SEMANAL DE CONSUMO DE GELO POR FRENTE
+// ========================================================
+
+let chartGeloEvolucaoInstance = null;
+let chartGeloFrentesPizzaInstance = null;
+let periodoGraficoGeloAtivo = '7dias'; // '7dias' | '14dias' | 'mes'
+let unidadeGraficoGeloAtiva = 'sacos'; // 'sacos' | 'kg'
+
+const CORES_FRENTES_GELO = {
+  'KM 12': { bg: '#0284c7', border: '#0369a1', badge: 'bg-sky-100 text-sky-800 border-sky-300' },
+  'KM 14': { bg: '#2563eb', border: '#1d4ed8', badge: 'bg-blue-100 text-blue-800 border-blue-300' },
+  'Britagem': { bg: '#f59e0b', border: '#d97706', badge: 'bg-amber-100 text-amber-800 border-amber-300' },
+  'Refeitório': { bg: '#10b981', border: '#059669', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  'Oficina': { bg: '#8b5cf6', border: '#7c3aed', badge: 'bg-purple-100 text-purple-800 border-purple-300' },
+  'Alojamentos': { bg: '#ec4899', border: '#db2777', badge: 'bg-pink-100 text-pink-800 border-pink-300' },
+  'Canteiro Central': { bg: '#64748b', border: '#475569', badge: 'bg-slate-100 text-slate-800 border-slate-300' },
+  'Outros': { bg: '#94a3b8', border: '#64748b', badge: 'bg-slate-100 text-slate-700 border-slate-200' }
+};
+
+function normalizarNomeFrenteGelo(destinoRaw) {
+  if (!destinoRaw) return 'Canteiro Central';
+  const d = String(destinoRaw).toLowerCase().trim();
+  if (d.includes('km 12') || d.includes('km12')) return 'KM 12';
+  if (d.includes('km 14') || d.includes('km14')) return 'KM 14';
+  if (d.includes('britag')) return 'Britagem';
+  if (d.includes('refeit')) return 'Refeitório';
+  if (d.includes('oficin')) return 'Oficina';
+  if (d.includes('aloj')) return 'Alojamentos';
+  if (d.includes('central') || d.includes('apoio') || d.includes('adm')) return 'Canteiro Central';
+  return destinoRaw.trim();
+}
+
+function alternarPeriodoGraficoGelo(periodo) {
+  periodoGraficoGeloAtivo = periodo || '7dias';
+
+  const btn7 = document.getElementById('btnPeriodoGelo7d');
+  const btn14 = document.getElementById('btnPeriodoGelo14d');
+  const btnMes = document.getElementById('btnPeriodoGeloMes');
+
+  const ativoCls = 'px-3 py-1.5 rounded-lg transition bg-white text-slate-900 shadow-xs font-bold';
+  const inativoCls = 'px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 font-semibold';
+
+  if (btn7) btn7.className = periodoGraficoGeloAtivo === '7dias' ? ativoCls : inativoCls;
+  if (btn14) btn14.className = periodoGraficoGeloAtivo === '14dias' ? ativoCls : inativoCls;
+  if (btnMes) btnMes.className = periodoGraficoGeloAtivo === 'mes' ? ativoCls : inativoCls;
+
+  const tagEvolucao = document.getElementById('tagPeriodoGraficoEvolucao');
+  if (tagEvolucao) {
+    tagEvolucao.textContent = periodoGraficoGeloAtivo === '7dias' ? 'Últimos 7 dias' : (periodoGraficoGeloAtivo === '14dias' ? 'Últimos 14 dias' : 'Este Mês');
+  }
+
+  atualizarGraficosGelo();
+}
+
+function alternarUnidadeGraficoGelo(unidade) {
+  unidadeGraficoGeloAtiva = unidade || 'sacos';
+
+  const btnSc = document.getElementById('btnUnidadeGraficoSacos');
+  const btnKg = document.getElementById('btnUnidadeGraficoKg');
+
+  if (btnSc) {
+    btnSc.className = unidadeGraficoGeloAtiva === 'sacos'
+      ? 'px-2.5 py-1.5 rounded-lg transition bg-cyan-600 text-white font-bold shadow-xs'
+      : 'px-2.5 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 font-semibold';
+  }
+  if (btnKg) {
+    btnKg.className = unidadeGraficoGeloAtiva === 'kg'
+      ? 'px-2.5 py-1.5 rounded-lg transition bg-cyan-600 text-white font-bold shadow-xs'
+      : 'px-2.5 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 font-semibold';
+  }
+
+  atualizarGraficosGelo();
+}
+
+function obterDadosPeriodoGraficoGelo() {
+  const dias = [];
+  const hoje = new Date();
+  let qtdDias = 7;
+  if (periodoGraficoGeloAtivo === '14dias') qtdDias = 14;
+  else if (periodoGraficoGeloAtivo === 'mes') {
+    qtdDias = Math.max(1, hoje.getDate());
+  }
+
+  for (let i = qtdDias - 1; i >= 0; i--) {
+    const d = new Date(hoje);
+    d.setDate(hoje.getDate() - i);
+    const dataStr = getDataHojeLocal(d);
+    const diaNum = String(d.getDate()).padStart(2, '0');
+    const mesNum = String(d.getMonth() + 1).padStart(2, '0');
+    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const diaSem = diasSemana[d.getDay()];
+    dias.push({
+      dataStr: dataStr,
+      labelCurto: `${diaNum}/${mesNum}`,
+      labelCompleto: `${diaNum}/${mesNum} (${diaSem})`,
+      diaSem: diaSem
+    });
+  }
+
+  const regsGelo = (listaRegistrosRonda || []).filter(r => 
+    r.tipo === 'maquina_gelo' || 
+    typeof r.gelo_produzido !== 'undefined' || 
+    typeof r.gelo_saida !== 'undefined' ||
+    typeof r.gelo_saldo !== 'undefined'
+  );
+
+  const producaoPorDia = {};
+  const totaisPorDiaEFrente = {};
+  const totaisGeraisFrente = {};
+  let totalProduzidoPeriodo = 0;
+  let totalExpedidoPeriodo = 0;
+
+  dias.forEach(d => {
+    producaoPorDia[d.dataStr] = 0;
+    totaisPorDiaEFrente[d.dataStr] = {};
+
+    const regsDoDia = regsGelo.filter(r => r.data === d.dataStr);
+    regsDoDia.forEach(r => {
+      const unid = r.gelo_unidade || 'sacos';
+      const fatorSaco = unid === 'kg' ? (1 / PESO_PADRAO_SACO_GELO_KG) : 1;
+
+      const prod = (parseFloat(r.gelo_produzido || 0) || 0) * fatorSaco;
+      const saida = (parseFloat(r.gelo_saida || 0) || 0) * fatorSaco;
+
+      if (prod > 0) {
+        producaoPorDia[d.dataStr] += prod;
+        totalProduzidoPeriodo += prod;
+      }
+
+      if (saida > 0) {
+        totalExpedidoPeriodo += saida;
+        const destStr = r.gelo_destinos || 'Canteiro Central';
+        const partes = destStr.split(',').map(s => s.trim()).filter(Boolean);
+        const listaFrentes = partes.length > 0 ? partes : ['Canteiro Central'];
+        const rateio = saida / listaFrentes.length;
+
+        listaFrentes.forEach(fRaw => {
+          const fNorm = normalizarNomeFrenteGelo(fRaw);
+          totaisPorDiaEFrente[d.dataStr][fNorm] = (totaisPorDiaEFrente[d.dataStr][fNorm] || 0) + rateio;
+          totaisGeraisFrente[fNorm] = (totaisGeraisFrente[fNorm] || 0) + rateio;
+        });
+      }
+    });
+  });
+
+  let frentesAtivas = Object.keys(totaisGeraisFrente).filter(f => totaisGeraisFrente[f] > 0);
+  frentesAtivas.sort((a, b) => (totaisGeraisFrente[b] || 0) - (totaisGeraisFrente[a] || 0));
+
+  if (frentesAtivas.length === 0) {
+    frentesAtivas = ['KM 12', 'KM 14', 'Britagem', 'Refeitório', 'Oficina', 'Alojamentos'];
+  }
+
+  return {
+    dias,
+    producaoPorDia,
+    totaisPorDiaEFrente,
+    totaisGeraisFrente,
+    frentesAtivas,
+    totalProduzidoPeriodo,
+    totalExpedidoPeriodo
+  };
+}
+
+function atualizarGraficosGelo() {
+  if (typeof Chart === 'undefined') return;
+
+  const canvasEvolucao = document.getElementById('chartGeloEvolucao');
+  const canvasPizza = document.getElementById('chartGeloFrentesPizza');
+  if (!canvasEvolucao || !canvasPizza) return;
+
+  const dados = obterDadosPeriodoGraficoGelo();
+  const fatorMult = unidadeGraficoGeloAtiva === 'kg' ? PESO_PADRAO_SACO_GELO_KG : 1;
+  const sufixo = unidadeGraficoGeloAtiva === 'kg' ? 'kg' : 'sc';
+
+  // 1. Atualizar Micro-KPIs do Card Gráfico
+  const elTop = document.getElementById('graficoGeloTopFrente');
+  const elTopSub = document.getElementById('graficoGeloTopFrenteSub');
+  const elMedia = document.getElementById('graficoGeloMediaDiaria');
+  const elMediaSub = document.getElementById('graficoGeloMediaDiariaSub');
+  const elTotExp = document.getElementById('graficoGeloTotalExpedido');
+  const elTotExpSub = document.getElementById('graficoGeloTotalExpedidoSub');
+  const elBalanco = document.getElementById('graficoGeloBalancoPeriodo');
+  const elBalancoSub = document.getElementById('graficoGeloBalancoPeriodoSub');
+
+  const topNome = dados.frentesAtivas[0] || 'Nenhuma';
+  const topQtd = dados.totaisGeraisFrente[topNome] || 0;
+  const pctTop = dados.totalExpedidoPeriodo > 0 ? Math.round((topQtd / dados.totalExpedidoPeriodo) * 100) : 0;
+  const mediaDiaria = dados.dias.length > 0 ? (dados.totalExpedidoPeriodo / dados.dias.length) : 0;
+
+  if (elTop) elTop.textContent = topNome;
+  if (elTopSub) elTopSub.textContent = `${Math.round(topQtd * fatorMult)} ${sufixo} (${pctTop}% da demanda)`;
+
+  if (elMedia) elMedia.textContent = `${(mediaDiaria * fatorMult).toFixed(1)} ${sufixo} / dia`;
+  if (elMediaSub) elMediaSub.textContent = `Em ${dados.dias.length} dias avaliados`;
+
+  if (elTotExp) elTotExp.textContent = `${Math.round(dados.totalExpedidoPeriodo * fatorMult)} ${sufixo}`;
+  if (elTotExpSub) {
+    const kgEquiv = Math.round(dados.totalExpedidoPeriodo * PESO_PADRAO_SACO_GELO_KG);
+    elTotExpSub.textContent = unidadeGraficoGeloAtiva === 'kg' ? `~${Math.round(dados.totalExpedidoPeriodo)} sacos distribuídos` : `~${kgEquiv} kg distribuídos`;
+  }
+
+  const saldoDif = dados.totalProduzidoPeriodo - dados.totalExpedidoPeriodo;
+  if (elBalanco) {
+    if (saldoDif >= 0) {
+      elBalanco.textContent = `Superávit (+${Math.round(saldoDif * fatorMult)} ${sufixo})`;
+      elBalanco.className = 'text-sm sm:text-base font-black text-emerald-700 block mt-0.5';
+    } else {
+      elBalanco.textContent = `Déficit (${Math.round(saldoDif * fatorMult)} ${sufixo})`;
+      elBalanco.className = 'text-sm sm:text-base font-black text-rose-700 block mt-0.5';
+    }
+  }
+  if (elBalancoSub) {
+    elBalancoSub.textContent = saldoDif >= 0 
+      ? `Fabricação superou a demanda em ${Math.round(saldoDif * fatorMult)} ${sufixo}`
+      : `Consumo consumiu reserva do freezer`;
+  }
+
+  // 2. Gráfico 1: Evolução Diária por Frente vs. Fabricação (Stacked Bar + Line)
+  if (chartGeloEvolucaoInstance) {
+    chartGeloEvolucaoInstance.destroy();
+  }
+
+  const datasetsBarras = dados.frentesAtivas.map(frente => {
+    const cor = CORES_FRENTES_GELO[frente] || CORES_FRENTES_GELO['Outros'];
+    return {
+      type: 'bar',
+      label: frente,
+      stack: 'saidas',
+      backgroundColor: cor.bg,
+      borderColor: cor.border,
+      borderWidth: 1,
+      borderRadius: 4,
+      data: dados.dias.map(d => Math.round((dados.totaisPorDiaEFrente[d.dataStr][frente] || 0) * fatorMult * 10) / 10),
+      order: 2
+    };
+  });
+
+  const datasetLinhaProducao = {
+    type: 'line',
+    label: `Fabricação Diária (${sufixo})`,
+    data: dados.dias.map(d => Math.round((dados.producaoPorDia[d.dataStr] || 0) * fatorMult * 10) / 10),
+    borderColor: '#06b6d4',
+    backgroundColor: 'rgba(6, 182, 212, 0.15)',
+    borderWidth: 3,
+    pointBackgroundColor: '#0891b2',
+    pointBorderColor: '#ffffff',
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    fill: true,
+    tension: 0.35,
+    order: 1
+  };
+
+  chartGeloEvolucaoInstance = new Chart(canvasEvolucao.getContext('2d'), {
+    data: {
+      labels: dados.dias.map(d => d.labelCompleto),
+      datasets: [datasetLinhaProducao, ...datasetsBarras]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            boxWidth: 12,
+            font: { size: 11, weight: 'bold' }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const val = context.parsed.y !== null ? context.parsed.y : context.raw;
+              const kgTxt = unidadeGraficoGeloAtiva === 'sacos' ? ` (~${Math.round(val * PESO_PADRAO_SACO_GELO_KG)} kg)` : '';
+              return ` ${context.dataset.label}: ${val} ${sufixo}${kgTxt}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false }
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: `Volume (${sufixo})`,
+            font: { size: 11, weight: 'bold' }
+          }
+        }
+      }
+    }
+  });
+
+  // 3. Gráfico 2: Participação % por Frente (Doughnut)
+  if (chartGeloFrentesPizzaInstance) {
+    chartGeloFrentesPizzaInstance.destroy();
+  }
+
+  const frentesComConsumo = dados.frentesAtivas.filter(f => (dados.totaisGeraisFrente[f] || 0) > 0);
+  const labelsPizza = frentesComConsumo.length > 0 ? frentesComConsumo : ['Sem Saídas'];
+  const dadosPizza = frentesComConsumo.length > 0 
+    ? frentesComConsumo.map(f => Math.round((dados.totaisGeraisFrente[f] || 0) * fatorMult * 10) / 10)
+    : [1];
+  const coresPizza = frentesComConsumo.length > 0
+    ? frentesComConsumo.map(f => (CORES_FRENTES_GELO[f] || CORES_FRENTES_GELO['Outros']).bg)
+    : ['#cbd5e1'];
+
+  chartGeloFrentesPizzaInstance = new Chart(canvasPizza.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: labelsPizza,
+      datasets: [{
+        data: dadosPizza,
+        backgroundColor: coresPizza,
+        borderWidth: 2,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '66%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              if (frentesComConsumo.length === 0) return ' Nenhuma saída registrada';
+              const val = context.raw || 0;
+              const pct = dados.totalExpedidoPeriodo > 0 
+                ? Math.round(((val / fatorMult) / dados.totalExpedidoPeriodo) * 100) 
+                : 0;
+              const kgTxt = unidadeGraficoGeloAtiva === 'sacos' ? ` (~${Math.round(val * PESO_PADRAO_SACO_GELO_KG)} kg)` : '';
+              return ` ${context.label}: ${val} ${sufixo}${kgTxt} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // 4. Renderizar Legenda em Cards abaixo do Doughnut
+  const elLegenda = document.getElementById('legendaGeloFrentesCards');
+  if (elLegenda) {
+    if (frentesComConsumo.length === 0) {
+      elLegenda.innerHTML = `
+        <div class="col-span-2 text-center text-slate-400 py-2 italic text-xs">
+          Nenhuma expedição de gelo registrada neste período ainda.
+        </div>
+      `;
+    } else {
+      elLegenda.innerHTML = frentesComConsumo.map(frente => {
+        const cor = CORES_FRENTES_GELO[frente] || CORES_FRENTES_GELO['Outros'];
+        const qtdSacos = dados.totaisGeraisFrente[frente] || 0;
+        const qtdValor = Math.round(qtdSacos * fatorMult * 10) / 10;
+        const pct = dados.totalExpedidoPeriodo > 0 ? Math.round((qtdSacos / dados.totalExpedidoPeriodo) * 100) : 0;
+
+        return `
+          <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${cor.bg}"></span>
+              <span class="font-bold text-slate-800 text-xs truncate" title="${frente}">${frente}</span>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <span class="font-black text-slate-900 text-xs">${qtdValor} ${sufixo}</span>
+              <span class="text-[10px] text-slate-500 font-medium ml-1">(${pct}%)</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
+// Impressão A4 Oficial do Relatório Semanal de Gelo
+function imprimirRelatorioGeloSemanalA4() {
+  renderizarRelatorioGeloSemanalA4UI();
+  abrirModal('modalRelatorioGeloSemanalA4');
+}
+
+function imprimirDocumentoGeloA4() {
+  document.body.classList.add('imprimindo-relatorio-gelo');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('imprimindo-relatorio-gelo');
+  }, 1000);
+}
+
+function renderizarRelatorioGeloSemanalA4UI() {
+  const container = document.getElementById('areaImpressaoRelatorioGeloSemanal');
+  if (!container) return;
+
+  const dados = obterDadosPeriodoGraficoGelo();
+  const dataHoje = getDataHojeLocal();
+  const horaAgora = new Date().toTimeString().substring(0, 5);
+
+  const dInicio = dados.dias[0] ? dados.dias[0].dataStr.split('-').reverse().join('/') : '-';
+  const dFim = dados.dias[dados.dias.length - 1] ? dados.dias[dados.dias.length - 1].dataStr.split('-').reverse().join('/') : '-';
+
+  const saldoAtualFreezer = typeof obterSaldoAtualSiloGelo === 'function' ? obterSaldoAtualSiloGelo() : 0;
+  const mediaDiaria = dados.dias.length > 0 ? (dados.totalExpedidoPeriodo / dados.dias.length) : 0;
+
+  // Linhas da Tabela de Frentes
+  const linhasTabela = dados.frentesAtivas.map((frente, idx) => {
+    const sacos = dados.totaisGeraisFrente[frente] || 0;
+    const kg = Math.round(sacos * PESO_PADRAO_SACO_GELO_KG);
+    const pct = dados.totalExpedidoPeriodo > 0 ? ((sacos / dados.totalExpedidoPeriodo) * 100).toFixed(1) : '0.0';
+    
+    // Contagem de dias em que a frente retirou gelo
+    let diasAtendidos = 0;
+    dados.dias.forEach(d => {
+      if ((dados.totaisPorDiaEFrente[d.dataStr][frente] || 0) > 0) diasAtendidos++;
+    });
+
+    return `
+      <tr class="border-b border-slate-200">
+        <td class="py-2 px-3 font-bold text-slate-900">${idx + 1}. ${frente}</td>
+        <td class="py-2 px-3 text-center text-slate-700">${diasAtendidos} dia(s)</td>
+        <td class="py-2 px-3 text-right font-black text-slate-900">${Math.round(sacos)} sacos</td>
+        <td class="py-2 px-3 text-right text-slate-700 font-semibold">~${kg} kg</td>
+        <td class="py-2 px-3 text-right font-bold text-cyan-800">${pct}%</td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="space-y-6 text-slate-800 print:text-black">
+      <!-- Cabeçalho Oficial GEL -->
+      <div class="flex items-start justify-between border-b-2 border-slate-900 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xl">
+            GEL
+          </div>
+          <div>
+            <h1 class="text-lg font-black text-slate-900 tracking-tight leading-tight uppercase">GEL • Goetze Lobato Engenharia S.A.</h1>
+            <h2 class="text-xs font-bold text-slate-600 uppercase">Canteiro de Obras PCH Taboca 2 • Suprimento & Hidratação</h2>
+            <p class="text-[10px] text-slate-500 mt-0.5">Gestão de Infraestrutura e Prefeitura de Canteiro • NR-18 e NR-24</p>
+          </div>
+        </div>
+        <div class="text-right text-xs">
+          <span class="inline-block px-2.5 py-1 rounded bg-cyan-100 text-cyan-900 font-black text-[11px] border border-cyan-300">
+            RELATÓRIO EXECUTIVO SEMANAL
+          </span>
+          <div class="text-[10px] text-slate-500 mt-1">Emissão: ${dataHoje.split('-').reverse().join('/')} às ${horaAgora}</div>
+          <div class="text-[10px] text-slate-600 font-bold">Responsável: Tiago Vidal (Prefeito)</div>
+        </div>
+      </div>
+
+      <!-- Resumo do Período -->
+      <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-300 flex items-center justify-between text-xs">
+        <div>
+          <span class="font-bold text-slate-700">Período de Análise:</span>
+          <span class="font-black text-slate-900 ml-1">${dInicio} até ${dFim} (${dados.dias.length} dias avaliados)</span>
+        </div>
+        <div>
+          <span class="font-bold text-slate-700">Padrão de Embalagem:</span>
+          <span class="font-black text-slate-900 ml-1">1 Saco = ${PESO_PADRAO_SACO_GELO_KG} kg</span>
+        </div>
+      </div>
+
+      <!-- Quadro de KPIs Consolidados -->
+      <div class="grid grid-cols-4 gap-3 text-center">
+        <div class="p-3 rounded-xl border border-slate-300 bg-white">
+          <span class="text-[10px] font-bold text-slate-500 uppercase block">Gelo Fabricado</span>
+          <span class="text-xl font-black text-slate-900 mt-1 block">${Math.round(dados.totalProduzidoPeriodo)} sacos</span>
+          <span class="text-[10px] text-slate-500 font-semibold block">~${Math.round(dados.totalProduzidoPeriodo * PESO_PADRAO_SACO_GELO_KG)} kg produzidos</span>
+        </div>
+        <div class="p-3 rounded-xl border border-slate-300 bg-white">
+          <span class="text-[10px] font-bold text-slate-500 uppercase block">Gelo Distribuído</span>
+          <span class="text-xl font-black text-amber-800 mt-1 block">${Math.round(dados.totalExpedidoPeriodo)} sacos</span>
+          <span class="text-[10px] text-slate-500 font-semibold block">~${Math.round(dados.totalExpedidoPeriodo * PESO_PADRAO_SACO_GELO_KG)} kg expedidos</span>
+        </div>
+        <div class="p-3 rounded-xl border border-slate-300 bg-white">
+          <span class="text-[10px] font-bold text-slate-500 uppercase block">Saldo Atual no Freezer</span>
+          <span class="text-xl font-black text-cyan-900 mt-1 block">${saldoAtualFreezer} sacos</span>
+          <span class="text-[10px] text-slate-500 font-semibold block">~${saldoAtualFreezer * PESO_PADRAO_SACO_GELO_KG} kg em estoque</span>
+        </div>
+        <div class="p-3 rounded-xl border border-slate-300 bg-white">
+          <span class="text-[10px] font-bold text-slate-500 uppercase block">Média Diária de Saída</span>
+          <span class="text-xl font-black text-slate-800 mt-1 block">${mediaDiaria.toFixed(1)} sacos/dia</span>
+          <span class="text-[10px] text-slate-500 font-semibold block">Demanda das frentes</span>
+        </div>
+      </div>
+
+      <!-- Tabela Consolidada por Frente de Serviço -->
+      <div>
+        <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <span>Detalhamento de Consumo por Frente de Serviço</span>
+        </h3>
+        <table class="w-full text-xs text-left border-collapse border border-slate-300">
+          <thead class="bg-slate-100 font-bold text-slate-700 text-[11px] uppercase border-b border-slate-300">
+            <tr>
+              <th class="py-2 px-3">Frente de Serviço / Destino</th>
+              <th class="py-2 px-3 text-center">Frequência</th>
+              <th class="py-2 px-3 text-right">Volume (Sacos)</th>
+              <th class="py-2 px-3 text-right">Volume (Kg)</th>
+              <th class="py-2 px-3 text-right">Participação (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhasTabela}
+          </tbody>
+          <tfoot class="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-900">
+            <tr>
+              <td class="py-2 px-3">TOTAL GERAL EXPEDIDO</td>
+              <td class="py-2 px-3 text-center">-</td>
+              <td class="py-2 px-3 text-right">${Math.round(dados.totalExpedidoPeriodo)} sacos</td>
+              <td class="py-2 px-3 text-right">~${Math.round(dados.totalExpedidoPeriodo * PESO_PADRAO_SACO_GELO_KG)} kg</td>
+              <td class="py-2 px-3 text-right">100.0%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Observações de Higiene e NR-18 / NR-24 -->
+      <div class="p-3.5 rounded-xl border border-slate-300 bg-slate-50 text-[11px] space-y-1">
+        <span class="font-bold text-slate-900 block uppercase">Diretrizes de Saúde & Hidratação no Canteiro (NR-18 e NR-24):</span>
+        <p class="text-slate-600 leading-relaxed">
+          • A água potável e o gelo devem ser fornecidos em condições higiênicas, garantindo reposição contínua para as frentes externas sob insolação direta.<br>
+          • É obrigatória a higienização semanal do freezer de armazenamento e das pás plásticas alimentícias com solução sanitizante autorizada.<br>
+          • As caixas térmicas das frentes de serviço (KM 12, KM 14, Britagem) devem ser limpas antes do abastecimento diário.
+        </p>
+      </div>
+
+      <!-- Assinaturas Formais -->
+      <div class="pt-8 grid grid-cols-2 gap-8 text-center text-xs">
+        <div class="border-t border-slate-400 pt-2">
+          <span class="font-black text-slate-900 block">Tiago Vidal</span>
+          <span class="text-[10px] text-slate-600 block">Prefeito de Canteiro • PCH Taboca 2</span>
+          <span class="text-[10px] text-slate-400 block">GEL Goetze Lobato Engenharia S.A.</span>
+        </div>
+        <div class="border-t border-slate-400 pt-2">
+          <span class="font-black text-slate-900 block">Encarregado Geral de Campo / SESMT</span>
+          <span class="text-[10px] text-slate-600 block">Fiscalização Operacional e Segurança</span>
+          <span class="text-[10px] text-slate-400 block">GEL Goetze Lobato Engenharia S.A.</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function exportarGeloExcel() {
   try {
     if (typeof XLSX === 'undefined') {
@@ -24058,6 +24609,12 @@ window.excluirLancamentoGelo = excluirLancamentoGelo;
 window.editarLancamentoGelo = editarLancamentoGelo;
 window.cancelarEdicaoGelo = cancelarEdicaoGelo;
 window.recarregarGeloManual = recarregarGeloManual;
+window.alternarPeriodoGraficoGelo = alternarPeriodoGraficoGelo;
+window.alternarUnidadeGraficoGelo = alternarUnidadeGraficoGelo;
+window.atualizarGraficosGelo = atualizarGraficosGelo;
+window.imprimirRelatorioGeloSemanalA4 = imprimirRelatorioGeloSemanalA4;
+window.imprimirDocumentoGeloA4 = imprimirDocumentoGeloA4;
+window.renderizarRelatorioGeloSemanalA4UI = renderizarRelatorioGeloSemanalA4UI;
 window.imprimirPlaquetaGeloA4 = imprimirPlaquetaGeloA4;
 window.exportarGeloExcel = exportarGeloExcel;
 

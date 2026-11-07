@@ -2254,6 +2254,12 @@ assert(indexHtml.includes('id="kpiGeloProducaoHoje"'), 'KPI Produção Hoje da M
 assert(indexHtml.includes('id="kpiGeloSaidaHoje"'), 'KPI Saída Hoje da Máquina de Gelo presente no HTML');
 assert(indexHtml.includes('id="kpiGeloSaldoSilo"'), 'KPI Saldo Silo da Máquina de Gelo presente no HTML');
 assert(indexHtml.includes('id="kpiGeloFrentesHoje"'), 'KPI Frentes Atendidas presente no HTML');
+assert(indexHtml.includes('id="chartGeloEvolucao"'), 'Canvas do gráfico de evolução de gelo presente no HTML');
+assert(indexHtml.includes('id="chartGeloFrentesPizza"'), 'Canvas do gráfico de frentes de gelo presente no HTML');
+assert(appJs.includes('function atualizarGraficosGelo('), 'Função atualizarGraficosGelo implementada em app.js');
+assert(appJs.includes('function alternarPeriodoGraficoGelo('), 'Função alternarPeriodoGraficoGelo implementada em app.js');
+assert(appJs.includes('function alternarUnidadeGraficoGelo('), 'Função alternarUnidadeGraficoGelo implementada em app.js');
+assert(appJs.includes('function imprimirRelatorioGeloSemanalA4('), 'Função imprimirRelatorioGeloSemanalA4 implementada em app.js');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
