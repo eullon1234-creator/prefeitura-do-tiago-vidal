@@ -3106,9 +3106,72 @@ function checkPrefeitoAccess() {
   return true;
 }
 
+// Mapa e Controle de Grupos de Navegação (Acordeão da Sidebar)
+const mapaGrupoAba = {
+  'dashboard': 'grupo_alojamento',
+  'blocos': 'grupo_alojamento',
+  'alojados': 'grupo_alojamento',
+  'moveis': 'grupo_alojamento',
+  'casas_cidade': 'grupo_alojamento',
+  'chamados': 'grupo_operacoes',
+  'ronda': 'grupo_operacoes',
+  'ronda_vigilancia': 'grupo_operacoes',
+  'portal_alojado': 'grupo_operacoes',
+  'estoque': 'grupo_logistica',
+  'erp_canteiro': 'grupo_logistica',
+  'gestao_cadastros': 'grupo_gestao',
+  'relatorios': 'grupo_gestao',
+  'importacao': 'grupo_gestao',
+  'auditoria': 'grupo_gestao',
+  'configuracoes': 'grupo_gestao'
+};
+
+function alternarGrupoSidebar(grupoId, forcarAberto = false) {
+  const grupos = ['grupo_alojamento', 'grupo_operacoes', 'grupo_logistica', 'grupo_gestao'];
+  grupos.forEach(id => {
+    const elContainer = document.getElementById(id + '_itens');
+    const elBtn = document.getElementById(id + '_btn');
+    const elChevron = document.getElementById(id + '_chevron');
+
+    if (id === grupoId) {
+      const estaAberto = elContainer && !elContainer.classList.contains('hidden');
+      const deveAbrir = forcarAberto ? true : !estaAberto;
+
+      if (deveAbrir) {
+        if (elContainer) elContainer.classList.remove('hidden');
+        if (elChevron) elChevron.classList.add('rotate-180');
+        if (elBtn) {
+          elBtn.classList.add('bg-slate-800/90', 'text-white');
+          elBtn.classList.remove('text-slate-400');
+        }
+      } else {
+        if (elContainer) elContainer.classList.add('hidden');
+        if (elChevron) elChevron.classList.remove('rotate-180');
+        if (elBtn) {
+          elBtn.classList.remove('bg-slate-800/90', 'text-white');
+          elBtn.classList.add('text-slate-400');
+        }
+      }
+    } else {
+      if (elContainer) elContainer.classList.add('hidden');
+      if (elChevron) elChevron.classList.remove('rotate-180');
+      if (elBtn) {
+        elBtn.classList.remove('bg-slate-800/90', 'text-white');
+        elBtn.classList.add('text-slate-400');
+      }
+    }
+  });
+}
+
 // Navegação de Abas
 function switchTab(tabId) {
   activeTab = tabId;
+
+  // Garante que o grupo da aba ativa fique expandido no acordeão
+  const grupoDestaAba = mapaGrupoAba[tabId];
+  if (grupoDestaAba) {
+    alternarGrupoSidebar(grupoDestaAba, true);
+  }
   
   // Atualiza botões da sidebar
   document.querySelectorAll('.nav-item').forEach(el => {
@@ -23167,3 +23230,5 @@ window.cancelarEdicaoContatoPortal = cancelarEdicaoContatoPortal;
 window.excluirContatoPortalAlojado = excluirContatoPortalAlojado;
 window.salvarTudoPortalAlojadoAdmin = salvarTudoPortalAlojadoAdmin;
 window.imprimirCartazPortalAlojadoA4 = imprimirCartazPortalAlojadoA4;
+window.mapaGrupoAba = mapaGrupoAba;
+window.alternarGrupoSidebar = alternarGrupoSidebar;

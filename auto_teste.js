@@ -2231,6 +2231,12 @@ assert(appJs.includes('function salvarContatoPortalAlojado('), 'Função salvarC
 assert(appJs.includes('function editarContatoPortalAlojado('), 'Função editarContatoPortalAlojado implementada em app.js');
 assert(appJs.includes('function excluirContatoPortalAlojado('), 'Função excluirContatoPortalAlojado implementada em app.js');
 assert(appJs.includes('function imprimirCartazPortalAlojadoA4('), 'Função imprimirCartazPortalAlojadoA4 implementada em app.js');
+assert(appJs.includes('function alternarGrupoSidebar('), 'Função alternarGrupoSidebar implementada em app.js');
+assert(appJs.includes('const mapaGrupoAba ='), 'Mapeamento mapaGrupoAba implementado em app.js');
+assert(indexHtml.includes('id="grupo_alojamento_btn"'), 'Botão do grupo Alojamentos presente na sidebar');
+assert(indexHtml.includes('id="grupo_operacoes_btn"'), 'Botão do grupo Operações presente na sidebar');
+assert(indexHtml.includes('id="grupo_logistica_btn"'), 'Botão do grupo Logística presente na sidebar');
+assert(indexHtml.includes('id="grupo_gestao_btn"'), 'Botão do grupo Gestão presente na sidebar');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL

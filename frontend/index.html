@@ -450,103 +450,136 @@
 
       <!-- Links de Navegação com Scroll Livre e Suave -->
       <div class="p-3 space-y-1 overflow-y-auto flex-1 custom-scrollbar overscroll-contain">
-        <div class="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-          Módulos Principais
-        </div>
         
-        <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-white bg-slate-800/80 border-l-4 border-amber-500">
-          <i class="fa-solid fa-chart-pie w-5 text-amber-400"></i>
-          <span>Dashboard Geral</span>
-        </button>
-        
-        <button onclick="switchTab('blocos')" data-tab="blocos" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-border-all w-5 text-sky-400"></i>
-          <span>Blocos & Quartos</span>
-          <span id="sideCountVagas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">880</span>
-        </button>
-        
-        <button onclick="switchTab('alojados')" data-tab="alojados" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-users-line w-5 text-emerald-400"></i>
-          <span>Gestão de Alojados</span>
-          <span id="sideCountAlojados" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">387</span>
-        </button>
-        
-        <button onclick="switchTab('moveis')" data-tab="moveis" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-bed w-5 text-violet-400"></i>
-          <span>Móveis & Vistoria</span>
-          <span id="sideCountAlertas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-red-950 text-red-300 border border-red-800">0</span>
-        </button>
-
-        <button onclick="switchTab('chamados')" data-tab="chamados" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-qrcode w-5 text-amber-400"></i>
-          <span>Chamados QR Code</span>
-          <span id="sideCountChamados" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold hidden">0</span>
-        </button>
-
-        <button onclick="switchTab('casas_cidade')" data-tab="casas_cidade" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-house-chimney-user w-5 text-indigo-400"></i>
-          <span>Casas na Cidade</span>
-          <span id="sideCountCasas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
-        </button>
-
-        <button onclick="switchTab('ronda')" data-tab="ronda" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-clipboard-check w-5 text-teal-400"></i>
-          <span>Ronda do Canteiro</span>
-          <span id="sideCountRonda" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
-        </button>
-
-        <button onclick="switchTab('ronda_vigilancia')" data-tab="ronda_vigilancia" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-shield-halved w-5 text-indigo-400"></i>
-          <span>Ronda de Vigilância</span>
-          <span id="sideCountRondaVigilancia" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
-        </button>
-
-        <button onclick="switchTab('portal_alojado')" data-tab="portal_alojado" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-id-card-clip w-5 text-amber-400"></i>
-          <span>App do Alojado</span>
-          <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase">Novo</span>
-        </button>
-
-        <button onclick="switchTab('estoque')" data-tab="estoque" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-boxes-stacked w-5 text-teal-400"></i>
-          <span>Estoque & Almoxarifado</span>
-          <span id="sideCountEstoque" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
-        </button>
-
-        <button onclick="switchTab('erp_canteiro')" data-tab="erp_canteiro" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-file-invoice-dollar w-5 text-emerald-400"></i>
-          <span>Rateio & Canteiro ERP</span>
-          <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase">Pro</span>
-        </button>
-
-        <div class="px-3 pt-4 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-          Administração & Relatórios
+        <!-- GRUPO 1: ALOJAMENTOS & VAGAS -->
+        <div class="mb-1.5">
+          <button type="button" id="grupo_alojamento_btn" onclick="alternarGrupoSidebar('grupo_alojamento')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-slate-800/90 hover:bg-slate-800 transition cursor-pointer">
+            <span class="flex items-center gap-2.5">
+              <i class="fa-solid fa-hotel text-amber-400 text-sm"></i>
+              <span>Alojamentos & Vagas</span>
+            </span>
+            <i id="grupo_alojamento_chevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200 rotate-180"></i>
+          </button>
+          
+          <div id="grupo_alojamento_itens" class="space-y-0.5 pl-1.5 pt-1 pb-1">
+            <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-white bg-slate-800/80 border-l-4 border-amber-500">
+              <i class="fa-solid fa-chart-pie w-5 text-amber-400"></i>
+              <span>Dashboard Geral</span>
+            </button>
+            <button onclick="switchTab('blocos')" data-tab="blocos" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-border-all w-5 text-sky-400"></i>
+              <span>Blocos & Quartos</span>
+              <span id="sideCountVagas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">880</span>
+            </button>
+            <button onclick="switchTab('alojados')" data-tab="alojados" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-users-line w-5 text-emerald-400"></i>
+              <span>Gestão de Alojados</span>
+              <span id="sideCountAlojados" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">387</span>
+            </button>
+            <button onclick="switchTab('moveis')" data-tab="moveis" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-bed w-5 text-violet-400"></i>
+              <span>Móveis & Vistoria</span>
+              <span id="sideCountAlertas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-red-950 text-red-300 border border-red-800">0</span>
+            </button>
+            <button onclick="switchTab('casas_cidade')" data-tab="casas_cidade" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-house-chimney-user w-5 text-indigo-400"></i>
+              <span>Casas na Cidade</span>
+              <span id="sideCountCasas" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
+            </button>
+          </div>
         </div>
 
-        <button onclick="switchTab('gestao_cadastros')" data-tab="gestao_cadastros" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-building-circle-gear w-5 text-indigo-400"></i>
-          <span>Estrutura & Empresas</span>
-        </button>
+        <!-- GRUPO 2: OPERAÇÕES & CAMPO -->
+        <div class="mb-1.5">
+          <button type="button" id="grupo_operacoes_btn" onclick="alternarGrupoSidebar('grupo_operacoes')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            <span class="flex items-center gap-2.5">
+              <i class="fa-solid fa-shield-halved text-indigo-400 text-sm"></i>
+              <span>Operações & Campo</span>
+            </span>
+            <i id="grupo_operacoes_chevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200"></i>
+          </button>
+          
+          <div id="grupo_operacoes_itens" class="space-y-0.5 pl-1.5 pt-1 pb-1 hidden">
+            <button onclick="switchTab('chamados')" data-tab="chamados" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-qrcode w-5 text-amber-400"></i>
+              <span>Chamados QR Code</span>
+              <span id="sideCountChamados" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold hidden">0</span>
+            </button>
+            <button onclick="switchTab('ronda')" data-tab="ronda" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-clipboard-check w-5 text-teal-400"></i>
+              <span>Ronda do Canteiro</span>
+              <span id="sideCountRonda" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
+            </button>
+            <button onclick="switchTab('ronda_vigilancia')" data-tab="ronda_vigilancia" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-shield-halved w-5 text-indigo-400"></i>
+              <span>Ronda de Vigilância</span>
+              <span id="sideCountRondaVigilancia" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold hidden">0</span>
+            </button>
+            <button onclick="switchTab('portal_alojado')" data-tab="portal_alojado" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-id-card-clip w-5 text-amber-400"></i>
+              <span>App do Alojado</span>
+              <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase">Novo</span>
+            </button>
+          </div>
+        </div>
 
-        <button onclick="switchTab('relatorios')" data-tab="relatorios" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-file-excel w-5 text-green-400"></i>
-          <span>Relatórios & Exportação</span>
-        </button>
+        <!-- GRUPO 3: LOGÍSTICA & CUSTOS -->
+        <div class="mb-1.5">
+          <button type="button" id="grupo_logistica_btn" onclick="alternarGrupoSidebar('grupo_logistica')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            <span class="flex items-center gap-2.5">
+              <i class="fa-solid fa-boxes-stacked text-teal-400 text-sm"></i>
+              <span>Logística & Custos</span>
+            </span>
+            <i id="grupo_logistica_chevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200"></i>
+          </button>
+          
+          <div id="grupo_logistica_itens" class="space-y-0.5 pl-1.5 pt-1 pb-1 hidden">
+            <button onclick="switchTab('estoque')" data-tab="estoque" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-boxes-stacked w-5 text-teal-400"></i>
+              <span>Estoque & Almoxarifado</span>
+              <span id="sideCountEstoque" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
+            </button>
+            <button onclick="switchTab('erp_canteiro')" data-tab="erp_canteiro" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-file-invoice-dollar w-5 text-emerald-400"></i>
+              <span>Rateio & Canteiro ERP</span>
+              <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase">Pro</span>
+            </button>
+          </div>
+        </div>
 
-        <button onclick="switchTab('importacao')" data-tab="importacao" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-file-import w-5 text-orange-400"></i>
-          <span>Importar Planilha</span>
-        </button>
-
-        <button onclick="switchTab('auditoria')" data-tab="auditoria" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-clock-rotate-left w-5 text-cyan-400"></i>
-          <span>Auditoria & Logs</span>
-        </button>
-
-        <button onclick="switchTab('configuracoes')" data-tab="configuracoes" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
-          <i class="fa-solid fa-sliders w-5 text-indigo-400"></i>
-          <span>Configurações & Firebase</span>
-        </button>
+        <!-- GRUPO 4: GESTÃO & SISTEMA -->
+        <div class="mb-1.5">
+          <button type="button" id="grupo_gestao_btn" onclick="alternarGrupoSidebar('grupo_gestao')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+            <span class="flex items-center gap-2.5">
+              <i class="fa-solid fa-sliders text-indigo-400 text-sm"></i>
+              <span>Gestão & Sistema</span>
+            </span>
+            <i id="grupo_gestao_chevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200"></i>
+          </button>
+          
+          <div id="grupo_gestao_itens" class="space-y-0.5 pl-1.5 pt-1 pb-1 hidden">
+            <button onclick="switchTab('gestao_cadastros')" data-tab="gestao_cadastros" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-building-circle-gear w-5 text-indigo-400"></i>
+              <span>Estrutura & Empresas</span>
+            </button>
+            <button onclick="switchTab('relatorios')" data-tab="relatorios" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-file-excel w-5 text-green-400"></i>
+              <span>Relatórios & Exportação</span>
+            </button>
+            <button onclick="switchTab('importacao')" data-tab="importacao" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-file-import w-5 text-orange-400"></i>
+              <span>Importar Planilha</span>
+            </button>
+            <button onclick="switchTab('auditoria')" data-tab="auditoria" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-clock-rotate-left w-5 text-cyan-400"></i>
+              <span>Auditoria & Logs</span>
+            </button>
+            <button onclick="switchTab('configuracoes')" data-tab="configuracoes" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-sliders w-5 text-indigo-400"></i>
+              <span>Configurações & Firebase</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Atalho Rápido de Instalar App também dentro da Sidebar -->
         <div class="pt-3 pb-4">
