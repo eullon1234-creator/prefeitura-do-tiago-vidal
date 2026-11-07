@@ -21466,7 +21466,7 @@ function gerarHtmlPlaquinhaA4(ponto, idx) {
     : '';
 
   return `
-    <div class="placa-a4-vigilancia bg-white p-6 sm:p-8 rounded-2xl border-4 border-slate-900 shadow-xl max-w-xl mx-auto text-center text-slate-900 my-6 flex flex-col justify-between" style="min-height: 270mm; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid;">
+    <div class="placa-a4-vigilancia bg-white p-6 sm:p-8 rounded-2xl border-4 border-slate-900 shadow-xl max-w-xl mx-auto text-center text-slate-900 my-6 flex flex-col justify-between" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid;">
       <!-- Cabeçalho Oficial GEL Engenharia -->
       <div>
         <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
@@ -21551,12 +21551,12 @@ function atualizarVisualizacaoPlacasVigilancia() {
       const isSel = pontosSelecionadosParaImpressao.has(p.id);
       const cod = p.id || `PNT-${String(idx + 1).padStart(2, '0')}`;
       return `
-        <button type="button" onclick="alternarSelecaoPontoImpressao('${p.id}')" class="px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+        <button type="button" onclick="alternarSelecaoPontoImpressao('${p.id}')" class="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs ${
           isSel 
-            ? 'bg-indigo-600 text-white shadow-xs' 
-            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-400/30' 
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
         }">
-          <i class="fa-solid ${isSel ? 'fa-check-circle text-amber-300' : 'fa-circle text-slate-300'}"></i>
+          <i class="fa-solid ${isSel ? 'fa-check-circle text-amber-300' : 'fa-circle text-slate-300'} text-xs"></i>
           <span>${escapeHTML(cod)} - ${escapeHTML(p.nome)}</span>
         </button>
       `;

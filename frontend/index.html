@@ -210,9 +210,9 @@
         margin: 0 auto !important;
         max-width: 100% !important;
         width: 100% !important;
-        height: 275mm !important;
-        min-height: 275mm !important;
-        max-height: 280mm !important;
+        height: 260mm !important;
+        min-height: 255mm !important;
+        max-height: 265mm !important;
         box-shadow: none !important;
         border: 4px solid #0f172a !important;
         border-radius: 1.25rem !important;
@@ -9239,7 +9239,7 @@ service cloud.firestore {
       </div>
 
       <!-- Barra de Ações Rápidas de Seleção (print:hidden) -->
-      <div class="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 print:hidden">
+      <div class="flex-shrink-0 px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 print:hidden">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs font-bold text-slate-700">Selecione os pontos:</span>
           <button type="button" onclick="selecionarTodosPontosImpressao(true)" class="px-2.5 py-1 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold text-[11px] transition">
@@ -9255,7 +9255,7 @@ service cloud.firestore {
       </div>
 
       <!-- Container de Chips dos Pontos (print:hidden) -->
-      <div id="containerChipsPontosVigilancia" class="px-5 py-2.5 bg-white border-b border-slate-200 max-h-28 overflow-y-auto flex items-center gap-1.5 flex-wrap print:hidden text-xs">
+      <div id="containerChipsPontosVigilancia" class="flex-shrink-0 px-5 py-3 bg-white border-b border-slate-200 min-h-[56px] max-h-40 overflow-y-auto flex items-center gap-2 flex-wrap print:hidden text-xs">
         <!-- Preenchido via JS com botões/chips toggleáveis -->
       </div>
 
