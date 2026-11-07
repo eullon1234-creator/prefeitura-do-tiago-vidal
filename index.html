@@ -510,6 +510,11 @@
               <span>Ronda do Canteiro</span>
               <span id="sideCountRonda" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold hidden">0</span>
             </button>
+            <button onclick="switchTab('maquina_gelo')" data-tab="maquina_gelo" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <span class="text-base">🧊</span>
+              <span>Fábrica & Máquina de Gelo</span>
+              <span id="sideCountGelo" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold hidden">0</span>
+            </button>
             <button onclick="switchTab('ronda_vigilancia')" data-tab="ronda_vigilancia" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
               <i class="fa-solid fa-shield-halved w-5 text-indigo-400"></i>
               <span>Ronda de Vigilância</span>
@@ -3442,8 +3447,7 @@ service cloud.firestore {
               <option value="todos">Todos os Tipos</option>
               <option value="banheiro">🚻 Apenas Banheiros</option>
               <option value="bebedouro">🚰 Apenas Bebedouros</option>
-              <option value="maquina_gelo">🧊 Apenas Máquinas de Gelo</option>
-            </select>
+                          </select>
 
             <!-- Filtro por Status do Dia -->
             <select id="filtroStatusRonda" onchange="filtrarRondaUI()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-teal-500">
@@ -3483,7 +3487,296 @@ service cloud.firestore {
 
       </div>
 
-      <!-- ================= TAB: RONDA DE VIGILÂNCIA NOTURNA ================= -->
+            <!-- ================= TAB: FÁBRICA & MÁQUINA DE GELO ================= -->
+      <div id="tab-maquina_gelo" class="tab-content hidden space-y-6">
+        <!-- Topo da Aba de Máquina de Gelo -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                <span class="mr-1">🧊</span> Suprimento & Hidratação • Canteiro PCH Taboca 2
+              </span>
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-900 text-cyan-300">
+                GEL Engenharia
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Fábrica & Máquina de Gelo</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Controle diário de fabricação de gelo, nível do silo industrial e expedição para as frentes de serviço (KM 12, KM 14, Refeitório, Oficina, Britagem).
+            </p>
+          </div>
+
+          <!-- Ações Rápidas no Topo -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="carregarMaquinaGelo()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Sincronizar com a Nuvem">
+              <i class="fa-solid fa-arrows-rotate" id="iconeReloadGelo"></i>
+              <span>Atualizar</span>
+            </button>
+
+            <button onclick="imprimirPlaquetaGeloA4()" class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-2 shadow-xs transition" title="Plaqueta Oficial A4 para Leitura no Celular">
+              <i class="fa-solid fa-qrcode text-indigo-600"></i>
+              <span>Plaqueta QR Code A4</span>
+            </button>
+
+            <button onclick="exportarGeloExcel()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>Exportar Excel</span>
+            </button>
+
+            <button onclick="focarFormularioGelo()" class="btn-prefeito px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition transform active:scale-95">
+              <i class="fa-solid fa-plus"></i>
+              <span>Novo Lançamento</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPIs Principais da Máquina de Gelo -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- KPI 1: Produção Hoje -->
+          <div class="bg-white p-4 rounded-2xl border border-cyan-200/80 shadow-xs bg-gradient-to-br from-cyan-50/30 to-white">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-cyan-900 uppercase tracking-wider">Produção do Dia</span>
+              <span class="w-8 h-8 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center text-sm font-bold">🏭</span>
+            </div>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiGeloProducaoHoje" class="text-2xl sm:text-3xl font-black text-cyan-900">0 sacos</span>
+            </div>
+            <p id="kpiGeloProducaoHojeSub" class="text-[11px] text-cyan-700/80 mt-1 font-medium">0 kg fabricados hoje</p>
+          </div>
+
+          <!-- KPI 2: Saída / Expedido Hoje -->
+          <div class="bg-white p-4 rounded-2xl border border-amber-200/80 shadow-xs bg-gradient-to-br from-amber-50/30 to-white">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-amber-900 uppercase tracking-wider">Distribuído Hoje</span>
+              <span class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">🚚</span>
+            </div>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiGeloSaidaHoje" class="text-2xl sm:text-3xl font-black text-amber-900">0 sacos</span>
+            </div>
+            <p id="kpiGeloSaidaHojeSub" class="text-[11px] text-amber-700/80 mt-1 font-medium">Expedido p/ frentes</p>
+          </div>
+
+          <!-- KPI 3: Saldo Atual no Silo -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs bg-gradient-to-br from-blue-50/30 to-white">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Saldo Atual no Silo</span>
+              <span id="badgeGeloStatusSilo" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">Silo Normal</span>
+            </div>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiGeloSaldoSilo" class="text-2xl sm:text-3xl font-black text-slate-900">0 sacos</span>
+            </div>
+            <p id="kpiGeloSaldoSiloSub" class="text-[11px] text-slate-500 mt-1">Estoque disponível agora</p>
+          </div>
+
+          <!-- KPI 4: Frentes Atendidas Hoje -->
+          <div class="bg-white p-4 rounded-2xl border border-teal-200/80 shadow-xs bg-gradient-to-br from-teal-50/30 to-white">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-teal-900 uppercase tracking-wider">Frentes Atendidas</span>
+              <span class="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-sm font-bold">📍</span>
+            </div>
+            <div class="flex items-baseline gap-2 mt-2">
+              <span id="kpiGeloFrentesHoje" class="text-2xl sm:text-3xl font-black text-teal-900">0</span>
+              <span class="text-xs text-teal-700 font-semibold">locais hoje</span>
+            </div>
+            <p id="kpiGeloListaFrentesHoje" class="text-[11px] text-teal-800/80 mt-1 truncate font-medium">Nenhuma frente atendida</p>
+          </div>
+        </div>
+
+        <!-- Grid: Lançamento Direto (Esquerda) e Logs / Histórico (Direita) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Coluna Esquerda: Formulário de Movimentação (col-span-5) -->
+          <div id="cardFormGeloContainer" class="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg bg-cyan-100 text-cyan-800 flex items-center justify-center font-bold text-sm">🧊</span>
+                <div>
+                  <h2 class="text-sm font-bold text-slate-900">Registrar Movimentação de Gelo</h2>
+                  <p class="text-[11px] text-slate-500">Produção, saída ou inventário de silo</p>
+                </div>
+              </div>
+              
+              <!-- Alternador Unidade (Sacos vs Kg) -->
+              <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 border border-slate-200 text-xs">
+                <button type="button" id="btnGeloTabSacos" onclick="alternarUnidadeGeloDesktop('sacos')" class="px-2.5 py-1 rounded-md font-bold transition bg-cyan-600 text-white shadow-xs">
+                  Sacos
+                </button>
+                <button type="button" id="btnGeloTabKg" onclick="alternarUnidadeGeloDesktop('kg')" class="px-2.5 py-1 rounded-md font-bold transition text-slate-600 hover:text-slate-900">
+                  Kg
+                </button>
+              </div>
+            </div>
+
+            <form id="formGeloMovimentacao" onsubmit="salvarLancamentoGeloDesktop(event)" class="space-y-3.5">
+              <!-- Tipo de Operação -->
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Tipo de Operação *
+                </label>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <label class="cursor-pointer border-2 border-amber-500 bg-amber-50/70 rounded-xl p-2 flex flex-col items-center text-center transition select-none" id="labelOpGeloSaida">
+                    <input type="radio" name="tipoOperacaoGelo" value="saida" checked onchange="aoMudarTipoOperacaoGelo('saida')" class="hidden">
+                    <span class="text-base mb-0.5">🚚</span>
+                    <span class="text-[11px] font-bold text-amber-900 leading-tight">Expedição (Saída)</span>
+                  </label>
+
+                  <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70" id="labelOpGeloProducao">
+                    <input type="radio" name="tipoOperacaoGelo" value="producao" onchange="aoMudarTipoOperacaoGelo('producao')" class="hidden">
+                    <span class="text-base mb-0.5">🏭</span>
+                    <span class="text-[11px] font-bold text-slate-700 leading-tight">Fabricação (Entrada)</span>
+                  </label>
+
+                  <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70" id="labelOpGeloAjuste">
+                    <input type="radio" name="tipoOperacaoGelo" value="ajuste" onchange="aoMudarTipoOperacaoGelo('ajuste')" class="hidden">
+                    <span class="text-base mb-0.5">⚖️</span>
+                    <span class="text-[11px] font-bold text-slate-700 leading-tight">Ajuste de Silo</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Quantidade & Saldo Resultante -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="formGeloQtd" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Quantidade <span class="labelUnidadeGeloTexto">(sacos)</span> *
+                  </label>
+                  <input type="number" id="formGeloQtd" min="0.5" step="any" required placeholder="Ex: 20" oninput="calcularPrevisaoSaldoGelo()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold text-base outline-none focus:border-cyan-500 focus:bg-white transition">
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Saldo Silo Estimado
+                  </label>
+                  <div class="w-full bg-cyan-50/70 border border-cyan-200 rounded-xl px-3 py-2 flex items-center justify-between">
+                    <span id="formGeloPrevisaoSaldo" class="font-black text-cyan-900 text-base">0 sacos</span>
+                    <span class="text-[10px] text-cyan-700 font-semibold uppercase">Pós-lançamento</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data e Hora -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="formGeloData" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Data *
+                  </label>
+                  <input type="date" id="formGeloData" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition">
+                </div>
+                <div>
+                  <label for="formGeloHora" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Horário *
+                  </label>
+                  <input type="time" id="formGeloHora" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition">
+                </div>
+              </div>
+
+              <!-- Destino / Frentes Atendidas -->
+              <div id="boxFormGeloDestinos">
+                <label for="formGeloDestinos" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Frente de Serviço / Destino do Gelo *
+                </label>
+                <input type="text" id="formGeloDestinos" placeholder="Ex: KM 12, KM 14, Refeitório..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition">
+                
+                <!-- Chips Rápidos -->
+                <div class="flex items-center gap-1.5 flex-wrap mt-2">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase mr-1">Atalhos:</span>
+                  <button type="button" onclick="adicionarDestinoGeloChipDesktop('KM 12')" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-cyan-100 hover:text-cyan-900 text-slate-700 font-semibold border border-slate-200 transition">+ KM 12</button>
+                  <button type="button" onclick="adicionarDestinoGeloChipDesktop('KM 14')" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-cyan-100 hover:text-cyan-900 text-slate-700 font-semibold border border-slate-200 transition">+ KM 14</button>
+                  <button type="button" onclick="adicionarDestinoGeloChipDesktop('Refeitório')" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-cyan-100 hover:text-cyan-900 text-slate-700 font-semibold border border-slate-200 transition">+ Refeitório</button>
+                  <button type="button" onclick="adicionarDestinoGeloChipDesktop('Oficina')" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-cyan-100 hover:text-cyan-900 text-slate-700 font-semibold border border-slate-200 transition">+ Oficina</button>
+                  <button type="button" onclick="adicionarDestinoGeloChipDesktop('Britagem')" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-cyan-100 hover:text-cyan-900 text-slate-700 font-semibold border border-slate-200 transition">+ Britagem</button>
+                  <button type="button" onclick="adicionarDestinoGeloChipDesktop('Alojamentos')" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-cyan-100 hover:text-cyan-900 text-slate-700 font-semibold border border-slate-200 transition">+ Alojamentos</button>
+                </div>
+              </div>
+
+              <!-- Responsável -->
+              <div>
+                <label for="formGeloResponsavel" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Operador / Responsável pelo Lançamento *
+                </label>
+                <input type="text" id="formGeloResponsavel" required placeholder="Ex: Tiago Vidal ou Inspetor do Turno" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition">
+              </div>
+
+              <!-- Observações -->
+              <div>
+                <label for="formGeloObs" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Observações / Checklist da Máquina
+                </label>
+                <input type="text" id="formGeloObs" placeholder="Ex: Higienização de pá e dreno realizada. Gelo translúcido sem odor." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition">
+              </div>
+
+              <button type="submit" id="btnSalvarLancamentoGelo" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-98 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Confirmar e Registrar Movimentação</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- Coluna Direita: Tabela de Histórico e Auditoria (col-span-7) -->
+          <div class="lg:col-span-7 space-y-4">
+            <!-- Barra de Filtros do Histórico -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="buscaGeloHistorico" oninput="filtrarHistoricoGeloUI()" placeholder="Buscar por frente, operador, observação..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:bg-white focus:border-cyan-500 transition">
+              </div>
+
+              <div class="flex items-center gap-2">
+                <select id="filtroPeriodoGelo" onchange="filtrarHistoricoGeloUI()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-500">
+                  <option value="hoje">Hoje</option>
+                  <option value="7dias">Últimos 7 dias</option>
+                  <option value="mes">Este Mês</option>
+                  <option value="todos">Todo o Histórico</option>
+                </select>
+
+                <select id="filtroTipoOperacaoGelo" onchange="filtrarHistoricoGeloUI()" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-500">
+                  <option value="todos">Todas as Operações</option>
+                  <option value="saida">Apenas Expedição (Saída)</option>
+                  <option value="producao">Apenas Fabricação (Entrada)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Tabela de Registros -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                <span class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <i class="fa-solid fa-list-check text-cyan-600"></i>
+                  Logs de Expedição & Fabricação
+                </span>
+                <span id="contadorRegistrosGelo" class="text-xs font-semibold text-slate-500">0 lançamentos</span>
+              </div>
+
+              <div class="overflow-x-auto max-h-[520px] overflow-y-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="sticky top-0 bg-slate-100/90 backdrop-blur-xs text-[11px] font-bold text-slate-600 uppercase border-b border-slate-200 z-10">
+                    <tr>
+                      <th class="py-2.5 px-3">Data / Hora</th>
+                      <th class="py-2.5 px-3">Operação</th>
+                      <th class="py-2.5 px-3">Quantidade</th>
+                      <th class="py-2.5 px-3">Saldo Silo</th>
+                      <th class="py-2.5 px-3">Destino / Frente</th>
+                      <th class="py-2.5 px-3">Responsável</th>
+                      <th class="py-2.5 px-3 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabelaHistoricoGeloCorpo" class="divide-y divide-slate-100">
+                    <!-- Renderizado dinamicamente via renderizarHistoricoGelo() -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Vazio -->
+              <div id="vazioHistoricoGelo" class="hidden p-8 text-center text-slate-500">
+                <span class="text-2xl mb-2 block">🧊</span>
+                <p class="font-bold text-xs text-slate-700">Nenhum lançamento de gelo encontrado</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Utilize o formulário ao lado para registrar a primeira fabricação ou expedição.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<!-- ================= TAB: RONDA DE VIGILÂNCIA NOTURNA ================= -->
       <div id="tab-ronda_vigilancia" class="tab-content hidden space-y-6">
         <!-- Topo da Aba -->
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">

@@ -2239,6 +2239,23 @@ assert(indexHtml.includes('id="grupo_logistica_btn"'), 'Botão do grupo Logísti
 assert(indexHtml.includes('id="grupo_gestao_btn"'), 'Botão do grupo Gestão presente na sidebar');
 
 // -------------------------------------------------------------
+// SEÇÃO 37: MÓDULO EXCLUSIVO DA MÁQUINA DE GELO (OPERAÇÕES & CAMPO)
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 37: MÓDULO EXCLUSIVO DA MÁQUINA DE GELO ---');
+assert(indexHtml.includes('id="tab-maquina_gelo"'), 'Aba tab-maquina_gelo presente em index.html');
+assert(indexHtml.includes('data-tab="maquina_gelo"'), 'Botão data-tab="maquina_gelo" presente na sidebar de index.html');
+assert(appJs.includes("'maquina_gelo': 'grupo_operacoes'"), 'Máquina de gelo mapeada para grupo_operacoes em mapaGrupoAba');
+assert(appJs.includes('function carregarMaquinaGelo('), 'Função carregarMaquinaGelo implementada em app.js');
+assert(appJs.includes('function salvarLancamentoGeloDesktop('), 'Função salvarLancamentoGeloDesktop implementada em app.js');
+assert(appJs.includes('function excluirLancamentoGelo('), 'Função excluirLancamentoGelo implementada em app.js');
+assert(appJs.includes('function exportarGeloExcel('), 'Função exportarGeloExcel implementada em app.js');
+assert(appJs.includes('function imprimirPlaquetaGeloA4('), 'Função imprimirPlaquetaGeloA4 implementada em app.js');
+assert(indexHtml.includes('id="kpiGeloProducaoHoje"'), 'KPI Produção Hoje da Máquina de Gelo presente no HTML');
+assert(indexHtml.includes('id="kpiGeloSaidaHoje"'), 'KPI Saída Hoje da Máquina de Gelo presente no HTML');
+assert(indexHtml.includes('id="kpiGeloSaldoSilo"'), 'KPI Saldo Silo da Máquina de Gelo presente no HTML');
+assert(indexHtml.includes('id="kpiGeloFrentesHoje"'), 'KPI Frentes Atendidas presente no HTML');
+
+// -------------------------------------------------------------
 // RELATÓRIO FINAL
 // -------------------------------------------------------------
 console.log('\n============================================================');

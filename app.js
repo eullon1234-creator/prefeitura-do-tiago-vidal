@@ -3117,6 +3117,7 @@ const mapaGrupoAba = {
   'ronda': 'grupo_operacoes',
   'ronda_vigilancia': 'grupo_operacoes',
   'portal_alojado': 'grupo_operacoes',
+  'maquina_gelo': 'grupo_operacoes',
   'estoque': 'grupo_logistica',
   'erp_canteiro': 'grupo_logistica',
   'gestao_cadastros': 'grupo_gestao',
@@ -3225,6 +3226,8 @@ function switchTab(tabId) {
     carregarRondaVigilancia();
   } else if (tabId === 'portal_alojado') {
     carregarPortalAlojadoAdmin();
+  } else if (tabId === 'maquina_gelo') {
+    carregarMaquinaGelo();
   } else if (tabId === 'estoque') {
     carregarEstoque();
   } else if (tabId === 'gestao_cadastros') {
@@ -23232,3 +23235,526 @@ window.salvarTudoPortalAlojadoAdmin = salvarTudoPortalAlojadoAdmin;
 window.imprimirCartazPortalAlojadoA4 = imprimirCartazPortalAlojadoA4;
 window.mapaGrupoAba = mapaGrupoAba;
 window.alternarGrupoSidebar = alternarGrupoSidebar;
+
+// ============================================================================
+// MÓDULO EXCLUSIVO: FÁBRICA & MÁQUINA DE GELO (OPERAÇÕES & CAMPO)
+// ============================================================================
+let unidadeGeloSelecionadaDesktop = 'sacos';
+let tipoOperacaoGeloSelecionada = 'saida';
+
+function alternarUnidadeGeloDesktop(unid) {
+  unidadeGeloSelecionadaDesktop = unid === 'kg' ? 'kg' : 'sacos';
+  const btnSacos = document.getElementById('btnGeloTabSacos');
+  const btnKg = document.getElementById('btnGeloTabKg');
+  const labelsUnid = document.querySelectorAll('.labelUnidadeGeloTexto');
+
+  if (unidadeGeloSelecionadaDesktop === 'kg') {
+    if (btnKg) {
+      btnKg.className = 'px-2.5 py-1 rounded-md font-bold transition bg-cyan-600 text-white shadow-xs';
+    }
+    if (btnSacos) {
+      btnSacos.className = 'px-2.5 py-1 rounded-md font-bold transition text-slate-600 hover:text-slate-900';
+    }
+    labelsUnid.forEach(el => el.textContent = '(kg)');
+  } else {
+    if (btnSacos) {
+      btnSacos.className = 'px-2.5 py-1 rounded-md font-bold transition bg-cyan-600 text-white shadow-xs';
+    }
+    if (btnKg) {
+      btnKg.className = 'px-2.5 py-1 rounded-md font-bold transition text-slate-600 hover:text-slate-900';
+    }
+    labelsUnid.forEach(el => el.textContent = '(sacos)');
+  }
+
+  calcularPrevisaoSaldoGelo();
+}
+
+function aoMudarTipoOperacaoGelo(tipo) {
+  tipoOperacaoGeloSelecionada = tipo;
+  const lblSaida = document.getElementById('labelOpGeloSaida');
+  const lblProd = document.getElementById('labelOpGeloProducao');
+  const lblAjuste = document.getElementById('labelOpGeloAjuste');
+  const boxDestinos = document.getElementById('boxFormGeloDestinos');
+  const inputDestinos = document.getElementById('formGeloDestinos');
+
+  // Reset classes
+  if (lblSaida) lblSaida.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+  if (lblProd) lblProd.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+  if (lblAjuste) lblAjuste.className = 'cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70';
+
+  if (tipo === 'saida') {
+    if (lblSaida) lblSaida.className = 'cursor-pointer border-2 border-amber-500 bg-amber-50/70 rounded-xl p-2 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (boxDestinos) boxDestinos.classList.remove('hidden');
+    if (inputDestinos && !inputDestinos.value) inputDestinos.placeholder = 'Ex: KM 12, KM 14, Refeitório...';
+  } else if (tipo === 'producao') {
+    if (lblProd) lblProd.className = 'cursor-pointer border-2 border-cyan-500 bg-cyan-50/70 rounded-xl p-2 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (boxDestinos) boxDestinos.classList.remove('hidden');
+    if (inputDestinos) inputDestinos.placeholder = 'Abastecimento de Silo Central / Fábrica';
+  } else {
+    if (lblAjuste) lblAjuste.className = 'cursor-pointer border-2 border-indigo-500 bg-indigo-50/70 rounded-xl p-2 flex flex-col items-center text-center transition select-none shadow-xs';
+    if (boxDestinos) boxDestinos.classList.remove('hidden');
+    if (inputDestinos) inputDestinos.placeholder = 'Inventário / Conferência de Silo';
+  }
+
+  calcularPrevisaoSaldoGelo();
+}
+
+function adicionarDestinoGeloChipDesktop(chip) {
+  const inp = document.getElementById('formGeloDestinos');
+  if (!inp) return;
+  const valAtual = inp.value.trim();
+  if (!valAtual) {
+    inp.value = chip;
+  } else if (!valAtual.includes(chip)) {
+    inp.value = valAtual + ', ' + chip;
+  }
+}
+
+function focarFormularioGelo() {
+  const inp = document.getElementById('formGeloQtd');
+  if (inp) {
+    inp.focus();
+    inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function calcularPrevisaoSaldoGelo() {
+  const saldoAtual = obterSaldoAtualSiloGelo();
+  const inputQtd = document.getElementById('formGeloQtd');
+  const spanPrevisao = document.getElementById('formGeloPrevisaoSaldo');
+  if (!spanPrevisao) return;
+
+  const qtd = parseFloat(inputQtd?.value || 0) || 0;
+  let saldoPrevisto = saldoAtual;
+
+  if (tipoOperacaoGeloSelecionada === 'producao') {
+    saldoPrevisto = saldoAtual + qtd;
+  } else if (tipoOperacaoGeloSelecionada === 'saida') {
+    saldoPrevisto = Math.max(0, saldoAtual - qtd);
+  } else if (tipoOperacaoGeloSelecionada === 'ajuste') {
+    saldoPrevisto = qtd;
+  }
+
+  spanPrevisao.textContent = `${saldoPrevisto} ${unidadeGeloSelecionadaDesktop}`;
+}
+
+function obterSaldoAtualSiloGelo() {
+  const regsGelo = (listaRegistrosRonda || [])
+    .filter(r => r.tipo === 'maquina_gelo' || typeof r.gelo_produzido !== 'undefined' || typeof r.gelo_saldo !== 'undefined')
+    .sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0));
+
+  if (regsGelo.length > 0 && typeof regsGelo[0].gelo_saldo !== 'undefined' && regsGelo[0].gelo_saldo !== null) {
+    return parseFloat(regsGelo[0].gelo_saldo) || 0;
+  }
+  return 0;
+}
+
+function carregarMaquinaGelo() {
+  const dataHoje = getDataHojeLocal();
+  const horaAgora = new Date().toTimeString().substring(0, 5);
+
+  // Inicializa inputs de data e hora do form se vazios
+  const inpData = document.getElementById('formGeloData');
+  const inpHora = document.getElementById('formGeloHora');
+  if (inpData && !inpData.value) inpData.value = dataHoje;
+  if (inpHora && !inpHora.value) inpHora.value = horaAgora;
+
+  // Garante que o ponto da máquina de gelo exista no seed
+  if (Array.isArray(listaPontosRonda) && !listaPontosRonda.some(p => p.id === 'ponto_maquina_gelo_01')) {
+    listaPontosRonda.push({
+      id: 'ponto_maquina_gelo_01',
+      nome: 'Máquina de Gelo 01 - Canteiro Central',
+      tipo: 'maquina_gelo',
+      setor: 'Canteiro Central - Refeitório / Apoio',
+      frequencia_diaria: 2,
+      horarios_sugeridos: '07:30 e 14:00',
+      observacoes: 'Controle diário de produção e expedição de gelo para frentes de obra',
+      ativo: true,
+      criado_em: new Date().toISOString()
+    });
+  }
+
+  // Registros de Gelo
+  const regsGelo = (listaRegistrosRonda || []).filter(r => 
+    r.tipo === 'maquina_gelo' || 
+    typeof r.gelo_produzido !== 'undefined' || 
+    typeof r.gelo_saida !== 'undefined' ||
+    typeof r.gelo_saldo !== 'undefined'
+  );
+
+  // Registros de Hoje
+  const regsGeloHoje = regsGelo.filter(r => r.data === dataHoje);
+
+  let prodHojeSacos = 0;
+  let saidaHojeSacos = 0;
+  let frentesSet = new Set();
+
+  regsHoje = regsGeloHoje;
+  regsGeloHoje.forEach(r => {
+    prodHojeSacos += parseFloat(r.gelo_produzido || 0) || 0;
+    saidaHojeSacos += parseFloat(r.gelo_saida || 0) || 0;
+    if (r.gelo_destinos) {
+      r.gelo_destinos.split(',').forEach(d => {
+        const tr = d.trim();
+        if (tr) frentesSet.add(tr);
+      });
+    }
+  });
+
+  const saldoSilo = obterSaldoAtualSiloGelo();
+
+  // KPIs
+  const elProd = document.getElementById('kpiGeloProducaoHoje');
+  const elProdSub = document.getElementById('kpiGeloProducaoHojeSub');
+  if (elProd) elProd.textContent = `${prodHojeSacos} sacos`;
+  if (elProdSub) elProdSub.textContent = `Aprox. ${Math.round(prodHojeSacos * 20)} kg fabricados hoje`;
+
+  const elSaida = document.getElementById('kpiGeloSaidaHoje');
+  const elSaidaSub = document.getElementById('kpiGeloSaidaHojeSub');
+  if (elSaida) elSaida.textContent = `${saidaHojeSacos} sacos`;
+  if (elSaidaSub) elSaidaSub.textContent = `Aprox. ${Math.round(saidaHojeSacos * 20)} kg distribuídos`;
+
+  const elSaldo = document.getElementById('kpiGeloSaldoSilo');
+  const elSaldoSub = document.getElementById('kpiGeloSaldoSiloSub');
+  const badgeSilo = document.getElementById('badgeGeloStatusSilo');
+  if (elSaldo) elSaldo.textContent = `${saldoSilo} sacos`;
+  if (elSaldoSub) elSaldoSub.textContent = `Estoque disponível: ~${Math.round(saldoSilo * 20)} kg`;
+  if (badgeSilo) {
+    if (saldoSilo > 50) {
+      badgeSilo.textContent = 'Silo Abastecido';
+      badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300';
+    } else if (saldoSilo > 15) {
+      badgeSilo.textContent = 'Silo Normal';
+      badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-300';
+    } else if (saldoSilo > 0) {
+      badgeSilo.textContent = 'Estoque Baixo';
+      badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 animate-pulse';
+    } else {
+      badgeSilo.textContent = 'Silo Vazio';
+      badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300';
+    }
+  }
+
+  const elFrentes = document.getElementById('kpiGeloFrentesHoje');
+  const elFrentesLista = document.getElementById('kpiGeloListaFrentesHoje');
+  if (elFrentes) elFrentes.textContent = frentesSet.size;
+  if (elFrentesLista) {
+    if (frentesSet.size > 0) {
+      elFrentesLista.textContent = Array.from(frentesSet).join(' • ');
+    } else {
+      elFrentesLista.textContent = 'Nenhuma frente atendida hoje ainda';
+    }
+  }
+
+  // Atualiza badge na barra lateral
+  const sideCount = document.getElementById('sideCountGelo');
+  if (sideCount) {
+    sideCount.textContent = `${saldoSilo} sc`;
+    sideCount.classList.remove('hidden');
+  }
+
+  calcularPrevisaoSaldoGelo();
+  filtrarHistoricoGeloUI();
+}
+
+function filtrarHistoricoGeloUI() {
+  const busca = (document.getElementById('buscaGeloHistorico')?.value || '').toLowerCase().trim();
+  const filtroPeriodo = document.getElementById('filtroPeriodoGelo')?.value || 'hoje';
+  const filtroOperacao = document.getElementById('filtroTipoOperacaoGelo')?.value || 'todos';
+
+  const dataHoje = getDataHojeLocal();
+
+  let regsGelo = (listaRegistrosRonda || [])
+    .filter(r => r.tipo === 'maquina_gelo' || typeof r.gelo_produzido !== 'undefined' || typeof r.gelo_saida !== 'undefined' || typeof r.gelo_saldo !== 'undefined')
+    .sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
+
+  // Filtro Período
+  if (filtroPeriodo === 'hoje') {
+    regsGelo = regsGelo.filter(r => r.data === dataHoje);
+  } else if (filtroPeriodo === '7dias') {
+    const d7 = new Date();
+    d7.setDate(d7.getDate() - 7);
+    const str7 = getDataHojeLocal(d7);
+    regsGelo = regsGelo.filter(r => (r.data || '') >= str7);
+  } else if (filtroPeriodo === 'mes') {
+    const mesAtual = dataHoje.substring(0, 7);
+    regsGelo = regsGelo.filter(r => (r.data || '').startsWith(mesAtual));
+  }
+
+  // Filtro Operação
+  if (filtroOperacao === 'saida') {
+    regsGelo = regsGelo.filter(r => (parseFloat(r.gelo_saida || 0) || 0) > 0);
+  } else if (filtroOperacao === 'producao') {
+    regsGelo = regsGelo.filter(r => (parseFloat(r.gelo_produzido || 0) || 0) > 0);
+  }
+
+  // Busca textual
+  if (busca) {
+    regsGelo = regsGelo.filter(r => {
+      const dest = (r.gelo_destinos || '').toLowerCase();
+      const resp = (r.responsavel || '').toLowerCase();
+      const obs = (r.observacoes || '').toLowerCase();
+      const ponto = (r.ponto_nome || '').toLowerCase();
+      return dest.includes(busca) || resp.includes(busca) || obs.includes(busca) || ponto.includes(busca);
+    });
+  }
+
+  renderizarHistoricoGelo(regsGelo);
+}
+
+function renderizarHistoricoGelo(registros) {
+  const tbody = document.getElementById('tabelaHistoricoGeloCorpo');
+  const vazio = document.getElementById('vazioHistoricoGelo');
+  const contador = document.getElementById('contadorRegistrosGelo');
+
+  if (contador) contador.textContent = `${registros.length} lançamentos`;
+
+  if (!tbody) return;
+
+  if (registros.length === 0) {
+    tbody.innerHTML = '';
+    if (vazio) vazio.classList.remove('hidden');
+    return;
+  }
+
+  if (vazio) vazio.classList.add('hidden');
+
+  tbody.innerHTML = registros.map(r => {
+    const prod = parseFloat(r.gelo_produzido || 0) || 0;
+    const saida = parseFloat(r.gelo_saida || 0) || 0;
+    const saldo = parseFloat(r.gelo_saldo || 0) || 0;
+    const unid = r.gelo_unidade || 'sacos';
+
+    let badgeOp = '';
+    let qtdTexto = '';
+
+    if (saida > 0) {
+      badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">🚚 Expedição (Saída)</span>';
+      qtdTexto = `<span class="font-bold text-amber-700">-${saida} ${unid}</span>`;
+    } else if (prod > 0) {
+      badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-300">🏭 Fabricação (+ Silo)</span>';
+      qtdTexto = `<span class="font-bold text-cyan-700">+${prod} ${unid}</span>`;
+    } else {
+      badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">⚖️ Ajuste / Silo</span>';
+      qtdTexto = `<span class="font-bold text-slate-700">${saldo} ${unid}</span>`;
+    }
+
+    const dataFormatada = typeof formatarDataLimpezaBR === 'function' ? formatarDataLimpezaBR(r.data) : (r.data || '-');
+
+    return `
+      <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+        <td class="py-2.5 px-3 whitespace-nowrap">
+          <div class="font-bold text-slate-900">${dataFormatada}</div>
+          <div class="text-[10px] text-slate-400">${r.hora || '--:--'}</div>
+        </td>
+        <td class="py-2.5 px-3 whitespace-nowrap">${badgeOp}</td>
+        <td class="py-2.5 px-3 whitespace-nowrap">${qtdTexto}</td>
+        <td class="py-2.5 px-3 whitespace-nowrap">
+          <span class="px-2 py-0.5 rounded font-black text-xs bg-slate-100 text-slate-800 border border-slate-200">
+            ${saldo} ${unid}
+          </span>
+        </td>
+        <td class="py-2.5 px-3 max-w-[200px]">
+          <div class="font-semibold text-slate-800 truncate" title="${r.gelo_destinos || 'Canteiro Central'}">
+            ${r.gelo_destinos || '<span class="text-slate-400 italic">Canteiro Central</span>'}
+          </div>
+          ${r.observacoes ? `<div class="text-[10px] text-slate-400 truncate" title="${r.observacoes}">${r.observacoes}</div>` : ''}
+        </td>
+        <td class="py-2.5 px-3 whitespace-nowrap">
+          <div class="font-medium text-slate-700">${r.responsavel || 'Operador'}</div>
+        </td>
+        <td class="py-2.5 px-3 text-center whitespace-nowrap">
+          <button onclick="excluirLancamentoGelo('${r.id}')" class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition" title="Excluir Lançamento">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function salvarLancamentoGeloDesktop(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const data = document.getElementById('formGeloData')?.value;
+  const hora = document.getElementById('formGeloHora')?.value;
+  const qtd = parseFloat(document.getElementById('formGeloQtd')?.value || 0) || 0;
+  const destinos = (document.getElementById('formGeloDestinos')?.value || '').trim();
+  const responsavel = (document.getElementById('formGeloResponsavel')?.value || '').trim();
+  const obs = (document.getElementById('formGeloObs')?.value || '').trim();
+
+  if (!data || !hora) {
+    showToast('Informe a data e o horário do lançamento.', 'warning');
+    return;
+  }
+
+  if (qtd <= 0) {
+    showToast('Informe uma quantidade válida de gelo.', 'warning');
+    return;
+  }
+
+  if (!responsavel) {
+    showToast('Informe o nome do operador ou responsável.', 'warning');
+    return;
+  }
+
+  if (tipoOperacaoGeloSelecionada === 'saida' && !destinos) {
+    showToast('Informe a frente ou setor de destino do gelo.', 'warning');
+    return;
+  }
+
+  const saldoAtual = obterSaldoAtualSiloGelo();
+  let saldoResultante = saldoAtual;
+  let prodVal = 0;
+  let saidaVal = 0;
+
+  if (tipoOperacaoGeloSelecionada === 'producao') {
+    prodVal = qtd;
+    saldoResultante = saldoAtual + qtd;
+  } else if (tipoOperacaoGeloSelecionada === 'saida') {
+    saidaVal = qtd;
+    saldoResultante = Math.max(0, saldoAtual - qtd);
+  } else {
+    saldoResultante = qtd;
+  }
+
+  const novoId = 'gelo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+  const dataHoraIso = new Date(`${data}T${hora}:00`).toISOString();
+
+  const novoRegistro = {
+    id: novoId,
+    ponto_id: 'ponto_maquina_gelo_01',
+    ponto_nome: 'Máquina de Gelo 01 - Canteiro Central',
+    tipo: 'maquina_gelo',
+    setor: 'Canteiro Central - Refeitório / Apoio',
+    data: data,
+    hora: hora,
+    data_hora: dataHoraIso,
+    responsavel: responsavel,
+    avaliacao: 'Excelente / Em Ordem',
+    observacoes: obs || (tipoOperacaoGeloSelecionada === 'producao' ? 'Fabricação de gelo registrada no desktop' : 'Expedição de gelo registrada no desktop'),
+    checklist: ['Controle de Silo', 'Expedição para Frentes'],
+    gelo_unidade: unidadeGeloSelecionadaDesktop,
+    gelo_produzido: prodVal,
+    gelo_saida: saidaVal,
+    gelo_saldo: saldoResultante,
+    gelo_destinos: destinos || (tipoOperacaoGeloSelecionada === 'producao' ? 'Abastecimento de Silo' : 'Canteiro Central')
+  };
+
+  if (!Array.isArray(listaRegistrosRonda)) listaRegistrosRonda = [];
+  listaRegistrosRonda.unshift(novoRegistro);
+  localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      await firestoreDb.collection('ronda_registros').doc(novoId).set(novoRegistro);
+    } catch (err) {
+      console.warn("Aviso ao salvar registro de gelo no Firestore:", err);
+    }
+  }
+
+  if (typeof registrarAuditoria === 'function') {
+    registrarAuditoria(
+      'gelo',
+      tipoOperacaoGeloSelecionada.toUpperCase(),
+      `Máquina de Gelo (${novoRegistro.gelo_destinos})`,
+      `${tipoOperacaoGeloSelecionada === 'saida' ? 'Expedido' : 'Produzido'}: ${qtd} ${unidadeGeloSelecionadaDesktop}. Saldo silo: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}. Operador: ${responsavel}`
+    );
+  }
+
+  showToast(`Lançamento de gelo registrado com sucesso! Saldo no silo: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}`, 'success');
+
+  // Limpa campos variáveis do form mantendo data e responsável
+  const inputQtd = document.getElementById('formGeloQtd');
+  const inputDest = document.getElementById('formGeloDestinos');
+  const inputObs = document.getElementById('formGeloObs');
+  if (inputQtd) inputQtd.value = '';
+  if (inputDest) inputDest.value = '';
+  if (inputObs) inputObs.value = '';
+
+  carregarMaquinaGelo();
+}
+
+async function excluirLancamentoGelo(id) {
+  if (!confirm('Deseja realmente excluir este lançamento de gelo?')) return;
+
+  const idx = (listaRegistrosRonda || []).findIndex(r => r.id === id);
+  if (idx === -1) {
+    showToast('Lançamento não encontrado.', 'warning');
+    return;
+  }
+
+  const [removido] = listaRegistrosRonda.splice(idx, 1);
+  localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      await firestoreDb.collection('ronda_registros').doc(id).delete();
+    } catch (err) {
+      console.warn("Aviso ao excluir registro de gelo no Firestore:", err);
+    }
+  }
+
+  showToast('Lançamento de gelo excluído com sucesso.', 'info');
+  carregarMaquinaGelo();
+}
+
+function imprimirPlaquetaGeloA4() {
+  if (typeof abrirModalPlacaQRRonda === 'function') {
+    abrirModalPlacaQRRonda('ponto_maquina_gelo_01');
+  } else {
+    showToast('Modal de impressão não disponível.', 'warning');
+  }
+}
+
+function exportarGeloExcel() {
+  try {
+    if (typeof XLSX === 'undefined') {
+      showToast('Biblioteca SheetJS (XLSX) não carregada.', 'error');
+      return;
+    }
+
+    const regsGelo = (listaRegistrosRonda || [])
+      .filter(r => r.tipo === 'maquina_gelo' || typeof r.gelo_produzido !== 'undefined' || typeof r.gelo_saida !== 'undefined' || typeof r.gelo_saldo !== 'undefined')
+      .sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
+
+    const dadosExport = regsGelo.map((r, i) => ({
+      'Item': i + 1,
+      'Data': r.data || '-',
+      'Horário': r.hora || '-',
+      'Ponto / Máquina': r.ponto_nome || 'Máquina de Gelo 01',
+      'Setor': r.setor || 'Canteiro Central',
+      'Operador': r.responsavel || 'Operador',
+      'Unidade': (r.gelo_unidade || 'sacos').toUpperCase(),
+      'Fabricado (Entrada)': parseFloat(r.gelo_produzido || 0) || 0,
+      'Expedido (Saída)': parseFloat(r.gelo_saida || 0) || 0,
+      'Saldo em Silo': parseFloat(r.gelo_saldo || 0) || 0,
+      'Frentes Atendidas / Destino': r.gelo_destinos || '-',
+      'Observações': r.observacoes || '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dadosExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "FÁBRICA DE GELO");
+
+    const dataHoje = getDataHojeLocal();
+    XLSX.writeFile(wb, `RELATORIO_FABRICA_MAQUINA_DE_GELO_${dataHoje}.xlsx`);
+    showToast('Planilha de Fábrica & Máquina de Gelo exportada com sucesso!', 'success');
+  } catch (err) {
+    showToast('Erro ao exportar planilha de gelo: ' + err.message, 'error');
+  }
+}
+
+// Exposição global das funções da Máquina de Gelo
+window.carregarMaquinaGelo = carregarMaquinaGelo;
+window.alternarUnidadeGeloDesktop = alternarUnidadeGeloDesktop;
+window.aoMudarTipoOperacaoGelo = aoMudarTipoOperacaoGelo;
+window.adicionarDestinoGeloChipDesktop = adicionarDestinoGeloChipDesktop;
+window.focarFormularioGelo = focarFormularioGelo;
+window.calcularPrevisaoSaldoGelo = calcularPrevisaoSaldoGelo;
+window.filtrarHistoricoGeloUI = filtrarHistoricoGeloUI;
+window.renderizarHistoricoGelo = renderizarHistoricoGelo;
+window.salvarLancamentoGeloDesktop = salvarLancamentoGeloDesktop;
+window.excluirLancamentoGelo = excluirLancamentoGelo;
+window.imprimirPlaquetaGeloA4 = imprimirPlaquetaGeloA4;
+window.exportarGeloExcel = exportarGeloExcel;
