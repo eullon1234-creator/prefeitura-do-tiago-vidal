@@ -3541,7 +3541,7 @@ service cloud.firestore {
             <div class="flex items-baseline gap-2 mt-2">
               <span id="kpiGeloProducaoHoje" class="text-2xl sm:text-3xl font-black text-cyan-900">0 sacos</span>
             </div>
-            <p id="kpiGeloProducaoHojeSub" class="text-[11px] text-cyan-700/80 mt-1 font-medium">0 kg fabricados hoje</p>
+            <p id="kpiGeloProducaoHojeSub" class="text-[11px] text-cyan-700/80 mt-1 font-medium">0 kg fabricados hoje (1 sc = 3 kg)</p>
           </div>
 
           <!-- KPI 2: Saída / Expedido Hoje -->
@@ -3598,7 +3598,7 @@ service cloud.firestore {
               <!-- Alternador Unidade (Sacos vs Kg) -->
               <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 border border-slate-200 text-xs">
                 <button type="button" id="btnGeloTabSacos" onclick="alternarUnidadeGeloDesktop('sacos')" class="px-2.5 py-1 rounded-md font-bold transition bg-cyan-600 text-white shadow-xs">
-                  Sacos
+                  Sacos (3 kg)
                 </button>
                 <button type="button" id="btnGeloTabKg" onclick="alternarUnidadeGeloDesktop('kg')" class="px-2.5 py-1 rounded-md font-bold transition text-slate-600 hover:text-slate-900">
                   Kg
@@ -8804,7 +8804,7 @@ service cloud.firestore {
             <!-- Alternar Unidade -->
             <div class="flex items-center gap-1 bg-white rounded-lg p-0.5 border border-cyan-300 text-[10px]">
               <button type="button" id="btnManualGeloSacos" onclick="alternarUnidadeGeloManualDesktop('sacos')" class="px-2 py-0.5 rounded font-bold transition bg-cyan-600 text-white shadow-2xs">
-                Sacos (Padrão)
+                Sacos (3 kg)
               </button>
               <button type="button" id="btnManualGeloKg" onclick="alternarUnidadeGeloManualDesktop('kg')" class="px-2 py-0.5 rounded font-bold transition text-cyan-800 hover:text-cyan-950">
                 Kg

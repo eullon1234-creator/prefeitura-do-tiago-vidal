@@ -23242,6 +23242,7 @@ window.alternarGrupoSidebar = alternarGrupoSidebar;
 // ============================================================================
 // MÓDULO EXCLUSIVO: FÁBRICA & MÁQUINA DE GELO (OPERAÇÕES & CAMPO)
 // ============================================================================
+const PESO_PADRAO_SACO_GELO_KG = 3;
 let unidadeGeloSelecionadaDesktop = 'sacos';
 let tipoOperacaoGeloSelecionada = 'saida';
 
@@ -23394,8 +23395,10 @@ function carregarMaquinaGelo() {
 
   regsHoje = regsGeloHoje;
   regsGeloHoje.forEach(r => {
-    prodHojeSacos += parseFloat(r.gelo_produzido || 0) || 0;
-    saidaHojeSacos += parseFloat(r.gelo_saida || 0) || 0;
+    const unid = r.gelo_unidade || 'sacos';
+    const fator = unid === 'kg' ? (1 / PESO_PADRAO_SACO_GELO_KG) : 1;
+    prodHojeSacos += (parseFloat(r.gelo_produzido || 0) || 0) * fator;
+    saidaHojeSacos += (parseFloat(r.gelo_saida || 0) || 0) * fator;
     if (r.gelo_destinos) {
       r.gelo_destinos.split(',').forEach(d => {
         const tr = d.trim();
@@ -23409,19 +23412,22 @@ function carregarMaquinaGelo() {
   // KPIs
   const elProd = document.getElementById('kpiGeloProducaoHoje');
   const elProdSub = document.getElementById('kpiGeloProducaoHojeSub');
-  if (elProd) elProd.textContent = `${prodHojeSacos} sacos`;
-  if (elProdSub) elProdSub.textContent = `Aprox. ${Math.round(prodHojeSacos * 20)} kg fabricados hoje`;
+  const prodSacosFormat = Number.isInteger(prodHojeSacos) ? prodHojeSacos : prodHojeSacos.toFixed(1);
+  const saidaSacosFormat = Number.isInteger(saidaHojeSacos) ? saidaHojeSacos : saidaHojeSacos.toFixed(1);
+
+  if (elProd) elProd.textContent = `${prodSacosFormat} sacos`;
+  if (elProdSub) elProdSub.textContent = `Aprox. ${Math.round(prodHojeSacos * PESO_PADRAO_SACO_GELO_KG)} kg fabricados hoje (1 sc = 3 kg)`;
 
   const elSaida = document.getElementById('kpiGeloSaidaHoje');
   const elSaidaSub = document.getElementById('kpiGeloSaidaHojeSub');
-  if (elSaida) elSaida.textContent = `${saidaHojeSacos} sacos`;
-  if (elSaidaSub) elSaidaSub.textContent = `Aprox. ${Math.round(saidaHojeSacos * 20)} kg distribuídos`;
+  if (elSaida) elSaida.textContent = `${saidaSacosFormat} sacos`;
+  if (elSaidaSub) elSaidaSub.textContent = `Aprox. ${Math.round(saidaHojeSacos * PESO_PADRAO_SACO_GELO_KG)} kg distribuídos`;
 
   const elSaldo = document.getElementById('kpiGeloSaldoSilo');
   const elSaldoSub = document.getElementById('kpiGeloSaldoSiloSub');
   const badgeSilo = document.getElementById('badgeGeloStatusSilo');
   if (elSaldo) elSaldo.textContent = `${saldoSilo} sacos`;
-  if (elSaldoSub) elSaldoSub.textContent = `Estoque disponível: ~${Math.round(saldoSilo * 20)} kg`;
+  if (elSaldoSub) elSaldoSub.textContent = `Estoque disponível: ~${Math.round(saldoSilo * PESO_PADRAO_SACO_GELO_KG)} kg (1 sc = 3 kg)`;
   if (badgeSilo) {
     if (saldoSilo > 50) {
       badgeSilo.textContent = 'Freezer Abastecido';
@@ -23763,3 +23769,5 @@ window.salvarLancamentoGeloDesktop = salvarLancamentoGeloDesktop;
 window.excluirLancamentoGelo = excluirLancamentoGelo;
 window.imprimirPlaquetaGeloA4 = imprimirPlaquetaGeloA4;
 window.exportarGeloExcel = exportarGeloExcel;
+
+window.PESO_PADRAO_SACO_GELO_KG = PESO_PADRAO_SACO_GELO_KG;
