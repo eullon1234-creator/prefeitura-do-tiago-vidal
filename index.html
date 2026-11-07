@@ -3502,7 +3502,7 @@ service cloud.firestore {
               <h1 class="text-xl md:text-2xl font-bold text-slate-900">Fábrica & Máquina de Gelo</h1>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 mt-1">
-              Controle diário de fabricação de gelo, nível do silo industrial e expedição para as frentes de serviço (KM 12, KM 14, Refeitório, Oficina, Britagem).
+              Controle diário de fabricação de gelo, nível de estoque no freezer e expedição para as frentes de serviço (KM 12, KM 14, Refeitório, Oficina, Britagem).
             </p>
           </div>
 
@@ -3556,11 +3556,11 @@ service cloud.firestore {
             <p id="kpiGeloSaidaHojeSub" class="text-[11px] text-amber-700/80 mt-1 font-medium">Expedido p/ frentes</p>
           </div>
 
-          <!-- KPI 3: Saldo Atual no Silo -->
+          <!-- KPI 3: Saldo Atual no Freezer -->
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs bg-gradient-to-br from-blue-50/30 to-white">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Saldo Atual no Silo</span>
-              <span id="badgeGeloStatusSilo" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">Silo Normal</span>
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Saldo Atual no Freezer</span>
+              <span id="badgeGeloStatusSilo" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">Freezer Normal</span>
             </div>
             <div class="flex items-baseline gap-2 mt-2">
               <span id="kpiGeloSaldoSilo" class="text-2xl sm:text-3xl font-black text-slate-900">0 sacos</span>
@@ -3591,7 +3591,7 @@ service cloud.firestore {
                 <span class="w-7 h-7 rounded-lg bg-cyan-100 text-cyan-800 flex items-center justify-center font-bold text-sm">🧊</span>
                 <div>
                   <h2 class="text-sm font-bold text-slate-900">Registrar Movimentação de Gelo</h2>
-                  <p class="text-[11px] text-slate-500">Produção, saída ou inventário de silo</p>
+                  <p class="text-[11px] text-slate-500">Produção, saída ou inventário do freezer</p>
                 </div>
               </div>
               
@@ -3628,7 +3628,7 @@ service cloud.firestore {
                   <label class="cursor-pointer border-2 border-slate-200 bg-white rounded-xl p-2 flex flex-col items-center text-center transition select-none hover:bg-slate-50 opacity-70" id="labelOpGeloAjuste">
                     <input type="radio" name="tipoOperacaoGelo" value="ajuste" onchange="aoMudarTipoOperacaoGelo('ajuste')" class="hidden">
                     <span class="text-base mb-0.5">⚖️</span>
-                    <span class="text-[11px] font-bold text-slate-700 leading-tight">Ajuste de Silo</span>
+                    <span class="text-[11px] font-bold text-slate-700 leading-tight">Ajuste do Freezer</span>
                   </label>
                 </div>
               </div>
@@ -3644,7 +3644,7 @@ service cloud.firestore {
 
                 <div>
                   <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Saldo Silo Estimado
+                    Saldo Estimado no Freezer
                   </label>
                   <div class="w-full bg-cyan-50/70 border border-cyan-200 rounded-xl px-3 py-2 flex items-center justify-between">
                     <span id="formGeloPrevisaoSaldo" class="font-black text-cyan-900 text-base">0 sacos</span>
@@ -3753,7 +3753,7 @@ service cloud.firestore {
                       <th class="py-2.5 px-3">Data / Hora</th>
                       <th class="py-2.5 px-3">Operação</th>
                       <th class="py-2.5 px-3">Quantidade</th>
-                      <th class="py-2.5 px-3">Saldo Silo</th>
+                      <th class="py-2.5 px-3">Saldo no Freezer</th>
                       <th class="py-2.5 px-3">Destino / Frente</th>
                       <th class="py-2.5 px-3">Responsável</th>
                       <th class="py-2.5 px-3 text-center">Ações</th>
@@ -7892,7 +7892,7 @@ service cloud.firestore {
             <span id="drawerBadgeGelo" class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">0 sacos</span>
           </div>
           <span class="text-xs font-bold text-white">Fábrica & Máquina de Gelo</span>
-          <span class="text-[10px] text-slate-300">Produção, silo industrial e expedição para frentes</span>
+          <span class="text-[10px] text-slate-300">Produção, estoque no freezer e expedição para frentes</span>
         </button>
 
         <button onclick="fecharMenuMobileMais(); switchTab('ronda_vigilancia')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-indigo-500/40 hover:bg-slate-800 text-left transition col-span-2">
@@ -8827,7 +8827,7 @@ service cloud.firestore {
             </div>
             <div>
               <label for="regManualGeloSaldo" class="block font-bold text-cyan-800 text-[10px] uppercase mb-1">
-                Saldo Silo <span class="labelUnidadeManualGelo">(sacos)</span>
+                Saldo no Freezer <span class="labelUnidadeManualGelo">(sacos)</span>
               </label>
               <input type="number" id="regManualGeloSaldo" min="0" step="any" placeholder="0" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-center font-bold text-xs text-cyan-900 outline-none focus:border-cyan-500">
             </div>

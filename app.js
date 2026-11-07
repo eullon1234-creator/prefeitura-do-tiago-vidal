@@ -18479,7 +18479,7 @@ function renderizarGridRonda(pontos) {
                   <span class="font-black text-amber-700 text-xs">${st.geloTotSaida} ${st.geloUnidade}</span>
                 </div>
                 <div class="bg-white p-1 rounded-lg border border-cyan-100 shadow-2xs">
-                  <span class="text-[9px] text-slate-500 block uppercase font-bold">Saldo Silo</span>
+                  <span class="text-[9px] text-slate-500 block uppercase font-bold">Saldo no Freezer</span>
                   <span class="font-black text-cyan-900 text-xs">${st.geloSaldoAtual} ${st.geloUnidade}</span>
                 </div>
               </div>
@@ -18930,7 +18930,7 @@ async function salvarRegistroManualRonda(e) {
     responsavel: responsavel,
     ordem_dia: ordemDia,
     meta_dia: meta,
-    checklist: p.tipo === 'maquina_gelo' ? ['Checagem de Silo & Compressor', 'Higienização de Cuba e Pá', 'Inspeção do Filtro de Água', 'Limpeza Externa e Dreno'] : ['Limpeza Geral e Desinfecção Completa'],
+    checklist: p.tipo === 'maquina_gelo' ? ['Checagem de Freezer & Compressor', 'Higienização de Cuba e Pá', 'Inspeção do Filtro de Água', 'Limpeza Externa e Dreno'] : ['Limpeza Geral e Desinfecção Completa'],
     avaliacao: avaliacao,
     observacoes: obs || 'Lançamento manual registrado via painel administrativo',
     criado_em: new Date().toISOString()
@@ -19020,7 +19020,7 @@ function abrirModalHistoricoPontoRonda(pontoId) {
           <div class="p-2 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-950 flex items-center justify-between font-semibold text-[11px]">
             <span>🧊 Produzido: <b>+${r.gelo_produzido || 0} ${r.gelo_unidade || 'sacos'}</b></span>
             <span>🚚 Saída: <b>-${r.gelo_saida || 0} ${r.gelo_unidade || 'sacos'}</b></span>
-            <span>📦 Saldo Silo: <b>${r.gelo_saldo || 0} ${r.gelo_unidade || 'sacos'}</b></span>
+            <span>📦 Saldo no Freezer: <b>${r.gelo_saldo || 0} ${r.gelo_unidade || 'sacos'}</b></span>
           </div>
           ${r.gelo_destinos ? `<p class="text-[10px] text-slate-600 font-medium"><i class="fa-solid fa-location-arrow text-cyan-600 mr-1"></i><b>Destinos:</b> ${r.gelo_destinos}</p>` : ''}
         ` : ''}
@@ -23292,11 +23292,11 @@ function aoMudarTipoOperacaoGelo(tipo) {
   } else if (tipo === 'producao') {
     if (lblProd) lblProd.className = 'cursor-pointer border-2 border-cyan-500 bg-cyan-50/70 rounded-xl p-2 flex flex-col items-center text-center transition select-none shadow-xs';
     if (boxDestinos) boxDestinos.classList.remove('hidden');
-    if (inputDestinos) inputDestinos.placeholder = 'Abastecimento de Silo Central / Fábrica';
+    if (inputDestinos) inputDestinos.placeholder = 'Abastecimento do Freezer / Fábrica';
   } else {
     if (lblAjuste) lblAjuste.className = 'cursor-pointer border-2 border-indigo-500 bg-indigo-50/70 rounded-xl p-2 flex flex-col items-center text-center transition select-none shadow-xs';
     if (boxDestinos) boxDestinos.classList.remove('hidden');
-    if (inputDestinos) inputDestinos.placeholder = 'Inventário / Conferência de Silo';
+    if (inputDestinos) inputDestinos.placeholder = 'Inventário / Conferência do Freezer';
   }
 
   calcularPrevisaoSaldoGelo();
@@ -23424,16 +23424,16 @@ function carregarMaquinaGelo() {
   if (elSaldoSub) elSaldoSub.textContent = `Estoque disponível: ~${Math.round(saldoSilo * 20)} kg`;
   if (badgeSilo) {
     if (saldoSilo > 50) {
-      badgeSilo.textContent = 'Silo Abastecido';
+      badgeSilo.textContent = 'Freezer Abastecido';
       badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300';
     } else if (saldoSilo > 15) {
-      badgeSilo.textContent = 'Silo Normal';
+      badgeSilo.textContent = 'Freezer Normal';
       badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-300';
     } else if (saldoSilo > 0) {
       badgeSilo.textContent = 'Estoque Baixo';
       badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 animate-pulse';
     } else {
-      badgeSilo.textContent = 'Silo Vazio';
+      badgeSilo.textContent = 'Freezer Vazio';
       badgeSilo.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300';
     }
   }
@@ -23643,7 +23643,7 @@ async function salvarLancamentoGeloDesktop(e) {
     gelo_produzido: prodVal,
     gelo_saida: saidaVal,
     gelo_saldo: saldoResultante,
-    gelo_destinos: destinos || (tipoOperacaoGeloSelecionada === 'producao' ? 'Abastecimento de Silo' : 'Canteiro Central')
+    gelo_destinos: destinos || (tipoOperacaoGeloSelecionada === 'producao' ? 'Abastecimento do Freezer' : 'Canteiro Central')
   };
 
   if (!Array.isArray(listaRegistrosRonda)) listaRegistrosRonda = [];
@@ -23663,11 +23663,11 @@ async function salvarLancamentoGeloDesktop(e) {
       'gelo',
       tipoOperacaoGeloSelecionada.toUpperCase(),
       `Máquina de Gelo (${novoRegistro.gelo_destinos})`,
-      `${tipoOperacaoGeloSelecionada === 'saida' ? 'Expedido' : 'Produzido'}: ${qtd} ${unidadeGeloSelecionadaDesktop}. Saldo silo: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}. Operador: ${responsavel}`
+      `${tipoOperacaoGeloSelecionada === 'saida' ? 'Expedido' : 'Produzido'}: ${qtd} ${unidadeGeloSelecionadaDesktop}. Saldo no freezer: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}. Operador: ${responsavel}`
     );
   }
 
-  showToast(`Lançamento de gelo registrado com sucesso! Saldo no silo: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}`, 'success');
+  showToast(`Lançamento de gelo registrado com sucesso! Saldo no freezer: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}`, 'success');
 
   // Limpa campos variáveis do form mantendo data e responsável
   const inputQtd = document.getElementById('formGeloQtd');
@@ -23733,7 +23733,7 @@ function exportarGeloExcel() {
       'Unidade': (r.gelo_unidade || 'sacos').toUpperCase(),
       'Fabricado (Entrada)': parseFloat(r.gelo_produzido || 0) || 0,
       'Expedido (Saída)': parseFloat(r.gelo_saida || 0) || 0,
-      'Saldo em Silo': parseFloat(r.gelo_saldo || 0) || 0,
+      'Saldo no Freezer': parseFloat(r.gelo_saldo || 0) || 0,
       'Frentes Atendidas / Destino': r.gelo_destinos || '-',
       'Observações': r.observacoes || '-'
     }));
