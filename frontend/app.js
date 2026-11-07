@@ -23342,18 +23342,60 @@ function calcularPrevisaoSaldoGelo() {
   spanPrevisao.textContent = `${saldoPrevisto} ${unidadeGeloSelecionadaDesktop}`;
 }
 
-function obterSaldoAtualSiloGelo() {
-  const regsGelo = (listaRegistrosRonda || [])
-    .filter(r => r.tipo === 'maquina_gelo' || typeof r.gelo_produzido !== 'undefined' || typeof r.gelo_saldo !== 'undefined')
-    .sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0));
+function reconciliarSaldoGelo() {
+  if (!Array.isArray(listaRegistrosRonda) || listaRegistrosRonda.length === 0) return 0;
 
-  if (regsGelo.length > 0 && typeof regsGelo[0].gelo_saldo !== 'undefined' && regsGelo[0].gelo_saldo !== null) {
-    return parseFloat(regsGelo[0].gelo_saldo) || 0;
-  }
-  return 0;
+  // Filtrar todos os registros de gelo
+  const regsGelo = listaRegistrosRonda.filter(r => 
+    r.tipo === 'maquina_gelo' || 
+    typeof r.gelo_produzido !== 'undefined' || 
+    typeof r.gelo_saida !== 'undefined' || 
+    typeof r.gelo_saldo !== 'undefined'
+  );
+
+  if (regsGelo.length === 0) return 0;
+
+  // Ordenar em ordem cronológica estrita (do mais antigo para o mais recente)
+  regsGelo.sort((a, b) => {
+    const timeA = new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0).getTime();
+    const timeB = new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0).getTime();
+    return timeA - timeB;
+  });
+
+  let saldoAcumulado = 0;
+  regsGelo.forEach(r => {
+    const prod = parseFloat(r.gelo_produzido || 0) || 0;
+    const saida = parseFloat(r.gelo_saida || 0) || 0;
+    const obsLower = (r.observacoes || '').toLowerCase();
+    const isAjuste = (r.tipo_operacao === 'ajuste') || 
+                     (obsLower.includes('ajuste') || obsLower.includes('inventário') || obsLower.includes('inventario'));
+
+    // Se for um ajuste explícito de inventário com produção e saída zeradas, define o novo ponto de partida
+    if (isAjuste && prod === 0 && saida === 0 && typeof r.gelo_saldo !== 'undefined' && r.gelo_saldo !== null) {
+      saldoAcumulado = parseFloat(r.gelo_saldo) || 0;
+    } else {
+      saldoAcumulado = Math.max(0, saldoAcumulado + prod - saida);
+    }
+
+    // Atualiza o saldo do registro no histórico para refletir o saldo contábil real
+    r.gelo_saldo = saldoAcumulado;
+  });
+
+  // Salva no cache local os saldos reconciliados
+  try {
+    localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+  } catch (e) {}
+
+  return saldoAcumulado;
+}
+
+function obterSaldoAtualSiloGelo() {
+  return reconciliarSaldoGelo();
 }
 
 function carregarMaquinaGelo() {
+  // Reconcilia o saldo contábil do freezer com base em todo o histórico de entradas e saídas
+  reconciliarSaldoGelo();
   const dataHoje = getDataHojeLocal();
   const horaAgora = new Date().toTimeString().substring(0, 5);
 
@@ -23645,6 +23687,7 @@ async function salvarLancamentoGeloDesktop(e) {
     avaliacao: 'Excelente / Em Ordem',
     observacoes: obs || (tipoOperacaoGeloSelecionada === 'producao' ? 'Fabricação de gelo registrada no desktop' : 'Expedição de gelo registrada no desktop'),
     checklist: ['Controle de Silo', 'Expedição para Frentes'],
+    tipo_operacao: tipoOperacaoGeloSelecionada,
     gelo_unidade: unidadeGeloSelecionadaDesktop,
     gelo_produzido: prodVal,
     gelo_saida: saidaVal,
@@ -23771,3 +23814,5 @@ window.imprimirPlaquetaGeloA4 = imprimirPlaquetaGeloA4;
 window.exportarGeloExcel = exportarGeloExcel;
 
 window.PESO_PADRAO_SACO_GELO_KG = PESO_PADRAO_SACO_GELO_KG;
+
+window.reconciliarSaldoGelo = reconciliarSaldoGelo;

@@ -1443,7 +1443,13 @@
         if (inpProd) inpProd.value = '';
         if (inpSaida) inpSaida.value = '';
         if (inpSaldo) {
-          inpSaldo.value = '';
+          let saldoAtualFreezer = 0;
+          if (historicoPlaquinhaRonda && historicoPlaquinhaRonda.length > 0) {
+            const ult = historicoPlaquinhaRonda.find(x => typeof x.gelo_saldo !== 'undefined' && x.gelo_saldo !== null);
+            if (ult) saldoAtualFreezer = parseFloat(ult.gelo_saldo) || 0;
+          }
+          inpSaldo.value = saldoAtualFreezer;
+          inpSaldo.placeholder = String(saldoAtualFreezer);
           delete inpSaldo.dataset.manualEdited;
           inpSaldo.onchange = () => { inpSaldo.dataset.manualEdited = 'true'; };
         }
@@ -1635,7 +1641,18 @@
       if (pontoTipo === 'maquina_gelo') {
         geloProduzido = parseFloat(document.getElementById('inputGeloProduzido')?.value || '0') || 0;
         geloSaida = parseFloat(document.getElementById('inputGeloSaida')?.value || '0') || 0;
-        geloSaldo = parseFloat(document.getElementById('inputGeloSaldo')?.value || '0') || 0;
+        
+        const rawSaldo = document.getElementById('inputGeloSaldo')?.value;
+        if (rawSaldo !== '' && rawSaldo !== null && !isNaN(parseFloat(rawSaldo))) {
+          geloSaldo = parseFloat(rawSaldo);
+        } else {
+          let saldoBase = 0;
+          if (historicoPlaquinhaRonda && historicoPlaquinhaRonda.length > 0) {
+            const ult = historicoPlaquinhaRonda.find(x => typeof x.gelo_saldo !== 'undefined' && x.gelo_saldo !== null);
+            if (ult) saldoBase = parseFloat(ult.gelo_saldo) || 0;
+          }
+          geloSaldo = Math.max(0, saldoBase + geloProduzido - geloSaida);
+        }
         geloDestinos = (document.getElementById('inputGeloDestinos')?.value || '').trim();
       }
 
