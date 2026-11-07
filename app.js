@@ -18090,6 +18090,29 @@ function inicializarRondaCanteiro() {
 
   atualizarContadoresRondaUI();
 
+  // Listener para sincronização cross-tab instantânea (mesmo navegador/máquina)
+  if (!window._listenerStorageRondaAtivo) {
+    window._listenerStorageRondaAtivo = true;
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'ronda_registros_cache' || e.key === 'ronda_pontos_cache') {
+        try {
+          if (e.key === 'ronda_registros_cache' && e.newValue) {
+            listaRegistrosRonda = JSON.parse(e.newValue);
+          }
+          if (e.key === 'ronda_pontos_cache' && e.newValue) {
+            listaPontosRonda = JSON.parse(e.newValue);
+          }
+        } catch (err) {}
+        reconciliarSaldoGelo();
+        atualizarContadoresRondaUI();
+        if (typeof activeTab !== 'undefined') {
+          if (activeTab === 'ronda') filtrarRondaUI();
+          if (activeTab === 'maquina_gelo') carregarMaquinaGelo();
+        }
+      }
+    });
+  }
+
   // Se houver Firestore conectado, sincronizar pontos, registros, ocorrências e config
   if (typeof firestoreDb !== 'undefined' && firestoreDb) {
     Promise.all([
@@ -18119,7 +18142,7 @@ function inicializarRondaCanteiro() {
       if (!snapRegs.empty) {
         const remRegs = [];
         snapRegs.forEach(doc => remRegs.push({ id: doc.id, ...doc.data() }));
-        remRegs.sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0));
+        remRegs.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0));
         listaRegistrosRonda = remRegs;
         localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
       }
@@ -18132,13 +18155,41 @@ function inicializarRondaCanteiro() {
         localStorage.setItem('ronda_ocorrencias_cache', JSON.stringify(listaOcorrenciasRonda));
       }
 
+      reconciliarSaldoGelo();
       atualizarContadoresRondaUI();
-      if (typeof activeTab !== 'undefined' && activeTab === 'ronda') {
-        filtrarRondaUI();
+      if (typeof activeTab !== 'undefined') {
+        if (activeTab === 'ronda') filtrarRondaUI();
+        if (activeTab === 'maquina_gelo') carregarMaquinaGelo();
       }
     }).catch(err => {
       console.warn("Aviso ao sincronizar Ronda do Canteiro com Firestore:", err);
     });
+
+    // Listener em tempo real do Firestore (onSnapshot) para novos lançamentos de Ronda e Máquina de Gelo
+    if (!window._listenerFirestoreRondaAtivo && typeof firestoreDb.collection === 'function') {
+      try {
+        window._listenerFirestoreRondaAtivo = true;
+        firestoreDb.collection('ronda_registros').onSnapshot((snapLive) => {
+          if (!snapLive.empty) {
+            const remRegs = [];
+            snapLive.forEach(doc => remRegs.push({ id: doc.id, ...doc.data() }));
+            remRegs.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0));
+            listaRegistrosRonda = remRegs;
+            try {
+              localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+            } catch (e) {}
+            reconciliarSaldoGelo();
+            atualizarContadoresRondaUI();
+            if (typeof activeTab !== 'undefined') {
+              if (activeTab === 'ronda') filtrarRondaUI();
+              if (activeTab === 'maquina_gelo') carregarMaquinaGelo();
+            }
+          }
+        }, err => console.warn("Aviso listener Firestore ronda_registros:", err));
+      } catch (errListener) {
+        console.warn("Falha ao registrar onSnapshot de ronda_registros:", errListener);
+      }
+    }
   }
 }
 
@@ -19070,13 +19121,17 @@ function recarregarRondaManual() {
       if (!snapRegs.empty) {
         const remRegs = [];
         snapRegs.forEach(doc => remRegs.push({ id: doc.id, ...doc.data() }));
-        remRegs.sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0));
+        remRegs.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0));
         listaRegistrosRonda = remRegs;
         localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
       }
 
+      reconciliarSaldoGelo();
       atualizarContadoresRondaUI();
       filtrarRondaUI();
+      if (typeof activeTab !== 'undefined' && activeTab === 'maquina_gelo') {
+        carregarMaquinaGelo();
+      }
       if (icone) icone.classList.remove('fa-spin');
       showToast('Dados da Ronda atualizados com sucesso!', 'success');
     }).catch(err => {
@@ -23585,10 +23640,10 @@ function renderizarHistoricoGelo(registros) {
       badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">🚚 Expedição (Saída)</span>';
       qtdTexto = `<span class="font-bold text-amber-700">-${saida} ${unid}</span>`;
     } else if (prod > 0) {
-      badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-300">🏭 Fabricação (+ Silo)</span>';
+      badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-300">🏭 Fabricação (+ Freezer)</span>';
       qtdTexto = `<span class="font-bold text-cyan-700">+${prod} ${unid}</span>`;
     } else {
-      badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">⚖️ Ajuste / Silo</span>';
+      badgeOp = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">⚖️ Ajuste / Freezer</span>';
       qtdTexto = `<span class="font-bold text-slate-700">${saldo} ${unid}</span>`;
     }
 
@@ -23617,6 +23672,9 @@ function renderizarHistoricoGelo(registros) {
           <div class="font-medium text-slate-700">${r.responsavel || 'Operador'}</div>
         </td>
         <td class="py-2.5 px-3 text-center whitespace-nowrap">
+          <button onclick="editarLancamentoGelo('${r.id}')" class="p-1.5 rounded-lg text-cyan-600 hover:bg-cyan-50 hover:text-cyan-800 transition mr-1" title="Editar Lançamento">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
           <button onclick="excluirLancamentoGelo('${r.id}')" class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition" title="Excluir Lançamento">
             <i class="fa-solid fa-trash-can"></i>
           </button>
@@ -23624,6 +23682,93 @@ function renderizarHistoricoGelo(registros) {
       </tr>
     `;
   }).join('');
+}
+
+// Controle de Estado de Edição de Lançamento de Gelo
+let idLancamentoGeloEmEdicao = null;
+
+function editarLancamentoGelo(id) {
+  const reg = (listaRegistrosRonda || []).find(r => r.id === id);
+  if (!reg) {
+    showToast('Lançamento não encontrado.', 'warning');
+    return;
+  }
+
+  idLancamentoGeloEmEdicao = id;
+
+  const inpData = document.getElementById('formGeloData');
+  const inpHora = document.getElementById('formGeloHora');
+  const inpQtd = document.getElementById('formGeloQtd');
+  const inpDest = document.getElementById('formGeloDestinos');
+  const inpResp = document.getElementById('formGeloResponsavel');
+  const inpObs = document.getElementById('formGeloObs');
+
+  if (inpData) inpData.value = reg.data || '';
+  if (inpHora) inpHora.value = reg.hora || '';
+  if (inpDest) inpDest.value = reg.gelo_destinos || '';
+  if (inpResp) inpResp.value = reg.responsavel || '';
+  if (inpObs) inpObs.value = reg.observacoes || '';
+
+  let op = reg.tipo_operacao;
+  if (!op) {
+    if ((parseFloat(reg.gelo_saida || 0) || 0) > 0) op = 'saida';
+    else if ((parseFloat(reg.gelo_produzido || 0) || 0) > 0) op = 'producao';
+    else op = 'ajuste';
+  }
+  aoMudarTipoOperacaoGelo(op);
+
+  const unid = reg.gelo_unidade || 'sacos';
+  alternarUnidadeGeloDesktop(unid);
+
+  let qtdVal = 0;
+  if (op === 'saida') qtdVal = parseFloat(reg.gelo_saida || 0) || 0;
+  else if (op === 'producao') qtdVal = parseFloat(reg.gelo_produzido || 0) || 0;
+  else qtdVal = parseFloat(reg.gelo_saldo || 0) || 0;
+  if (inpQtd) inpQtd.value = qtdVal || '';
+
+  const banner = document.getElementById('bannerEdicaoGelo');
+  const textoDetalhes = document.getElementById('textoEdicaoGeloDetalhes');
+  if (banner) banner.classList.remove('hidden');
+  if (textoDetalhes) {
+    textoDetalhes.textContent = `Lançamento de ${reg.data} às ${reg.hora} (${reg.responsavel || 'Operador'}).`;
+  }
+
+  const btnTxt = document.getElementById('textoBtnSalvarGelo');
+  const btnIco = document.getElementById('iconeBtnSalvarGelo');
+  if (btnTxt) btnTxt.textContent = 'Salvar Alterações do Lançamento';
+  if (btnIco) btnIco.className = 'fa-solid fa-pen-to-square';
+
+  calcularPrevisaoSaldoGelo();
+
+  const container = document.getElementById('cardFormGeloContainer');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    container.classList.add('ring-2', 'ring-cyan-500');
+    setTimeout(() => container.classList.remove('ring-2', 'ring-cyan-500'), 1500);
+  }
+
+  showToast('Modo de edição ativado. Altere os valores e salve.', 'info');
+}
+
+function cancelarEdicaoGelo() {
+  idLancamentoGeloEmEdicao = null;
+  const banner = document.getElementById('bannerEdicaoGelo');
+  if (banner) banner.classList.add('hidden');
+
+  const btnTxt = document.getElementById('textoBtnSalvarGelo');
+  const btnIco = document.getElementById('iconeBtnSalvarGelo');
+  if (btnTxt) btnTxt.textContent = 'Confirmar e Registrar Movimentação';
+  if (btnIco) btnIco.className = 'fa-solid fa-floppy-disk';
+
+  const inpQtd = document.getElementById('formGeloQtd');
+  const inpDest = document.getElementById('formGeloDestinos');
+  const inpObs = document.getElementById('formGeloObs');
+  if (inpQtd) inpQtd.value = '';
+  if (inpDest) inpDest.value = '';
+  if (inpObs) inpObs.value = '';
+
+  calcularPrevisaoSaldoGelo();
+  showToast('Edição cancelada.', 'info');
 }
 
 async function salvarLancamentoGeloDesktop(e) {
@@ -23671,54 +23816,78 @@ async function salvarLancamentoGeloDesktop(e) {
     saldoResultante = qtd;
   }
 
-  const novoId = 'gelo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
   const dataHoraIso = new Date(`${data}T${hora}:00`).toISOString();
 
-  const novoRegistro = {
-    id: novoId,
-    ponto_id: 'ponto_maquina_gelo_01',
-    ponto_nome: 'Máquina de Gelo 01 - Canteiro Central',
-    tipo: 'maquina_gelo',
-    setor: 'Canteiro Central - Refeitório / Apoio',
-    data: data,
-    hora: hora,
-    data_hora: dataHoraIso,
-    responsavel: responsavel,
-    avaliacao: 'Excelente / Em Ordem',
-    observacoes: obs || (tipoOperacaoGeloSelecionada === 'producao' ? 'Fabricação de gelo registrada no desktop' : 'Expedição de gelo registrada no desktop'),
-    checklist: ['Controle de Silo', 'Expedição para Frentes'],
-    tipo_operacao: tipoOperacaoGeloSelecionada,
-    gelo_unidade: unidadeGeloSelecionadaDesktop,
-    gelo_produzido: prodVal,
-    gelo_saida: saidaVal,
-    gelo_saldo: saldoResultante,
-    gelo_destinos: destinos || (tipoOperacaoGeloSelecionada === 'producao' ? 'Abastecimento do Freezer' : 'Canteiro Central')
-  };
+  let registroAlvo = null;
+  let idAlvo = idLancamentoGeloEmEdicao;
+  const isEdicao = Boolean(idAlvo);
 
   if (!Array.isArray(listaRegistrosRonda)) listaRegistrosRonda = [];
-  listaRegistrosRonda.unshift(novoRegistro);
-  localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
 
-  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
-    try {
-      await firestoreDb.collection('ronda_registros').doc(novoId).set(novoRegistro);
-    } catch (err) {
-      console.warn("Aviso ao salvar registro de gelo no Firestore:", err);
+  if (isEdicao) {
+    const idx = listaRegistrosRonda.findIndex(r => r.id === idAlvo);
+    if (idx !== -1) {
+      listaRegistrosRonda[idx] = {
+        ...listaRegistrosRonda[idx],
+        data: data,
+        hora: hora,
+        data_hora: dataHoraIso,
+        responsavel: responsavel,
+        observacoes: obs || (tipoOperacaoGeloSelecionada === 'producao' ? 'Fabricação de gelo registrada no desktop' : 'Expedição de gelo registrada no desktop'),
+        tipo_operacao: tipoOperacaoGeloSelecionada,
+        gelo_unidade: unidadeGeloSelecionadaDesktop,
+        gelo_produzido: prodVal,
+        gelo_saida: saidaVal,
+        gelo_saldo: saldoResultante,
+        gelo_destinos: destinos || (tipoOperacaoGeloSelecionada === 'producao' ? 'Abastecimento do Freezer' : 'Canteiro Central')
+      };
+      registroAlvo = listaRegistrosRonda[idx];
     }
   }
 
-  if (typeof registrarAuditoria === 'function') {
-    registrarAuditoria(
-      'gelo',
-      tipoOperacaoGeloSelecionada.toUpperCase(),
-      `Máquina de Gelo (${novoRegistro.gelo_destinos})`,
-      `${tipoOperacaoGeloSelecionada === 'saida' ? 'Expedido' : 'Produzido'}: ${qtd} ${unidadeGeloSelecionadaDesktop}. Saldo no freezer: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}. Operador: ${responsavel}`
-    );
+  if (!registroAlvo) {
+    idAlvo = 'gelo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    registroAlvo = {
+      id: idAlvo,
+      ponto_id: 'ponto_maquina_gelo_01',
+      ponto_nome: 'Máquina de Gelo 01 - Canteiro Central',
+      tipo: 'maquina_gelo',
+      setor: 'Canteiro Central - Refeitório / Apoio',
+      data: data,
+      hora: hora,
+      data_hora: dataHoraIso,
+      responsavel: responsavel,
+      avaliacao: 'Excelente / Em Ordem',
+      observacoes: obs || (tipoOperacaoGeloSelecionada === 'producao' ? 'Fabricação de gelo registrada no desktop' : 'Expedição de gelo registrada no desktop'),
+      checklist: ['Controle de Silo', 'Expedição para Frentes'],
+      tipo_operacao: tipoOperacaoGeloSelecionada,
+      gelo_unidade: unidadeGeloSelecionadaDesktop,
+      gelo_produzido: prodVal,
+      gelo_saida: saidaVal,
+      gelo_saldo: saldoResultante,
+      gelo_destinos: destinos || (tipoOperacaoGeloSelecionada === 'producao' ? 'Abastecimento do Freezer' : 'Canteiro Central')
+    };
+    listaRegistrosRonda.unshift(registroAlvo);
   }
 
-  showToast(`Lançamento de gelo registrado com sucesso! Saldo no freezer: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}`, 'success');
+  // 1. Atualização Instantânea no Cache Local (Optimistic UI - 0ms)
+  try {
+    localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+  } catch (e) {}
 
-  // Limpa campos variáveis do form mantendo data e responsável
+  // 2. Reconciliação imediata do saldo contábil
+  reconciliarSaldoGelo();
+
+  // 3. Reset do estado de edição
+  idLancamentoGeloEmEdicao = null;
+  const banner = document.getElementById('bannerEdicaoGelo');
+  if (banner) banner.classList.add('hidden');
+  const btnTxt = document.getElementById('textoBtnSalvarGelo');
+  const btnIco = document.getElementById('iconeBtnSalvarGelo');
+  if (btnTxt) btnTxt.textContent = 'Confirmar e Registrar Movimentação';
+  if (btnIco) btnIco.className = 'fa-solid fa-floppy-disk';
+
+  // Limpa campos variáveis mantendo operador e data
   const inputQtd = document.getElementById('formGeloQtd');
   const inputDest = document.getElementById('formGeloDestinos');
   const inputObs = document.getElementById('formGeloObs');
@@ -23726,7 +23895,35 @@ async function salvarLancamentoGeloDesktop(e) {
   if (inputDest) inputDest.value = '';
   if (inputObs) inputObs.value = '';
 
+  // 4. Renderização Instantânea da UI (0ms)
   carregarMaquinaGelo();
+
+  // 5. Feedback para o usuário
+  showToast(
+    isEdicao 
+      ? `Lançamento de gelo alterado com sucesso! Saldo recalculado: ${obterSaldoAtualSiloGelo()} ${unidadeGeloSelecionadaDesktop}`
+      : `Lançamento de gelo registrado com sucesso! Saldo no freezer: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}`,
+    'success'
+  );
+
+  // 6. Sincronização em segundo plano no Firestore (não trava a tela)
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    firestoreDb.collection('ronda_registros').doc(idAlvo).set(registroAlvo).catch(err => {
+      console.warn("Aviso ao salvar registro de gelo no Firestore:", err);
+    });
+  }
+
+  // 7. Registro de auditoria assíncrono
+  if (typeof registrarAuditoria === 'function') {
+    try {
+      registrarAuditoria(
+        'gelo',
+        isEdicao ? 'EDICAO' : tipoOperacaoGeloSelecionada.toUpperCase(),
+        `Máquina de Gelo (${registroAlvo.gelo_destinos})`,
+        `${isEdicao ? 'Alterado' : (tipoOperacaoGeloSelecionada === 'saida' ? 'Expedido' : 'Produzido')}: ${qtd} ${unidadeGeloSelecionadaDesktop}. Saldo: ${saldoResultante} ${unidadeGeloSelecionadaDesktop}. Operador: ${responsavel}`
+      );
+    } catch (e) {}
+  }
 }
 
 async function excluirLancamentoGelo(id) {
@@ -23738,19 +23935,67 @@ async function excluirLancamentoGelo(id) {
     return;
   }
 
+  // Se estava em edição, cancela modo de edição
+  if (idLancamentoGeloEmEdicao === id) {
+    cancelarEdicaoGelo();
+  }
+
   const [removido] = listaRegistrosRonda.splice(idx, 1);
-  localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+
+  // 1. Salva localmente imediatamente (Optimistic UI - 0ms)
+  try {
+    localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+  } catch (e) {}
+
+  // 2. Reconcilia o saldo imediatamente
+  reconciliarSaldoGelo();
+
+  // 3. Atualiza tela na hora (0ms)
+  carregarMaquinaGelo();
+  showToast('Lançamento de gelo excluído com sucesso.', 'info');
+
+  // 4. Exclusão assíncrona no Firestore em segundo plano
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    firestoreDb.collection('ronda_registros').doc(id).delete().catch(err => {
+      console.warn("Aviso ao excluir registro de gelo no Firestore:", err);
+    });
+  }
+}
+
+async function recarregarGeloManual() {
+  const icone = document.getElementById('iconeReloadGelo');
+  if (icone) icone.classList.add('fa-spin');
+  showToast('Sincronizando registros da Fábrica de Gelo com a nuvem...', 'info');
 
   if (typeof firestoreDb !== 'undefined' && firestoreDb) {
     try {
-      await firestoreDb.collection('ronda_registros').doc(id).delete();
+      const snap = await firestoreDb.collection('ronda_registros').get();
+      if (!snap.empty) {
+        const remRegs = [];
+        snap.forEach(doc => remRegs.push({ id: doc.id, ...doc.data() }));
+        remRegs.sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00')) || 0) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00')) || 0));
+        listaRegistrosRonda = remRegs;
+        try {
+          localStorage.setItem('ronda_registros_cache', JSON.stringify(listaRegistrosRonda));
+        } catch (e) {}
+      }
+      reconciliarSaldoGelo();
+      atualizarContadoresRondaUI();
+      carregarMaquinaGelo();
+      if (icone) icone.classList.remove('fa-spin');
+      showToast('Estoque e lançamentos de gelo atualizados com a nuvem!', 'success');
+      return;
     } catch (err) {
-      console.warn("Aviso ao excluir registro de gelo no Firestore:", err);
+      console.warn("Aviso ao sincronizar gelo com Firestore:", err);
     }
   }
 
-  showToast('Lançamento de gelo excluído com sucesso.', 'info');
+  // Fallback local caso offline
+  reconciliarSaldoGelo();
+  atualizarContadoresRondaUI();
   carregarMaquinaGelo();
+  if (icone) icone.classList.remove('fa-spin');
+  showToast('Estoque e lançamentos de gelo recalculados localmente!', 'info');
 }
 
 function imprimirPlaquetaGeloA4() {
@@ -23810,6 +24055,9 @@ window.filtrarHistoricoGeloUI = filtrarHistoricoGeloUI;
 window.renderizarHistoricoGelo = renderizarHistoricoGelo;
 window.salvarLancamentoGeloDesktop = salvarLancamentoGeloDesktop;
 window.excluirLancamentoGelo = excluirLancamentoGelo;
+window.editarLancamentoGelo = editarLancamentoGelo;
+window.cancelarEdicaoGelo = cancelarEdicaoGelo;
+window.recarregarGeloManual = recarregarGeloManual;
 window.imprimirPlaquetaGeloA4 = imprimirPlaquetaGeloA4;
 window.exportarGeloExcel = exportarGeloExcel;
 

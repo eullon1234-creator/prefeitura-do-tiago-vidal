@@ -3508,7 +3508,7 @@ service cloud.firestore {
 
           <!-- Ações Rápidas no Topo -->
           <div class="flex items-center gap-2 flex-wrap">
-            <button onclick="carregarMaquinaGelo()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Sincronizar com a Nuvem">
+            <button onclick="recarregarGeloManual()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition" title="Sincronizar com a Nuvem">
               <i class="fa-solid fa-arrows-rotate" id="iconeReloadGelo"></i>
               <span>Atualizar</span>
             </button>
@@ -3604,6 +3604,20 @@ service cloud.firestore {
                   Kg
                 </button>
               </div>
+            </div>
+
+            <!-- Banner de Edição Ativa -->
+            <div id="bannerEdicaoGelo" class="hidden p-3 rounded-xl bg-cyan-50 border border-cyan-300 text-cyan-900 text-xs flex items-center justify-between shadow-xs">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square text-cyan-700 text-sm"></i>
+                <div>
+                  <span class="font-bold block">Editando Lançamento de Gelo</span>
+                  <span id="textoEdicaoGeloDetalhes" class="text-[11px] text-cyan-800">Modifique os campos abaixo e clique em Salvar Alterações.</span>
+                </div>
+              </div>
+              <button type="button" onclick="cancelarEdicaoGelo()" class="px-2.5 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-xs font-bold transition">
+                Cancelar
+              </button>
             </div>
 
             <form id="formGeloMovimentacao" onsubmit="salvarLancamentoGeloDesktop(event)" class="space-y-3.5">
@@ -3705,8 +3719,8 @@ service cloud.firestore {
               </div>
 
               <button type="submit" id="btnSalvarLancamentoGelo" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-98 text-white font-bold text-xs uppercase tracking-wider shadow-sm transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-floppy-disk"></i>
-                <span>Confirmar e Registrar Movimentação</span>
+                <i class="fa-solid fa-floppy-disk" id="iconeBtnSalvarGelo"></i>
+                <span id="textoBtnSalvarGelo">Confirmar e Registrar Movimentação</span>
               </button>
             </form>
           </div>
