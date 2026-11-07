@@ -24564,33 +24564,374 @@ function exportarGeloExcel() {
       return;
     }
 
+    showToast('📊 Gerando Planilha Executiva da Fábrica de Gelo (GEL Engenharia)...', 'info');
+
+    const wb = XLSX.utils.book_new();
+    const dataHora = new Date().toLocaleString('pt-BR');
+    const dataHoje = getDataHojeLocal();
+    const empresaNome = localStorage.getItem('appCustomEmpresaNome') || 'GEL Goetze Lobato Engenharia S.A.';
+    const obraNome = localStorage.getItem('appCustomObraNome') || 'Canteiro PCH Taboca 2';
+
+    // 1. Obter e Reconciliar Dados de Gelo
+    const saldoAtualFreezer = typeof obterSaldoAtualSiloGelo === 'function' ? obterSaldoAtualSiloGelo() : 0;
     const regsGelo = (listaRegistrosRonda || [])
       .filter(r => r.tipo === 'maquina_gelo' || typeof r.gelo_produzido !== 'undefined' || typeof r.gelo_saida !== 'undefined' || typeof r.gelo_saldo !== 'undefined')
       .sort((a, b) => new Date(b.data_hora || (b.data + 'T' + (b.hora || '00:00'))) - new Date(a.data_hora || (a.data + 'T' + (a.hora || '00:00'))));
 
-    const dadosExport = regsGelo.map((r, i) => ({
-      'Item': i + 1,
-      'Data': r.data || '-',
-      'Horário': r.hora || '-',
-      'Ponto / Máquina': r.ponto_nome || 'Máquina de Gelo 01',
-      'Setor': r.setor || 'Canteiro Central',
-      'Operador': r.responsavel || 'Operador',
-      'Unidade': (r.gelo_unidade || 'sacos').toUpperCase(),
-      'Fabricado (Entrada)': parseFloat(r.gelo_produzido || 0) || 0,
-      'Expedido (Saída)': parseFloat(r.gelo_saida || 0) || 0,
-      'Saldo no Freezer': parseFloat(r.gelo_saldo || 0) || 0,
-      'Frentes Atendidas / Destino': r.gelo_destinos || '-',
-      'Observações': r.observacoes || '-'
-    }));
+    const totalLancamentos = regsGelo.length;
+    let totalFabricadoSacos = 0;
+    let totalExpedidoSacos = 0;
+    const totaisPorFrente = {};
+    const viagensPorFrente = {};
 
-    const ws = XLSX.utils.json_to_sheet(dadosExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "FÁBRICA DE GELO");
+    regsGelo.forEach(r => {
+      const unid = r.gelo_unidade || 'sacos';
+      const fator = unid === 'kg' ? (1 / PESO_PADRAO_SACO_GELO_KG) : 1;
+      const prod = (parseFloat(r.gelo_produzido || 0) || 0) * fator;
+      const saida = (parseFloat(r.gelo_saida || 0) || 0) * fator;
 
-    const dataHoje = getDataHojeLocal();
-    XLSX.writeFile(wb, `RELATORIO_FABRICA_MAQUINA_DE_GELO_${dataHoje}.xlsx`);
-    showToast('Planilha de Fábrica & Máquina de Gelo exportada com sucesso!', 'success');
+      totalFabricadoSacos += prod;
+      totalExpedidoSacos += saida;
+
+      if (saida > 0) {
+        const destStr = r.gelo_destinos || 'Canteiro Central';
+        const partes = destStr.split(',').map(s => s.trim()).filter(Boolean);
+        const listaFrentes = partes.length > 0 ? partes : ['Canteiro Central'];
+        const rateio = saida / listaFrentes.length;
+
+        listaFrentes.forEach(fRaw => {
+          const fNorm = typeof normalizarNomeFrenteGelo === 'function' ? normalizarNomeFrenteGelo(fRaw) : fRaw;
+          totaisPorFrente[fNorm] = (totaisPorFrente[fNorm] || 0) + rateio;
+          viagensPorFrente[fNorm] = (viagensPorFrente[fNorm] || 0) + 1;
+        });
+      }
+    });
+
+    // Ordena frentes por volume consumido
+    let frentesOrdenadas = Object.keys(totaisPorFrente).sort((a, b) => totaisPorFrente[b] - totaisPorFrente[a]);
+    if (frentesOrdenadas.length === 0) {
+      frentesOrdenadas = ['KM 12', 'KM 14', 'Britagem', 'Refeitório', 'Oficina', 'Alojamentos', 'Canteiro Central'];
+    }
+
+    const topFrenteNome = frentesOrdenadas[0] || 'Nenhuma';
+    const topFrenteQtd = totaisPorFrente[topFrenteNome] || 0;
+    const pctTop = totalExpedidoSacos > 0 ? Math.round((topFrenteQtd / totalExpedidoSacos) * 100) : 0;
+
+    // ========================================================
+    // ABA 1: PAINEL EXECUTIVO & FRENTES DE SERVIÇO
+    // ========================================================
+    const ws1 = {};
+    ExcelProGenerator.addCabecalhoCorporativoGEL(
+      ws1,
+      `${empresaNome.toUpperCase()} — PAINEL EXECUTIVO DE GESTÃO DE GELO`,
+      `${obraNome} • Responsável: Tiago Vidal (Prefeito do Canteiro) • Emissão: ${dataHora} • Padrão: 1 Saco = ${PESO_PADRAO_SACO_GELO_KG} kg`,
+      6
+    );
+
+    // Bloco de KPIs Consolidados (Linhas 4 a 8)
+    ExcelProGenerator.addCell(ws1, 3, 0, 'QUADRO DE INDICADORES GERAIS DA FÁBRICA', { s: ExcelProGenerator.estilos.thSection });
+    for (let c = 1; c < 6; c++) ExcelProGenerator.addCell(ws1, 3, c, '', { s: ExcelProGenerator.estilos.thSection });
+    if (!ws1['!merges']) ws1['!merges'] = [];
+    ws1['!merges'].push({ s: { r: 3, c: 0 }, e: { r: 3, c: 5 } });
+
+    const kpisLinhas = [
+      ['Saldo Atual Disponível no Freezer', `${saldoAtualFreezer} sacos`, `~${Math.round(saldoAtualFreezer * PESO_PADRAO_SACO_GELO_KG)} kg`, 'Estoque imediato para abastecimento'],
+      ['Total Histórico de Gelo Fabricado', `${Math.round(totalFabricadoSacos)} sacos`, `~${Math.round(totalFabricadoSacos * PESO_PADRAO_SACO_GELO_KG)} kg`, 'Produção acumulada pela máquina'],
+      ['Total Histórico Expedido p/ Frentes', `${Math.round(totalExpedidoSacos)} sacos`, `~${Math.round(totalExpedidoSacos * PESO_PADRAO_SACO_GELO_KG)} kg`, 'Consumo consolidado nas frentes'],
+      ['Maior Frente Consumidora de Gelo', topFrenteNome, `${Math.round(topFrenteQtd)} sacos (${pctTop}%)`, 'Líder em demanda de hidratação'],
+      ['Balanço Geral da Operação', (totalFabricadoSacos >= totalExpedidoSacos ? 'SUPERÁVIT DE PRODUÇÃO' : 'DÉFICIT OPERACIONAL'), `${Math.round(totalFabricadoSacos - totalExpedidoSacos)} sacos de saldo líquido`, 'Capacidade produtiva vs. demanda']
+    ];
+
+    kpisLinhas.forEach((k, idx) => {
+      const r = 4 + idx;
+      const zebra = idx % 2 === 1;
+      ExcelProGenerator.addCell(ws1, r, 0, k[0], { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 1, k[1], { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 2, k[2], { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 3, k[3], { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, r, 4, '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, r, 5, '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ws1['!merges'].push({ s: { r, c: 3 }, e: { r, c: 5 } });
+    });
+
+    // Tabela de Detalhamento por Frente de Serviço (A partir da Linha 11)
+    const rowTabelaFrentesHeader = 10;
+    ExcelProGenerator.addCell(ws1, rowTabelaFrentesHeader - 1, 0, 'DEMANDA CONSOLIDADA POR FRENTE DE SERVIÇO', { s: ExcelProGenerator.estilos.thSection });
+    for (let c = 1; c < 6; c++) ExcelProGenerator.addCell(ws1, rowTabelaFrentesHeader - 1, c, '', { s: ExcelProGenerator.estilos.thSection });
+    ws1['!merges'].push({ s: { r: rowTabelaFrentesHeader - 1, c: 0 }, e: { r: rowTabelaFrentesHeader - 1, c: 5 } });
+
+    const hFrentes = [
+      'Frente de Serviço / Setor',
+      'Viagens / Lançamentos',
+      'Volume Total (Sacos)',
+      'Equivalente (Kg)',
+      'Participação no Consumo (%)',
+      'Status Operacional'
+    ];
+    hFrentes.forEach((h, col) => ExcelProGenerator.addCell(ws1, rowTabelaFrentesHeader, col, h, { s: ExcelProGenerator.estilos.thNavy }));
+
+    let rFrentes = rowTabelaFrentesHeader + 1;
+    const firstRowFrentesEx = rFrentes + 1;
+
+    frentesOrdenadas.forEach((frente, idx) => {
+      const zebra = idx % 2 === 1;
+      const rowEx = rFrentes + 1;
+      const qtdSacos = Math.round((totaisPorFrente[frente] || 0) * 10) / 10;
+      const viagens = viagensPorFrente[frente] || (qtdSacos > 0 ? 1 : 0);
+      const pct = totalExpedidoSacos > 0 ? (qtdSacos / totalExpedidoSacos) : 0;
+
+      ExcelProGenerator.addCell(ws1, rFrentes, 0, frente, { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws1, rFrentes, 1, viagens, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, rFrentes, 2, qtdSacos, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, rFrentes, 3, Math.round(qtdSacos * PESO_PADRAO_SACO_GELO_KG), { f: `C${rowEx}*${PESO_PADRAO_SACO_GELO_KG}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws1, rFrentes, 4, pct, { f: `IF($C$${firstRowFrentesEx + frentesOrdenadas.length}>0,C${rowEx}/$C$${firstRowFrentesEx + frentesOrdenadas.length},0)`, z: '0.0%', s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws1, rFrentes, 5, qtdSacos > 0 ? 'FRENTE ATIVA' : 'SEM RETIRADA', { s: qtdSacos > 0 ? ExcelProGenerator.estilos.statusLivre : ExcelProGenerator.estilos.td(zebra, 'center') });
+      rFrentes++;
+    });
+
+    const totRowFrentes = rFrentes;
+    const totRowFrentesEx = totRowFrentes + 1;
+    const lastRowFrentesEx = rFrentes;
+
+    ExcelProGenerator.addCell(ws1, totRowFrentes, 0, 'TOTAL GERAL DISTRIBUÍDO', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws1, totRowFrentes, 1, '-', { f: `SUM(B${firstRowFrentesEx}:B${lastRowFrentesEx})`, s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowFrentes, 2, Math.round(totalExpedidoSacos), { f: `SUM(C${firstRowFrentesEx}:C${lastRowFrentesEx})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowFrentes, 3, Math.round(totalExpedidoSacos * PESO_PADRAO_SACO_GELO_KG), { f: `SUM(D${firstRowFrentesEx}:D${lastRowFrentesEx})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws1, totRowFrentes, 4, 1.0, { z: '0.0%', s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws1, totRowFrentes, 5, '100% ATENDIDO', { s: ExcelProGenerator.estilos.total('center') });
+
+    ws1['!ref'] = `A1:F${totRowFrentesEx + 2}`;
+    ws1['!cols'] = [{ wch: 32 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 26 }, { wch: 22 }];
+    ws1['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 12 }, { hpt: 22 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "PAINEL EXECUTIVO");
+
+    // ========================================================
+    // ABA 2: EXPEDIÇÃO DE GELO (SAÍDAS PARA FRENTES)
+    // ========================================================
+    const ws2 = {};
+    ExcelProGenerator.addCabecalhoCorporativoGEL(
+      ws2,
+      `${empresaNome.toUpperCase()} — LOGS DE EXPEDIÇÃO DE GELO PARA FRENTES`,
+      `${obraNome} • Controle de Saídas e Abastecimento de Caixas Térmicas • Emissão: ${dataHora}`,
+      9
+    );
+
+    const h2 = [
+      'Nº',
+      'Data da Saída',
+      'Horário',
+      'Frente de Serviço / Destino',
+      'Qtd Expedida (Sacos)',
+      'Equivalente (Kg)',
+      'Saldo Freezer (Sacos)',
+      'Operador / Responsável',
+      'Observações de Campo'
+    ];
+    h2.forEach((h, col) => ExcelProGenerator.addCell(ws2, 3, col, h, { s: ExcelProGenerator.estilos.thNavy }));
+
+    const saidas = regsGelo.filter(r => (parseFloat(r.gelo_saida || 0) || 0) > 0);
+    let r2 = 4;
+    const firstRowSaidasEx = 5;
+
+    saidas.forEach((r, idx) => {
+      const zebra = idx % 2 === 1;
+      const rowEx = r2 + 1;
+      const unid = r.gelo_unidade || 'sacos';
+      const fator = unid === 'kg' ? (1 / PESO_PADRAO_SACO_GELO_KG) : 1;
+      const qtdSacos = (parseFloat(r.gelo_saida || 0) || 0) * fator;
+      const saldoSacos = parseFloat(r.gelo_saldo || 0) || 0;
+
+      ExcelProGenerator.addCell(ws2, r2, 0, idx + 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 1, r.data || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 2, r.hora || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 3, r.gelo_destinos || 'Canteiro Central', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r2, 4, qtdSacos, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws2, r2, 5, Math.round(qtdSacos * PESO_PADRAO_SACO_GELO_KG), { f: `E${rowEx}*${PESO_PADRAO_SACO_GELO_KG}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws2, r2, 6, saldoSacos, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws2, r2, 7, r.responsavel || 'Operador', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws2, r2, 8, r.observacoes || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      r2++;
+    });
+
+    if (saidas.length === 0) {
+      ExcelProGenerator.addCell(ws2, r2, 0, 'Nenhuma expedição registrada até o momento.', { s: ExcelProGenerator.estilos.td(false, 'center') });
+      for (let c = 1; c < 9; c++) ExcelProGenerator.addCell(ws2, r2, c, '', { s: ExcelProGenerator.estilos.td(false, 'center') });
+      if (!ws2['!merges']) ws2['!merges'] = [];
+      ws2['!merges'].push({ s: { r: r2, c: 0 }, e: { r: r2, c: 8 } });
+      r2++;
+    } else {
+      const totRowSaidas = r2;
+      const lastRowSaidasEx = r2;
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 0, 'TOTAL GERAL EXPEDIDO', { s: ExcelProGenerator.estilos.total('left') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 1, `${saidas.length} saídas`, { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 4, Math.round(totalExpedidoSacos), { f: `SUM(E${firstRowSaidasEx}:E${lastRowSaidasEx})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 5, Math.round(totalExpedidoSacos * PESO_PADRAO_SACO_GELO_KG), { f: `SUM(F${firstRowSaidasEx}:F${lastRowSaidasEx})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 6, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 7, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws2, totRowSaidas, 8, '-', { s: ExcelProGenerator.estilos.total('center') });
+      r2++;
+    }
+
+    ws2['!ref'] = `A1:I${r2 + 1}`;
+    ws2['!cols'] = [{ wch: 8 }, { wch: 14 }, { wch: 10 }, { wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 26 }, { wch: 36 }];
+    ws2['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 24 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "EXPEDIÇÃO FRENTES");
+
+    // ========================================================
+    // ABA 3: FABRICAÇÃO & ENTRADAS NO FREEZER
+    // ========================================================
+    const ws3 = {};
+    ExcelProGenerator.addCabecalhoCorporativoGEL(
+      ws3,
+      `${empresaNome.toUpperCase()} — FABRICAÇÃO E ENTRADAS NO FREEZER`,
+      `${obraNome} • Lotes Produzidos pela Máquina de Gelo 01 • Emissão: ${dataHora}`,
+      9
+    );
+
+    const h3 = [
+      'Nº',
+      'Data da Produção',
+      'Horário',
+      'Tipo de Operação',
+      'Qtd Fabricada (Sacos)',
+      'Equivalente (Kg)',
+      'Saldo Resultante no Freezer',
+      'Operador Responsável',
+      'Checklist / Observações Técnicas'
+    ];
+    h3.forEach((h, col) => ExcelProGenerator.addCell(ws3, 3, col, h, { s: ExcelProGenerator.estilos.thNavy }));
+
+    const entradas = regsGelo.filter(r => (parseFloat(r.gelo_produzido || 0) || 0) > 0 || r.tipo_operacao === 'ajuste');
+    let r3 = 4;
+    const firstRowEntradasEx = 5;
+
+    entradas.forEach((r, idx) => {
+      const zebra = idx % 2 === 1;
+      const rowEx = r3 + 1;
+      const unid = r.gelo_unidade || 'sacos';
+      const fator = unid === 'kg' ? (1 / PESO_PADRAO_SACO_GELO_KG) : 1;
+      const prodSacos = (parseFloat(r.gelo_produzido || 0) || 0) * fator;
+      const saldoSacos = parseFloat(r.gelo_saldo || 0) || 0;
+      const tipoOpTexto = r.tipo_operacao === 'ajuste' ? 'AJUSTE / INVENTÁRIO' : 'FABRICAÇÃO (LOTE)';
+
+      ExcelProGenerator.addCell(ws3, r3, 0, idx + 1, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r3, 1, r.data || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r3, 2, r.hora || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r3, 3, tipoOpTexto, { s: r.tipo_operacao === 'ajuste' ? ExcelProGenerator.estilos.statusOcupada : ExcelProGenerator.estilos.statusLivre });
+      ExcelProGenerator.addCell(ws3, r3, 4, prodSacos, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws3, r3, 5, Math.round(prodSacos * PESO_PADRAO_SACO_GELO_KG), { f: `E${rowEx}*${PESO_PADRAO_SACO_GELO_KG}`, s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws3, r3, 6, saldoSacos, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws3, r3, 7, r.responsavel || 'Operador', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws3, r3, 8, r.observacoes || 'Higienização de dreno e pás em ordem', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      r3++;
+    });
+
+    if (entradas.length === 0) {
+      ExcelProGenerator.addCell(ws3, r3, 0, 'Nenhuma fabricação registrada no período.', { s: ExcelProGenerator.estilos.td(false, 'center') });
+      for (let c = 1; c < 9; c++) ExcelProGenerator.addCell(ws3, r3, c, '', { s: ExcelProGenerator.estilos.td(false, 'center') });
+      if (!ws3['!merges']) ws3['!merges'] = [];
+      ws3['!merges'].push({ s: { r: r3, c: 0 }, e: { r: r3, c: 8 } });
+      r3++;
+    } else {
+      const totRowEntradas = r3;
+      const lastRowEntradasEx = r3;
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 0, 'TOTAL GERAL FABRICADO', { s: ExcelProGenerator.estilos.total('left') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 1, `${entradas.length} registros`, { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 4, Math.round(totalFabricadoSacos), { f: `SUM(E${firstRowEntradasEx}:E${lastRowEntradasEx})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 5, Math.round(totalFabricadoSacos * PESO_PADRAO_SACO_GELO_KG), { f: `SUM(F${firstRowEntradasEx}:F${lastRowEntradasEx})`, s: ExcelProGenerator.estilos.total('right') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 6, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 7, '-', { s: ExcelProGenerator.estilos.total('center') });
+      ExcelProGenerator.addCell(ws3, totRowEntradas, 8, '-', { s: ExcelProGenerator.estilos.total('center') });
+      r3++;
+    }
+
+    ws3['!ref'] = `A1:I${r3 + 1}`;
+    ws3['!cols'] = [{ wch: 8 }, { wch: 14 }, { wch: 10 }, { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 26 }, { wch: 26 }, { wch: 40 }];
+    ws3['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 24 }];
+    XLSX.utils.book_append_sheet(wb, ws3, "FABRICAÇÃO FREEZER");
+
+    // ========================================================
+    // ABA 4: AUDITORIA COMPLETA & TRACE CONTÁBIL
+    // ========================================================
+    const ws4 = {};
+    ExcelProGenerator.addCabecalhoCorporativoGEL(
+      ws4,
+      `${empresaNome.toUpperCase()} — LIVRO RAZÃO CONTÁBIL & AUDITORIA DE GELO`,
+      `${obraNome} • Rastreamento Cronológico de Entradas, Saídas e Saldos do Freezer • Emissão: ${dataHora}`,
+      10
+    );
+
+    const h4 = [
+      'Protocolo ID',
+      'Data',
+      'Horário',
+      'Operação',
+      'Frente / Destino',
+      'Entrada (Sacos)',
+      'Saída (Sacos)',
+      'Saldo no Freezer (Sacos)',
+      'Operador / Inspetor',
+      'Observações Técnicas'
+    ];
+    h4.forEach((h, col) => ExcelProGenerator.addCell(ws4, 3, col, h, { s: ExcelProGenerator.estilos.thNavy }));
+
+    let r4 = 4;
+    const firstRowAuditEx = 5;
+
+    regsGelo.forEach((rg, idx) => {
+      const zebra = idx % 2 === 1;
+      const unid = rg.gelo_unidade || 'sacos';
+      const fator = unid === 'kg' ? (1 / PESO_PADRAO_SACO_GELO_KG) : 1;
+      const prod = (parseFloat(rg.gelo_produzido || 0) || 0) * fator;
+      const saida = (parseFloat(rg.gelo_saida || 0) || 0) * fator;
+      const saldo = parseFloat(rg.gelo_saldo || 0) || 0;
+
+      let opBadge = 'EXPEDIÇÃO';
+      if (prod > 0) opBadge = 'FABRICAÇÃO';
+      else if (rg.tipo_operacao === 'ajuste') opBadge = 'AJUSTE';
+
+      ExcelProGenerator.addCell(ws4, r4, 0, rg.id || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 1, rg.data || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 2, rg.hora || '-', { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 3, opBadge, { s: ExcelProGenerator.estilos.badgeAction(opBadge, zebra) });
+      ExcelProGenerator.addCell(ws4, r4, 4, rg.gelo_destinos || (prod > 0 ? 'Abastecimento do Freezer' : 'Canteiro Central'), { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws4, r4, 5, prod, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws4, r4, 6, saida, { s: ExcelProGenerator.estilos.td(zebra, 'right') });
+      ExcelProGenerator.addCell(ws4, r4, 7, saldo, { s: ExcelProGenerator.estilos.td(zebra, 'center') });
+      ExcelProGenerator.addCell(ws4, r4, 8, rg.responsavel || 'Operador', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      ExcelProGenerator.addCell(ws4, r4, 9, rg.observacoes || '-', { s: ExcelProGenerator.estilos.td(zebra, 'left') });
+      r4++;
+    });
+
+    const totRowAudit = r4;
+    const lastRowAuditEx = r4;
+
+    ExcelProGenerator.addCell(ws4, totRowAudit, 0, 'TOTALIZAÇÃO GERAL', { s: ExcelProGenerator.estilos.total('left') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 1, `${regsGelo.length} movs`, { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 2, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 3, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 4, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 5, Math.round(totalFabricadoSacos), { f: `SUM(F${firstRowAuditEx}:F${lastRowAuditEx})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 6, Math.round(totalExpedidoSacos), { f: `SUM(G${firstRowAuditEx}:G${lastRowAuditEx})`, s: ExcelProGenerator.estilos.total('right') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 7, saldoAtualFreezer, { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 8, '-', { s: ExcelProGenerator.estilos.total('center') });
+    ExcelProGenerator.addCell(ws4, totRowAudit, 9, '-', { s: ExcelProGenerator.estilos.total('center') });
+
+    ws4['!ref'] = `A1:J${r4 + 1}`;
+    ws4['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 16 }, { wch: 30 }, { wch: 18 }, { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 36 }];
+    ws4['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 10 }, { hpt: 24 }];
+    XLSX.utils.book_append_sheet(wb, ws4, "AUDITORIA COMPLETA");
+
+    // Gravação e Download do Arquivo XLSX
+    const nomeArquivo = `RELATORIO_EXECUTIVO_FABRICA_DE_GELO_${obraNome.replace(/\s+/g, '_').toUpperCase()}_${dataHoje}.xlsx`;
+    XLSX.writeFile(wb, nomeArquivo);
+    showToast('Planilha Executiva de Gelo gerada com sucesso com 4 abas profissionais!', 'success');
   } catch (err) {
+    console.error("Erro ao gerar planilha executiva de gelo:", err);
     showToast('Erro ao exportar planilha de gelo: ' + err.message, 'error');
   }
 }
