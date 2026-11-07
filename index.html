@@ -168,9 +168,63 @@
         max-width: 100% !important;
         width: 100% !important;
       }
-      body.imprimindo-placa-ronda #areaImpressaoPlacaRonda {
+            body.imprimindo-placa-ronda #areaImpressaoPlacaRonda {
         background: white !important;
         padding: 0 !important;
+      }
+
+      /* Impressão em Lote das Placas A4 da Ronda de Vigilância Noturna */
+      body.imprimindo-placas-vigilancia > *:not(#modalPlaquinhasA4Vigilancia) { display: none !important; }
+      body.imprimindo-placas-vigilancia #modalPlaquinhasA4Vigilancia {
+        position: static !important;
+        display: block !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        max-height: none !important;
+        width: 100% !important;
+      }
+      body.imprimindo-placas-vigilancia #modalPlaquinhasA4Vigilancia > div {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      body.imprimindo-placas-vigilancia #containerPlaquinhasA4Vigilancia {
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+      }
+      body.imprimindo-placas-vigilancia .placa-a4-vigilancia {
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin: 0 auto !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        height: 275mm !important;
+        min-height: 275mm !important;
+        max-height: 280mm !important;
+        box-shadow: none !important;
+        border: 4px solid #0f172a !important;
+        border-radius: 1.25rem !important;
+        padding: 1.5rem !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+      }
+      body.imprimindo-placas-vigilancia .placa-a4-vigilancia:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
       }
       @page {
         size: A4 portrait;
@@ -9154,29 +9208,55 @@ service cloud.firestore {
     </div>
   </div>
 
-  <!-- ================= MODAL PLAQUINHAS A4 DE VIGILÂNCIA NOTURNA (IMPRESSÃO) ================= -->
+  <!-- ================= MODAL PLAQUINHAS A4 DE VIGILÂNCIA NOTURNA (IMPRESSÃO EM LOTE) ================= -->
   <div id="modalPlaquinhasA4Vigilancia" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[85] flex items-center justify-center p-2 sm:p-4 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-700">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[96vh] flex flex-col overflow-hidden border border-slate-700">
+      
       <!-- Topbar não-imprimível -->
-      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between flex-shrink-0 print:hidden">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between flex-shrink-0 print:hidden border-b border-slate-800">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+          <div class="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
             <i class="fa-solid fa-print text-base"></i>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-white">Impressão de Placas com QR Code • Vigilância Noturna</h3>
-            <p class="text-[11px] text-slate-400">Padrão A4 • Canteiro PCH Taboca 2 • GEL Engenharia</p>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 flex-wrap">
+              <span>Impressão de Placas A4 • Ronda de Vigilância</span>
+              <span id="badgeQtdPlacasVigilancia" class="px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-500 text-white shadow-xs">0 selecionadas</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">1 placa oficial por folha A4 • Impressão em lote sem cortes</p>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
-          <button type="button" onclick="window.print()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
-            <i class="fa-solid fa-print"></i> Imprimir Placas
+          <button type="button" id="btnDispararImpressaoVigilancia" onclick="executarImpressaoPlacasVigilancia()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md hover:shadow-lg transition">
+            <i class="fa-solid fa-print"></i>
+            <span id="txtBtnImprimirPlacasVigilancia">Imprimir Placas</span>
           </button>
-          <button type="button" onclick="fecharModal('modalPlaquinhasA4Vigilancia')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <button type="button" onclick="fecharModal('modalPlaquinhasA4Vigilancia')" class="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition">
             <i class="fa-solid fa-xmark text-lg"></i>
           </button>
         </div>
+      </div>
+
+      <!-- Barra de Ações Rápidas de Seleção (print:hidden) -->
+      <div class="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 print:hidden">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs font-bold text-slate-700">Selecione os pontos:</span>
+          <button type="button" onclick="selecionarTodosPontosImpressao(true)" class="px-2.5 py-1 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold text-[11px] transition">
+            <i class="fa-solid fa-check-double mr-1"></i> Marcar Todos
+          </button>
+          <button type="button" onclick="selecionarTodosPontosImpressao(false)" class="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px] transition">
+            <i class="fa-solid fa-xmark mr-1"></i> Desmarcar Todos
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-500 font-medium">
+          Dica: Você pode desmarcar pontos para imprimir apenas os que desejar.
+        </p>
+      </div>
+
+      <!-- Container de Chips dos Pontos (print:hidden) -->
+      <div id="containerChipsPontosVigilancia" class="px-5 py-2.5 bg-white border-b border-slate-200 max-h-28 overflow-y-auto flex items-center gap-1.5 flex-wrap print:hidden text-xs">
+        <!-- Preenchido via JS com botões/chips toggleáveis -->
       </div>
 
       <!-- Área rolável de impressão com as placas -->

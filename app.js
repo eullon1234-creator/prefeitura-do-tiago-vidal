@@ -21456,73 +21456,171 @@ function excluirPontoVigilancia(id) {
 }
 
 // Geração do HTML de Plaquinha A4 com QR Code
+let pontosSelecionadosParaImpressao = new Set();
+
 function gerarHtmlPlaquinhaA4(ponto, idx) {
   const cod = ponto.id || `PNT-${String(idx + 1).padStart(2, '0')}`;
   const qrUrl = getQRCodeUrlVigilancia(cod, ponto.nome);
-  const imgId = `imgQrPlaquinhaVig_${cod.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-  setTimeout(() => {
-    const imgEl = document.getElementById(imgId);
-    if (imgEl) renderizarQRCodeEmImagem(imgEl, qrUrl, 380);
-  }, 100);
+  const dataUrl = (typeof gerarQRCodeDataUrl === 'function') 
+    ? gerarQRCodeDataUrl(qrUrl, 6, 4) 
+    : '';
 
   return `
-    <div class="bg-white p-8 rounded-2xl border-4 border-slate-900 shadow-xl max-w-xl mx-auto break-after-page text-center text-slate-900 my-6">
+    <div class="placa-a4-vigilancia bg-white p-6 sm:p-8 rounded-2xl border-4 border-slate-900 shadow-xl max-w-xl mx-auto text-center text-slate-900 my-6 flex flex-col justify-between" style="min-height: 270mm; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid;">
       <!-- Cabeçalho Oficial GEL Engenharia -->
-      <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
-        <img src="logo_gel_cropped.png" alt="GEL Engenharia" class="h-10 object-contain">
-        <div class="text-right">
-          <h3 class="text-xs font-black uppercase tracking-wider text-indigo-900">GEL • Goetze Lobato Engenharia S.A.</h3>
-          <p class="text-[11px] font-bold text-slate-600">Obra PCH Taboca 2 • Canteiro & Alojamentos</p>
+      <div>
+        <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
+          <img src="logo_gel_cropped.png" alt="GEL Engenharia" class="h-9 sm:h-10 object-contain">
+          <div class="text-right">
+            <h3 class="text-xs font-black uppercase tracking-wider text-indigo-900">GEL • Goetze Lobato Engenharia S.A.</h3>
+            <p class="text-[10px] sm:text-[11px] font-bold text-slate-600">Obra PCH Taboca 2 • Canteiro & Alojamentos</p>
+          </div>
+        </div>
+
+        <!-- Título da Plaqueta -->
+        <div class="bg-slate-900 text-white py-2 px-3 sm:px-4 rounded-xl mb-4">
+          <h2 class="text-sm sm:text-base font-black uppercase tracking-wider flex items-center justify-center gap-2">
+            <i class="fa-solid fa-shield-halved text-amber-400"></i> Ponto Oficial de Ronda Noturna
+          </h2>
+          <p class="text-[10px] sm:text-[11px] text-slate-300">Vigilância Patrimonial • Passagem Obrigatória (18h às 06h)</p>
+        </div>
+
+        <!-- Informações do Local -->
+        <div class="mb-3">
+          <span class="inline-block px-3 py-1 rounded-md bg-indigo-100 text-indigo-900 font-mono font-black text-xs mb-1.5">
+            CÓDIGO: ${escapeHTML(cod)}
+          </span>
+          <h1 class="text-2xl sm:text-3xl font-black uppercase text-slate-950 tracking-tight leading-tight">
+            ${escapeHTML(ponto.nome)}
+          </h1>
+          <p class="text-xs sm:text-sm font-semibold text-slate-600 mt-1">
+            ${escapeHTML(ponto.referencia || 'Fixar em local visível e desobstruído')}
+          </p>
         </div>
       </div>
 
-      <!-- Título da Plaqueta -->
-      <div class="bg-slate-900 text-white py-2 px-4 rounded-xl mb-6">
-        <h2 class="text-base sm:text-lg font-black uppercase tracking-wider flex items-center justify-center gap-2">
-          <i class="fa-solid fa-shield-halved text-amber-400"></i> Ponto Oficial de Ronda Noturna
-        </h2>
-        <p class="text-[11px] text-slate-300">Vigilância Patrimonial • Passagem Obrigatória (18h às 06h)</p>
+      <!-- QR Code em Alta Resolução Gerado Imediatamente -->
+      <div class="p-3 sm:p-4 bg-white rounded-2xl border-2 border-slate-300 inline-block mx-auto my-2 shadow-inner">
+        <img src="${dataUrl}" alt="QR Code Ponto de Ronda" class="w-60 h-60 sm:w-68 sm:h-68 object-contain mx-auto">
       </div>
 
-      <!-- Informações do Local -->
-      <div class="mb-5">
-        <span class="inline-block px-3 py-1 rounded-md bg-indigo-100 text-indigo-900 font-mono font-black text-xs mb-2">
-          CÓDIGO: ${escapeHTML(cod)}
-        </span>
-        <h1 class="text-2xl sm:text-3xl font-black uppercase text-slate-950 tracking-tight leading-tight">
-          ${escapeHTML(ponto.nome)}
-        </h1>
-        <p class="text-sm font-semibold text-slate-600 mt-1">
-          ${escapeHTML(ponto.referencia || 'Fixar em local visível e desobstruído')}
-        </p>
-      </div>
-
-      <!-- QR Code em Alta Resolução -->
-      <div class="p-4 bg-white rounded-2xl border-2 border-slate-300 inline-block mx-auto my-3 shadow-inner">
-        <img id="${imgId}" src="" alt="QR Code Ponto de Ronda" class="w-64 h-64 sm:w-72 sm:h-72 object-contain mx-auto">
-      </div>
-
-      <!-- Instruções de Escaneamento -->
-      <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 mt-5 text-indigo-950 text-xs text-left">
-        <div class="flex items-center gap-2 font-bold mb-1">
-          <i class="fa-solid fa-mobile-screen-button text-indigo-600"></i> INSTRUÇÕES PARA O VIGILANTE:
+      <!-- Instruções de Escaneamento e Rodapé -->
+      <div>
+        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-indigo-950 text-xs text-left">
+          <div class="flex items-center gap-1.5 font-bold mb-1">
+            <i class="fa-solid fa-mobile-screen-button text-indigo-600"></i> INSTRUÇÕES PARA O VIGILANTE:
+          </div>
+          <ol class="list-decimal list-inside space-y-0.5 text-[10px] sm:text-[11px] text-indigo-900 font-medium">
+            <li>Abra o aplicativo de <b>Vigilância Noturna</b> no celular do plantão.</li>
+            <li>Aponte a câmera para o QR Code acima até emitir o bipe de confirmação.</li>
+            <li>Em caso de porta aberta ou avaria, marque <b>Registrar Ocorrência</b>.</li>
+            <li>Trava de segurança: escaneamentos repetidos no mesmo ponto exigem 10 minutos de intervalo.</li>
+          </ol>
         </div>
-        <ol class="list-decimal list-inside space-y-0.5 text-[11px] text-indigo-900">
-          <li>Abra o aplicativo de <b>Vigilância Noturna</b> no celular do plantão.</li>
-          <li>Aponte a câmera para o QR Code acima até emitir o bipe de confirmação.</li>
-          <li>Em caso de porta aberta ou avaria, marque <b>Registrar Ocorrência</b>.</li>
-          <li>Trava de segurança: escaneamentos repetidos no mesmo ponto exigem 10 minutos de intervalo.</li>
-        </ol>
-      </div>
 
-      <!-- Rodapé da Plaqueta -->
-      <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-        <span>PREFEITURA DE CANTEIRO GEL</span>
-        <span>SISTEMA DE CONTROLE PATRIMONIAL</span>
+        <!-- Rodapé da Plaqueta -->
+        <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+          <span>PREFEITURA DE CANTEIRO GEL</span>
+          <span>SISTEMA DE CONTROLE PATRIMONIAL</span>
+        </div>
       </div>
     </div>
   `;
+}
+
+function atualizarVisualizacaoPlacasVigilancia() {
+  const container = document.getElementById('containerPlaquinhasA4Vigilancia');
+  const badgeQtd = document.getElementById('badgeQtdPlacasVigilancia');
+  const txtBtn = document.getElementById('txtBtnImprimirPlacasVigilancia');
+  const containerChips = document.getElementById('containerChipsPontosVigilancia');
+
+  const totalSelecionados = pontosSelecionadosParaImpressao.size;
+
+  if (badgeQtd) {
+    badgeQtd.textContent = `${totalSelecionados} selecionada${totalSelecionados !== 1 ? 's' : ''} (${totalSelecionados} folha${totalSelecionados !== 1 ? 's' : ''} A4)`;
+  }
+  if (txtBtn) {
+    txtBtn.textContent = totalSelecionados > 0 
+      ? `Imprimir ${totalSelecionados} Placa${totalSelecionados !== 1 ? 's' : ''} (${totalSelecionados} A4)`
+      : 'Nenhuma Placa Selecionada';
+  }
+
+  // Renderizar chips de seleção
+  if (containerChips) {
+    containerChips.innerHTML = listaPontosVigilancia.map((p, idx) => {
+      const isSel = pontosSelecionadosParaImpressao.has(p.id);
+      const cod = p.id || `PNT-${String(idx + 1).padStart(2, '0')}`;
+      return `
+        <button type="button" onclick="alternarSelecaoPontoImpressao('${p.id}')" class="px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+          isSel 
+            ? 'bg-indigo-600 text-white shadow-xs' 
+            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+        }">
+          <i class="fa-solid ${isSel ? 'fa-check-circle text-amber-300' : 'fa-circle text-slate-300'}"></i>
+          <span>${escapeHTML(cod)} - ${escapeHTML(p.nome)}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  // Renderizar placas selecionadas
+  if (container) {
+    if (totalSelecionados === 0) {
+      container.innerHTML = `
+        <div class="py-16 text-center text-slate-400">
+          <i class="fa-solid fa-file-circle-xmark text-4xl mb-3 text-slate-300"></i>
+          <p class="text-sm font-bold text-slate-600">Nenhum ponto de ronda selecionado.</p>
+          <p class="text-xs text-slate-400 mt-1">Marque os pontos desejados na barra acima para visualizar e imprimir.</p>
+          <button type="button" onclick="selecionarTodosPontosImpressao(true)" class="mt-4 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-sm hover:bg-indigo-500 transition">
+            Marcar Todos os Pontos
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    const pontosParaRenderizar = listaPontosVigilancia.filter(p => pontosSelecionadosParaImpressao.has(p.id));
+    container.innerHTML = pontosParaRenderizar.map((p, idx) => gerarHtmlPlaquinhaA4(p, idx)).join('');
+  }
+}
+
+function alternarSelecaoPontoImpressao(id) {
+  if (pontosSelecionadosParaImpressao.has(id)) {
+    pontosSelecionadosParaImpressao.delete(id);
+  } else {
+    pontosSelecionadosParaImpressao.add(id);
+  }
+  atualizarVisualizacaoPlacasVigilancia();
+}
+
+function selecionarTodosPontosImpressao(marcar) {
+  if (marcar) {
+    pontosSelecionadosParaImpressao = new Set(listaPontosVigilancia.map(p => p.id));
+  } else {
+    pontosSelecionadosParaImpressao.clear();
+  }
+  atualizarVisualizacaoPlacasVigilancia();
+}
+
+function executarImpressaoPlacasVigilancia() {
+  if (pontosSelecionadosParaImpressao.size === 0) {
+    showToast('Nenhum ponto selecionado para impressão.', 'warning');
+    return;
+  }
+
+  document.body.classList.add('imprimindo-placas-vigilancia');
+
+  const onPrintEnd = () => {
+    document.body.classList.remove('imprimindo-placas-vigilancia');
+    window.removeEventListener('afterprint', onPrintEnd);
+  };
+  window.addEventListener('afterprint', onPrintEnd);
+
+  setTimeout(() => {
+    document.body.classList.remove('imprimindo-placas-vigilancia');
+  }, 2500);
+
+  window.print();
 }
 
 function imprimirPlaquinhaVigilancia(id) {
@@ -21532,10 +21630,8 @@ function imprimirPlaquinhaVigilancia(id) {
     return;
   }
 
-  const container = document.getElementById('containerPlaquinhasA4Vigilancia');
-  if (!container) return;
-
-  container.innerHTML = gerarHtmlPlaquinhaA4(ponto, 0);
+  pontosSelecionadosParaImpressao = new Set([id]);
+  atualizarVisualizacaoPlacasVigilancia();
   abrirModal('modalPlaquinhasA4Vigilancia');
 }
 
@@ -21545,10 +21641,8 @@ function imprimirTodasPlaquinhasVigilancia() {
     return;
   }
 
-  const container = document.getElementById('containerPlaquinhasA4Vigilancia');
-  if (!container) return;
-
-  container.innerHTML = listaPontosVigilancia.map((p, idx) => gerarHtmlPlaquinhaA4(p, idx)).join('');
+  pontosSelecionadosParaImpressao = new Set(listaPontosVigilancia.map(p => p.id));
+  atualizarVisualizacaoPlacasVigilancia();
   abrirModal('modalPlaquinhasA4Vigilancia');
 }
 
@@ -21646,6 +21740,9 @@ window.salvarNovoPontoVigilancia = salvarNovoPontoVigilancia;
 window.excluirPontoVigilancia = excluirPontoVigilancia;
 window.imprimirPlaquinhaVigilancia = imprimirPlaquinhaVigilancia;
 window.imprimirTodasPlaquinhasVigilancia = imprimirTodasPlaquinhasVigilancia;
+window.executarImpressaoPlacasVigilancia = executarImpressaoPlacasVigilancia;
+window.alternarSelecaoPontoImpressao = alternarSelecaoPontoImpressao;
+window.selecionarTodosPontosImpressao = selecionarTodosPontosImpressao;
 window.exportarRelatorioTurnoVigilanciaExcel = exportarRelatorioTurnoVigilanciaExcel;
 
 

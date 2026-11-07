@@ -2105,6 +2105,11 @@ assert(appJs.includes('function salvarNovoPontoVigilancia('), 'Função salvarNo
 assert(appJs.includes('function excluirPontoVigilancia('), 'Função excluirPontoVigilancia implementada');
 assert(appJs.includes('function imprimirPlaquinhaVigilancia('), 'Função imprimirPlaquinhaVigilancia implementada');
 assert(appJs.includes('function imprimirTodasPlaquinhasVigilancia()'), 'Função imprimirTodasPlaquinhasVigilancia implementada');
+assert(appJs.includes('function executarImpressaoPlacasVigilancia()'), 'Função executarImpressaoPlacasVigilancia implementada');
+assert(appJs.includes('function alternarSelecaoPontoImpressao('), 'Função alternarSelecaoPontoImpressao implementada');
+assert(appJs.includes('function selecionarTodosPontosImpressao('), 'Função selecionarTodosPontosImpressao implementada');
+assert(indexHtml.includes('id="badgeQtdPlacasVigilancia"'), 'Badge de quantidade de placas selecionadas presente em index.html');
+assert(indexHtml.includes('id="containerChipsPontosVigilancia"'), 'Container de chips de pontos de vigilância presente em index.html');
 assert(appJs.includes('function exportarRelatorioTurnoVigilanciaExcel()'), 'Função exportarRelatorioTurnoVigilanciaExcel implementada');
 assert(appJs.includes('function getQRCodeUrlVigilancia('), 'Função getQRCodeUrlVigilancia implementada');
 assert(appJs.includes('function obterInfoTurnoNoturno('), 'Função obterInfoTurnoNoturno implementada');
