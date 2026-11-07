@@ -3531,6 +3531,9 @@ async function carregarDashboard() {
     const elSideCountVagas = document.getElementById('sideCountVagas');
     if (elSideCountVagas) elSideCountVagas.textContent = totalVagasGeral;
 
+    const elSideCountAlojados = document.getElementById('sideCountAlojados');
+    if (elSideCountAlojados) elSideCountAlojados.textContent = totalOcupadasGeral;
+
     const sideBadge = document.getElementById('sideCountAlertas');
     if (sideBadge) {
       sideBadge.textContent = data.geral.total_alertas_manutencao;
@@ -23452,6 +23455,8 @@ function carregarMaquinaGelo() {
     sideCount.textContent = `${saldoSilo} sc`;
     sideCount.classList.remove('hidden');
   }
+  const drawerGelo = document.getElementById('drawerBadgeGelo');
+  if (drawerGelo) drawerGelo.textContent = `${saldoSilo} sacos`;
 
   calcularPrevisaoSaldoGelo();
   filtrarHistoricoGeloUI();
