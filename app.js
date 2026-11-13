@@ -3117,6 +3117,7 @@ const mapaGrupoAba = {
   'ronda': 'grupo_operacoes',
   'ronda_vigilancia': 'grupo_operacoes',
   'portal_alojado': 'grupo_operacoes',
+  'sorteio': 'grupo_operacoes',
   'maquina_gelo': 'grupo_operacoes',
   'estoque': 'grupo_logistica',
   'erp_canteiro': 'grupo_logistica',
@@ -3226,6 +3227,8 @@ function switchTab(tabId) {
     carregarRondaVigilancia();
   } else if (tabId === 'portal_alojado') {
     carregarPortalAlojadoAdmin();
+  } else if (tabId === 'sorteio') {
+    carregarSorteioAdmin();
   } else if (tabId === 'maquina_gelo') {
     carregarMaquinaGelo();
   } else if (tabId === 'estoque') {
@@ -22021,6 +22024,23 @@ let estadoPortalMoradorAdmin = {
   ],
   alojados_sincronizados: [],
   ultimo_sync_alojados: '',
+  sorteio: {
+    ativo: false,
+    status: 'rascunho',
+    titulo: 'Sorteio Destaque do Canteiro',
+    premio: 'Kit Churrasco & Brinde Especial GEL',
+    criterio: 'Quarto Mais Organizado',
+    modo_justica: 'individual',
+    evitar_repeticao: true,
+    horario_sorteio: '',
+    auto_disparar: false,
+    quartos_ids: [],
+    bilhetes: [],
+    ganhador: null,
+    sorteio_iniciado_em: 0,
+    historico: [],
+    atualizado_em: ''
+  },
   atualizado_timestamp: Date.now()
 };
 
@@ -22110,6 +22130,9 @@ function obterEstadoPortalLocal() {
         }
         if (parsed.lavanderia) {
           estadoPortalMoradorAdmin.lavanderia = Object.assign({}, estadoPortalMoradorAdmin.lavanderia, parsed.lavanderia);
+        }
+        if (parsed.sorteio) {
+          estadoPortalMoradorAdmin.sorteio = Object.assign({}, estadoPortalMoradorAdmin.sorteio, parsed.sorteio);
         }
       }
     }
@@ -23261,6 +23284,579 @@ function exportarAvaliacoesRefeicoesExcel() {
 }
 
 window.alternarSubAbaPortalAlojado = alternarSubAbaPortalAlojado;
+// ========================================================
+// MÓDULO: SORTEIO MOTIVACIONAL DE QUARTOS (PREFEITO + CELULAR AO VIVO)
+// ========================================================
+let quartosSelecionadosSorteioSet = new Set();
+let timerGloboSorteioAdmin = null;
+let timerAgendamentoSorteioAdmin = null;
+let globosAdminPausado = false;
+
+function obterDbSorteio() {
+  return (window.StaticApiEngine && window.StaticApiEngine.dbState) ? window.StaticApiEngine.dbState : {};
+}
+
+/**
+ * Retorna quartos ocupados elegíveis enriquecidos com moradores ativos e status de limpeza.
+ */
+function obterQuartosElegiveisSorteio() {
+  const db = obterDbSorteio();
+  const quartos = Array.isArray(db.quartos) ? db.quartos : [];
+  const alojados = (Array.isArray(db.alojados) ? db.alojados : []).filter(a => a && a.nome_completo && a.status !== 'inativo' && !a.excluido);
+
+  const lista = [];
+  quartos.forEach(q => {
+    if (!q || q.status === 'desativado' || q.status === 'manutencao') return;
+    const ocupantes = alojados.filter(a =>
+      String(a.quarto_id) === String(q.id) ||
+      (String(a.bloco_nome || '').toLowerCase() === String(q.bloco_nome || '').toLowerCase() &&
+       String(a.quarto_numero || '').trim() === String(q.numero || '').trim())
+    );
+    if (ocupantes.length === 0) return; // Ignora quartos vazios automaticamente
+
+    let limpezaEmDia = false;
+    let textoLimpeza = 'Sem vistoria hoje';
+    if (typeof calcularStatusLimpezaQuarto === 'function') {
+      const st = calcularStatusLimpezaQuarto(q);
+      if (st && st.rotina && st.rotina.status === 'ok') {
+        limpezaEmDia = true;
+        textoLimpeza = 'Limpeza em dia';
+      }
+    }
+
+    lista.push({
+      id: String(q.id),
+      bloco: q.bloco_nome || 'Bloco',
+      numero: String(q.numero || ''),
+      limpezaEmDia,
+      textoLimpeza,
+      ocupantes: ocupantes.map(o => ({
+        id: String(o.id || ''),
+        nome: o.nome_completo,
+        matricula: o.matricula || '',
+        empresa: o.empresa_nome || 'GEL ENGENHARIA',
+        funcao: o.funcao || 'Colaborador',
+        cama: o.numero_cama || 1
+      }))
+    });
+  });
+
+  lista.sort((a, b) => {
+    const cmpB = a.bloco.localeCompare(b.bloco, 'pt-BR', { numeric: true });
+    if (cmpB !== 0) return cmpB;
+    return a.numero.localeCompare(b.numero, 'pt-BR', { numeric: true });
+  });
+  return lista;
+}
+
+function getIdsQuartosFiltradosSorteio() {
+  const blocoFiltro = document.getElementById('selectSorteioFiltroBloco')?.value || 'todos';
+  const condFiltro = document.getElementById('selectSorteioFiltroStatus')?.value || 'ocupados';
+  const busca = (document.getElementById('inputSorteioBuscaQuarto')?.value || '').trim().toLowerCase();
+
+  return obterQuartosElegiveisSorteio().filter(q => {
+    if (blocoFiltro !== 'todos' && q.bloco !== blocoFiltro) return false;
+    if (condFiltro === 'limpos' && !q.limpezaEmDia) return false;
+    if (busca) {
+      const matchQuarto = q.numero.toLowerCase().includes(busca) || q.bloco.toLowerCase().includes(busca);
+      const matchMorador = q.ocupantes.some(o => o.nome.toLowerCase().includes(busca) || String(o.matricula).toLowerCase().includes(busca));
+      if (!matchQuarto && !matchMorador) return false;
+    }
+    return true;
+  });
+}
+
+function popularFiltroBlocosSorteio(quartosElegiveis) {
+  const sel = document.getElementById('selectSorteioFiltroBloco');
+  if (!sel) return;
+  const valorAtual = sel.value || 'todos';
+  const blocos = [...new Set(quartosElegiveis.map(q => q.bloco))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+  sel.innerHTML = '<option value="todos">Todos os Blocos / Pavilhões</option>' +
+    blocos.map(b => `<option value="${escapeHTML(b)}">${escapeHTML(b)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === valorAtual)) sel.value = valorAtual;
+}
+
+function aoMudarConfigSorteio() {
+  atualizarPreviewBilhetesSorteio();
+}
+
+function filtrarQuartosSorteio() {
+  const filtrados = getIdsQuartosFiltradosSorteio();
+  const grid = document.getElementById('gridQuartosSorteio');
+  if (!grid) return;
+
+  if (filtrados.length === 0) {
+    grid.innerHTML = `<div class="col-span-full text-center py-8 text-slate-400 font-semibold">Nenhum quarto ocupado encontrado para este filtro.</div>`;
+    atualizarPreviewBilhetesSorteio();
+    return;
+  }
+
+  grid.innerHTML = filtrados.map(q => {
+    const marcado = quartosSelecionadosSorteioSet.has(q.id);
+    const nomesResumo = q.ocupantes.map(o => escapeHTML(o.nome.split(' ').slice(0, 2).join(' '))).join(', ');
+    const badgeLimp = q.limpezaEmDia
+      ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">Limpo</span>'
+      : '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold">Padrão</span>';
+    return `
+      <button type="button" onclick="alternarQuartoSorteio('${escapeHTML(q.id)}')" aria-pressed="${marcado ? 'true' : 'false'}" class="text-left p-3 rounded-xl border-2 transition flex flex-col justify-between gap-2 ${marcado ? 'border-amber-500 bg-amber-50/70 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'}">
+        <div class="flex items-center justify-between gap-1.5 w-full">
+          <div class="font-black text-slate-900 text-xs">${escapeHTML(q.bloco)} • Q.${escapeHTML(q.numero)}</div>
+          <span class="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-black ${marcado ? 'bg-amber-500 text-slate-950' : 'bg-slate-100 text-slate-400'}">
+            <i class="fa-solid ${marcado ? 'fa-check' : 'fa-plus'}"></i>
+          </span>
+        </div>
+        <div class="flex items-center justify-between gap-1 flex-wrap">
+          <span class="text-[11px] font-bold text-indigo-700">${q.ocupantes.length} pessoa(s)</span>
+          ${badgeLimp}
+        </div>
+        <div class="text-[10px] text-slate-500 truncate w-full" title="${escapeHTML(q.ocupantes.map(o => o.nome).join(', '))}">${nomesResumo}</div>
+      </button>
+    `;
+  }).join('');
+
+  atualizarPreviewBilhetesSorteio();
+}
+
+function alternarQuartoSorteio(quartoId) {
+  const idStr = String(quartoId);
+  if (quartosSelecionadosSorteioSet.has(idStr)) {
+    quartosSelecionadosSorteioSet.delete(idStr);
+  } else {
+    quartosSelecionadosSorteioSet.add(idStr);
+  }
+  filtrarQuartosSorteio();
+}
+
+function selecionarQuartosVisiveisSorteio(marcar) {
+  const visiveis = getIdsQuartosFiltradosSorteio();
+  visiveis.forEach(q => {
+    if (marcar) quartosSelecionadosSorteioSet.add(q.id);
+    else quartosSelecionadosSorteioSet.delete(q.id);
+  });
+  filtrarQuartosSorteio();
+}
+
+function selecionarQuartosLimposAutomatico() {
+  const todos = obterQuartosElegiveisSorteio();
+  quartosSelecionadosSorteioSet.clear();
+  todos.filter(q => q.limpezaEmDia).forEach(q => quartosSelecionadosSorteioSet.add(q.id));
+  filtrarQuartosSorteio();
+  showToast(`🧹 ${quartosSelecionadosSorteioSet.size} quarto(s) com limpeza em dia selecionado(s)!`, 'info');
+}
+
+/**
+ * Gera os bilhetes garantindo igualdade de chances conforme o modo escolhido.
+ */
+function gerarBilhetesSorteio() {
+  const modo = document.getElementById('selectSorteioModoJustica')?.value || 'individual';
+  const evitarRep = Boolean(document.getElementById('chkSorteioEvitarRepeticao')?.checked);
+  const s = (estadoPortalMoradorAdmin && estadoPortalMoradorAdmin.sorteio) ? estadoPortalMoradorAdmin.sorteio : {};
+  const ultimoGanhador = (Array.isArray(s.historico) && s.historico.length > 0) ? s.historico[0] : null;
+
+  const quartosMap = new Map(obterQuartosElegiveisSorteio().map(q => [q.id, q]));
+  const bilhetes = [];
+  let seq = 1;
+
+  quartosSelecionadosSorteioSet.forEach(qid => {
+    const q = quartosMap.get(String(qid));
+    if (!q || q.ocupantes.length === 0) return;
+
+    if (modo === 'por_quarto') {
+      if (evitarRep && ultimoGanhador && String(ultimoGanhador.quarto_id) === q.id) return;
+      const numStr = 'Q' + String(seq).padStart(2, '0');
+      seq++;
+      bilhetes.push({
+        numero: numStr,
+        tipo: 'quarto',
+        quarto_id: q.id,
+        bloco: q.bloco,
+        quarto: q.numero,
+        alojado_id: '',
+        nome: `Equipe Quarto ${q.numero} (${q.ocupantes.length} mor.)`,
+        moradores_nomes: q.ocupantes.map(o => o.nome)
+      });
+    } else {
+      q.ocupantes.forEach(oc => {
+        if (evitarRep && ultimoGanhador && oc.id && String(ultimoGanhador.alojado_id) === String(oc.id)) return;
+        const numStr = String(seq).padStart(3, '0');
+        seq++;
+        bilhetes.push({
+          numero: numStr,
+          tipo: 'individual',
+          quarto_id: q.id,
+          bloco: q.bloco,
+          quarto: q.numero,
+          alojado_id: oc.id,
+          matricula: oc.matricula,
+          cama: oc.cama,
+          empresa: oc.empresa,
+          nome: oc.nome,
+          moradores_nomes: [oc.nome]
+        });
+      });
+    }
+  });
+
+  return bilhetes;
+}
+
+function atualizarPreviewBilhetesSorteio() {
+  const modo = document.getElementById('selectSorteioModoJustica')?.value || 'individual';
+  const expEl = document.getElementById('textoExplicacaoJusticaSorteio');
+  if (expEl) {
+    expEl.innerHTML = modo === 'por_quarto'
+      ? 'Modo Coletivo: cada quarto selecionado recebe <strong>1 único bilhete</strong> (mesma chance para quarto de 1, 2 ou 4 pessoas). Se ganhar, todos os ocupantes do quarto compartilham a premiação.'
+      : 'Como quartos têm de 1 a 4 moradores, cada colaborador ativo nos quartos marcados recebe <strong>1 único número da sorte</strong>: todos têm exatamente a mesma chance individual. Quartos vazios ou em manutenção ficam bloqueados automaticamente.';
+  }
+
+  const bilhetes = gerarBilhetesSorteio();
+  const qtdQuartos = quartosSelecionadosSorteioSet.size;
+
+  const contEl = document.getElementById('contadorQuartosSelecionadosSorteio');
+  if (contEl) contEl.textContent = `${qtdQuartos} quarto(s) marcado(s)`;
+  const resEl = document.getElementById('resumoBilhetesSorteioAdmin');
+  if (resEl) resEl.textContent = `${qtdQuartos} quarto(s) • ${bilhetes.length} bilhete(s) da sorte gerado(s)`;
+  const badgeBilEl = document.getElementById('badgeQtdBilhetesPreview');
+  if (badgeBilEl) badgeBilEl.textContent = `${bilhetes.length} bilhete(s)`;
+  const badgeChanceEl = document.getElementById('badgeChanceSorteioAdmin');
+  if (badgeChanceEl) {
+    badgeChanceEl.textContent = bilhetes.length > 0 ? `Chance: ${(100 / bilhetes.length).toFixed(1)}% cada` : 'Chance: --';
+  }
+
+  const listEl = document.getElementById('listaBilhetesPreviewSorteio');
+  if (!listEl) return;
+  if (bilhetes.length === 0) {
+    listEl.innerHTML = `<p class="text-center text-slate-400 py-4">Marque ao menos 1 quarto ocupado ao lado para gerar os números da sorte.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = bilhetes.map(b => `
+    <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200">
+      <div class="min-w-0">
+        <div class="font-bold text-slate-800 truncate">${escapeHTML(b.nome)}</div>
+        <div class="text-[10px] text-slate-500">${escapeHTML(b.bloco)} • Quarto ${escapeHTML(b.quarto)}</div>
+      </div>
+      <span class="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 font-black font-mono text-[11px] flex-shrink-0">#${escapeHTML(b.numero)}</span>
+    </div>
+  `).join('');
+}
+
+function lerConfigSorteioDoFormulario(bilhetes) {
+  const getVal = (id) => (document.getElementById(id)?.value || '').trim();
+  const sAtual = (estadoPortalMoradorAdmin && estadoPortalMoradorAdmin.sorteio) ? estadoPortalMoradorAdmin.sorteio : {};
+  return {
+    ativo: true,
+    status: 'agendado',
+    titulo: getVal('inputSorteioTitulo') || 'Sorteio Destaque do Canteiro',
+    premio: getVal('inputSorteioPremio') || 'Kit Especial GEL',
+    criterio: getVal('selectSorteioCriterio') || 'Quarto Mais Organizado',
+    modo_justica: getVal('selectSorteioModoJustica') || 'individual',
+    evitar_repeticao: Boolean(document.getElementById('chkSorteioEvitarRepeticao')?.checked),
+    horario_sorteio: getVal('inputSorteioDataHora'),
+    auto_disparar: Boolean(document.getElementById('chkSorteioAutoHorario')?.checked),
+    quartos_ids: Array.from(quartosSelecionadosSorteioSet),
+    bilhetes: bilhetes,
+    ganhador: null,
+    sorteio_iniciado_em: 0,
+    historico: Array.isArray(sAtual.historico) ? sAtual.historico : [],
+    atualizado_em: new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  };
+}
+
+async function publicarSorteioMotivacional() {
+  if (!checkPrefeitoAccess()) return;
+  const bilhetes = gerarBilhetesSorteio();
+  if (bilhetes.length === 0) {
+    showToast('Selecione pelo menos 1 quarto ocupado para publicar o sorteio.', 'warning');
+    return;
+  }
+
+  obterEstadoPortalLocal();
+  estadoPortalMoradorAdmin.sorteio = lerConfigSorteioDoFormulario(bilhetes);
+  atualizarStatusUiSorteioAdmin();
+  iniciarMonitorHorarioSorteioAdmin();
+
+  await persistirDocumentoUnicoPortal(`🏆 Sorteio publicado no App do Celular com ${bilhetes.length} bilhete(s)!`);
+}
+
+function escolherIndiceAleatorioJusto(total) {
+  if (total <= 1) return 0;
+  if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    return arr[0] % total;
+  }
+  return Math.floor(Math.random() * total);
+}
+
+async function dispararSorteioAoVivo(disparoAutomatico = false) {
+  if (!disparoAutomatico && !checkPrefeitoAccess()) return;
+  const bilhetes = gerarBilhetesSorteio();
+  if (bilhetes.length === 0) {
+    showToast('Nenhum bilhete gerado. Selecione os quartos participantes primeiro!', 'warning');
+    return;
+  }
+
+  obterEstadoPortalLocal();
+  const sConfig = lerConfigSorteioDoFormulario(bilhetes);
+  const escolhido = bilhetes[escolhidoIdxSafe(bilhetes.length)];
+  const agora = Date.now();
+  const ganhadorObj = {
+    numero: escolhido.numero,
+    nome: escolhido.nome,
+    alojado_id: escolhido.alojado_id || '',
+    quarto_id: escolhido.quarto_id,
+    bloco: escolhido.bloco,
+    quarto: escolhido.quarto,
+    moradores_nomes: escolhido.moradores_nomes || [escolhido.nome],
+    premio: sConfig.premio,
+    criterio: sConfig.criterio,
+    titulo: sConfig.titulo,
+    modo_justica: sConfig.modo_justica,
+    sorteado_em: new Date(agora).toLocaleDateString('pt-BR') + ' às ' + new Date(agora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  };
+
+  sConfig.status = 'sorteando';
+  sConfig.sorteio_iniciado_em = agora;
+  sConfig.ganhador = ganhadorObj;
+  sConfig.historico = [ganhadorObj].concat(sConfig.historico || []).slice(0, 15);
+  estadoPortalMoradorAdmin.sorteio = sConfig;
+
+  pararMonitorHorarioSorteioAdmin();
+  atualizarStatusUiSorteioAdmin();
+  renderizarHistoricoSorteiosAdmin();
+  iniciarAnimacaoGloboAdmin(ganhadorObj);
+
+  if (typeof registrarAuditoriaLocal === 'function') {
+    try { registrarAuditoriaLocal('Sorteio', `Sorteio "${sConfig.titulo}" vencido por #${ganhadorObj.numero} ${ganhadorObj.nome} (${ganhadorObj.bloco} - Q.${ganhadorObj.quarto})`); } catch (e) {}
+  }
+
+  await persistirDocumentoUnicoPortal(`🎲 Globo girando! Resultado #${ganhadorObj.numero} transmitido ao vivo para o App!`, disparoAutomatico);
+}
+
+function escolhidoIdxSafe(total) {
+  return escolherIndiceAleatorioJusto(total);
+}
+
+function iniciarAnimacaoGloboAdmin(ganhador) {
+  if (timerGloboSorteioAdmin) clearTimeout(timerGloboSorteioAdmin);
+  globosAdminPausado = false;
+
+  const palco = document.getElementById('palcoGloboSorteioAdmin');
+  const esfera = document.getElementById('esferaGloboAdmin');
+  const cardRes = document.getElementById('cardResultadoSorteioAdmin');
+  const txtSt = document.getElementById('textoStatusGloboAdmin');
+
+  if (cardRes) cardRes.classList.add('hidden');
+  if (palco) palco.classList.remove('hidden');
+  if (esfera) esfera.classList.remove('sorteio-globo-pausado');
+  if (txtSt) txtSt.textContent = 'Misturando as bolinhas da sorte no globo ao vivo...';
+
+  const semMovimento = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const duracaoMs = semMovimento ? 400 : 5200;
+
+  timerGloboSorteioAdmin = setTimeout(() => {
+    revelarGanhadorSorteioAdmin(ganhador, true);
+  }, duracaoMs);
+}
+
+function pausarOuRevelarGloboAdmin() {
+  if (timerGloboSorteioAdmin) clearTimeout(timerGloboSorteioAdmin);
+  const s = estadoPortalMoradorAdmin.sorteio || {};
+  if (s.ganhador) {
+    revelarGanhadorSorteioAdmin(s.ganhador, true);
+  }
+}
+
+async function revelarGanhadorSorteioAdmin(ganhador, persistirEncerrado = false) {
+  const palco = document.getElementById('palcoGloboSorteioAdmin');
+  const cardRes = document.getElementById('cardResultadoSorteioAdmin');
+  if (palco) palco.classList.add('hidden');
+  if (cardRes && ganhador) {
+    cardRes.classList.remove('hidden');
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v || '--'; };
+    setTxt('resSorteioNumeroBadge', `#${ganhador.numero}`);
+    setTxt('resSorteioNomeGanhador', ganhador.nome);
+    setTxt('resSorteioQuartoGanhador', `${ganhador.bloco} • Quarto ${ganhador.quarto}`);
+    setTxt('resSorteioPremioGanhador', ganhador.premio);
+    setTxt('resSorteioCriterioGanhador', `${ganhador.criterio} (${ganhador.sorteado_em || ''})`);
+  }
+
+  if (persistirEncerrado && estadoPortalMoradorAdmin.sorteio && estadoPortalMoradorAdmin.sorteio.status === 'sorteando') {
+    estadoPortalMoradorAdmin.sorteio.status = 'encerrado';
+    atualizarStatusUiSorteioAdmin();
+    await persistirDocumentoUnicoPortal(null, true);
+  }
+}
+
+async function resetarSorteioAtual() {
+  if (!checkPrefeitoAccess()) return;
+  if (timerGloboSorteioAdmin) clearTimeout(timerGloboSorteioAdmin);
+  pararMonitorHorarioSorteioAdmin();
+
+  const hist = (estadoPortalMoradorAdmin.sorteio && Array.isArray(estadoPortalMoradorAdmin.sorteio.historico))
+    ? estadoPortalMoradorAdmin.sorteio.historico
+    : [];
+  quartosSelecionadosSorteioSet.clear();
+
+  estadoPortalMoradorAdmin.sorteio = {
+    ativo: false,
+    status: 'rascunho',
+    titulo: document.getElementById('inputSorteioTitulo')?.value || 'Sorteio Destaque do Canteiro',
+    premio: document.getElementById('inputSorteioPremio')?.value || 'Kit Especial GEL',
+    criterio: document.getElementById('selectSorteioCriterio')?.value || 'Quarto Mais Organizado',
+    modo_justica: document.getElementById('selectSorteioModoJustica')?.value || 'individual',
+    evitar_repeticao: Boolean(document.getElementById('chkSorteioEvitarRepeticao')?.checked),
+    horario_sorteio: '',
+    auto_disparar: false,
+    quartos_ids: [],
+    bilhetes: [],
+    ganhador: null,
+    sorteio_iniciado_em: 0,
+    historico: hist,
+    atualizado_em: ''
+  };
+
+  const palco = document.getElementById('palcoGloboSorteioAdmin');
+  const cardRes = document.getElementById('cardResultadoSorteioAdmin');
+  if (palco) palco.classList.add('hidden');
+  if (cardRes) cardRes.classList.add('hidden');
+
+  atualizarStatusUiSorteioAdmin();
+  filtrarQuartosSorteio();
+  await persistirDocumentoUnicoPortal('🔄 Rodada encerrada! Você pode selecionar quartos para um novo sorteio.');
+}
+
+function atualizarStatusUiSorteioAdmin() {
+  const s = (estadoPortalMoradorAdmin && estadoPortalMoradorAdmin.sorteio) ? estadoPortalMoradorAdmin.sorteio : {};
+  const badge = document.getElementById('badgeStatusSorteioAdmin');
+  if (!badge) return;
+  if (!s.ativo || s.status === 'rascunho') {
+    badge.textContent = 'Rascunho / Aguardando';
+    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200';
+  } else if (s.status === 'agendado') {
+    badge.textContent = s.horario_sorteio ? `Publicado • ${s.horario_sorteio.replace('T', ' ')}` : 'Publicado no App';
+    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-200';
+  } else if (s.status === 'sorteando') {
+    badge.textContent = '🎲 Sorteando Ao Vivo!';
+    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300';
+  } else if (s.status === 'encerrado') {
+    badge.textContent = '🏆 Resultado Publicado';
+    badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+  }
+}
+
+function renderizarHistoricoSorteiosAdmin() {
+  const s = (estadoPortalMoradorAdmin && estadoPortalMoradorAdmin.sorteio) ? estadoPortalMoradorAdmin.sorteio : {};
+  const hist = Array.isArray(s.historico) ? s.historico : [];
+  const badge = document.getElementById('badgeQtdHistoricoSorteio');
+  if (badge) badge.textContent = String(hist.length);
+  const cont = document.getElementById('listaHistoricoSorteiosAdmin');
+  if (!cont) return;
+
+  if (hist.length === 0) {
+    cont.innerHTML = `<p class="text-center text-slate-400 py-3">Nenhum sorteio concluído ainda.</p>`;
+    return;
+  }
+
+  cont.innerHTML = hist.map(h => `
+    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+      <div class="min-w-0">
+        <div class="font-bold text-slate-900 truncate">${escapeHTML(h.nome)}</div>
+        <div class="text-[10px] text-slate-500">${escapeHTML(h.bloco)} • Q.${escapeHTML(h.quarto)} • ${escapeHTML(h.premio)}</div>
+        <div class="text-[10px] text-slate-400">${escapeHTML(h.sorteado_em || '')}</div>
+      </div>
+      <span class="px-2 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-black font-mono text-[11px] flex-shrink-0">#${escapeHTML(h.numero)}</span>
+    </div>
+  `).join('');
+}
+
+function iniciarMonitorHorarioSorteioAdmin() {
+  pararMonitorHorarioSorteioAdmin();
+  const s = estadoPortalMoradorAdmin.sorteio;
+  if (!s || s.status !== 'agendado' || !s.auto_disparar || !s.horario_sorteio) return;
+
+  const alvoMs = new Date(s.horario_sorteio).getTime();
+  if (isNaN(alvoMs)) return;
+
+  timerAgendamentoSorteioAdmin = setInterval(() => {
+    if (!estadoPortalMoradorAdmin.sorteio || estadoPortalMoradorAdmin.sorteio.status !== 'agendado') {
+      pararMonitorHorarioSorteioAdmin();
+      return;
+    }
+    if (Date.now() >= alvoMs) {
+      pararMonitorHorarioSorteioAdmin();
+      dispararSorteioAoVivo(true);
+    }
+  }, 1000);
+}
+
+function pararMonitorHorarioSorteioAdmin() {
+  if (timerAgendamentoSorteioAdmin) {
+    clearInterval(timerAgendamentoSorteioAdmin);
+    timerAgendamentoSorteioAdmin = null;
+  }
+}
+
+async function carregarSorteioAdmin() {
+  obterEstadoPortalLocal();
+  if (typeof firestoreDb !== 'undefined' && firestoreDb) {
+    try {
+      const snap = await firestoreDb.collection('config_sistema').doc('portal_morador').get();
+      if (snap && snap.exists && snap.data().sorteio) {
+        estadoPortalMoradorAdmin.sorteio = Object.assign({}, estadoPortalMoradorAdmin.sorteio, snap.data().sorteio);
+      }
+    } catch (e) {}
+  }
+
+  const s = estadoPortalMoradorAdmin.sorteio || {};
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
+  setVal('inputSorteioTitulo', s.titulo || 'Sorteio Destaque do Canteiro');
+  setVal('inputSorteioPremio', s.premio || 'Kit Churrasco & Brinde Especial GEL');
+  setVal('selectSorteioCriterio', s.criterio || 'Quarto Mais Organizado');
+  setVal('selectSorteioModoJustica', s.modo_justica || 'individual');
+  setVal('inputSorteioDataHora', s.horario_sorteio || '');
+  const chkRep = document.getElementById('chkSorteioEvitarRepeticao');
+  if (chkRep) chkRep.checked = s.evitar_repeticao !== false;
+  const chkAuto = document.getElementById('chkSorteioAutoHorario');
+  if (chkAuto) chkAuto.checked = Boolean(s.auto_disparar);
+
+  if (Array.isArray(s.quartos_ids) && s.quartos_ids.length > 0) {
+    quartosSelecionadosSorteioSet = new Set(s.quartos_ids.map(String));
+  }
+
+  const elegiveis = obterQuartosElegiveisSorteio();
+  popularFiltroBlocosSorteio(elegiveis);
+  filtrarQuartosSorteio();
+  atualizarStatusUiSorteioAdmin();
+  renderizarHistoricoSorteiosAdmin();
+
+  if (s.status === 'encerrado' && s.ganhador) {
+    revelarGanhadorSorteioAdmin(s.ganhador, false);
+  } else if (s.status === 'sorteando' && s.ganhador) {
+    const decorrido = Date.now() - (s.sorteio_iniciado_em || 0);
+    if (decorrido < 5200) {
+      iniciarAnimacaoGloboAdmin(s.ganhador);
+    } else {
+      revelarGanhadorSorteioAdmin(s.ganhador, true);
+    }
+  } else {
+    iniciarMonitorHorarioSorteioAdmin();
+  }
+}
+
+window.carregarSorteioAdmin = carregarSorteioAdmin;
+window.aoMudarConfigSorteio = aoMudarConfigSorteio;
+window.filtrarQuartosSorteio = filtrarQuartosSorteio;
+window.alternarQuartoSorteio = alternarQuartoSorteio;
+window.selecionarQuartosVisiveisSorteio = selecionarQuartosVisiveisSorteio;
+window.selecionarQuartosLimposAutomatico = selecionarQuartosLimposAutomatico;
+window.atualizarPreviewBilhetesSorteio = atualizarPreviewBilhetesSorteio;
+window.publicarSorteioMotivacional = publicarSorteioMotivacional;
+window.dispararSorteioAoVivo = dispararSorteioAoVivo;
+window.pausarOuRevelarGloboAdmin = pausarOuRevelarGloboAdmin;
+window.resetarSorteioAtual = resetarSorteioAtual;
+
 window.carregarPortalAlojadoAdmin = carregarPortalAlojadoAdmin;
 window.salvarIdentidadePortalAlojado = salvarIdentidadePortalAlojado;
 window.sincronizarListaAlojadosComPortal = sincronizarListaAlojadosComPortal;

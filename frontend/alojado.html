@@ -49,6 +49,88 @@
       background-color: rgba(245, 158, 11, 0.2);
       border-color: rgba(245, 158, 11, 0.4);
     }
+    /* Globo do Sorteio Ao Vivo no Celular (Compositor + Reduced Motion + Pausável) */
+    .sorteio-globo-arena {
+      position: relative;
+      width: 176px;
+      height: 176px;
+      margin: 0 auto;
+    }
+    .sorteio-globo-esfera {
+      position: relative;
+      width: 156px;
+      height: 156px;
+      margin: 0 auto;
+      border-radius: 9999px;
+      background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.42), rgba(56,189,248,0.22) 48%, rgba(2,6,23,0.92) 100%);
+      border: 3px solid rgba(251, 191, 36, 0.8);
+      box-shadow: inset 0 0 28px rgba(251,191,36,0.25), 0 12px 32px rgba(245,158,11,0.35);
+      overflow: hidden;
+    }
+    .sorteio-globo-aro {
+      position: absolute;
+      inset: 6px;
+      border-radius: 9999px;
+      border: 2px dashed rgba(251, 191, 36, 0.6);
+      pointer-events: none;
+    }
+    .sorteio-bolinha {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 11px;
+      color: #0f172a;
+      box-shadow: inset -3px -4px 6px rgba(0,0,0,0.28), 0 3px 8px rgba(0,0,0,0.45);
+      will-change: transform;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .sorteio-globo-girando .sorteio-globo-aro {
+        animation: sorteioAroSpin 1.1s linear infinite;
+      }
+      .sorteio-globo-girando .sorteio-bolinha-1 { animation: sorteioBola1 0.85s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-2 { animation: sorteioBola2 0.72s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-3 { animation: sorteioBola3 0.94s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-4 { animation: sorteioBola4 0.68s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-5 { animation: sorteioBola5 0.78s ease-in-out infinite alternate; }
+      .sorteio-globo-pausado .sorteio-globo-aro,
+      .sorteio-globo-pausado .sorteio-bolinha {
+        animation-play-state: paused !important;
+      }
+    }
+    @keyframes sorteioAroSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes sorteioBola1 {
+      0% { transform: translate(18px, 88px) rotate(0deg); }
+      50% { transform: translate(86px, 24px) rotate(180deg); }
+      100% { transform: translate(38px, 46px) rotate(360deg); }
+    }
+    @keyframes sorteioBola2 {
+      0% { transform: translate(84px, 90px) rotate(0deg); }
+      50% { transform: translate(22px, 32px) rotate(-180deg); }
+      100% { transform: translate(78px, 52px) rotate(-360deg); }
+    }
+    @keyframes sorteioBola3 {
+      0% { transform: translate(52px, 22px) rotate(0deg); }
+      50% { transform: translate(92px, 86px) rotate(220deg); }
+      100% { transform: translate(26px, 76px) rotate(400deg); }
+    }
+    @keyframes sorteioBola4 {
+      0% { transform: translate(30px, 54px) rotate(0deg); }
+      50% { transform: translate(74px, 94px) rotate(-160deg); }
+      100% { transform: translate(62px, 20px) rotate(-320deg); }
+    }
+    @keyframes sorteioBola5 {
+      0% { transform: translate(70px, 42px) rotate(0deg); }
+      50% { transform: translate(40px, 92px) rotate(190deg); }
+      100% { transform: translate(88px, 38px) rotate(360deg); }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-24 selection:bg-amber-500 selection:text-slate-950">
@@ -156,6 +238,11 @@
 
       <!-- ABA 1: MEU QUARTO & CRACHÁ DIGITAL -->
       <section id="abaMoradorQuarto" class="aba-morador-section space-y-4">
+        <!-- Banner Destaque do Sorteio Ao Vivo no Topo de Meu Quarto -->
+        <div id="cardBannerSorteioHomeMorador" class="hidden rounded-3xl p-4 border shadow-lg cursor-pointer transition active:scale-98" onclick="alternarAbaMorador('sorteio')">
+          <!-- Preenchido dinamicamente pelo estado do sorteio -->
+        </div>
+
         <!-- Card Principal de Acomodação -->
         <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/80 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
           <div class="flex items-start justify-between gap-3">
@@ -547,39 +634,149 @@
         </div>
       </section>
 
+      <!-- ABA 5: SORTEIO MOTIVACIONAL AO VIVO -->
+      <section id="abaMoradorSorteio" class="aba-morador-section hidden space-y-4">
+        <!-- Cabeçalho do Sorteio -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/50 border border-amber-500/40 rounded-3xl p-5 shadow-xl space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              <i class="fa-solid fa-trophy mr-1"></i> Sorteio Motivacional
+            </span>
+            <span id="badgeStatusSorteioMorador" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300">
+              Carregando...
+            </span>
+          </div>
+          <div>
+            <h2 id="tituloSorteioMorador" class="text-base font-black text-white">Sorteio Destaque do Canteiro</h2>
+            <p id="criterioSorteioMorador" class="text-xs text-amber-300 font-semibold mt-0.5">Critério: --</p>
+          </div>
+          <div class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Premiação</span>
+              <span id="premioSorteioMorador" class="text-xs font-black text-emerald-400">--</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block">Horário / Contagem</span>
+              <span id="countdownSorteioMorador" class="text-xs font-black text-amber-300 font-mono">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Meu Bilhete da Sorte / Status de Participação -->
+        <div id="cardMeuBilheteSorteioMorador" class="rounded-3xl p-5 border shadow-lg space-y-2">
+          <!-- Injetado via JS -->
+        </div>
+
+        <!-- Palco do Globo Girando Ao Vivo (Exibido durante o sorteio / horário) -->
+        <div id="palcoGloboMorador" class="hidden bg-slate-900 border-2 border-amber-400 rounded-3xl p-5 text-center space-y-3 shadow-2xl" aria-live="polite">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] font-black uppercase tracking-wider text-amber-300">
+              <i class="fa-solid fa-compact-disc mr-1"></i> Sorteando Ao Vivo!
+            </span>
+            <button type="button" id="btnPausarGloboMorador" onclick="alternarPausaGloboMorador()" class="min-h-[28px] px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px]">
+              Pausar / Ver Resultado
+            </button>
+          </div>
+
+          <div id="esferaGloboMorador" class="sorteio-globo-arena sorteio-globo-girando">
+            <div class="sorteio-globo-esfera">
+              <div class="sorteio-globo-aro"></div>
+              <div class="sorteio-bolinha sorteio-bolinha-1 bg-amber-400">07</div>
+              <div class="sorteio-bolinha sorteio-bolinha-2 bg-emerald-400">14</div>
+              <div class="sorteio-bolinha sorteio-bolinha-3 bg-sky-400">22</div>
+              <div class="sorteio-bolinha sorteio-bolinha-4 bg-rose-400">03</div>
+              <div class="sorteio-bolinha sorteio-bolinha-5 bg-yellow-300">19</div>
+            </div>
+          </div>
+
+          <p id="statusGloboAcessivelMorador" class="text-xs font-bold text-amber-200">
+            Globo girando! Aguarde a saída da bola premiada...
+          </p>
+        </div>
+
+        <!-- Cartão do Vencedor Oficial -->
+        <div id="cardGanhadorSorteioMorador" class="hidden bg-gradient-to-br from-amber-500/20 via-slate-900 to-emerald-500/15 border-2 border-amber-400 rounded-3xl p-5 space-y-3 shadow-2xl" aria-live="polite">
+          <div class="flex items-center justify-between gap-2">
+            <span id="badgeVencedorTituloMorador" class="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-400 text-slate-950">
+              🎉 Ganhador do Sorteio!
+            </span>
+            <span id="ganhadorNumeroSorteioMorador" class="text-xl font-black text-amber-300 font-mono">#001</span>
+          </div>
+          <div>
+            <div id="ganhadorNomeSorteioMorador" class="text-lg font-black text-white leading-tight">--</div>
+            <div id="ganhadorQuartoSorteioMorador" class="text-xs font-bold text-emerald-300 mt-1">--</div>
+          </div>
+          <div class="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1 text-xs">
+            <div><strong class="text-amber-300">Premiação:</strong> <span id="ganhadorPremioSorteioMorador" class="text-white font-bold">--</span></div>
+            <div><strong class="text-slate-400">Critério:</strong> <span id="ganhadorCriterioSorteioMorador" class="text-slate-300">--</span></div>
+          </div>
+        </div>
+
+        <!-- Participantes & Transparência -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-ticket text-amber-400"></i>
+              <span>Quartos &amp; Bilhetes Participantes</span>
+            </h3>
+            <span id="badgeTotalBilhetesMorador" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-amber-300">0</span>
+          </div>
+          <div id="listaParticipantesSorteioMorador" class="space-y-1.5 max-h-60 overflow-y-auto text-xs">
+            <!-- Preenchido via JS -->
+          </div>
+        </div>
+
+        <!-- Histórico Recente -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-2.5">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-sky-400"></i>
+            <span>Últimos Ganhadores</span>
+          </h3>
+          <div id="listaHistoricoSorteiosMorador" class="space-y-2 text-xs"></div>
+        </div>
+      </section>
+
     </div>
 
   </main>
 
   <!-- ================= BARRA DE NAVEGAÇÃO INFERIOR (BOTTOM NAV) ================= -->
-  <nav id="bottomNavMorador" class="hidden fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 z-40 shadow-2xl">
-    <div class="max-w-md mx-auto grid grid-cols-4 gap-1">
+  <nav id="bottomNavMorador" class="hidden fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-1.5 py-1.5 z-40 shadow-2xl">
+    <div class="max-w-md mx-auto grid grid-cols-5 gap-0.5">
       <button type="button" onclick="alternarAbaMorador('quarto')" data-aba="quarto" class="bottom-nav-item active flex flex-col items-center justify-center py-1 text-slate-400 transition">
-        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+        <div class="nav-pill px-3 py-1 rounded-full border border-transparent transition">
           <i class="fa-solid fa-bed text-sm"></i>
         </div>
-        <span class="text-[10px] font-bold mt-0.5">Meu Quarto</span>
+        <span class="text-[10px] font-bold mt-0.5">Quarto</span>
       </button>
 
       <button type="button" onclick="alternarAbaMorador('mural')" data-aba="mural" class="bottom-nav-item flex flex-col items-center justify-center py-1 text-slate-400 transition">
-        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+        <div class="nav-pill px-3 py-1 rounded-full border border-transparent transition">
           <i class="fa-solid fa-utensils text-sm"></i>
         </div>
-        <span class="text-[10px] font-bold mt-0.5">Mural & Menu</span>
+        <span class="text-[10px] font-bold mt-0.5">Menu</span>
+      </button>
+
+      <button type="button" onclick="alternarAbaMorador('sorteio')" data-aba="sorteio" class="bottom-nav-item relative flex flex-col items-center justify-center py-1 text-slate-400 transition">
+        <div class="nav-pill px-3 py-1 rounded-full border border-transparent transition">
+          <i class="fa-solid fa-trophy text-sm text-amber-400"></i>
+        </div>
+        <span id="dotBadgeSorteioNav" class="hidden absolute top-1 right-3 w-2 h-2 rounded-full bg-amber-400"></span>
+        <span class="text-[10px] font-bold mt-0.5">Sorteio</span>
       </button>
 
       <button type="button" onclick="alternarAbaMorador('manutencao')" data-aba="manutencao" class="bottom-nav-item flex flex-col items-center justify-center py-1 text-slate-400 transition">
-        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+        <div class="nav-pill px-3 py-1 rounded-full border border-transparent transition">
           <i class="fa-solid fa-screwdriver-wrench text-sm"></i>
         </div>
-        <span class="text-[10px] font-bold mt-0.5">Manutenção</span>
+        <span class="text-[10px] font-bold mt-0.5">Chamado</span>
       </button>
 
       <button type="button" onclick="alternarAbaMorador('regras')" data-aba="regras" class="bottom-nav-item flex flex-col items-center justify-center py-1 text-slate-400 transition">
-        <div class="nav-pill px-4 py-1 rounded-full border border-transparent transition">
+        <div class="nav-pill px-3 py-1 rounded-full border border-transparent transition">
           <i class="fa-solid fa-shield-heart text-sm"></i>
         </div>
-        <span class="text-[10px] font-bold mt-0.5">Regras & Apoio</span>
+        <span class="text-[10px] font-bold mt-0.5">Regras</span>
       </button>
     </div>
   </nav>
@@ -717,7 +914,8 @@
             data: new Date().toLocaleDateString('pt-BR')
           }
         ],
-        whatsapp_prefeito: '5500000000000'
+        whatsapp_prefeito: '5500000000000',
+        sorteio: { ativo: false, status: 'rascunho', bilhetes: [], historico: [] }
       };
     }
 
@@ -1044,6 +1242,7 @@
       if (perfilMoradorAtivo) {
         renderizarColegasDeQuarto();
       }
+      renderizarSecaoSorteioMorador();
 
       // 5. Regras de Ouro Dinâmicas (Aba 4)
       const ulRegras = document.getElementById('listaRegrasOuroMorador');
@@ -1307,6 +1506,7 @@
       const mapa = {
         quarto: 'abaMoradorQuarto',
         mural: 'abaMoradorMural',
+        sorteio: 'abaMoradorSorteio',
         manutencao: 'abaMoradorManutencao',
         regras: 'abaMoradorRegras'
       };
@@ -1456,10 +1656,248 @@
       } catch (e) {}
     }
 
+    // ========================================================
+    // MÓDULO: SORTEIO MOTIVACIONAL EM TEMPO REAL NO CELULAR
+    // ========================================================
+    let unsubSorteioPortal = null;
+    let timerCountdownSorteioMorador = null;
+    let timerRevelacaoGloboMorador = null;
+    let globoMoradorPausado = false;
+
+    function encontrarMeuBilheteNoSorteio(bilhetes) {
+      if (!perfilMoradorAtivo || !Array.isArray(bilhetes)) return null;
+      const meuId = String(perfilMoradorAtivo.id || '');
+      const meuBloco = String(perfilMoradorAtivo.bloco || '').toLowerCase().trim();
+      const meuQuarto = String(perfilMoradorAtivo.quarto || '').toLowerCase().trim();
+      const meuNome = String(perfilMoradorAtivo.nome || '').toLowerCase().trim();
+
+      return bilhetes.find(b => {
+        if (b.tipo !== 'quarto' && meuId && b.alojado_id && String(b.alojado_id) === meuId) return true;
+        const mesmoQuarto = String(b.bloco || '').toLowerCase().trim() === meuBloco && String(b.quarto || '').toLowerCase().trim() === meuQuarto;
+        if (!mesmoQuarto) return false;
+        if (b.tipo === 'quarto') return true;
+        return String(b.nome || '').toLowerCase().trim() === meuNome;
+      }) || null;
+    }
+
+    function ehMeuQuartoOuEuGanhador(ganhador) {
+      if (!perfilMoradorAtivo || !ganhador) return false;
+      const meuId = String(perfilMoradorAtivo.id || '');
+      if (meuId && ganhador.alojado_id && String(ganhador.alojado_id) === meuId) return true;
+      const mesmoQuarto = String(ganhador.bloco || '').toLowerCase().trim() === String(perfilMoradorAtivo.bloco || '').toLowerCase().trim() &&
+        String(ganhador.quarto || '').toLowerCase().trim() === String(perfilMoradorAtivo.quarto || '').toLowerCase().trim();
+      if (ganhador.modo_justica === 'por_quarto' && mesmoQuarto) return true;
+      return mesmoQuarto && String(ganhador.nome || '').toLowerCase().trim() === String(perfilMoradorAtivo.nome || '').toLowerCase().trim();
+    }
+
+    function alternarPausaGloboMorador() {
+      globoMoradorPausado = true;
+      if (timerRevelacaoGloboMorador) clearTimeout(timerRevelacaoGloboMorador);
+      renderizarSecaoSorteioMorador();
+    }
+
+    function formatarContagemSorteio(horarioIso) {
+      if (!horarioIso) return 'Ao vivo pelo Prefeito';
+      const alvo = new Date(horarioIso).getTime();
+      if (isNaN(alvo)) return 'A confirmar';
+      const diff = alvo - Date.now();
+      if (diff <= 0) return 'Horário atingido!';
+      const totSec = Math.floor(diff / 1000);
+      const dias = Math.floor(totSec / 86400);
+      const hrs = Math.floor((totSec % 86400) / 3600);
+      const mins = Math.floor((totSec % 3600) / 60);
+      const segs = totSec % 60;
+      const hhmmss = `${String(hrs).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m ${String(segs).padStart(2, '0')}s`;
+      return dias > 0 ? `${dias}d ${hhmmss}` : hhmmss;
+    }
+
+    function renderizarSecaoSorteioMorador() {
+      const portal = dadosPortalMorador || getDadosPortalPadrao();
+      const s = portal.sorteio || { ativo: false, status: 'rascunho', bilhetes: [], historico: [] };
+      const bilhetes = Array.isArray(s.bilhetes) ? s.bilhetes : [];
+      const hist = Array.isArray(s.historico) ? s.historico : [];
+      const meuBilhete = encontrarMeuBilheteNoSorteio(bilhetes);
+
+      const dotNav = document.getElementById('dotBadgeSorteioNav');
+      if (dotNav) dotNav.classList.toggle('hidden', !(s.ativo || s.status === 'sorteando' || s.status === 'encerrado'));
+
+      // Banner compacto no topo da aba Meu Quarto
+      const bannerHome = document.getElementById('cardBannerSorteioHomeMorador');
+      if (bannerHome) {
+        if (!s.ativo && s.status !== 'encerrado' && s.status !== 'sorteando') {
+          bannerHome.classList.add('hidden');
+        } else {
+          bannerHome.classList.remove('hidden');
+          if (s.status === 'sorteando') {
+            bannerHome.className = 'rounded-3xl p-4 border-2 border-amber-400 bg-gradient-to-r from-amber-500/20 to-slate-900 shadow-lg cursor-pointer transition active:scale-98';
+            bannerHome.innerHTML = `<div class="flex items-center justify-between gap-3"><div><div class="text-[10px] font-black uppercase text-amber-300">🎲 Sorteio Ao Vivo Agora!</div><div class="text-sm font-black text-white">${escapeHTML(s.titulo || 'Globo Girando!')}</div><div class="text-[11px] text-amber-200 mt-0.5">Toque aqui para acompanhar a bola premiada</div></div><i class="fa-solid fa-trophy text-2xl text-amber-400"></i></div>`;
+          } else if (s.status === 'encerrado' && s.ganhador) {
+            const ganhei = ehMeuQuartoOuEuGanhador(s.ganhador);
+            bannerHome.className = `rounded-3xl p-4 border-2 ${ganhei ? 'border-emerald-400 bg-gradient-to-r from-emerald-600/30 to-slate-900' : 'border-amber-500/50 bg-slate-900'} shadow-lg cursor-pointer transition active:scale-98`;
+            bannerHome.innerHTML = `<div class="flex items-center justify-between gap-3"><div><div class="text-[10px] font-black uppercase ${ganhei ? 'text-emerald-300' : 'text-amber-300'}">${ganhei ? '🎉 PARABÉNS! VOCÊ GANHOU!' : '🏆 Resultado do Sorteio'}</div><div class="text-sm font-black text-white">#${escapeHTML(s.ganhador.numero)} • ${escapeHTML(s.ganhador.nome)}</div><div class="text-[11px] text-slate-300 mt-0.5">${escapeHTML(s.ganhador.bloco)} • Quarto ${escapeHTML(s.ganhador.quarto)}</div></div><span class="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-[11px]">Ver</span></div>`;
+          } else {
+            bannerHome.className = 'rounded-3xl p-4 border border-amber-500/40 bg-gradient-to-r from-slate-900 to-amber-950/30 shadow-lg cursor-pointer transition active:scale-98';
+            const subMeu = meuBilhete ? `Seu Nº da Sorte: #${escapeHTML(meuBilhete.numero)} • ` : 'Acompanhe os participantes • ';
+            bannerHome.innerHTML = `<div class="flex items-center justify-between gap-3"><div><div class="text-[10px] font-black uppercase text-amber-300">🏆 Sorteio Ativo</div><div class="text-sm font-black text-white">${escapeHTML(s.titulo || 'Sorteio Motivacional')}</div><div class="text-[11px] text-slate-300 mt-0.5">${subMeu}${escapeHTML(s.premio || '')}</div></div><span class="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-[11px]">Abrir</span></div>`;
+          }
+        }
+      }
+
+      // Conteúdo completo da Aba 5 (Sorteio)
+      const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      setTxt('tituloSorteioMorador', s.titulo || 'Nenhum Sorteio Ativo no Momento');
+      setTxt('criterioSorteioMorador', s.criterio ? `Critério: ${s.criterio}` : 'Aguarde o Prefeito abrir a próxima rodada');
+      setTxt('premioSorteioMorador', s.premio || 'A definir pela Prefeitura');
+      setTxt('badgeTotalBilhetesMorador', `${bilhetes.length} bilhete(s)`);
+
+      const badgeSt = document.getElementById('badgeStatusSorteioMorador');
+      if (badgeSt) {
+        if (s.status === 'sorteando') badgeSt.textContent = '🎲 Ao Vivo';
+        else if (s.status === 'encerrado') badgeSt.textContent = '🏆 Encerrado';
+        else if (s.status === 'agendado') badgeSt.textContent = '📅 Participando';
+        else badgeSt.textContent = 'Aguardando';
+      }
+
+      // Meu Bilhete / Elegibilidade
+      const cardMeu = document.getElementById('cardMeuBilheteSorteioMorador');
+      if (cardMeu) {
+        if (!s.ativo && s.status !== 'encerrado' && s.status !== 'sorteando') {
+          cardMeu.className = 'rounded-3xl p-5 border border-slate-800 bg-slate-900 space-y-2 text-center';
+          cardMeu.innerHTML = `<i class="fa-solid fa-ticket text-2xl text-slate-600"></i><div class="text-xs font-bold text-slate-300">Sem sorteio aberto neste instante.</div><p class="text-[11px] text-slate-500">Mantenha seu quarto limpo e organizado para garantir vaga na próxima rodada!</p>`;
+        } else if (meuBilhete) {
+          const descJustica = s.modo_justica === 'por_quarto'
+            ? 'Modo Coletivo: 1 bilhete único para todo o seu quarto.'
+            : 'Modo Justo: 1 bilhete individual igual por colaborador.';
+          cardMeu.className = 'rounded-3xl p-5 border-2 border-amber-400 bg-gradient-to-br from-amber-500/15 to-slate-900 space-y-2 shadow-xl';
+          cardMeu.innerHTML = `
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">✅ Você está participando!</span>
+              <span class="text-2xl font-black text-amber-300 font-mono">#${escapeHTML(meuBilhete.numero)}</span>
+            </div>
+            <div class="text-sm font-black text-white">${escapeHTML(meuBilhete.nome)}</div>
+            <div class="text-xs text-slate-300">${escapeHTML(meuBilhete.bloco)} • Quarto ${escapeHTML(meuBilhete.quarto)}</div>
+            <p class="text-[11px] text-amber-200/80 pt-1">${descJustica}</p>
+          `;
+        } else {
+          cardMeu.className = 'rounded-3xl p-5 border border-slate-800 bg-slate-900 space-y-1.5';
+          cardMeu.innerHTML = `<div class="text-xs font-black text-slate-200">Seu quarto não entrou nesta rodada</div><p class="text-[11px] text-slate-400">O Prefeito selecionou os quartos elegíveis pelo critério "${escapeHTML(s.criterio || 'Especial')}". Você pode acompanhar o sorteio ao vivo abaixo!</p>`;
+        }
+      }
+
+      // Globo Ao Vivo vs Cartão do Ganhador
+      const palco = document.getElementById('palcoGloboMorador');
+      const cardWin = document.getElementById('cardGanhadorSorteioMorador');
+      const esfera = document.getElementById('esferaGloboMorador');
+      const semMovimento = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const decorridoMs = Date.now() - (s.sorteio_iniciado_em || 0);
+      const mostrandoGlobo = s.status === 'sorteando' && !globoMoradorPausado && !semMovimento && decorridoMs < 5500;
+
+      if (timerRevelacaoGloboMorador) clearTimeout(timerRevelacaoGloboMorador);
+      if (mostrandoGlobo) {
+        if (palco) palco.classList.remove('hidden');
+        if (cardWin) cardWin.classList.add('hidden');
+        if (esfera) esfera.classList.remove('sorteio-globo-pausado');
+        timerRevelacaoGloboMorador = setTimeout(() => {
+          globoMoradorPausado = true;
+          renderizarSecaoSorteioMorador();
+        }, Math.max(300, 5500 - decorridoMs));
+      } else {
+        if (palco) palco.classList.add('hidden');
+        if (s.ganhador && (s.status === 'encerrado' || s.status === 'sorteando')) {
+          if (cardWin) cardWin.classList.remove('hidden');
+          const euGanhei = ehMeuQuartoOuEuGanhador(s.ganhador);
+          setTxt('badgeVencedorTituloMorador', euGanhei ? '🎉 PARABÉNS! SEU NÚMERO SAIU!' : '🏆 Ganhador Oficial');
+          setTxt('ganhadorNumeroSorteioMorador', `#${s.ganhador.numero}`);
+          setTxt('ganhadorNomeSorteioMorador', s.ganhador.nome);
+          setTxt('ganhadorQuartoSorteioMorador', `${s.ganhador.bloco} • Quarto ${s.ganhador.quarto}`);
+          setTxt('ganhadorPremioSorteioMorador', s.ganhador.premio || s.premio || '--');
+          setTxt('ganhadorCriterioSorteioMorador', s.ganhador.criterio || s.criterio || '--');
+        } else {
+          if (cardWin) cardWin.classList.add('hidden');
+        }
+      }
+
+      // Lista de participantes (Transparência)
+      const listPart = document.getElementById('listaParticipantesSorteioMorador');
+      if (listPart) {
+        if (bilhetes.length === 0) {
+          listPart.innerHTML = `<p class="text-slate-500 text-center py-3">Nenhum participante publicado no momento.</p>`;
+        } else {
+          listPart.innerHTML = bilhetes.map(b => {
+            const souEu = meuBilhete && b.numero === meuBilhete.numero;
+            return `
+              <div class="flex items-center justify-between gap-2 p-2.5 rounded-2xl border ${souEu ? 'bg-amber-500/15 border-amber-400/60' : 'bg-slate-950 border-slate-800'}">
+                <div class="min-w-0">
+                  <div class="font-bold text-white truncate">${escapeHTML(b.nome)} ${souEu ? '<span class="text-amber-300">(Você)</span>' : ''}</div>
+                  <div class="text-[10px] text-slate-400">${escapeHTML(b.bloco)} • Quarto ${escapeHTML(b.quarto)}</div>
+                </div>
+                <span class="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-black font-mono text-[11px] flex-shrink-0">#${escapeHTML(b.numero)}</span>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Histórico
+      const listHist = document.getElementById('listaHistoricoSorteiosMorador');
+      if (listHist) {
+        if (hist.length === 0) {
+          listHist.innerHTML = `<p class="text-slate-500 text-center py-2">Sem ganhadores anteriores registrados.</p>`;
+        } else {
+          listHist.innerHTML = hist.slice(0, 8).map(h => `
+            <div class="p-2.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <div class="font-bold text-white truncate">${escapeHTML(h.nome)}</div>
+                <div class="text-[10px] text-slate-400">${escapeHTML(h.bloco)} • Q.${escapeHTML(h.quarto)} • ${escapeHTML(h.premio)}</div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-slate-800 text-amber-300 font-black font-mono text-[11px]">#${escapeHTML(h.numero)}</span>
+            </div>
+          `).join('');
+        }
+      }
+
+      // Contagem regressiva
+      if (timerCountdownSorteioMorador) clearInterval(timerCountdownSorteioMorador);
+      const atualizarCount = () => {
+        const elCount = document.getElementById('countdownSorteioMorador');
+        if (!elCount) return;
+        if (s.status === 'sorteando') elCount.textContent = '🎲 AO VIVO!';
+        else if (s.status === 'encerrado') elCount.textContent = 'Finalizado';
+        else elCount.textContent = formatarContagemSorteio(s.horario_sorteio);
+      };
+      atualizarCount();
+      if (s.status === 'agendado' && s.horario_sorteio) {
+        timerCountdownSorteioMorador = setInterval(atualizarCount, 1000);
+      }
+    }
+
+    // Listener em tempo real focado apenas no documento único (1 leitura inicial + atualizações quando o Prefeito publica/sorteia)
+    function iniciarListenerTempoRealSorteioPortal() {
+      if (!firestoreDb || unsubSorteioPortal) return;
+      try {
+        unsubSorteioPortal = firestoreDb.collection('config_sistema').doc('portal_morador').onSnapshot((doc) => {
+          if (doc && doc.exists) {
+            const anteriorIniciadoEm = dadosPortalMorador && dadosPortalMorador.sorteio ? dadosPortalMorador.sorteio.sorteio_iniciado_em : 0;
+            dadosPortalMorador = Object.assign(getDadosPortalPadrao(), doc.data());
+            const novoIniciadoEm = dadosPortalMorador.sorteio ? dadosPortalMorador.sorteio.sorteio_iniciado_em : 0;
+            if (novoIniciadoEm && novoIniciadoEm !== anteriorIniciadoEm) {
+              globoMoradorPausado = false;
+            }
+            localStorage.setItem(CACHE_PORTAL_KEY, JSON.stringify(dadosPortalMorador));
+            localStorage.setItem(CACHE_PORTAL_TS_KEY, String(Date.now()));
+            renderizarMuralECardapioMorador();
+          }
+        }, (err) => {
+          console.warn('Listener em tempo real do sorteio em espera/offline:', err);
+        });
+      } catch (e) {}
+    }
+
     // Inicialização na abertura do app
     window.addEventListener('DOMContentLoaded', async () => {
       await carregarBaseEstaticaAlojados();
       await carregarDadosPortalMorador(true);
+      iniciarListenerTempoRealSorteioPortal();
 
       // Verificar parâmetros de URL (caso venha do QR Code da porta do quarto)
       const params = new URLSearchParams(window.location.search);

@@ -347,6 +347,93 @@
         min-height: auto !important;
       }
     }
+    /* Animação do Globo Giratório do Sorteio Motivacional (Compositor + Reduced Motion + Pausável) */
+    .sorteio-globo-arena {
+      position: relative;
+      width: 172px;
+      height: 172px;
+      margin: 0 auto;
+    }
+    .sorteio-globo-esfera {
+      position: relative;
+      width: 152px;
+      height: 152px;
+      margin: 0 auto;
+      border-radius: 9999px;
+      background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.45), rgba(14,165,233,0.22) 48%, rgba(15,23,42,0.85) 100%);
+      border: 3px solid rgba(251, 191, 36, 0.75);
+      box-shadow: inset 0 0 28px rgba(251,191,36,0.25), 0 12px 32px rgba(245,158,11,0.3);
+      overflow: hidden;
+    }
+    .sorteio-globo-aro {
+      position: absolute;
+      inset: 6px;
+      border-radius: 9999px;
+      border: 2px dashed rgba(251, 191, 36, 0.55);
+      pointer-events: none;
+    }
+    .sorteio-bolinha {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 11px;
+      color: #0f172a;
+      box-shadow: inset -3px -4px 6px rgba(0,0,0,0.28), 0 3px 8px rgba(0,0,0,0.45);
+      will-change: transform;
+    }
+    .sorteio-bola-premiada {
+      transform: translateY(-6px) scale(1);
+      opacity: 1;
+      transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .sorteio-globo-girando .sorteio-globo-aro {
+        animation: sorteioAroSpin 1.1s linear infinite;
+      }
+      .sorteio-globo-girando .sorteio-bolinha-1 { animation: sorteioBola1 0.85s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-2 { animation: sorteioBola2 0.72s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-3 { animation: sorteioBola3 0.94s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-4 { animation: sorteioBola4 0.68s ease-in-out infinite alternate; }
+      .sorteio-globo-girando .sorteio-bolinha-5 { animation: sorteioBola5 0.78s ease-in-out infinite alternate; }
+      .sorteio-globo-pausado .sorteio-globo-aro,
+      .sorteio-globo-pausado .sorteio-bolinha {
+        animation-play-state: paused !important;
+      }
+    }
+    @keyframes sorteioAroSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes sorteioBola1 {
+      0% { transform: translate(18px, 88px) rotate(0deg); }
+      50% { transform: translate(86px, 24px) rotate(180deg); }
+      100% { transform: translate(38px, 46px) rotate(360deg); }
+    }
+    @keyframes sorteioBola2 {
+      0% { transform: translate(84px, 90px) rotate(0deg); }
+      50% { transform: translate(22px, 32px) rotate(-180deg); }
+      100% { transform: translate(78px, 52px) rotate(-360deg); }
+    }
+    @keyframes sorteioBola3 {
+      0% { transform: translate(52px, 22px) rotate(0deg); }
+      50% { transform: translate(92px, 86px) rotate(220deg); }
+      100% { transform: translate(26px, 76px) rotate(400deg); }
+    }
+    @keyframes sorteioBola4 {
+      0% { transform: translate(30px, 54px) rotate(0deg); }
+      50% { transform: translate(74px, 94px) rotate(-160deg); }
+      100% { transform: translate(62px, 20px) rotate(-320deg); }
+    }
+    @keyframes sorteioBola5 {
+      0% { transform: translate(70px, 42px) rotate(0deg); }
+      50% { transform: translate(40px, 92px) rotate(190deg); }
+      100% { transform: translate(88px, 38px) rotate(360deg); }
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 h-screen flex flex-col antialiased overflow-hidden w-full select-none-safe">
@@ -551,6 +638,11 @@
               <i class="fa-solid fa-id-card-clip w-5 text-amber-400"></i>
               <span>App do Alojado</span>
               <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase">Novo</span>
+            </button>
+            <button onclick="switchTab('sorteio')" data-tab="sorteio" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-trophy w-5 text-yellow-400"></i>
+              <span>Sorteio Motivacional</span>
+              <span id="sideBadgeSorteio" class="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-bold uppercase">Novo</span>
             </button>
           </div>
         </div>
@@ -4150,6 +4242,9 @@ service cloud.firestore {
           </div>
 
           <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="switchTab('sorteio')" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-trophy"></i> Sorteio de Quartos
+            </button>
             <a href="alojado.html" target="_blank" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
               <i class="fa-solid fa-mobile-screen-button text-amber-400"></i> Ver App do Celular
             </a>
@@ -4811,6 +4906,265 @@ service cloud.firestore {
             <!-- Lista de Feedbacks e Observações -->
             <div class="p-5">
               <div id="listaAvaliacoesRefeicoesAdmin" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                <!-- Preenchido via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= TAB: SORTEIO MOTIVACIONAL DE QUARTOS ================= -->
+      <div id="tab-sorteio" class="tab-content hidden space-y-5">
+        <!-- Cabeçalho da Aba -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                <i class="fa-solid fa-trophy text-amber-600 mr-1"></i> Engajamento &amp; Reconhecimento
+              </span>
+              <span id="badgeStatusSorteioAdmin" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                Nenhum sorteio ativo
+              </span>
+              <h1 class="text-xl md:text-2xl font-bold text-slate-900">Sorteio Motivacional de Quartos</h1>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Selecione quartos mais limpos, organizados ou por pavilhão, gere bilhetes justos e transmita o globo girando ao vivo no celular de todos os colaboradores.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <a href="alojado.html" target="_blank" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-mobile-screen-button text-amber-400"></i> Ver no App do Celular
+            </a>
+            <button type="button" onclick="resetarSorteioAtual()" class="btn-prefeito px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-rotate-left"></i> Novo / Encerrar Rodada
+            </button>
+          </div>
+        </div>
+
+        <!-- Grade Principal: Configuração + Seleção de Quartos (Esquerda) | Palco Ao Vivo + Bilhetes (Direita) -->
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+          <!-- Coluna Esquerda (7 cols): Regras, Filtros & Escolha de Quartos -->
+          <div class="xl:col-span-7 space-y-5">
+            <!-- Card 1: Dados da Premiação, Critério, Justiça e Horário -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+                <h2 class="text-sm font-bold flex items-center gap-2">
+                  <i class="fa-solid fa-sliders text-amber-400"></i>
+                  <span>1. Configurar Critério, Justiça &amp; Horário do Sorteio</span>
+                </h2>
+                <span class="text-[11px] text-amber-300 font-semibold">Permissão: Prefeito</span>
+              </div>
+
+              <div class="p-5 space-y-4 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label for="inputSorteioTitulo" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Título do Sorteio *</label>
+                    <input type="text" id="inputSorteioTitulo" value="Sorteio Destaque do Canteiro" placeholder="Ex: Prêmio Quarto Padrão Ouro" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  </div>
+                  <div>
+                    <label for="inputSorteioPremio" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Premiação *</label>
+                    <input type="text" id="inputSorteioPremio" value="Kit Churrasco &amp; Brinde Especial GEL" placeholder="Ex: Cesta Especial / Vale Folga / Fone" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div>
+                    <label for="selectSorteioCriterio" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Critério de Seleção</label>
+                    <select id="selectSorteioCriterio" onchange="aoMudarConfigSorteio()" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      <option value="Quarto Mais Organizado">✨ Quarto Mais Organizado</option>
+                      <option value="Quarto Mais Limpo">🧹 Quarto Mais Limpo</option>
+                      <option value="Limpeza e Organização Nota 10">🏆 Limpeza &amp; Organização Nota 10</option>
+                      <option value="Destaque do Pavilhão / Bloco">🏢 Destaque do Pavilhão</option>
+                      <option value="Disciplina &amp; Zero Ocorrências">🛡️ Disciplina &amp; Zelo</option>
+                      <option value="Participação Geral do Canteiro">🤝 Geral (Todos Elegíveis)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="inputSorteioDataHora" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Horário do Sorteio</label>
+                    <input type="datetime-local" id="inputSorteioDataHora" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  </div>
+                  <div>
+                    <label for="selectSorteioModoJustica" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Distribuição de Bilhetes</label>
+                    <select id="selectSorteioModoJustica" onchange="atualizarPreviewBilhetesSorteio()" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      <option value="individual">⚖️ 1 Bilhete Igual por Pessoa (Mais Justo)</option>
+                      <option value="por_quarto">🏠 1 Bilhete Único por Quarto (Coletivo)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Regras Anti-Desigualdade e Pontos Cegos -->
+                <div class="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2">
+                  <div class="font-bold text-amber-900 flex items-center gap-1.5">
+                    <i class="fa-solid fa-scale-balanced text-amber-600"></i>
+                    <span>Regras de Justiça &amp; Elegibilidade Automáticas</span>
+                  </div>
+                  <p id="textoExplicacaoJusticaSorteio" class="text-[11px] text-amber-800 leading-relaxed">
+                    Como quartos têm de 1 a 4 moradores, cada colaborador ativo nos quartos marcados recebe <strong>1 único número da sorte</strong>: todos têm exatamente a mesma chance individual. Quartos vazios ou em manutenção ficam bloqueados automaticamente.
+                  </p>
+                  <div class="flex flex-wrap items-center gap-4 pt-1">
+                    <label for="chkSorteioEvitarRepeticao" class="inline-flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
+                      <input type="checkbox" id="chkSorteioEvitarRepeticao" checked onchange="atualizarPreviewBilhetesSorteio()" class="w-4 h-4 accent-amber-500 rounded">
+                      <span>Bloquear vencedor da última rodada (evitar repetição seguida)</span>
+                    </label>
+                    <label for="chkSorteioAutoHorario" class="inline-flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
+                      <input type="checkbox" id="chkSorteioAutoHorario" class="w-4 h-4 accent-amber-500 rounded">
+                      <span>Disparar automático no horário agendado (se este painel estiver aberto)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Seleção Interativa de Pavilhões e Quartos -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="px-5 py-3.5 bg-slate-800 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h2 class="text-sm font-bold flex items-center gap-2">
+                  <i class="fa-solid fa-door-open text-amber-400"></i>
+                  <span>2. Escolher Quartos ou Pavilhões Participantes</span>
+                </h2>
+                <span id="contadorQuartosSelecionadosSorteio" class="px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-[11px]">
+                  0 quartos marcados
+                </span>
+              </div>
+
+              <!-- Barra de Filtros & Botões em Lote -->
+              <div class="p-4 bg-slate-50 border-b border-slate-200 space-y-3 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label for="selectSorteioFiltroBloco" class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Pavilhão / Bloco</label>
+                    <select id="selectSorteioFiltroBloco" onchange="filtrarQuartosSorteio()" class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
+                      <option value="todos">Todos os Blocos</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="selectSorteioFiltroStatus" class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Condição do Quarto</label>
+                    <select id="selectSorteioFiltroStatus" onchange="filtrarQuartosSorteio()" class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-800">
+                      <option value="ocupados">Todos Quartos Ocupados</option>
+                      <option value="limpos">Apenas com Limpeza em Dia</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="inputSorteioBuscaQuarto" class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Quarto ou Morador</label>
+                    <input type="text" id="inputSorteioBuscaQuarto" oninput="filtrarQuartosSorteio()" placeholder="Ex: 102, João..." class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-slate-800">
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="button" onclick="selecionarQuartosVisiveisSorteio(true)" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-check-double"></i> Selecionar Visíveis
+                  </button>
+                  <button type="button" onclick="selecionarQuartosVisiveisSorteio(false)" class="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold transition flex items-center gap-1.5">
+                    <i class="fa-regular fa-square-minus"></i> Desmarcar Visíveis
+                  </button>
+                  <button type="button" onclick="selecionarQuartosLimposAutomatico()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-broom"></i> Marcar Só Limpeza em Dia
+                  </button>
+                </div>
+              </div>
+
+              <!-- Grade de Quartos -->
+              <div class="p-4">
+                <div id="gridQuartosSorteio" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
+                  <!-- Renderizado via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coluna Direita (5 cols): Publicação, Globo Girando, Ganhador & Bilhetes -->
+          <div class="xl:col-span-5 space-y-5">
+            <!-- Card 3: Comandos de Publicação e Disparo Ao Vivo -->
+            <div class="bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-lg p-5 space-y-4">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <h2 class="text-sm font-black uppercase tracking-wide text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-satellite-dish"></i> Central do Sorteio Ao Vivo
+                  </h2>
+                  <p id="resumoBilhetesSorteioAdmin" class="text-xs text-slate-300 mt-0.5">
+                    0 quartos • 0 bilhetes da sorte gerados
+                  </p>
+                </div>
+                <span id="badgeChanceSorteioAdmin" class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-emerald-400">
+                  Chance: --
+                </span>
+              </div>
+
+              <!-- Ações Principais -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button type="button" id="btnPublicarSorteioApp" onclick="publicarSorteioMotivacional()" class="btn-prefeito py-3 px-3.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow transition">
+                  <i class="fa-solid fa-paper-plane"></i>
+                  <span>Publicar no Celular</span>
+                </button>
+                <button type="button" id="btnDispararSorteioAoVivo" onclick="dispararSorteioAoVivo()" class="btn-prefeito py-3 px-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow-lg transition">
+                  <i class="fa-solid fa-dice"></i>
+                  <span>Girar Globo &amp; Sortear</span>
+                </button>
+              </div>
+
+              <!-- Palco Animado do Globo + Resultado -->
+              <div id="palcoGloboSorteioAdmin" class="hidden rounded-2xl bg-slate-950 border border-amber-500/40 p-4 text-center space-y-3" aria-live="polite">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="font-bold uppercase tracking-wider text-amber-300">
+                    <i class="fa-solid fa-compact-disc mr-1"></i> Globo de Sorteio Ao Vivo
+                  </span>
+                  <button type="button" id="btnPausarGloboAdmin" onclick="pausarOuRevelarGloboAdmin()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px]">
+                    Pausar / Revelar Já
+                  </button>
+                </div>
+
+                <div id="esferaGloboAdmin" class="sorteio-globo-arena sorteio-globo-girando">
+                  <div class="sorteio-globo-esfera">
+                    <div class="sorteio-globo-aro"></div>
+                    <div class="sorteio-bolinha sorteio-bolinha-1 bg-amber-400">07</div>
+                    <div class="sorteio-bolinha sorteio-bolinha-2 bg-emerald-400">14</div>
+                    <div class="sorteio-bolinha sorteio-bolinha-3 bg-sky-400">22</div>
+                    <div class="sorteio-bolinha sorteio-bolinha-4 bg-rose-400">03</div>
+                    <div class="sorteio-bolinha sorteio-bolinha-5 bg-yellow-300">19</div>
+                  </div>
+                </div>
+                <p id="textoStatusGloboAdmin" class="text-xs font-bold text-amber-200">
+                  Misturando as bolinhas no globo...
+                </p>
+              </div>
+
+              <!-- Cartão do Vencedor Revelado -->
+              <div id="cardResultadoSorteioAdmin" class="hidden rounded-2xl bg-gradient-to-br from-amber-500/20 via-slate-950 to-emerald-500/10 border-2 border-amber-400 p-4 space-y-2.5" aria-live="polite">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950">
+                    🏆 Ganhador Oficial
+                  </span>
+                  <span id="resSorteioNumeroBadge" class="text-lg font-black text-amber-300 font-mono">#001</span>
+                </div>
+                <div>
+                  <div id="resSorteioNomeGanhador" class="text-base font-black text-white">--</div>
+                  <div id="resSorteioQuartoGanhador" class="text-xs font-bold text-emerald-300 mt-0.5">--</div>
+                </div>
+                <div class="pt-2 border-t border-slate-800 text-xs flex flex-col gap-1 text-slate-300">
+                  <div><strong class="text-amber-300">Premiação:</strong> <span id="resSorteioPremioGanhador">--</span></div>
+                  <div><strong class="text-slate-400">Critério:</strong> <span id="resSorteioCriterioGanhador">--</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 4: Lista de Bilhetes Numerados Gerados -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-xs font-black uppercase text-slate-700">Bilhetes da Sorte Gerados</h3>
+                <span id="badgeQtdBilhetesPreview" class="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">0 bilhetes</span>
+              </div>
+              <div id="listaBilhetesPreviewSorteio" class="p-3 space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar text-xs">
+                <!-- Preenchido via JS -->
+              </div>
+            </div>
+
+            <!-- Card 5: Histórico de Ganhadores -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-xs font-black uppercase text-slate-700">Histórico de Sorteios Realizados</h3>
+                <span id="badgeQtdHistoricoSorteio" class="text-[11px] font-bold text-slate-600">0</span>
+              </div>
+              <div id="listaHistoricoSorteiosAdmin" class="p-3 space-y-2 max-h-56 overflow-y-auto custom-scrollbar text-xs">
                 <!-- Preenchido via JS -->
               </div>
             </div>
@@ -8067,6 +8421,15 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Bipes de QR Code, cobertura e alertas de plantão</span>
         </button>
 
+        <button onclick="fecharMenuMobileMais(); switchTab('sorteio')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-yellow-500/40 hover:bg-slate-800 text-left transition col-span-2">
+          <div class="flex items-center justify-between w-full">
+            <i class="fa-solid fa-trophy text-yellow-400 text-lg mb-1.5"></i>
+            <span id="drawerBadgeSorteio" class="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 font-bold border border-yellow-500/30">Ao Vivo</span>
+          </div>
+          <span class="text-xs font-bold text-white">Sorteio Motivacional de Quartos</span>
+          <span class="text-[10px] text-slate-300">Escolha quartos por limpeza/organização e sorteie para o App</span>
+        </button>
+
         <button onclick="fecharMenuMobileMais(); switchTab('estoque')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-boxes-stacked text-teal-400 text-lg mb-1.5"></i>
@@ -9571,7 +9934,7 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=5.7"></script>
+  <script src="app.js?v=5.8"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">

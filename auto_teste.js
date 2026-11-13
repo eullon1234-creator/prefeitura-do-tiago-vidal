@@ -2182,7 +2182,8 @@ assert(alojadoHtml.includes('dados_iniciais_taboca.json'), 'alojado.html consult
 assert(alojadoHtml.includes("collection('config_sistema').doc('portal_morador')"), 'alojado.html lê o Documento Único config_sistema/portal_morador');
 assert(alojadoHtml.includes('TTL_PORTAL_MS = 2 * 60 * 60 * 1000'), 'TTL de 2 horas configurado para o cache local do Portal do Morador');
 assert(alojadoHtml.includes('5 * 60 * 1000') && alojadoHtml.includes('cooldown_chamado_'), 'Cooldown de 5 minutos configurado para consulta individual de status de chamado');
-assert(!alojadoHtml.includes('.onSnapshot('), 'Zero listeners em tempo real (.onSnapshot) no app dos alojados para proteção de cota Firebase');
+assert(!alojadoHtml.includes("collection('alojados').onSnapshot") && !alojadoHtml.includes("collection('chamados_suporte').onSnapshot"), 'Zero listeners em coleções inteiras no app dos alojados para proteção de cota Firebase');
+assert(alojadoHtml.includes("collection('config_sistema').doc('portal_morador').onSnapshot"), 'Listener em tempo real enxuto focado apenas no documento único portal_morador em alojado.html');
 
 // 3. Estrutura das 4 Abas Mobile do Colaborador em alojado.html
 assert(alojadoHtml.includes('id="abaMoradorQuarto"'), 'Aba Meu Quarto & Crachá Digital presente em alojado.html');
@@ -2193,7 +2194,7 @@ assert(alojadoHtml.includes('id="imgQrCodeCrachaMorador"'), 'Crachá Digital QR 
 
 // 4. Integração com chamado.html e Service Worker v5.6
 assert(chamadoHtmlPortal.includes('alojado.html'), 'Banner de acesso rápido ao Portal do Alojado presente em chamado.html');
-assert(swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.7'") || swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.6'"), 'Service Worker atualizado para prefeitura-pwa-v5.7');
+assert(swJsPortal.includes("CACHE_NAME = 'prefeitura-pwa-v5.8'"), 'Service Worker atualizado para prefeitura-pwa-v5.8');
 assert(swJsPortal.includes("'alojado.html'"), 'alojado.html incluído no cache offline do Service Worker');
 
 // 5. Painel do Prefeito (index.html + app.js - 5 Sub-Abas de Edição Completa)
@@ -2260,6 +2261,30 @@ assert(appJs.includes('function atualizarGraficosGelo('), 'Função atualizarGra
 assert(appJs.includes('function alternarPeriodoGraficoGelo('), 'Função alternarPeriodoGraficoGelo implementada em app.js');
 assert(appJs.includes('function alternarUnidadeGraficoGelo('), 'Função alternarUnidadeGraficoGelo implementada em app.js');
 assert(appJs.includes('function imprimirRelatorioGeloSemanalA4('), 'Função imprimirRelatorioGeloSemanalA4 implementada em app.js');
+
+// -------------------------------------------------------------
+// SEÇÃO 38: SISTEMA DE SORTEIO MOTIVACIONAL DE QUARTOS
+// -------------------------------------------------------------
+console.log('\n--- SEÇÃO 38: SISTEMA DE SORTEIO MOTIVACIONAL DE QUARTOS ---');
+assert(indexHtml.includes('id="tab-sorteio"'), 'Aba tab-sorteio presente em index.html');
+assert(indexHtml.includes('data-tab="sorteio"'), 'Botão data-tab="sorteio" presente na sidebar de index.html');
+assert(indexHtml.includes('id="selectSorteioModoJustica"') && indexHtml.includes('value="individual"') && indexHtml.includes('value="por_quarto"'), 'Seletor de justiça de bilhetes (individual igual vs coletivo por quarto) presente em index.html');
+assert(indexHtml.includes('id="chkSorteioEvitarRepeticao"'), 'Trava opcional anti-repetição de vencedor presente em index.html');
+assert(indexHtml.includes('id="esferaGloboAdmin"') && indexHtml.includes('prefers-reduced-motion'), 'Globo giratório animado com suporte a prefers-reduced-motion presente em index.html');
+
+assert(appJs.includes("'sorteio': 'grupo_operacoes'"), 'Sorteio mapeado para grupo_operacoes em mapaGrupoAba');
+assert(appJs.includes('function carregarSorteioAdmin('), 'Função carregarSorteioAdmin implementada em app.js');
+assert(appJs.includes('function gerarBilhetesSorteio('), 'Função gerarBilhetesSorteio implementada em app.js');
+assert(appJs.includes('function publicarSorteioMotivacional('), 'Função publicarSorteioMotivacional implementada em app.js');
+assert(appJs.includes('function dispararSorteioAoVivo('), 'Função dispararSorteioAoVivo implementada em app.js');
+assert(appJs.includes('function resetarSorteioAtual('), 'Função resetarSorteioAtual implementada em app.js');
+
+assert(alojadoHtml.includes('id="abaMoradorSorteio"'), 'Aba abaMoradorSorteio presente em alojado.html');
+assert(alojadoHtml.includes('id="cardBannerSorteioHomeMorador"'), 'Banner de destaque do sorteio em Meu Quarto presente em alojado.html');
+assert(alojadoHtml.includes('id="palcoGloboMorador"') && alojadoHtml.includes('id="esferaGloboMorador"'), 'Globo animado de sorteio presente em alojado.html');
+assert(alojadoHtml.includes('id="cardGanhadorSorteioMorador"') && alojadoHtml.includes('id="ganhadorNumeroSorteioMorador"') && alojadoHtml.includes('id="ganhadorNomeSorteioMorador"') && alojadoHtml.includes('id="ganhadorQuartoSorteioMorador"') && alojadoHtml.includes('id="ganhadorPremioSorteioMorador"'), 'Cartão completo do vencedor (número, nome, quarto e premiação) presente em alojado.html');
+assert(alojadoHtml.includes('function renderizarSecaoSorteioMorador('), 'Função renderizarSecaoSorteioMorador implementada em alojado.html');
+assert(alojadoHtml.includes('function iniciarListenerTempoRealSorteioPortal('), 'Listener em tempo real do sorteio implementado em alojado.html');
 
 // -------------------------------------------------------------
 // RELATÓRIO FINAL
