@@ -1818,7 +1818,10 @@ function initFirebase() {
       firebaseInitialized = true;
       atualizarBadgeFirebaseUI(true, "Firebase Conectado");
       console.log("Firebase Firestore inicializado com sucesso:", firebaseConfig.projectId);
-      iniciarListenerTempoRealFirebase();
+      // Se o módulo PrefeituraAuth estiver ativo, os listeners de dados só iniciam após login aprovado
+      if (typeof window.PrefeituraAuth === 'undefined') {
+        iniciarListenerTempoRealFirebase();
+      }
     } else {
       console.warn("SDK do Firebase não detectado.");
       atualizarBadgeFirebaseUI(false, "Offline");
@@ -3032,11 +3035,11 @@ async function confirmarCropFoto() {
   }
 }
 
-// Inicialização
-document.addEventListener('DOMContentLoaded', () => {
-  aplicarIdentidadeVisual();
-  inicializarTamanhoFonte();
-  initFirebase();
+// Inicialização protegida por Autenticação (PrefeituraAuth)
+function iniciarAppAposLogin() {
+  if (firebaseInitialized && firestoreDb) {
+    iniciarListenerTempoRealFirebase();
+  }
   initMobileMenu();
   restaurarPreferenciaSidebar();
   initScrollToTopListener();
@@ -3046,10 +3049,34 @@ document.addEventListener('DOMContentLoaded', () => {
   inicializarRondaCanteiro();
   inicializarConfigNotificacoes();
   verificarAcaoUrlParametros();
+}
+window.iniciarAppAposLogin = iniciarAppAposLogin;
+
+function sincronizarEstadoUsuarioApp(role, nome) {
+  currentUserRole = role === 'prefeito' ? 'prefeito' : 'consulta';
+  if (nome) currentUserName = nome;
+  updateUserRoleUI();
+}
+window.sincronizarEstadoUsuarioApp = sincronizarEstadoUsuarioApp;
+
+document.addEventListener('DOMContentLoaded', () => {
+  aplicarIdentidadeVisual();
+  inicializarTamanhoFonte();
+  initFirebase();
+  if (typeof window.PrefeituraAuth !== 'undefined' && typeof window.PrefeituraAuth.init === 'function') {
+    window.PrefeituraAuth.init();
+  } else {
+    document.body.classList.remove('auth-locked');
+    iniciarAppAposLogin();
+  }
 });
 
-// Alternar entre modo Prefeito (Admin) e Consulta
+// Alternar modo de acesso (agora governado pelo sistema de permissões RBAC)
 function toggleUserMode() {
+  if (typeof window.PrefeituraAuth !== 'undefined') {
+    showToast('As permissões de edição e visualização são gerenciadas pela sua conta na Prefeitura.', 'info');
+    return;
+  }
   if (currentUserRole === 'prefeito') {
     currentUserRole = 'consulta';
     currentUserName = 'Fiscal / Consulta (Leitura)';
@@ -3068,11 +3095,13 @@ function updateUserRoleUI() {
   const roleBadgeInPage = document.getElementById('roleBadgeInPage');
 
   if (currentUserRole === 'prefeito') {
-    userRoleIcon.className = 'fa-solid fa-shield-halved text-amber-400';
-    userRoleText.textContent = 'PREFEITO';
-    userRoleText.className = 'text-amber-300 font-bold hidden sm:inline';
+    if (userRoleIcon) userRoleIcon.className = 'fa-solid fa-shield-halved text-amber-400';
+    if (userRoleText) {
+      userRoleText.textContent = 'PREFEITO';
+      userRoleText.className = 'text-amber-300 font-bold hidden sm:inline';
+    }
     if (roleBadgeInPage) {
-      roleBadgeInPage.textContent = 'Acesso: Prefeito (Total)';
+      roleBadgeInPage.textContent = `Acesso: ${currentUserName || 'Edição Liberada'}`;
       roleBadgeInPage.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300';
     }
     // Habilitar botões de prefeito
@@ -3082,11 +3111,13 @@ function updateUserRoleUI() {
       btn.removeAttribute('disabled');
     });
   } else {
-    userRoleIcon.className = 'fa-solid fa-eye text-sky-400';
-    userRoleText.textContent = 'CONSULTA';
-    userRoleText.className = 'text-sky-300 font-medium hidden sm:inline';
+    if (userRoleIcon) userRoleIcon.className = 'fa-solid fa-eye text-sky-400';
+    if (userRoleText) {
+      userRoleText.textContent = 'CONSULTA';
+      userRoleText.className = 'text-sky-300 font-medium hidden sm:inline';
+    }
     if (roleBadgeInPage) {
-      roleBadgeInPage.textContent = 'Acesso: Consulta (Somente Leitura)';
+      roleBadgeInPage.textContent = `Acesso: ${currentUserName || 'Somente Visualização'}`;
       roleBadgeInPage.className = 'px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-300';
     }
     // Desabilitar botões de edição para modo consulta
@@ -3099,8 +3130,16 @@ function updateUserRoleUI() {
 }
 
 function checkPrefeitoAccess() {
+  if (typeof window.PrefeituraAuth !== 'undefined' && window.PrefeituraAuth.getPerfilAtual && window.PrefeituraAuth.getPerfilAtual()) {
+    const aba = typeof activeTab !== 'undefined' ? activeTab : 'dashboard';
+    if (!window.PrefeituraAuth.canEditTab(aba)) {
+      showToast('Ação restrita! Seu perfil tem acesso apenas de visualização neste módulo.', 'warning');
+      return false;
+    }
+    return true;
+  }
   if (currentUserRole !== 'prefeito') {
-    showToast('Ação restrita! Mude para o modo Prefeito para editar ou excluir dados.', 'warning');
+    showToast('Ação restrita! Você não possui permissão de edição neste módulo.', 'warning');
     return false;
   }
   return true;
@@ -3125,6 +3164,7 @@ const mapaGrupoAba = {
   'relatorios': 'grupo_gestao',
   'importacao': 'grupo_gestao',
   'auditoria': 'grupo_gestao',
+  'usuarios': 'grupo_gestao',
   'configuracoes': 'grupo_gestao'
 };
 
@@ -3167,6 +3207,21 @@ function alternarGrupoSidebar(grupoId, forcarAberto = false) {
 
 // Navegação de Abas
 function switchTab(tabId) {
+  // Guarda de permissão por módulo (RBAC)
+  if (typeof window.PrefeituraAuth !== 'undefined' && window.PrefeituraAuth.getPerfilAtual && window.PrefeituraAuth.getPerfilAtual()) {
+    const nivel = window.PrefeituraAuth.getNivelModulo(tabId);
+    if (nivel === 'bloqueado') {
+      const primeira = window.PrefeituraAuth.obterPrimeiraAbaPermitida();
+      if (primeira && primeira !== tabId) {
+        showToast('Acesso restrito! Este módulo não foi liberado para o seu perfil.', 'warning');
+        tabId = primeira;
+      } else {
+        showToast('Nenhum módulo liberado para sua conta. Contate o Prefeito.', 'warning');
+        return;
+      }
+    }
+  }
+
   activeTab = tabId;
 
   // Garante que o grupo da aba ativa fique expandido no acordeão
@@ -3239,6 +3294,8 @@ function switchTab(tabId) {
     carregarRelatoriosPreview();
   } else if (tabId === 'auditoria') {
     carregarAuditoria();
+  } else if (tabId === 'usuarios') {
+    if (typeof window.PrefeituraAuth !== 'undefined') window.PrefeituraAuth.renderUsuariosGestao();
   } else if (tabId === 'erp_canteiro') {
     carregarErpCanteiro();
   } else if (tabId === 'configuracoes') {
@@ -3260,6 +3317,9 @@ function switchTab(tabId) {
   }
 
   updateUserRoleUI();
+  if (typeof window.PrefeituraAuth !== 'undefined' && window.PrefeituraAuth.aplicarPermissoesAbaAtiva) {
+    window.PrefeituraAuth.aplicarPermissoesAbaAtiva(tabId);
+  }
 }
 
 function toggleSidebar(forceState) {
@@ -7143,6 +7203,10 @@ function exportarMoveisDanificadosExcel() {
 }
 
 function exportarPlanilhaOficial() {
+  if (typeof window.PrefeituraAuth !== 'undefined' && window.PrefeituraAuth.getPerfilAtual && window.PrefeituraAuth.getPerfilAtual() && !window.PrefeituraAuth.canExport()) {
+    showToast('Você não tem permissão para exportar planilhas. Solicite liberação ao Prefeito.', 'warning');
+    return;
+  }
   if (staticModeActive && typeof XLSX !== 'undefined') {
     showToast('📗 Gerando Planilha Oficial Consolidada Taboca 2 (Canteiro + Casas na Cidade)...', 'info');
     const wb = XLSX.utils.book_new();

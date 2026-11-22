@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v5.8';
+const CACHE_NAME = 'prefeitura-pwa-v6.0';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
@@ -10,6 +10,7 @@ const ASSETS_TO_CACHE = [
   'ronda.html',
   'guarda.html',
   'alojado.html',
+  'auth.js',
   'app.js',
   'qrcode.min.js',
   'xlsx.bundle.js',
@@ -19,6 +20,7 @@ const ASSETS_TO_CACHE = [
   'icon-192.png',
   'icon-512.png',
   'apple-touch-icon.png',
+  'banner_pavilhao.jpg',
   'logo_gel.png',
   'logo_gel_cropped.png',
   'logo_gel_oficial.png'
@@ -67,19 +69,28 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Não interceptar requisições de API (o app.js já gerencia) ou Firebase/Imgbb
-  if (url.pathname.includes('/api/') || url.hostname.includes('firestore') || url.hostname.includes('googleapis') || url.hostname.includes('imgbb')) {
+  // Não interceptar requisições de API (o app.js já gerencia) ou Firebase Auth/Firestore/Imgbb
+  if (
+    url.pathname.includes('/api/') ||
+    url.hostname.includes('firestore') ||
+    url.hostname.includes('googleapis') ||
+    url.hostname.includes('firebaseapp') ||
+    url.hostname.includes('identitytoolkit') ||
+    url.hostname.includes('securetoken') ||
+    url.hostname.includes('imgbb')
+  ) {
     return;
   }
 
-  // Network-First para app.js, index.html e dados_iniciais_taboca.json
-  const isDynamicAsset = event.request.mode === 'navigate' || 
-                         url.pathname.endsWith('index.html') || 
-                         url.pathname.endsWith('app.js') || 
-                         url.pathname.endsWith('ronda.html') || 
-                         url.pathname.endsWith('limpeza.html') || 
-                         url.pathname.endsWith('chamado.html') || 
-                         url.pathname.endsWith('alojado.html') || 
+  // Network-First para auth.js, app.js, index.html e dados_iniciais_taboca.json
+  const isDynamicAsset = event.request.mode === 'navigate' ||
+                         url.pathname.endsWith('index.html') ||
+                         url.pathname.endsWith('auth.js') ||
+                         url.pathname.endsWith('app.js') ||
+                         url.pathname.endsWith('ronda.html') ||
+                         url.pathname.endsWith('limpeza.html') ||
+                         url.pathname.endsWith('chamado.html') ||
+                         url.pathname.endsWith('alojado.html') ||
                          url.pathname.endsWith('dados_iniciais_taboca.json');
 
   if (isDynamicAsset) {

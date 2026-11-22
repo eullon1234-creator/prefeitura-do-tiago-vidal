@@ -39,8 +39,9 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
   <!-- Gerador Nativo de QR Code 100% Offline (Zero Dependencia Externa) -->
   <script src="qrcode.min.js"></script>
-  <!-- Firebase SDKs (v10 compat para sincronização com Firestore) -->
+  <!-- Firebase SDKs (v10 compat para autenticação e sincronização com Firestore) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script>
     tailwind.config = {
@@ -434,12 +435,334 @@
       50% { transform: translate(40px, 92px) rotate(190deg); }
       100% { transform: translate(88px, 38px) rotate(360deg); }
     }
+    /* ================= SISTEMA DE LOGIN GLASSMORPHISM & BLOQUEIO ANTI-FLASH ================= */
+    body.auth-locked .app-protected {
+      display: none !important;
+    }
+    @keyframes authFloatGlow {
+      0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.45; }
+      50% { transform: translate(18px, -14px) scale(1.08); opacity: 0.7; }
+    }
+    @keyframes authCardEnter {
+      0% { opacity: 0; transform: translateY(16px) scale(0.98); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .auth-glow-orb {
+      animation: authFloatGlow 8s ease-in-out infinite;
+    }
+    .auth-card-enter {
+      animation: authCardEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .auth-glass-card {
+      background: linear-gradient(155deg, rgba(15, 23, 42, 0.82) 0%, rgba(15, 23, 42, 0.68) 100%);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .auth-input {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      transition: all 0.2s ease;
+    }
+    .auth-input:focus {
+      background: rgba(15, 23, 42, 0.9);
+      border-color: rgba(245, 158, 11, 0.8);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+      outline: none;
+    }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 h-screen flex flex-col antialiased overflow-hidden w-full select-none-safe">
+<body class="auth-locked bg-slate-100 text-slate-800 h-screen flex flex-col antialiased overflow-hidden w-full select-none-safe">
+
+  <!-- ================= TELA DE AUTENTICAÇÃO GLASSMORPHISM (BLOQUEIA ACESSO NÃO AUTORIZADO) ================= -->
+  <div id="authGateOverlay" class="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto bg-slate-950 no-print">
+    <!-- Fundo Cinematográfico com Foto do Pavilhão Desfocada + Gradiente Escuro + Auras -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <img src="banner_pavilhao.jpg" alt="" class="w-full h-full object-cover scale-105 blur-md opacity-40">
+      <div class="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-slate-900/80 to-slate-950/95"></div>
+      <div class="auth-glow-orb absolute -top-24 -left-24 w-96 h-96 rounded-full bg-amber-500/20 blur-3xl"></div>
+      <div class="auth-glow-orb absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-emerald-500/15 blur-3xl" style="animation-delay: -4s;"></div>
+    </div>
+
+    <!-- Container Central -->
+    <div class="relative z-10 w-full max-w-md my-auto auth-card-enter">
+      <!-- Borda de Brilho Superior Âmbar -->
+      <div class="auth-glass-card rounded-3xl overflow-hidden border border-white/10">
+        <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-500"></div>
+
+        <!-- Cabeçalho Institucional GEL / Prefeitura -->
+        <div class="px-6 pt-7 pb-5 text-center border-b border-white/10">
+          <div class="inline-flex items-center justify-center bg-white/95 px-4 py-2 rounded-2xl shadow-lg shadow-black/30 mb-3.5 border border-amber-400/30">
+            <img src="logo_gel_oficial.png" alt="GEL Engenharia" class="h-9 w-auto object-contain">
+          </div>
+          <div class="flex items-center justify-center gap-2">
+            <h1 class="text-lg sm:text-xl font-extrabold text-white tracking-tight">Prefeitura de Canteiro</h1>
+            <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-extrabold uppercase tracking-wider">Taboca 2</span>
+          </div>
+          <p class="text-xs text-slate-300/80 mt-1">Acesso Restrito à Gestão • GEL Engenharia S.A.</p>
+        </div>
+
+        <!-- VIEW 1: CARREGANDO SESSÃO -->
+        <div id="authViewLoading" class="p-8 text-center space-y-4">
+          <div class="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-shield-halved text-2xl animate-pulse"></i>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-white">Verificando credenciais...</p>
+            <p class="text-xs text-slate-400 mt-1">Conectando ao servidor seguro da Prefeitura</p>
+          </div>
+        </div>
+
+        <!-- VIEW 2: PRIMEIRO ACESSO (CRIAR CONTA MASTER DO PREFEITO) -->
+        <div id="authViewSetupMaster" class="hidden p-6 sm:p-7 space-y-4">
+          <div class="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-400/30 flex items-start gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <i class="fa-solid fa-crown text-sm"></i>
+            </div>
+            <div>
+              <h2 class="text-xs font-extrabold text-amber-300 uppercase tracking-wider">Configuração Inicial — Primeiro Acesso</h2>
+              <p class="text-[11px] text-slate-200 mt-0.5 leading-relaxed">Crie a conta <strong class="text-white">Prefeito Master</strong>. Só você poderá liberar novos usuários e escolher o que cada pessoa pode acessar.</p>
+            </div>
+          </div>
+
+          <div id="authSetupError" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-medium flex items-start gap-2"></div>
+
+          <form onsubmit="PrefeituraAuth.handleSetupMaster(event)" class="space-y-3.5">
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Seu Nome Completo</label>
+              <div class="relative">
+                <i class="fa-solid fa-user-shield absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="setupMasterNome" type="text" required placeholder="Ex: Tiago Vidal" class="auth-input w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white placeholder-slate-400">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Usuário de Login (sem espaços)</label>
+              <div class="relative">
+                <i class="fa-solid fa-at absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 text-sm"></i>
+                <input id="setupMasterUsername" type="text" required autocomplete="username" placeholder="Ex: tiago.vidal" class="auth-input w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white placeholder-slate-400 lowercase">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Crie sua Senha Master</label>
+              <div class="relative">
+                <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="setupMasterSenha" type="password" required minlength="6" autocomplete="new-password" oninput="PrefeituraAuth.atualizarMedidorForca('setupMasterSenha','setupForcaBar','setupForcaLbl')" placeholder="Mínimo 6 caracteres" class="auth-input w-full h-12 pl-10 pr-11 rounded-xl text-sm text-white placeholder-slate-400">
+                <button type="button" onclick="PrefeituraAuth.toggleVisibilidadeSenha('setupMasterSenha', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1.5">
+                  <i class="fa-solid fa-eye text-sm"></i>
+                </button>
+              </div>
+              <div class="mt-1.5 flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div id="setupForcaBar" class="h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <span id="setupForcaLbl" class="text-[10px] font-semibold text-slate-300"></span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Confirmar Senha</label>
+              <div class="relative">
+                <i class="fa-solid fa-check-double absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="setupMasterConfirmar" type="password" required minlength="6" autocomplete="new-password" placeholder="Repita sua senha" class="auth-input w-full h-12 pl-10 pr-11 rounded-xl text-sm text-white placeholder-slate-400">
+                <button type="button" onclick="PrefeituraAuth.toggleVisibilidadeSenha('setupMasterConfirmar', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1.5">
+                  <i class="fa-solid fa-eye text-sm"></i>
+                </button>
+              </div>
+            </div>
+
+            <button id="btnSubmitSetupMaster" type="submit" class="w-full h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/25 transition transform active:scale-[0.98] flex items-center justify-center">
+              <i class="fa-solid fa-crown mr-2"></i>Criar Conta Master do Prefeito
+            </button>
+          </form>
+        </div>
+
+        <!-- VIEW 3: LOGIN & SOLICITAR ACESSO -->
+        <div id="authViewAuth" class="hidden p-6 sm:p-7 space-y-5">
+          <!-- Abas Entrar / Solicitar Acesso -->
+          <div class="flex p-1 rounded-2xl bg-slate-950/70 border border-white/10">
+            <button id="authTabBtnEntrar" type="button" onclick="PrefeituraAuth.alternarAbaAuth('entrar')" class="flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
+              <i class="fa-solid fa-right-to-bracket mr-1.5"></i>Entrar
+            </button>
+            <button id="authTabBtnSolicitar" type="button" onclick="PrefeituraAuth.alternarAbaAuth('solicitar')" class="flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-300 hover:text-white">
+              <i class="fa-solid fa-user-plus mr-1.5"></i>Solicitar Acesso
+            </button>
+          </div>
+
+          <!-- FORMULÁRIO ENTRAR -->
+          <form id="formAuthLogin" onsubmit="PrefeituraAuth.handleLogin(event)" class="space-y-4">
+            <div id="authLoginError" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-medium flex items-start gap-2"></div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Usuário</label>
+              <div class="relative">
+                <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400/90 text-sm"></i>
+                <input id="authLoginUsername" type="text" required autocomplete="username" placeholder="Ex: tiago.vidal" class="auth-input w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white placeholder-slate-400">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Senha</label>
+              <div class="relative">
+                <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="authLoginSenha" type="password" required autocomplete="current-password" placeholder="Digite sua senha" class="auth-input w-full h-12 pl-10 pr-11 rounded-xl text-sm text-white placeholder-slate-400">
+                <button type="button" onclick="PrefeituraAuth.toggleVisibilidadeSenha('authLoginSenha', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1.5">
+                  <i class="fa-solid fa-eye text-sm"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs">
+              <label class="inline-flex items-center gap-2 text-slate-300 cursor-pointer select-none">
+                <input id="authLoginLembrar" type="checkbox" checked class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500">
+                <span>Manter conectado</span>
+              </label>
+              <span class="text-[11px] text-slate-400"><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i>Protegido</span>
+            </div>
+
+            <button id="btnSubmitLogin" type="submit" class="w-full h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/25 transition transform active:scale-[0.98] flex items-center justify-center">
+              <i class="fa-solid fa-right-to-bracket mr-2"></i>Entrar no Painel
+            </button>
+          </form>
+
+          <!-- FORMULÁRIO SOLICITAR ACESSO (AUTO-CADASTRO PENDENTE) -->
+          <form id="formAuthRegister" onsubmit="PrefeituraAuth.handleSolicitarAcesso(event)" class="hidden space-y-3.5">
+            <div class="p-3 rounded-xl bg-sky-500/10 border border-sky-400/25 text-[11px] text-sky-200 flex items-start gap-2">
+              <i class="fa-solid fa-circle-info text-sky-400 mt-0.5 flex-shrink-0"></i>
+              <span>Sua conta ficará <strong>aguardando liberação do Prefeito</strong>. Você só entra no sistema após ele aprovar e escolher seus módulos.</span>
+            </div>
+
+            <div id="authRegisterError" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-medium flex items-start gap-2"></div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Nome Completo</label>
+                <input id="authRegNome" type="text" required placeholder="Seu nome" class="auth-input w-full h-11 px-3.5 rounded-xl text-sm text-white placeholder-slate-400">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Cargo / Setor</label>
+                <input id="authRegCargo" type="text" required placeholder="Ex: Fiscal, Almoxarife" class="auth-input w-full h-11 px-3.5 rounded-xl text-sm text-white placeholder-slate-400">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Escolha seu Usuário de Login</label>
+              <div class="relative">
+                <i class="fa-solid fa-at absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 text-sm"></i>
+                <input id="authRegUsername" type="text" required autocomplete="username" placeholder="Ex: carlos.ronda" class="auth-input w-full h-11 pl-9 pr-4 rounded-xl text-sm text-white placeholder-slate-400 lowercase">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Crie sua Senha</label>
+              <div class="relative">
+                <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="authRegSenha" type="password" required minlength="6" autocomplete="new-password" oninput="PrefeituraAuth.atualizarMedidorForca('authRegSenha','regForcaBar','regForcaLbl')" placeholder="Mínimo 6 caracteres" class="auth-input w-full h-11 pl-9 pr-11 rounded-xl text-sm text-white placeholder-slate-400">
+                <button type="button" onclick="PrefeituraAuth.toggleVisibilidadeSenha('authRegSenha', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1">
+                  <i class="fa-solid fa-eye text-sm"></i>
+                </button>
+              </div>
+              <div class="mt-1.5 flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div id="regForcaBar" class="h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <span id="regForcaLbl" class="text-[10px] font-semibold text-slate-300"></span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Confirmar Senha</label>
+              <input id="authRegConfirmar" type="password" required minlength="6" autocomplete="new-password" placeholder="Repita a senha" class="auth-input w-full h-11 px-3.5 rounded-xl text-sm text-white placeholder-slate-400">
+            </div>
+
+            <button id="btnSubmitRegister" type="submit" class="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition transform active:scale-[0.98] flex items-center justify-center">
+              <i class="fa-solid fa-paper-plane mr-2"></i>Enviar Solicitação de Acesso
+            </button>
+          </form>
+        </div>
+
+        <!-- VIEW 4: AGUARDANDO LIBERAÇÃO DO PREFEITO -->
+        <div id="authViewPending" class="hidden p-7 text-center space-y-5">
+          <div class="relative w-16 h-16 mx-auto">
+            <div class="absolute inset-0 rounded-2xl bg-amber-500/30 animate-ping"></div>
+            <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/25 to-amber-600/20 border border-amber-400/50 text-amber-400 flex items-center justify-center">
+              <i class="fa-solid fa-hourglass-half text-2xl"></i>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[11px] font-bold uppercase tracking-wider">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>Aguardando Aprovação
+            </span>
+            <h2 class="text-lg font-extrabold text-white pt-1">Solicitação Enviada!</h2>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Olá, <strong id="pendingUserNome" class="text-white">Colaborador</strong>! Sua conta (<span id="pendingUserLogin" class="font-mono text-amber-300">@usuario</span> • <span id="pendingUserCargo">Setor</span>) foi registrada, mas o acesso ao painel só é liberado após autorização do <strong>Prefeito da Obra</strong>.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-[11px] text-emerald-200 flex items-center justify-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Assim que o Prefeito liberar, esta tela abrirá automaticamente.</span>
+          </div>
+
+          <button type="button" onclick="PrefeituraAuth.logout()" class="w-full h-11 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-right-from-bracket"></i>Sair e voltar para a tela de login
+          </button>
+        </div>
+
+        <!-- VIEW 5: ACESSO BLOQUEADO / RECUSADO -->
+        <div id="authViewBlocked" class="hidden p-7 text-center space-y-5">
+          <div class="w-16 h-16 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-user-lock text-2xl"></i>
+          </div>
+          <div class="space-y-1.5">
+            <h2 class="text-lg font-extrabold text-white">Acesso Não Autorizado</h2>
+            <p class="text-xs font-semibold text-rose-300" id="blockedUserNome">Usuário</p>
+            <p class="text-xs text-slate-300 leading-relaxed" id="blockedUserMotivo">Seu acesso foi suspenso pela administração da Prefeitura. Procure o Prefeito da Obra para reativação.</p>
+          </div>
+          <button type="button" onclick="PrefeituraAuth.logout()" class="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrow-left"></i>Voltar para o Login
+          </button>
+        </div>
+
+        <!-- VIEW 6: GUIA RÁPIDO SE FIREBASE AUTH NÃO ESTIVER ATIVO NO CONSOLE -->
+        <div id="authViewConfigError" class="hidden p-6 space-y-4">
+          <div class="p-4 rounded-2xl bg-amber-500/15 border border-amber-400/40 space-y-2.5 text-left">
+            <div class="flex items-center gap-2 text-amber-300 font-extrabold text-xs uppercase tracking-wider">
+              <i class="fa-solid fa-triangle-exclamation text-sm"></i>
+              <span>Ative o Login no Console do Firebase (1x só)</span>
+            </div>
+            <p class="text-xs text-slate-200 leading-relaxed">O provedor <strong>E-mail/senha</strong> ainda não foi ativado no seu projeto <code class="text-amber-300">prefeitura-cc71b</code>. Leva 15 segundos:</p>
+            <ol class="text-xs text-slate-200 space-y-1.5 list-decimal list-inside">
+              <li>Clique no botão abaixo para abrir o Firebase.</li>
+              <li>Clique em <strong>Começar</strong> ➔ <strong>E-mail/senha</strong>.</li>
+              <li>Ative a chave <strong>Ativar</strong> e clique em <strong>Salvar</strong>.</li>
+              <li>Volte aqui e clique em <strong>Tentar Novamente</strong>.</li>
+            </ol>
+          </div>
+          <a href="https://console.firebase.google.com/project/prefeitura-cc71b/authentication/providers" target="_blank" rel="noopener noreferrer" class="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg transition">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>Abrir Console Firebase Authentication
+          </a>
+          <button type="button" onclick="window.location.reload()" class="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs transition">
+            <i class="fa-solid fa-rotate-right mr-1.5"></i>Já ativei — Tentar Novamente
+          </button>
+        </div>
+
+        <!-- Rodapé Discreto: Atalho para o Portal do Alojado -->
+        <div class="px-6 py-4 bg-slate-950/60 border-t border-white/10 text-center">
+          <a href="alojado.html" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-amber-300 transition group">
+            <i class="fa-solid fa-id-card-clip text-amber-400"></i>
+            <span>É colaborador alojado? <strong class="underline decoration-amber-400/50 group-hover:decoration-amber-300">Acessar Portal do Alojado</strong></span>
+            <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-0.5 transition-transform"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Top Navbar -->
-  <header class="bg-slate-900 text-white border-b border-slate-800 flex-shrink-0 z-30 shadow-md no-print w-full">
+  <header class="app-protected bg-slate-900 text-white border-b border-slate-800 flex-shrink-0 z-30 shadow-md no-print w-full">
     <div class="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2 max-w-full">
       <!-- Left: Brand & Mobile Toggle -->
       <div class="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -495,26 +818,59 @@
         </button>
 
         <!-- Botão Rápido: Baixar Planilha Oficial Modelo Original (Desktop) -->
-        <button onclick="exportarPlanilhaOficial()" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition flex-shrink-0" title="Exportar Planilha Oficial no formato original exato">
+        <button onclick="exportarPlanilhaOficial()" class="rbac-export-btn hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition flex-shrink-0" title="Exportar Planilha Oficial no formato original exato">
           <i class="fa-solid fa-file-excel"></i> Planilha Oficial
         </button>
 
         <!-- Maintenance Alert Indicator -->
-        <button onclick="goToAlertas()" title="Ver itens em manutenção" class="relative p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex-shrink-0">
+        <button id="btnAlertaManutencaoHeader" onclick="goToAlertas()" title="Ver itens em manutenção" class="relative p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex-shrink-0">
           <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm"></i>
           <span id="badgeAlertasNav" class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full hidden">0</span>
         </button>
 
-        <!-- Profile / Role badge (Responsivo: Compacto no celular, Completo no desktop) -->
-        <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5 sm:p-1 flex-shrink-0">
-          <div class="px-1.5 sm:px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5" id="userBadge">
-            <i class="fa-solid fa-shield-halved text-amber-400" id="userRoleIcon"></i>
-            <span id="userRoleText" class="text-amber-300 font-medium hidden sm:inline">PREFEITO</span>
-          </div>
-          <button onclick="toggleUserMode()" class="px-1.5 sm:px-2 py-1 text-[11px] rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium transition flex items-center gap-1" title="Alternar entre modo Prefeito (Admin) e Consulta">
-            <i class="fa-solid fa-repeat text-slate-400 text-[10px]"></i>
-            <span class="hidden md:inline">Alternar</span>
+        <!-- Menu do Usuário Autenticado (Perfil, Permissões, Pendentes & Sair) -->
+        <div class="relative flex-shrink-0">
+          <button type="button" onclick="PrefeituraAuth.toggleDropdownUsuario(event)" class="relative flex items-center gap-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-amber-500/50 rounded-xl pl-1.5 pr-2.5 py-1 transition cursor-pointer">
+            <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-extrabold text-[11px] flex items-center justify-center shadow-xs flex-shrink-0" id="headerUserAvatarIniciais">
+              PF
+            </div>
+            <div class="hidden sm:flex flex-col items-start text-left leading-tight">
+              <div class="flex items-center gap-1.5">
+                <span id="headerUserNome" class="text-xs font-bold text-white max-w-[110px] truncate">Prefeito</span>
+                <span id="headerNivelAbaPill" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">Master</span>
+              </div>
+              <span id="headerUserCargo" class="text-[10px] text-slate-400 max-w-[140px] truncate">Prefeito Master</span>
+            </div>
+            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+            <!-- Badge de solicitações pendentes -->
+            <span id="headerBadgeUsuariosPendentes" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black flex items-center justify-center shadow-md ring-2 ring-slate-900 animate-bounce">0</span>
+            <!-- Elementos ocultos de compatibilidade com funções legadas -->
+            <span class="hidden"><i id="userRoleIcon"></i><span id="userRoleText"></span></span>
           </button>
+
+          <!-- Dropdown do Usuário -->
+          <div id="userProfileDropdown" onclick="event.stopPropagation()" class="hidden absolute right-0 mt-2 w-64 rounded-2xl bg-slate-900 border border-slate-700/90 shadow-2xl overflow-hidden z-50">
+            <div class="p-3.5 bg-slate-950/70 border-b border-slate-800">
+              <p id="dropdownUserNome" class="text-sm font-bold text-white truncate">Prefeito</p>
+              <p id="dropdownUserLogin" class="text-xs font-mono text-amber-400 truncate">@prefeito</p>
+              <p id="dropdownUserCargo" class="text-[11px] text-slate-400 mt-0.5 truncate">Prefeito Master • Acesso Total</p>
+            </div>
+            <div class="p-1.5 space-y-1">
+              <button id="dropdownBtnGerenciarUsuarios" type="button" onclick="PrefeituraAuth.fecharDropdownUsuario(); switchTab('usuarios');" class="hidden w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-amber-300 transition text-left">
+                <i class="fa-solid fa-users-gear text-amber-400 w-4 text-center"></i>
+                <span>Usuários & Permissões</span>
+              </button>
+              <button type="button" onclick="PrefeituraAuth.abrirModalMinhaConta()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition text-left">
+                <i class="fa-solid fa-key text-sky-400 w-4 text-center"></i>
+                <span>Minha Conta & Alterar Senha</span>
+              </button>
+              <div class="border-t border-slate-800 my-1"></div>
+              <button type="button" onclick="PrefeituraAuth.logout()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/15 transition text-left">
+                <i class="fa-solid fa-right-from-bracket w-4 text-center"></i>
+                <span>Sair do Sistema</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Refresh Button -->
@@ -526,7 +882,7 @@
   </header>
 
   <!-- Main Container -->
-  <div class="flex-1 flex min-h-0 overflow-hidden relative">
+  <div class="app-protected flex-1 flex min-h-0 overflow-hidden relative">
 
     <!-- Backdrop Overlay para Fechar Sidebar no Celular ao Clicar Fora -->
     <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 hidden md:hidden transition-opacity duration-300 no-print" onclick="toggleSidebarMobile(false)"></div>
@@ -697,6 +1053,11 @@
             <button onclick="switchTab('auditoria')" data-tab="auditoria" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
               <i class="fa-solid fa-clock-rotate-left w-5 text-cyan-400"></i>
               <span>Auditoria & Logs</span>
+            </button>
+            <button onclick="switchTab('usuarios')" data-tab="usuarios" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-users-gear w-5 text-amber-400"></i>
+              <span>Usuários & Acessos</span>
+              <span id="sideCountUsuariosPendentes" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black hidden animate-pulse">0</span>
             </button>
             <button onclick="switchTab('configuracoes')" data-tab="configuracoes" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
               <i class="fa-solid fa-sliders w-5 text-indigo-400"></i>
@@ -5573,6 +5934,99 @@ service cloud.firestore {
 
       </div>
 
+      <!-- ================= TAB: USUÁRIOS & CONTROLE DE ACESSOS (RBAC) ================= -->
+      <div id="tab-usuarios" class="tab-content hidden space-y-6">
+        <!-- Cabeçalho -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Usuários & Controle de Acessos</h2>
+              <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-extrabold uppercase tracking-wider">Exclusivo Gestão</span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Aprove solicitações de entrada, cadastre membros da equipe e defina exatamente quais módulos cada pessoa pode ver ou editar.</p>
+          </div>
+          <button type="button" onclick="PrefeituraAuth.abrirModalUsuario('criar')" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-95 flex-shrink-0">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Cadastrar Novo Usuário</span>
+          </button>
+        </div>
+
+        <!-- Banner de Solicitações Pendentes -->
+        <div id="bannerUsuariosPendentes" class="hidden p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center flex-shrink-0 shadow-xs">
+              <i class="fa-solid fa-bell text-base animate-bounce"></i>
+            </div>
+            <div>
+              <h4 class="text-xs sm:text-sm font-extrabold text-amber-950">Novas solicitações aguardando sua liberação!</h4>
+              <p id="bannerUsuariosPendentesTexto" class="text-xs text-amber-800 mt-0.5">Há colaboradores aguardando aprovação.</p>
+            </div>
+          </div>
+          <button type="button" onclick="PrefeituraAuth.setFiltroUsuarios('pendente')" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs transition flex-shrink-0">
+            Ver Pendentes
+          </button>
+        </div>
+
+        <!-- Cards de KPI -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-users"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold uppercase text-slate-400">Total Contas</p>
+              <p id="kpiUsersTotal" class="text-2xl font-extrabold text-slate-900">0</p>
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-amber-200 shadow-xs flex items-center gap-3 cursor-pointer hover:border-amber-400 transition" onclick="PrefeituraAuth.setFiltroUsuarios('pendente')">
+            <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-hourglass-half"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold uppercase text-amber-600">Pendentes</p>
+              <p id="kpiUsersPendentes" class="text-2xl font-extrabold text-amber-600">0</p>
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs flex items-center gap-3 cursor-pointer hover:border-emerald-400 transition" onclick="PrefeituraAuth.setFiltroUsuarios('ativo')">
+            <div class="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-user-check"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold uppercase text-emerald-600">Ativos</p>
+              <p id="kpiUsersAtivos" class="text-2xl font-extrabold text-emerald-700">0</p>
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 cursor-pointer hover:border-rose-300 transition" onclick="PrefeituraAuth.setFiltroUsuarios('bloqueado')">
+            <div class="w-11 h-11 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-lg flex-shrink-0">
+              <i class="fa-solid fa-user-lock"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold uppercase text-rose-500">Bloqueados</p>
+              <p id="kpiUsersBloqueados" class="text-2xl font-extrabold text-rose-700">0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros e Busca -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button type="button" data-status="todos" onclick="PrefeituraAuth.setFiltroUsuarios('todos')" class="btn-filtro-usuario px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white shadow-xs transition">Todos</button>
+            <button type="button" data-status="pendente" onclick="PrefeituraAuth.setFiltroUsuarios('pendente')" class="btn-filtro-usuario px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">Pendentes</button>
+            <button type="button" data-status="ativo" onclick="PrefeituraAuth.setFiltroUsuarios('ativo')" class="btn-filtro-usuario px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">Ativos</button>
+            <button type="button" data-status="bloqueado" onclick="PrefeituraAuth.setFiltroUsuarios('bloqueado')" class="btn-filtro-usuario px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">Bloqueados</button>
+          </div>
+          <div class="relative w-full md:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" oninput="PrefeituraAuth.setBuscaUsuarios(this.value)" placeholder="Buscar por nome, @login ou cargo..." class="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none">
+          </div>
+        </div>
+
+        <!-- Lista de Usuários -->
+        <div id="listaUsuariosGestaoContainer" class="space-y-3">
+          <!-- Renderizado via auth.js -->
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -8317,7 +8771,7 @@ service cloud.firestore {
   </div>
 
   <!-- ================= BARRA DE NAVEGAÇÃO INFERIOR FIXA (MOBILE APP) ================= -->
-  <nav id="bottomNavBar" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around items-center py-2 px-1 shadow-2xl no-print" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
+  <nav id="bottomNavBar" class="app-protected md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around items-center py-2 px-1 shadow-2xl no-print" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
     <button onclick="switchTab('dashboard')" data-mob-tab="dashboard" class="mobile-nav-btn flex flex-col items-center justify-center flex-1 py-1 text-amber-400 transition font-bold scale-105">
       <i class="fa-solid fa-chart-pie text-lg mb-0.5"></i>
       <span class="text-[10px]">Painel</span>
@@ -8376,7 +8830,16 @@ service cloud.firestore {
 
       <!-- Grade de Atalhos -->
       <div class="grid grid-cols-2 gap-2.5 pt-1">
-        <button onclick="fecharMenuMobileMais(); switchTab('chamados')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-amber-500/40 hover:bg-slate-800 text-left transition col-span-2">
+        <button data-mob-drawer-tab="usuarios" onclick="fecharMenuMobileMais(); switchTab('usuarios')" class="flex flex-col items-start p-3 rounded-xl bg-amber-500/15 border border-amber-500/50 hover:bg-amber-500/20 text-left transition col-span-2">
+          <div class="flex items-center justify-between w-full">
+            <i class="fa-solid fa-users-gear text-amber-400 text-lg mb-1.5"></i>
+            <span id="drawerBadgeUsuariosPendentes" class="hidden text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black animate-pulse">0 pendentes</span>
+          </div>
+          <span class="text-xs font-bold text-white">Usuários & Controle de Acessos</span>
+          <span class="text-[10px] text-amber-200/80">Aprovar contas e liberar módulos da equipe</span>
+        </button>
+
+        <button data-mob-drawer-tab="chamados" onclick="fecharMenuMobileMais(); switchTab('chamados')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-amber-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-qrcode text-amber-400 text-lg mb-1.5"></i>
             <span id="drawerBadgeChamados" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">0 pendentes</span>
@@ -8385,7 +8848,7 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Solicitações de lâmpada, ar e manutenção</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('casas_cidade')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-indigo-500/40 hover:bg-slate-800 text-left transition col-span-2">
+        <button data-mob-drawer-tab="casas_cidade" onclick="fecharMenuMobileMais(); switchTab('casas_cidade')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-indigo-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-house-chimney-user text-indigo-400 text-lg mb-1.5"></i>
             <span id="drawerBadgeCasas" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">0 casas</span>
@@ -8394,7 +8857,7 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Imóveis alugados, cômodos, móveis e contas</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('ronda')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
+        <button data-mob-drawer-tab="ronda" onclick="fecharMenuMobileMais(); switchTab('ronda')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-clipboard-check text-teal-400 text-lg mb-1.5"></i>
             <span id="drawerBadgeRonda" class="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">0 pontos</span>
@@ -8403,7 +8866,7 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Controle de higienização por QR Code em tempo real</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('maquina_gelo')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-cyan-500/40 hover:bg-slate-800 text-left transition col-span-2">
+        <button data-mob-drawer-tab="maquina_gelo" onclick="fecharMenuMobileMais(); switchTab('maquina_gelo')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-cyan-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <span class="text-lg mb-1.5">🧊</span>
             <span id="drawerBadgeGelo" class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">0 sacos</span>
@@ -8412,7 +8875,7 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Produção, estoque no freezer e expedição para frentes</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('ronda_vigilancia')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-indigo-500/40 hover:bg-slate-800 text-left transition col-span-2">
+        <button data-mob-drawer-tab="ronda_vigilancia" onclick="fecharMenuMobileMais(); switchTab('ronda_vigilancia')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-indigo-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-shield-halved text-indigo-400 text-lg mb-1.5"></i>
             <span id="drawerBadgeVigilancia" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">Segurança</span>
@@ -8421,7 +8884,13 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Bipes de QR Code, cobertura e alertas de plantão</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('sorteio')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-yellow-500/40 hover:bg-slate-800 text-left transition col-span-2">
+        <button data-mob-drawer-tab="portal_alojado" onclick="fecharMenuMobileMais(); switchTab('portal_alojado')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-amber-500/40 hover:bg-slate-800 text-left transition col-span-2">
+          <i class="fa-solid fa-id-card-clip text-amber-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">App do Alojado (Admin)</span>
+          <span class="text-[10px] text-slate-300">Cardápio, avisos, cartaz QR Code</span>
+        </button>
+
+        <button data-mob-drawer-tab="sorteio" onclick="fecharMenuMobileMais(); switchTab('sorteio')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-yellow-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-trophy text-yellow-400 text-lg mb-1.5"></i>
             <span id="drawerBadgeSorteio" class="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 font-bold border border-yellow-500/30">Ao Vivo</span>
@@ -8430,7 +8899,7 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Escolha quartos por limpeza/organização e sorteie para o App</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('estoque')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
+        <button data-mob-drawer-tab="estoque" onclick="fecharMenuMobileMais(); switchTab('estoque')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-teal-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-boxes-stacked text-teal-400 text-lg mb-1.5"></i>
             <span id="drawerBadgeEstoque" class="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">0 itens</span>
@@ -8439,45 +8908,58 @@ service cloud.firestore {
           <span class="text-[10px] text-slate-300">Móveis, patrimônio, lâmpadas, colchões e baixas</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('gestao_cadastros')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+        <button data-mob-drawer-tab="erp_canteiro" onclick="fecharMenuMobileMais(); switchTab('erp_canteiro')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-emerald-500/40 hover:bg-slate-800 text-left transition col-span-2">
+          <i class="fa-solid fa-file-invoice-dollar text-emerald-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Rateio & Canteiro ERP</span>
+          <span class="text-[10px] text-slate-300">Custos, marmitas e enxovais</span>
+        </button>
+
+        <button data-mob-drawer-tab="gestao_cadastros" onclick="fecharMenuMobileMais(); switchTab('gestao_cadastros')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
           <i class="fa-solid fa-sitemap text-indigo-400 text-lg mb-1.5"></i>
           <span class="text-xs font-bold text-white">Estrutura & Empresas</span>
           <span class="text-[10px] text-slate-400">Cadastros e cores</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('relatorios')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+        <button data-mob-drawer-tab="relatorios" onclick="fecharMenuMobileMais(); switchTab('relatorios')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
           <i class="fa-solid fa-file-excel text-emerald-400 text-lg mb-1.5"></i>
           <span class="text-xs font-bold text-white">Relatórios & Excel</span>
           <span class="text-[10px] text-slate-400">Exportar planilhas</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('importacao')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+        <button data-mob-drawer-tab="importacao" onclick="fecharMenuMobileMais(); switchTab('importacao')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
           <i class="fa-solid fa-file-import text-orange-400 text-lg mb-1.5"></i>
           <span class="text-xs font-bold text-white">Importar Planilha</span>
           <span class="text-[10px] text-slate-400">Atualizar dados</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('auditoria')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+        <button data-mob-drawer-tab="auditoria" onclick="fecharMenuMobileMais(); switchTab('auditoria')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
           <i class="fa-solid fa-clock-rotate-left text-cyan-400 text-lg mb-1.5"></i>
           <span class="text-xs font-bold text-white">Auditoria & Logs</span>
           <span class="text-[10px] text-slate-400">Histórico de ações</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); switchTab('configuracoes')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+        <button data-mob-drawer-tab="configuracoes" onclick="fecharMenuMobileMais(); switchTab('configuracoes')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
           <i class="fa-solid fa-sliders text-amber-400 text-lg mb-1.5"></i>
           <span class="text-xs font-bold text-white">Configurações</span>
           <span class="text-[10px] text-slate-400">Firebase & fontes</span>
         </button>
 
-        <button onclick="fecharMenuMobileMais(); toggleUserMode()" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
-          <i class="fa-solid fa-shield-halved text-amber-400 text-lg mb-1.5"></i>
-          <span class="text-xs font-bold text-white">Modo de Acesso</span>
-          <span class="text-[10px] text-slate-400">Prefeito / Consulta</span>
+        <button onclick="fecharMenuMobileMais(); PrefeituraAuth.abrirModalMinhaConta()" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 hover:bg-slate-800 text-left transition">
+          <i class="fa-solid fa-key text-sky-400 text-lg mb-1.5"></i>
+          <span class="text-xs font-bold text-white">Minha Conta</span>
+          <span class="text-[10px] text-slate-400">Alterar senha & perfil</span>
+        </button>
+
+        <button onclick="fecharMenuMobileMais(); PrefeituraAuth.logout()" class="flex flex-col items-start p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 hover:bg-rose-900/50 text-left transition col-span-2">
+          <div class="flex items-center gap-2 text-rose-400 font-bold text-xs">
+            <i class="fa-solid fa-right-from-bracket text-base"></i>
+            <span>Sair da Conta (Encerrar Sessão)</span>
+          </div>
         </button>
       </div>
 
       <!-- Botão Rápido Baixar Planilha Original no Mobile -->
-      <button onclick="fecharMenuMobileMais(); exportarPlanilhaOficial()" class="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800 text-emerald-400 border border-emerald-900/50 hover:bg-slate-750 font-bold text-xs transition">
+      <button onclick="fecharMenuMobileMais(); exportarPlanilhaOficial()" class="rbac-export-btn w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800 text-emerald-400 border border-emerald-900/50 hover:bg-slate-750 font-bold text-xs transition">
         <i class="fa-solid fa-file-excel"></i> Baixar Planilha Oficial (.xlsx)
       </button>
     </div>
@@ -9930,11 +10412,211 @@ service cloud.firestore {
     </div>
   </div>
 
-  <!-- Toast Container -->
-  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <!-- ================= MODAL: CONFIGURAR / APROVAR / CADASTRAR USUÁRIO & PERMISSÕES ================= -->
+  <div id="modalUsuarioPermissoes" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[90] flex items-center justify-center p-2 sm:p-4 hidden no-print">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[94vh] flex flex-col overflow-hidden border border-slate-200">
+      <!-- Header -->
+      <div class="px-5 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-user-shield text-lg"></i>
+          </div>
+          <div class="min-w-0">
+            <h3 id="modalUsuarioPermTitulo" class="text-sm sm:text-base font-extrabold text-white truncate">Configurar Permissões do Usuário</h3>
+            <p id="modalUsuarioPermSubtitulo" class="text-[11px] text-slate-400 truncate">Defina o nível de acesso por módulo em tempo real.</p>
+          </div>
+        </div>
+        <button type="button" onclick="PrefeituraAuth.fecharModalUsuarioPermissoes()" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
 
-  <!-- Script da Aplicação -->
-  <script src="app.js?v=5.8"></script>
+      <!-- Conteúdo Rolável -->
+      <form onsubmit="PrefeituraAuth.salvarModalUsuarioPermissoes(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div class="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5 bg-slate-50/70 custom-scrollbar">
+          <div id="modalUsuarioPermErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold"></div>
+
+          <!-- Campos para CRIAR Novo Usuário -->
+          <div id="modalUsuarioCamposCriar" class="hidden bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+            <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <i class="fa-solid fa-id-badge text-amber-500"></i> Dados da Nova Conta
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Nome Completo *</label>
+                <input id="novoUserNome" type="text" placeholder="Ex: Maria Oliveira" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Cargo / Setor *</label>
+                <input id="novoUserCargo" type="text" placeholder="Ex: Auxiliar Administrativo" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Login (Usuário) *</label>
+                <input id="novoUserUsername" type="text" placeholder="Ex: maria.adm" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono lowercase focus:ring-2 focus:ring-amber-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Senha Inicial (mín. 6 dígitos) *</label>
+                <div class="relative">
+                  <input id="novoUserSenha" type="password" placeholder="Defina uma senha inicial" class="w-full pl-3 pr-10 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+                  <button type="button" onclick="PrefeituraAuth.toggleVisibilidadeSenha('novoUserSenha', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1">
+                    <i class="fa-solid fa-eye text-sm"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resumo para APROVAR / EDITAR Usuário Existente -->
+          <div id="modalUsuarioResumoExistente" class="hidden bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Colaborador Selecionado</h4>
+              <span id="editUserLoginBadge" class="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">@usuario</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Nome</label>
+                <input id="editUserNomeInput" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Cargo / Setor</label>
+                <input id="editUserCargoInput" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+              </div>
+            </div>
+          </div>
+
+          <!-- Perfis Prontos (1 Clique) -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Perfis Prontos (1 Clique)
+              </h4>
+              <span class="text-[11px] text-slate-400">Você pode ajustar cada módulo abaixo depois</span>
+            </div>
+            <div id="modalPerfisProntosContainer" class="flex flex-wrap gap-2">
+              <!-- Populado via auth.js -->
+            </div>
+          </div>
+
+          <!-- Permissões Especiais -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-2.5">
+            <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <i class="fa-solid fa-shield-halved text-indigo-500"></i> Permissões Especiais
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input id="chkPermPodeExcluir" type="checkbox" class="mt-0.5 w-4 h-4 rounded text-rose-600 focus:ring-rose-500">
+                <div>
+                  <span class="block text-xs font-bold text-slate-800">Pode Excluir</span>
+                  <span class="block text-[10px] text-slate-500">Permite apagar registros definitivos</span>
+                </div>
+              </label>
+              <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input id="chkPermPodeExportar" type="checkbox" class="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                <div>
+                  <span class="block text-xs font-bold text-slate-800">Pode Exportar Excel</span>
+                  <span class="block text-[10px] text-slate-500">Baixar planilhas oficiais e PDFs</span>
+                </div>
+              </label>
+              <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input id="chkPermGerenciarUsuarios" type="checkbox" class="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+                <div>
+                  <span class="block text-xs font-bold text-slate-800">Co-Admin (Usuários)</span>
+                  <span class="block text-[10px] text-slate-500">Aprovar e gerenciar outros acessos</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Matriz dos 18 Módulos -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <i class="fa-solid fa-table-cells-large text-slate-500"></i> Controle Granular por Módulo (18 Módulos)
+              </h4>
+            </div>
+            <div id="modalMatrizModulosContainer" class="space-y-3">
+              <!-- Populado via auth.js -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Rodapé Fixo -->
+        <div class="px-5 sm:px-6 py-3.5 bg-white border-t border-slate-200 flex items-center justify-end gap-2.5 flex-shrink-0">
+          <button type="button" onclick="PrefeituraAuth.fecharModalUsuarioPermissoes()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+            Cancelar
+          </button>
+          <button id="btnSalvarUsuarioPermissoes" type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-extrabold text-xs shadow-sm transition active:scale-95 flex items-center">
+            <i class="fa-solid fa-floppy-disk mr-1.5"></i>Salvar Permissões
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: MINHA CONTA & ALTERAR SENHA ================= -->
+  <div id="modalMinhaConta" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[90] flex items-center justify-center p-3 sm:p-4 hidden no-print">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <div id="minhaContaAvatar" class="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-extrabold text-sm flex items-center justify-center shadow-sm">
+            PF
+          </div>
+          <div>
+            <h3 id="minhaContaNome" class="text-sm sm:text-base font-extrabold text-white leading-tight">Usuário</h3>
+            <p class="text-[11px] text-slate-400"><span id="minhaContaLogin" class="font-mono text-amber-300">@usuario</span> • <span id="minhaContaCargo">Cargo</span></p>
+          </div>
+        </div>
+        <button type="button" onclick="PrefeituraAuth.fecharModalMinhaConta()" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar">
+        <!-- Módulos Liberados -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Seus Módulos Liberados</h4>
+          <div id="minhaContaPermissoesBadges" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <!-- Formulário de Troca de Senha -->
+        <form onsubmit="PrefeituraAuth.handleAlterarMinhaSenha(event)" class="pt-4 border-t border-slate-200 space-y-3.5">
+          <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+            <i class="fa-solid fa-key text-amber-500"></i> Alterar Minha Senha
+          </h4>
+          <div id="minhaContaErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold"></div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-1">Senha Atual</label>
+            <input id="minhaContaSenhaAtual" type="password" required autocomplete="current-password" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 mb-1">Nova Senha (mín. 6)</label>
+              <input id="minhaContaNovaSenha" type="password" required minlength="6" autocomplete="new-password" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 mb-1">Confirmar Nova Senha</label>
+              <input id="minhaContaConfirmarSenha" type="password" required minlength="6" autocomplete="new-password" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <button type="button" onclick="PrefeituraAuth.fecharModalMinhaConta()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">Fechar</button>
+            <button id="btnSubmitAlterarSenha" type="submit" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition flex items-center">
+              <i class="fa-solid fa-key mr-1.5"></i>Atualizar Minha Senha
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-[110] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Scripts da Aplicação e Sistema de Autenticação (RBAC) -->
+  <script src="auth.js?v=6.0"></script>
+  <script src="app.js?v=6.0"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
