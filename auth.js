@@ -21,7 +21,6 @@
     { id: 'casas_cidade', nome: 'Casas na Cidade', grupo: 'grupo_alojamento', grupoNome: 'Alojamentos & Vagas', icone: 'fa-house-chimney-user', cor: 'text-indigo-500' },
 
     // Grupo 2: Operações & Campo
-    { id: 'equipe_prioridades', nome: 'Equipe & Prioridades', grupo: 'grupo_operacoes', grupoNome: 'Operações & Campo', icone: 'fa-helmet-safety', cor: 'text-amber-500' },
     { id: 'chamados', nome: 'Chamados QR Code', grupo: 'grupo_operacoes', grupoNome: 'Operações & Campo', icone: 'fa-qrcode', cor: 'text-amber-500' },
     { id: 'ronda', nome: 'Ronda do Canteiro', grupo: 'grupo_operacoes', grupoNome: 'Operações & Campo', icone: 'fa-clipboard-check', cor: 'text-teal-500' },
     { id: 'maquina_gelo', nome: 'Fábrica & Máquina de Gelo', grupo: 'grupo_operacoes', grupoNome: 'Operações & Campo', icone: 'fa-cubes', cor: 'text-cyan-500' },
@@ -50,13 +49,6 @@
 
   // Perfis prontos de 1 clique (totalmente editáveis após aplicar)
   const AUTH_PERFIS_PRONTOS = {
-    equipe_campo: {
-      nome: 'Funcionário (Só App Equipe)',
-      icone: 'fa-helmet-safety',
-      cor: 'bg-amber-100 text-amber-950 border-amber-300 hover:bg-amber-200',
-      modulos: criarMapaPermissoes('bloqueado'),
-      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false, acessoAppEquipe: true }
-    },
     auxiliar_adm: {
       nome: 'Auxiliar Adm',
       icone: 'fa-user-tie',
@@ -71,7 +63,7 @@
         portal_alojado: 'editar',
         relatorios: 'ver'
       }),
-      extras: { podeExcluir: false, podeExportar: true, gerenciarUsuarios: false, acessoAppEquipe: true }
+      extras: { podeExcluir: false, podeExportar: true, gerenciarUsuarios: false }
     },
     fiscal_ronda: {
       nome: 'Fiscal de Ronda',
@@ -87,7 +79,7 @@
         maquina_gelo: 'editar',
         ronda_vigilancia: 'editar'
       }),
-      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false, acessoAppEquipe: true }
+      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false }
     },
     manutencao: {
       nome: 'Manutenção',
@@ -101,7 +93,7 @@
         chamados: 'editar',
         estoque: 'ver'
       }),
-      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false, acessoAppEquipe: true }
+      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false }
     },
     almoxarife: {
       nome: 'Almoxarife',
@@ -114,7 +106,7 @@
         moveis: 'ver',
         relatorios: 'ver'
       }),
-      extras: { podeExcluir: false, podeExportar: true, gerenciarUsuarios: false, acessoAppEquipe: true }
+      extras: { podeExcluir: false, podeExportar: true, gerenciarUsuarios: false }
     },
     diretoria_leitura: {
       nome: 'Diretoria (Só Ver)',
@@ -124,14 +116,14 @@
         importacao: 'bloqueado',
         configuracoes: 'bloqueado'
       }),
-      extras: { podeExcluir: false, podeExportar: true, gerenciarUsuarios: false, acessoAppEquipe: false }
+      extras: { podeExcluir: false, podeExportar: true, gerenciarUsuarios: false }
     },
     co_admin: {
       nome: 'Co-Admin (Tudo)',
       icone: 'fa-crown',
       cor: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
       modulos: criarMapaPermissoes('editar'),
-      extras: { podeExcluir: true, podeExportar: true, gerenciarUsuarios: true, acessoAppEquipe: true }
+      extras: { podeExcluir: true, podeExportar: true, gerenciarUsuarios: true }
     }
   };
 
@@ -267,7 +259,7 @@
     if (gate) gate.classList.remove('hidden');
     document.body.classList.add('auth-locked');
 
-    const views = ['authViewLoading', 'authViewSetupMaster', 'authViewAuth', 'authViewPending', 'authViewBlocked', 'authViewConfigError', 'authViewSomenteEquipe'];
+    const views = ['authViewLoading', 'authViewSetupMaster', 'authViewAuth', 'authViewPending', 'authViewBlocked', 'authViewConfigError'];
     views.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('hidden', id !== viewName);
@@ -417,7 +409,7 @@
         status: 'ativo',
         perfilBase: 'master',
         permissoesModulos: criarMapaPermissoes('editar'),
-        extras: { podeExcluir: true, podeExportar: true, gerenciarUsuarios: true, acessoAppEquipe: true },
+        extras: { podeExcluir: true, podeExportar: true, gerenciarUsuarios: true },
         criadoEm: agora,
         aprovadoPor: nome,
         aprovadoEm: agora,
@@ -507,7 +499,7 @@
         status: 'pendente',
         perfilBase: 'personalizado',
         permissoesModulos: criarMapaPermissoes('bloqueado'),
-        extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false, acessoAppEquipe: false },
+        extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false },
         criadoEm: agora,
         aprovadoPor: null,
         aprovadoEm: null,
@@ -625,14 +617,6 @@
   }
 
   function ativarSessaoNoPainel(perfil) {
-    // Se a conta for exclusiva do App da Equipe (sem módulos administrativos liberados), redireciona amigavelmente
-    if (!isMaster() && obterPrimeiraAbaPermitida() === null && perfil.extras && perfil.extras.acessoAppEquipe === true) {
-      const elNomeEq = document.getElementById('somenteEquipeNome');
-      if (elNomeEq) elNomeEq.textContent = perfil.nome || 'Colaborador';
-      mostrarTelaGate('authViewSomenteEquipe');
-      return;
-    }
-
     // Atualiza nome global usado nos logs de auditoria do app.js
     if (typeof window !== 'undefined') {
       try {
@@ -1193,7 +1177,6 @@
                   </span>
                   ${u.extras && u.extras.podeExcluir ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-trash mr-1"></i>Pode Excluir</span>' : ''}
                   ${u.extras && u.extras.podeExportar ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-green-50 text-green-700 border border-green-200"><i class="fa-solid fa-file-excel mr-1"></i>Exporta Excel</span>' : ''}
-                  ${u.extras && u.extras.acessoAppEquipe ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200"><i class="fa-solid fa-helmet-safety mr-1"></i>App da Equipe</span>' : ''}
                 </div>
               ` : `
                 <p class="text-[11px] text-amber-800 mt-2 font-medium">
@@ -1237,7 +1220,7 @@
       if (blocoCriar) blocoCriar.classList.remove('hidden');
       if (blocoResumo) blocoResumo.classList.add('hidden');
 
-      ['novoUserNome', 'novoUserCargo', 'novoUserUsername', 'novoUserSenha', 'novoUserWhatsapp'].forEach(id => {
+      ['novoUserNome', 'novoUserCargo', 'novoUserUsername', 'novoUserSenha'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -1253,11 +1236,9 @@
 
       const elResNome = document.getElementById('editUserNomeInput');
       const elResCargo = document.getElementById('editUserCargoInput');
-      const elResZap = document.getElementById('editUserWhatsappInput');
       const elResLogin = document.getElementById('editUserLoginBadge');
       if (elResNome) elResNome.value = usuario.nome || '';
       if (elResCargo) elResCargo.value = usuario.cargo || '';
-      if (elResZap) elResZap.value = usuario.whatsapp || '';
       if (elResLogin) elResLogin.textContent = '@' + (usuario.username || 'usuario');
 
       if (modo === 'aprovar') {
@@ -1272,8 +1253,7 @@
           state.modalExtrasTemp = {
             podeExcluir: !!(usuario.extras && usuario.extras.podeExcluir),
             podeExportar: !!(usuario.extras && usuario.extras.podeExportar),
-            gerenciarUsuarios: !!(usuario.extras && usuario.extras.gerenciarUsuarios),
-            acessoAppEquipe: !!(usuario.extras && usuario.extras.acessoAppEquipe)
+            gerenciarUsuarios: !!(usuario.extras && usuario.extras.gerenciarUsuarios)
           };
           state.modalPerfilBaseTemp = usuario.perfilBase || 'personalizado';
         } else {
@@ -1349,11 +1329,9 @@
     const cExc = document.getElementById('chkPermPodeExcluir');
     const cExp = document.getElementById('chkPermPodeExportar');
     const cUsu = document.getElementById('chkPermGerenciarUsuarios');
-    const cEq = document.getElementById('chkPermAppEquipe');
     if (cExc) cExc.checked = !!state.modalExtrasTemp.podeExcluir;
     if (cExp) cExp.checked = !!state.modalExtrasTemp.podeExportar;
     if (cUsu) cUsu.checked = !!state.modalExtrasTemp.gerenciarUsuarios;
-    if (cEq) cEq.checked = !!state.modalExtrasTemp.acessoAppEquipe;
   }
 
   function renderMatrizModulosModal() {
@@ -1426,13 +1404,12 @@
     const extras = {
       podeExcluir: !!document.getElementById('chkPermPodeExcluir')?.checked,
       podeExportar: !!document.getElementById('chkPermPodeExportar')?.checked,
-      gerenciarUsuarios: !!document.getElementById('chkPermGerenciarUsuarios')?.checked,
-      acessoAppEquipe: !!document.getElementById('chkPermAppEquipe')?.checked
+      gerenciarUsuarios: !!document.getElementById('chkPermGerenciarUsuarios')?.checked
     };
 
-    const temAlgumModulo = Object.values(state.modalPermissoesTemp).some(v => v === 'ver' || v === 'editar') || extras.gerenciarUsuarios || extras.acessoAppEquipe;
+    const temAlgumModulo = Object.values(state.modalPermissoesTemp).some(v => v === 'ver' || v === 'editar') || extras.gerenciarUsuarios;
     if (!temAlgumModulo) {
-      return mostrarErro('Libere pelo menos 1 módulo do painel OU ative o "App da Equipe (Campo)" para esta conta.');
+      return mostrarErro('Libere pelo menos 1 módulo (Só Ver ou Editar) para que o usuário consiga entrar no sistema.');
     }
 
     const agora = new Date().toISOString();
@@ -1441,7 +1418,6 @@
     if (state.modalModo === 'criar') {
       const nome = (document.getElementById('novoUserNome')?.value || '').trim();
       const cargo = (document.getElementById('novoUserCargo')?.value || '').trim();
-      const whatsapp = (document.getElementById('novoUserWhatsapp')?.value || '').trim();
       const userRaw = (document.getElementById('novoUserUsername')?.value || '').trim();
       const senha = document.getElementById('novoUserSenha')?.value || '';
       const username = normalizarUsername(userRaw);
@@ -1470,7 +1446,6 @@
           emailInterno,
           nome,
           cargo,
-          whatsapp,
           role: 'operador',
           status: 'ativo',
           perfilBase: state.modalPerfilBaseTemp,
@@ -1502,7 +1477,6 @@
     if (!uid) return;
     const nomeEdit = (document.getElementById('editUserNomeInput')?.value || '').trim();
     const cargoEdit = (document.getElementById('editUserCargoInput')?.value || '').trim();
-    const zapEdit = (document.getElementById('editUserWhatsappInput')?.value || '').trim();
 
     setBotaoCarregando('btnSalvarUsuarioPermissoes', true, null, 'Salvando...');
     try {
@@ -1510,7 +1484,6 @@
         permissoesModulos: { ...state.modalPermissoesTemp },
         extras,
         perfilBase: state.modalPerfilBaseTemp,
-        whatsapp: zapEdit,
         atualizadoEm: agora,
         atualizadoPor: nomeAprovador
       };

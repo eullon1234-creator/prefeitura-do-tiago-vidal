@@ -1,1356 +1,163 @@
 rules_version = '2';
-
-// ============================================================================
-// CLOUD FIRESTORE SECURITY RULES (PROTOTYPE — REVIEW & TEST BEFORE PRODUCTION)
-// Sistema: Prefeitura de Canteiro — GEL Engenharia (Obra Taboca 2)
-// Projeto Firebase: prefeitura-cc71b
-// ============================================================================
-//
-// ============================================================================
-// Assumed Data Model
-// ============================================================================
-//
-// Collection: configuracoes
-// Document ID: sistema_auth | identidade_visual | prefeitura_contato |
-//              notificacoes | estoque_locais | manutencao_plaquinhas | {docId}
-// Fields (sistema_auth):
-//   - masterConfigurado: bool (required, must be true on create/update)
-//   - masterUid: string (required, immutable after create, max 128 chars)
-//   - masterUsername: string (optional, max 100 chars)
-//   - criadoEm: string (optional, max 64 chars)
-//   - atualizadoEm: string (optional, max 64 chars)
-//
-// Collection: usuarios_sistema
-// Document ID: {uid} (Firebase Auth UID)
-// Fields:
-//   - uid: string (required, immutable, must match document ID)
-//   - username: string (required, immutable, max 64 chars)
-//   - emailInterno: string (required, immutable, valid email format, max 200 chars)
-//   - nome: string (required, max 120 chars)
-//   - cargo: string (optional, max 120 chars)
-//   - whatsapp: string (optional, max 40 chars)
-//   - role: string (required, immutable, enum: 'master' | 'operador')
-//   - status: string (required, enum: 'pendente' | 'ativo' | 'bloqueado' | 'recusado')
-//   - perfilBase: string (optional, max 64 chars)
-//   - permissoesModulos: map (required, keys limited to the 19 official modules; values: 'bloqueado' | 'ver' | 'editar')
-//   - extras: map (required, keys: podeExcluir, podeExportar, gerenciarUsuarios [required bool], acessoAppEquipe [optional bool])
-//   - criadoEm: string (optional, immutable, max 64 chars)
-//   - aprovadoPor: string | null (optional, max 120 chars)
-//   - aprovadoEm: string | null (optional, max 64 chars)
-//   - ultimoAcesso: string | null (optional, max 64 chars)
-//   - atualizadoEm: string | null (optional, max 64 chars)
-//   - atualizadoPor: string | null (optional, max 120 chars)
-//   - motivo: string | null (optional, max 300 chars)
-//
-// Collection: config_sistema
-// Document ID: portal_morador
-// Fields:
-//   - cardapio: map (optional)
-//   - avisos: list (optional, max 100 items)
-//   - regras: list (optional, max 50 items)
-//   - contatos: list (optional, max 50 items)
-//   - identidade: map (optional)
-//   - whatsapp_prefeito: string (optional, max 40 chars)
-//   - sorteio: map (optional)
-//   - alojados_sincronizados: list (optional, max 1500 items)
-//   - atualizado_em / atualizado_por: string | timestamp (optional)
-//
-// Collection: ronda_config
-// Document ID: geral | {docId}
-// Fields:
-//   - senha_equipe: string (optional, max 32 chars)
-//   - freq_padrao_banheiro: number (optional, 0..50)
-//   - freq_padrao_bebedouro: number (optional, 0..50)
-//
-// Collection: chamados_suporte
-// Document ID: {id} (protocolo e.g. CH-123456)
-// Fields:
-//   - id / protocolo: string (immutable on update, max 64 chars)
-//   - categoria: string (required, max 120 chars)
-//   - descricao: string (required, max 2000 chars)
-//   - status: string (required; 'pendente' for public create; enum: 'pendente' | 'em_atendimento' | 'concluido' | 'aberto' | 'resolvido' | 'cancelado')
-//   - tipo_local, unidade_id, quarto_id, casa_id, quarto, bloco, casa_nome,
-//     comodo, local_formatado, nome_solicitante, whatsapp_solicitante, origem,
-//     criado_em, data_formatada: optional strings with strict max lengths
-//   - observacoes_prefeito, atualizado_por, concluido_por, data_conclusao,
-//     atualizado_em: staff-managed resolution fields
-//
-// Collection: avaliacoes_refeicoes
-// Document ID: {id} (e.g. AVAL-...)
-// Fields:
-//   - refeicao: string (required, max 60 chars)
-//   - nota: number (required, 1..5)
-//   - status: string (required; 'pendente' for public create; enum: 'pendente' | 'tratado' | 'lida' | 'respondida' | 'arquivada')
-//   - id, data, data_formatada, sentimento, observacao, morador_nome,
-//     matricula, bloco, quarto: optional strings with length bounds
-//   - morador_id: string | number (optional)
-//   - timestamp: number (optional)
-//   - anonimo: bool (optional)
-//
-// Collection: ronda_pontos
-// Document ID: {id}
-// Fields: nome (required), tipo (required), setor, frequencia_diaria,
-//         horarios_sugeridos, observacoes, ativo, criado_em, atualizado_em
-//
-// Collection: ronda_registros
-// Document ID: {id} (e.g. RONDA-...)
-// Fields: ponto_id (required), ponto_nome (required), tipo (required), data (required),
-//         hora (required), responsavel (required), setor, data_hora, ordem_dia, meta_dia,
-//         checklist (list <= 25), avaliacao, observacoes, criado_em,
-//         gelo_unidade, gelo_produzido, gelo_saida, gelo_saldo, gelo_destinos
-//
-// Collection: ronda_ocorrencias
-// Document ID: {id} (e.g. OCORR-...)
-// Fields: ponto_id (required), ponto_nome (required), tipo_problema (required),
-//         descricao (required), status (required; 'aberto' for public create),
-//         tipo_ponto, setor, solicitante, data, hora, data_hora,
-//         resolvido_em, resolvido_por, criado_em
-//
-// Collection: casas_cidade
-// Document ID: {id}
-// Fields: nome, endereco, bairro, cep, moradores, moveis, vagas, status, etc.
-//
-// Collection: casas_limpezas
-// Document ID: {id} (e.g. LIMP-...)
-// Fields: casa_id (required), casa_nome (required), tipo (required), data (required),
-//         responsavel (required), tipo_local, quarto_id, quarto_numero, bloco_nome,
-//         subtipo, hora, data_hora, avaliacao, observacoes, origem, criado_em, criado_por
-//
-// Collection: ronda_vigilancia_registros
-// Document ID: {id} (e.g. RND-...)
-// Fields: ponto_id (required), ponto_nome (required), guarda_nome (required),
-//         turno_id (required), data_turno (required), timestamp (required number),
-//         guarda_matricula, guarda_empresa, data_hora, tem_ocorrencia (bool),
-//         tipo_ocorrencia, detalhes_ocorrencia, latitude, longitude
-//
-// Collection: auditoria_logs (append-only)
-// Document ID: {id} (e.g. LOG-...)
-// Fields: id, data_hora, usuario, modulo, acao, entidade, detalhes (all required),
-//         timestamp (optional)
-//
-// Collection: equipe_tarefas
-// Document ID: {id} (e.g. TAR-...)
-// Fields:
-//   - id: string (optional, immutable, max 80 chars)
-//   - funcionarioUid: string (required, immutable for employee, max 128 chars)
-//   - funcionarioNome: string (required, max 150 chars)
-//   - categoria: string (required, enum: maquina_gelo|banheiro|bebedouro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
-//   - itemId: string (optional, max 120 chars)
-//   - itemNome: string (required, max 250 chars)
-//   - refColecao: string (optional, max 64 chars)
-//   - titulo: string (required, max 200 chars)
-//   - instrucoes: string (optional, max 2000 chars)
-//   - prioridade: string (required, enum: urgente|alta|normal)
-//   - ordem: number (required, 0..10000)
-//   - status: string (required, enum: pendente|em_andamento|impedimento|aguardando_visto|concluido)
-//   - baixaAutomatica: bool (required)
-//   - criadoEm, atualizadoEm, iniciadoEm, concluidoEm, vistoEm: string (optional, max 64 chars)
-//   - criadoPor, vistoPor: string (optional, max 150 chars)
-//   - observacaoConclusao, motivoImpedimento: string (optional, max 2000 chars)
-//   - resumoOperacional: string (optional, max 500 chars)
-//   - fotoConclusao: string (optional URL or empty string, max 500 chars)
-//
-// Collection: equipe_rotinas
-// Document ID: {id} (e.g. ROT-...)
-// Fields:
-//   - id: string (optional, immutable, max 80 chars)
-//   - funcionarioUid: string (required, max 128 chars)
-//   - funcionarioNome: string (required, max 150 chars)
-//   - categoria: string (required, enum: maquina_gelo|banheiro|bebedouro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
-//   - itemId: string (optional, max 120 chars)
-//   - itemNome: string (required, max 250 chars)
-//   - refColecao: string (optional, max 64 chars)
-//   - titulo: string (required, max 200 chars)
-//   - instrucoes: string (optional, max 2000 chars)
-//   - turno: string (optional, max 60 chars)
-//   - continuo: bool (optional)
-//   - metaDia: number (optional, 1..20)
-//   - ordem: number (required, 0..10000)
-//   - ativo: bool (optional)
-//   - criadoEm, atualizadoEm: string (optional, max 64 chars)
-//   - criadoPor: string (optional, max 150 chars)
-//
-// Collection: equipe_rotinas_logs (append-only)
-// Document ID: LOG-{timestamp} (supports multiple daily logs per routine)
-// Fields:
-//   - rotinaId: string (required, max 100 chars)
-//   - rotinaTitulo: string (required, max 200 chars)
-//   - itemNome: string (optional, max 250 chars)
-//   - categoria: string (required, enum: maquina_gelo|banheiro|bebedouro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
-//   - funcionarioUid: string (required, must match auth.uid for employee, max 128 chars)
-//   - funcionarioNome: string (required, max 150 chars)
-//   - data: string (required, YYYY-MM-DD)
-//   - concluidoEm: string (required, max 64 chars)
-//   - observacao: string (optional, max 2000 chars)
-//   - resumoOperacional: string (optional, max 500 chars)
-//   - fotoUrl: string (optional URL or empty string, max 500 chars)
-//
-// Administrative Collections (strictly authenticated active staff only):
-//   alojados, blocos, quartos, empresas, moveis_vistorias, canteiro_metadata,
-//   casas_despesas, estoque_itens, estoque_movimentacoes, pontos_vigilancia
-// ============================================================================
-
+// Cloud Firestore Security Rules (Prototype — review & test before production)
+// Prefeitura de Canteiro — GEL Engenharia (Obra Taboca 2 | prefeitura-cc71b)
+// Assumed Models: configuracoes/{id} (sistema_auth + app cfg); usuarios_sistema/{uid} (18-module RBAC + 3 extras);
+// QR Portals (portal_morador, ronda_*, chamados_suporte, avaliacoes_refeicoes, casas_cidade, casas_limpezas, vigilancia, auditoria_logs);
+// Staff Admin (alojados, blocos, quartos, empresas, moveis_vistorias, canteiro_metadata, casas_despesas, estoque_*, pontos_vigilancia).
 service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // ========================================================================
-    // 1. AUTHENTICATION & RBAC HELPER FUNCTIONS
-    // ========================================================================
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAuthenticated() {
-      return isSignedIn();
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function uidUnchanged() {
-      return !('uid' in request.resource.data) ||
-             request.resource.data.uid == request.auth.uid;
-    }
-
-    function uidNotModified() {
-      return !('uid' in request.resource.data) ||
-             request.resource.data.uid == resource.data.uid;
-    }
-
-    function userDocPath(uid) {
-      return /databases/$(database)/documents/usuarios_sistema/$(uid);
-    }
-
-    function userExists() {
-      return isSignedIn() && exists(userDocPath(request.auth.uid));
-    }
-
-    function userData() {
-      return get(userDocPath(request.auth.uid)).data;
-    }
-
-    function isActiveUser() {
-      return userExists() && userData().status == 'ativo';
-    }
-
-    function isMaster() {
-      return isActiveUser() && userData().role == 'master';
-    }
-
-    function canManageUsers() {
-      return isMaster() ||
-        (isActiveUser() &&
-         'extras' in userData() &&
-         userData().extras is map &&
-         'gerenciarUsuarios' in userData().extras &&
-         userData().extras.gerenciarUsuarios == true);
-    }
-
-    function canDelete() {
-      return isMaster() ||
-        (isActiveUser() &&
-         'extras' in userData() &&
-         userData().extras is map &&
-         'podeExcluir' in userData().extras &&
-         userData().extras.podeExcluir == true);
-    }
-
-    function hasAppEquipeAccess() {
-      return isMaster() ||
-        (isActiveUser() &&
-         'extras' in userData() &&
-         userData().extras is map &&
-         'acessoAppEquipe' in userData().extras &&
-         userData().extras.acessoAppEquipe == true);
-    }
-
-    function moduleLevel(mod) {
-      return isMaster()
-        ? 'editar'
-        : (isActiveUser() &&
-           'permissoesModulos' in userData() &&
-           userData().permissoesModulos is map &&
-           mod in userData().permissoesModulos
-             ? userData().permissoesModulos[mod]
-             : 'bloqueado');
-    }
-
-    function canView(mod) {
-      return moduleLevel(mod) in ['ver', 'editar'];
-    }
-
-    function canEdit(mod) {
-      return moduleLevel(mod) == 'editar';
-    }
-
-    // ========================================================================
-    // 2. GENERIC VALIDATION HELPER FUNCTIONS
-    // ========================================================================
-
-    function hasRequiredFields(data, fields) {
-      return data.keys().hasAll(fields);
-    }
-
-    function hasOnlyAllowedFields(data, fields) {
-      return data.keys().hasOnly(fields);
-    }
-
-    function areImmutableFieldsUnchanged(fields) {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
-    }
-
-    function isNonEmptyString(val, maxLen) {
-      return val is string && val.size() > 0 && val.size() <= maxLen;
-    }
-
-    function isOptionalString(data, field, maxLen) {
-      return !(field in data) ||
-             data[field] == null ||
-             (data[field] is string && data[field].size() <= maxLen);
-    }
-
-    function isOptionalNumber(data, field, minVal, maxVal) {
-      return !(field in data) ||
-             data[field] == null ||
-             (data[field] is number && data[field] >= minVal && data[field] <= maxVal);
-    }
-
-    function isOptionalBool(data, field) {
-      return !(field in data) ||
-             data[field] == null ||
-             data[field] is bool;
-    }
-
-    function isOptionalList(data, field, maxItems) {
-      return !(field in data) ||
-             data[field] == null ||
-             (data[field] is list && data[field].size() <= maxItems);
-    }
-
-    function isOptionalTimestampOrString(data, field, maxLen) {
-      return !(field in data) ||
-             data[field] == null ||
-             data[field] is timestamp ||
-             (data[field] is string && data[field].size() <= maxLen);
-    }
-
-    function isOptionalStringOrNumber(data, field, maxLen) {
-      return !(field in data) ||
-             data[field] == null ||
-             data[field] is number ||
-             (data[field] is string && data[field].size() <= maxLen);
-    }
-
-    function isValidEmail(email) {
-      return email is string &&
-             email.size() >= 5 &&
-             email.size() <= 200 &&
-             email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isOptionalUrlOrEmpty(data, field, maxLen) {
-      return !(field in data) ||
-             data[field] == null ||
-             (data[field] is string &&
-              data[field].size() <= maxLen &&
-              (data[field] == '' ||
-               data[field].matches("^https://.*") ||
-               data[field].matches("^http://.*")));
-    }
-
-    // ========================================================================
-    // 3. DOMAIN VALIDATORS (INVOKED IN BOTH CREATE AND UPDATE RULES)
-    // ========================================================================
-
-    function isValidSistemaAuth(data) {
-      return hasRequiredFields(data, ['masterConfigurado', 'masterUid']) &&
-             hasOnlyAllowedFields(data, ['masterConfigurado', 'masterUid', 'masterUsername', 'criadoEm', 'atualizadoEm']) &&
-             data.masterConfigurado is bool &&
-             isNonEmptyString(data.masterUid, 128) &&
-             isOptionalString(data, 'masterUsername', 100) &&
-             isOptionalString(data, 'criadoEm', 64) &&
-             isOptionalString(data, 'atualizadoEm', 64);
-    }
-
-    function isValidConfigDoc(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 50 &&
-             isOptionalString(data, 'whatsapp_prefeito', 40) &&
-             isOptionalString(data, 'empresa_nome', 150) &&
-             isOptionalString(data, 'obra_nome', 150) &&
-             isOptionalString(data, 'atualizado_por', 150) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64) &&
-             isOptionalList(data, 'locais', 100);
-    }
-
-    function isValidExtrasMap(extras) {
-      return extras is map &&
-             hasRequiredFields(extras, ['podeExcluir', 'podeExportar', 'gerenciarUsuarios']) &&
-             hasOnlyAllowedFields(extras, ['podeExcluir', 'podeExportar', 'gerenciarUsuarios', 'acessoAppEquipe']) &&
-             extras.podeExcluir is bool &&
-             extras.podeExportar is bool &&
-             extras.gerenciarUsuarios is bool &&
-             isOptionalBool(extras, 'acessoAppEquipe');
-    }
-
-    function isValidModuleLevelOrMissing(perms, mod) {
-      return !(mod in perms) || perms[mod] in ['bloqueado', 'ver', 'editar'];
-    }
-
-    function isValidPermissoesModulos(perms) {
-      return perms is map &&
-             perms.keys().size() <= 20 &&
-             hasOnlyAllowedFields(perms, [
-               'dashboard', 'blocos', 'alojados', 'moveis', 'casas_cidade',
-               'equipe_prioridades', 'chamados', 'ronda', 'maquina_gelo', 'ronda_vigilancia', 'portal_alojado', 'sorteio',
-               'estoque', 'erp_canteiro',
-               'gestao_cadastros', 'relatorios', 'importacao', 'auditoria', 'configuracoes'
-             ]) &&
-             isValidModuleLevelOrMissing(perms, 'dashboard') &&
-             isValidModuleLevelOrMissing(perms, 'blocos') &&
-             isValidModuleLevelOrMissing(perms, 'alojados') &&
-             isValidModuleLevelOrMissing(perms, 'moveis') &&
-             isValidModuleLevelOrMissing(perms, 'casas_cidade') &&
-             isValidModuleLevelOrMissing(perms, 'equipe_prioridades') &&
-             isValidModuleLevelOrMissing(perms, 'chamados') &&
-             isValidModuleLevelOrMissing(perms, 'ronda') &&
-             isValidModuleLevelOrMissing(perms, 'maquina_gelo') &&
-             isValidModuleLevelOrMissing(perms, 'ronda_vigilancia') &&
-             isValidModuleLevelOrMissing(perms, 'portal_alojado') &&
-             isValidModuleLevelOrMissing(perms, 'sorteio') &&
-             isValidModuleLevelOrMissing(perms, 'estoque') &&
-             isValidModuleLevelOrMissing(perms, 'erp_canteiro') &&
-             isValidModuleLevelOrMissing(perms, 'gestao_cadastros') &&
-             isValidModuleLevelOrMissing(perms, 'relatorios') &&
-             isValidModuleLevelOrMissing(perms, 'importacao') &&
-             isValidModuleLevelOrMissing(perms, 'auditoria') &&
-             isValidModuleLevelOrMissing(perms, 'configuracoes');
-    }
-
-    function isAllModulesBlocked(perms) {
-      return isValidPermissoesModulos(perms) &&
-             (!('dashboard' in perms) || perms.dashboard == 'bloqueado') &&
-             (!('blocos' in perms) || perms.blocos == 'bloqueado') &&
-             (!('alojados' in perms) || perms.alojados == 'bloqueado') &&
-             (!('moveis' in perms) || perms.moveis == 'bloqueado') &&
-             (!('casas_cidade' in perms) || perms.casas_cidade == 'bloqueado') &&
-             (!('equipe_prioridades' in perms) || perms.equipe_prioridades == 'bloqueado') &&
-             (!('chamados' in perms) || perms.chamados == 'bloqueado') &&
-             (!('ronda' in perms) || perms.ronda == 'bloqueado') &&
-             (!('maquina_gelo' in perms) || perms.maquina_gelo == 'bloqueado') &&
-             (!('ronda_vigilancia' in perms) || perms.ronda_vigilancia == 'bloqueado') &&
-             (!('portal_alojado' in perms) || perms.portal_alojado == 'bloqueado') &&
-             (!('sorteio' in perms) || perms.sorteio == 'bloqueado') &&
-             (!('estoque' in perms) || perms.estoque == 'bloqueado') &&
-             (!('erp_canteiro' in perms) || perms.erp_canteiro == 'bloqueado') &&
-             (!('gestao_cadastros' in perms) || perms.gestao_cadastros == 'bloqueado') &&
-             (!('relatorios' in perms) || perms.relatorios == 'bloqueado') &&
-             (!('importacao' in perms) || perms.importacao == 'bloqueado') &&
-             (!('auditoria' in perms) || perms.auditoria == 'bloqueado') &&
-             (!('configuracoes' in perms) || perms.configuracoes == 'bloqueado');
-    }
-
-    function isValidUsuarioSistema(data, uid) {
-      return hasRequiredFields(data, [
-               'uid', 'username', 'emailInterno', 'nome', 'role', 'status', 'permissoesModulos', 'extras'
-             ]) &&
-             hasOnlyAllowedFields(data, [
-               'uid', 'username', 'emailInterno', 'nome', 'cargo', 'whatsapp', 'role', 'status',
-               'perfilBase', 'permissoesModulos', 'extras', 'criadoEm', 'aprovadoPor',
-               'aprovadoEm', 'ultimoAcesso', 'atualizadoEm', 'atualizadoPor', 'motivo'
-             ]) &&
-             data.uid == uid &&
-             isNonEmptyString(data.username, 64) &&
-             isValidEmail(data.emailInterno) &&
-             isNonEmptyString(data.nome, 120) &&
-             isOptionalString(data, 'cargo', 120) &&
-             isOptionalString(data, 'whatsapp', 40) &&
-             data.role in ['master', 'operador'] &&
-             data.status in ['pendente', 'ativo', 'bloqueado', 'recusado'] &&
-             isOptionalString(data, 'perfilBase', 64) &&
-             isValidPermissoesModulos(data.permissoesModulos) &&
-             isValidExtrasMap(data.extras) &&
-             isOptionalString(data, 'criadoEm', 64) &&
-             isOptionalString(data, 'aprovadoPor', 120) &&
-             isOptionalString(data, 'aprovadoEm', 64) &&
-             isOptionalString(data, 'ultimoAcesso', 64) &&
-             isOptionalString(data, 'atualizadoEm', 64) &&
-             isOptionalString(data, 'atualizadoPor', 120) &&
-             isOptionalString(data, 'motivo', 300);
-    }
-
-    function isValidPortalMorador(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 40 &&
-             isOptionalString(data, 'whatsapp_prefeito', 40) &&
-             isOptionalList(data, 'avisos', 100) &&
-             isOptionalList(data, 'regras', 50) &&
-             isOptionalList(data, 'contatos', 50) &&
-             isOptionalList(data, 'alojados_sincronizados', 2000) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64) &&
-             isOptionalString(data, 'atualizado_por', 150);
-    }
-
-    function isValidRondaConfig(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 30 &&
-             isOptionalString(data, 'senha_equipe', 32) &&
-             isOptionalNumber(data, 'freq_padrao_banheiro', 0, 50) &&
-             isOptionalNumber(data, 'freq_padrao_bebedouro', 0, 50) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidChamado(data) {
-      return hasRequiredFields(data, ['categoria', 'descricao', 'status']) &&
-             data.keys().size() <= 35 &&
-             isNonEmptyString(data.categoria, 120) &&
-             isNonEmptyString(data.descricao, 2000) &&
-             data.status in ['pendente', 'em_atendimento', 'concluido', 'aberto', 'resolvido', 'cancelado'] &&
-             isOptionalString(data, 'id', 64) &&
-             isOptionalString(data, 'protocolo', 64) &&
-             isOptionalString(data, 'tipo_local', 40) &&
-             isOptionalString(data, 'unidade_id', 100) &&
-             isOptionalString(data, 'quarto_id', 100) &&
-             isOptionalString(data, 'casa_id', 100) &&
-             isOptionalString(data, 'quarto', 100) &&
-             isOptionalString(data, 'bloco', 120) &&
-             isOptionalString(data, 'casa_nome', 150) &&
-             isOptionalString(data, 'comodo', 120) &&
-             isOptionalString(data, 'local_formatado', 250) &&
-             isOptionalString(data, 'nome_solicitante', 150) &&
-             isOptionalString(data, 'whatsapp_solicitante', 40) &&
-             isOptionalString(data, 'origem', 100) &&
-             isOptionalString(data, 'criado_em', 64) &&
-             isOptionalString(data, 'data_formatada', 64) &&
-             isOptionalString(data, 'observacoes_prefeito', 2000) &&
-             isOptionalString(data, 'atualizado_por', 150) &&
-             isOptionalString(data, 'concluido_por', 150) &&
-             isOptionalString(data, 'data_conclusao', 64) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidPublicChamadoCreate(data) {
-      return isValidChamado(data) &&
-             data.status == 'pendente' &&
-             hasOnlyAllowedFields(data, [
-               'id', 'protocolo', 'tipo_local', 'unidade_id', 'quarto_id', 'casa_id',
-               'quarto', 'bloco', 'casa_nome', 'comodo', 'local_formatado',
-               'nome_solicitante', 'whatsapp_solicitante', 'categoria', 'descricao',
-               'status', 'origem', 'criado_em', 'data_formatada'
-             ]);
-    }
-
-    function isValidAvaliacaoRefeicao(data) {
-      return hasRequiredFields(data, ['refeicao', 'nota', 'status']) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'data', 'timestamp', 'data_formatada', 'refeicao', 'nota',
-               'sentimento', 'observacao', 'anonimo', 'morador_id', 'morador_nome',
-               'matricula', 'bloco', 'quarto', 'status',
-               'resposta_prefeito', 'atualizado_em', 'atualizado_por'
-             ]) &&
-             isNonEmptyString(data.refeicao, 60) &&
-             data.nota is number && data.nota >= 1 && data.nota <= 5 &&
-             data.status in ['pendente', 'tratado', 'lida', 'respondida', 'arquivada'] &&
-             isOptionalString(data, 'id', 64) &&
-             isOptionalString(data, 'data', 32) &&
-             isOptionalNumber(data, 'timestamp', 0, 9999999999999) &&
-             isOptionalString(data, 'data_formatada', 64) &&
-             isOptionalString(data, 'sentimento', 40) &&
-             isOptionalString(data, 'observacao', 1500) &&
-             isOptionalBool(data, 'anonimo') &&
-             isOptionalStringOrNumber(data, 'morador_id', 80) &&
-             isOptionalString(data, 'morador_nome', 150) &&
-             isOptionalStringOrNumber(data, 'matricula', 64) &&
-             isOptionalString(data, 'bloco', 80) &&
-             isOptionalStringOrNumber(data, 'quarto', 64) &&
-             isOptionalString(data, 'resposta_prefeito', 1500) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64) &&
-             isOptionalString(data, 'atualizado_por', 150);
-    }
-
-    function isValidRondaPonto(data) {
-      return hasRequiredFields(data, ['nome', 'tipo']) &&
-             data.keys().size() <= 25 &&
-             isNonEmptyString(data.nome, 150) &&
-             isNonEmptyString(data.tipo, 50) &&
-             isOptionalString(data, 'id', 100) &&
-             isOptionalString(data, 'setor', 150) &&
-             isOptionalNumber(data, 'frequencia_diaria', 0, 50) &&
-             isOptionalString(data, 'horarios_sugeridos', 150) &&
-             isOptionalString(data, 'observacoes', 1000) &&
-             isOptionalBool(data, 'ativo') &&
-             isOptionalTimestampOrString(data, 'criado_em', 64) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidRondaRegistro(data) {
-      return hasRequiredFields(data, ['ponto_id', 'ponto_nome', 'tipo', 'data', 'responsavel']) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'ponto_id', 'ponto_nome', 'tipo', 'tipo_operacao', 'setor', 'data', 'hora',
-               'data_hora', 'responsavel', 'ordem_dia', 'meta_dia', 'checklist',
-               'avaliacao', 'observacoes', 'criado_em', 'atualizado_em', 'origem',
-               'gelo_unidade', 'gelo_produzido', 'gelo_saida', 'gelo_saldo', 'gelo_destinos'
-             ]) &&
-             isNonEmptyString(data.ponto_id, 120) &&
-             isNonEmptyString(data.ponto_nome, 250) &&
-             isNonEmptyString(data.tipo, 50) &&
-             isOptionalString(data, 'tipo_operacao', 40) &&
-             isNonEmptyString(data.data, 32) &&
-             isNonEmptyString(data.responsavel, 150) &&
-             isOptionalString(data, 'id', 80) &&
-             isOptionalString(data, 'setor', 150) &&
-             isOptionalString(data, 'hora', 16) &&
-             isOptionalString(data, 'data_hora', 64) &&
-             isOptionalNumber(data, 'ordem_dia', 0, 100) &&
-             isOptionalNumber(data, 'meta_dia', 0, 50) &&
-             isOptionalList(data, 'checklist', 25) &&
-             isOptionalString(data, 'avaliacao', 100) &&
-             isOptionalString(data, 'observacoes', 1500) &&
-             isOptionalString(data, 'origem', 100) &&
-             isOptionalTimestampOrString(data, 'criado_em', 64) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64) &&
-             isOptionalString(data, 'gelo_unidade', 32) &&
-             isOptionalNumber(data, 'gelo_produzido', 0, 1000000) &&
-             isOptionalNumber(data, 'gelo_saida', 0, 1000000) &&
-             isOptionalNumber(data, 'gelo_saldo', 0, 1000000) &&
-             isOptionalString(data, 'gelo_destinos', 300);
-    }
-
-    function isValidRondaOcorrencia(data) {
-      return hasRequiredFields(data, ['ponto_id', 'ponto_nome', 'tipo_problema', 'descricao', 'status']) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'ponto_id', 'ponto_nome', 'tipo_ponto', 'setor', 'tipo_problema',
-               'descricao', 'solicitante', 'data', 'hora', 'data_hora', 'status',
-               'resolvido_em', 'resolvido_por', 'criado_em', 'atualizado_em'
-             ]) &&
-             isNonEmptyString(data.ponto_id, 100) &&
-             isNonEmptyString(data.ponto_nome, 150) &&
-             isNonEmptyString(data.tipo_problema, 120) &&
-             isNonEmptyString(data.descricao, 2000) &&
-             data.status in ['aberto', 'pendente', 'em_atendimento', 'resolvido', 'concluido'] &&
-             isOptionalString(data, 'id', 80) &&
-             isOptionalString(data, 'tipo_ponto', 50) &&
-             isOptionalString(data, 'setor', 150) &&
-             isOptionalString(data, 'solicitante', 150) &&
-             isOptionalString(data, 'data', 32) &&
-             isOptionalString(data, 'hora', 16) &&
-             isOptionalString(data, 'data_hora', 64) &&
-             isOptionalTimestampOrString(data, 'resolvido_em', 64) &&
-             isOptionalString(data, 'resolvido_por', 150) &&
-             isOptionalTimestampOrString(data, 'criado_em', 64) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidCasaCidade(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 60 &&
-             isOptionalString(data, 'id', 100) &&
-             isOptionalString(data, 'nome', 150) &&
-             isOptionalString(data, 'endereco', 300) &&
-             isOptionalString(data, 'bairro', 120) &&
-             isOptionalString(data, 'cep', 32) &&
-             isOptionalString(data, 'observacoes', 2000) &&
-             isOptionalList(data, 'moradores', 200) &&
-             isOptionalList(data, 'moveis', 500) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidCasaLimpeza(data) {
-      return hasRequiredFields(data, ['casa_id', 'casa_nome', 'tipo', 'data', 'responsavel']) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'casa_id', 'casa_nome', 'tipo_local', 'quarto_id', 'quarto_numero',
-               'bloco_nome', 'tipo', 'subtipo', 'data', 'hora', 'data_hora',
-               'responsavel', 'avaliacao', 'observacoes', 'origem',
-               'criado_em', 'criado_por', 'atualizado_em'
-             ]) &&
-             isNonEmptyString(data.casa_id, 120) &&
-             isNonEmptyString(data.casa_nome, 250) &&
-             isNonEmptyString(data.tipo, 60) &&
-             isNonEmptyString(data.data, 32) &&
-             isNonEmptyString(data.responsavel, 150) &&
-             isOptionalString(data, 'id', 80) &&
-             isOptionalString(data, 'tipo_local', 40) &&
-             isOptionalStringOrNumber(data, 'quarto_id', 120) &&
-             isOptionalStringOrNumber(data, 'quarto_numero', 250) &&
-             isOptionalString(data, 'bloco_nome', 100) &&
-             isOptionalString(data, 'subtipo', 60) &&
-             isOptionalString(data, 'hora', 16) &&
-             isOptionalString(data, 'data_hora', 64) &&
-             isOptionalString(data, 'avaliacao', 120) &&
-             isOptionalString(data, 'observacoes', 1500) &&
-             isOptionalString(data, 'origem', 100) &&
-             isOptionalTimestampOrString(data, 'criado_em', 64) &&
-             isOptionalString(data, 'criado_por', 150) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidVigilanciaRegistro(data) {
-      return hasRequiredFields(data, ['ponto_id', 'ponto_nome', 'guarda_nome', 'turno_id', 'data_turno', 'timestamp']) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'ponto_id', 'ponto_nome', 'guarda_nome', 'guarda_matricula',
-               'guarda_empresa', 'turno_id', 'data_turno', 'data_hora', 'timestamp',
-               'tem_ocorrencia', 'tipo_ocorrencia', 'detalhes_ocorrencia',
-               'latitude', 'longitude', 'atualizado_em', 'status', 'observacoes_prefeito'
-             ]) &&
-             isNonEmptyString(data.ponto_id, 120) &&
-             isNonEmptyString(data.ponto_nome, 250) &&
-             isNonEmptyString(data.guarda_nome, 150) &&
-             isNonEmptyString(data.turno_id, 64) &&
-             isNonEmptyString(data.data_turno, 32) &&
-             data.timestamp is number && data.timestamp > 0 && data.timestamp <= 9999999999999 &&
-             isOptionalString(data, 'id', 80) &&
-             isOptionalString(data, 'guarda_matricula', 80) &&
-             isOptionalString(data, 'guarda_empresa', 120) &&
-             isOptionalString(data, 'data_hora', 64) &&
-             isOptionalBool(data, 'tem_ocorrencia') &&
-             isOptionalString(data, 'tipo_ocorrencia', 150) &&
-             isOptionalString(data, 'detalhes_ocorrencia', 1500) &&
-             isOptionalNumber(data, 'latitude', -90, 90) &&
-             isOptionalNumber(data, 'longitude', -180, 180) &&
-             isOptionalString(data, 'status', 40) &&
-             isOptionalString(data, 'observacoes_prefeito', 1500) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidAuditoriaLog(data) {
-      return hasRequiredFields(data, ['id', 'data_hora', 'usuario', 'modulo', 'acao', 'entidade', 'detalhes']) &&
-             hasOnlyAllowedFields(data, ['id', 'data_hora', 'timestamp', 'usuario', 'modulo', 'acao', 'entidade', 'detalhes']) &&
-             isNonEmptyString(data.id, 80) &&
-             isNonEmptyString(data.data_hora, 64) &&
-             isOptionalString(data, 'timestamp', 64) &&
-             isNonEmptyString(data.usuario, 150) &&
-             isNonEmptyString(data.modulo, 64) &&
-             isNonEmptyString(data.acao, 80) &&
-             isNonEmptyString(data.entidade, 200) &&
-             isNonEmptyString(data.detalhes, 2000);
-    }
-
-    function isValidAlojado(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 60 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'nome_completo', 180) &&
-             isOptionalString(data, 'nome', 180) &&
-             isOptionalStringOrNumber(data, 'matricula', 64) &&
-             isOptionalString(data, 'funcao', 120) &&
-             isOptionalString(data, 'cpf', 32) &&
-             isOptionalString(data, 'telefone', 40) &&
-             isOptionalString(data, 'bloco_nome', 100) &&
-             isOptionalStringOrNumber(data, 'quarto_numero', 40) &&
-             isOptionalString(data, 'observacoes', 2000) &&
-             isOptionalString(data, 'foto_url', 600000) &&
-             isOptionalBool(data, 'excluido') &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidBloco(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 40 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'nome', 120) &&
-             isOptionalString(data, 'tipo', 60) &&
-             isOptionalBool(data, 'excluido') &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidQuarto(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 50 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalStringOrNumber(data, 'numero', 40) &&
-             isOptionalString(data, 'bloco_nome', 100) &&
-             isOptionalString(data, 'status', 60) &&
-             isOptionalString(data, 'observacoes', 2000) &&
-             isOptionalBool(data, 'excluido') &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidEmpresa(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 35 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'nome', 150) &&
-             isOptionalString(data, 'cor', 40) &&
-             isOptionalString(data, 'cnpj', 32) &&
-             isOptionalBool(data, 'excluido') &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidMovelVistoria(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 50 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'tipo', 100) &&
-             isOptionalString(data, 'nome', 150) &&
-             isOptionalString(data, 'status', 60) &&
-             isOptionalString(data, 'estado', 60) &&
-             (!('precisa_manutencao' in data) ||
-              data.precisa_manutencao == null ||
-              data.precisa_manutencao is bool ||
-              (data.precisa_manutencao is number &&
-               (data.precisa_manutencao == 0 || data.precisa_manutencao == 1))) &&
-             isOptionalTimestampOrString(data, 'ultima_vistoria', 64) &&
-             isOptionalString(data, 'observacoes', 2000) &&
-             isOptionalBool(data, 'excluido') &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidEquipeMovelVistoriaFields(data) {
-      return ('estado' in data) &&
-             data.estado in ['Bom', 'Regular', 'Ruim', 'Danificado'] &&
-             ('precisa_manutencao' in data) &&
-             data.precisa_manutencao is bool &&
-             ('ultima_vistoria' in data) &&
-             data.ultima_vistoria is string &&
-             data.ultima_vistoria.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
-             isOptionalString(data, 'observacoes', 2000);
-    }
-
-    function isValidCanteiroMetadata(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 40 &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidCasaDespesa(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 40 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'casa_id', 100) &&
-             isOptionalString(data, 'descricao', 500) &&
-             isOptionalString(data, 'categoria', 100) &&
-             isOptionalString(data, 'status', 40) &&
-             isOptionalNumber(data, 'valor', 0, 100000000) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidEstoqueItem(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 45 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'nome', 180) &&
-             isOptionalString(data, 'categoria', 100) &&
-             isOptionalString(data, 'local', 120) &&
-             isOptionalString(data, 'unidade', 40) &&
-             isOptionalNumber(data, 'quantidade', 0, 100000000) &&
-             isOptionalNumber(data, 'minimo', 0, 100000000) &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidEstoqueMovimentacao(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 40 &&
-             isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'item_id', 120) &&
-             isOptionalString(data, 'item_nome', 250) &&
-             isOptionalString(data, 'tipo', 40) &&
-             isOptionalNumber(data, 'quantidade', 0, 100000000) &&
-             isOptionalString(data, 'data', 64) &&
-             isOptionalString(data, 'motivo', 1500) &&
-             isOptionalString(data, 'responsavel', 150) &&
-             isOptionalString(data, 'local', 150) &&
-             isOptionalString(data, 'observacoes', 1500) &&
-             isOptionalTimestampOrString(data, 'criado_em', 64);
-    }
-
-    function isValidEquipeEstoqueMovimentacao(data, docId) {
-      return hasRequiredFields(data, [
-               'id', 'item_id', 'item_nome', 'tipo', 'quantidade',
-               'data', 'motivo', 'responsavel', 'local', 'criado_em'
-             ]) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'item_id', 'item_nome', 'tipo', 'quantidade',
-               'data', 'motivo', 'responsavel', 'local', 'criado_em'
-             ]) &&
-             isNonEmptyString(data.id, 80) &&
-             data.id == docId &&
-             isNonEmptyString(data.item_id, 120) &&
-             isNonEmptyString(data.item_nome, 250) &&
-             data.tipo in ['entrada', 'saida'] &&
-             data.quantidade is number && data.quantidade > 0 && data.quantidade <= 100000000 &&
-             data.data is string && data.data.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
-             isNonEmptyString(data.motivo, 1500) &&
-             isNonEmptyString(data.responsavel, 150) &&
-             isNonEmptyString(data.local, 150) &&
-             isNonEmptyString(data.criado_em, 64);
-    }
-
-    function isValidPontoVigilancia(data) {
-      return data.keys().size() > 0 &&
-             data.keys().size() <= 30 &&
-             isOptionalString(data, 'id', 100) &&
-             isOptionalString(data, 'nome', 150) &&
-             isOptionalString(data, 'setor', 150) &&
-             isOptionalString(data, 'descricao', 1000) &&
-             isOptionalBool(data, 'ativo') &&
-             isOptionalTimestampOrString(data, 'atualizado_em', 64);
-    }
-
-    function isValidEquipeCategoria(cat) {
-      return cat in [
-        'maquina_gelo', 'banheiro', 'bebedouro', 'alojamento', 'casa',
-        'equipamento', 'estoque', 'chamado', 'vigilancia', 'outro'
-      ];
-    }
-
-    function isValidEquipeTarefa(data) {
-      return hasRequiredFields(data, [
-               'funcionarioUid', 'funcionarioNome', 'categoria', 'itemNome',
-               'titulo', 'prioridade', 'ordem', 'status', 'baixaAutomatica'
-             ]) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
-               'itemNome', 'refColecao', 'titulo', 'instrucoes', 'prioridade',
-               'ordem', 'status', 'baixaAutomatica', 'criadoEm', 'atualizadoEm',
-               'criadoPor', 'iniciadoEm', 'concluidoEm', 'observacaoConclusao',
-               'resumoOperacional', 'fotoConclusao', 'motivoImpedimento',
-               'vistoPor', 'vistoEm'
-             ]) &&
-             isOptionalString(data, 'id', 80) &&
-             isNonEmptyString(data.funcionarioUid, 128) &&
-             isNonEmptyString(data.funcionarioNome, 150) &&
-             isValidEquipeCategoria(data.categoria) &&
-             isOptionalString(data, 'itemId', 120) &&
-             isNonEmptyString(data.itemNome, 250) &&
-             isOptionalString(data, 'refColecao', 64) &&
-             isNonEmptyString(data.titulo, 200) &&
-             isOptionalString(data, 'instrucoes', 2000) &&
-             data.prioridade in ['urgente', 'alta', 'normal'] &&
-             data.ordem is number && data.ordem >= 0 && data.ordem <= 10000 &&
-             data.status in ['pendente', 'em_andamento', 'impedimento', 'aguardando_visto', 'concluido'] &&
-             data.baixaAutomatica is bool &&
-             isOptionalString(data, 'criadoEm', 64) &&
-             isOptionalString(data, 'atualizadoEm', 64) &&
-             isOptionalString(data, 'criadoPor', 150) &&
-             isOptionalString(data, 'iniciadoEm', 64) &&
-             isOptionalString(data, 'concluidoEm', 64) &&
-             isOptionalString(data, 'observacaoConclusao', 2000) &&
-             isOptionalString(data, 'resumoOperacional', 500) &&
-             isOptionalUrlOrEmpty(data, 'fotoConclusao', 500) &&
-             isOptionalString(data, 'motivoImpedimento', 2000) &&
-             isOptionalString(data, 'vistoPor', 150) &&
-             isOptionalString(data, 'vistoEm', 64);
-    }
-
-    function isValidEquipeRotina(data) {
-      return hasRequiredFields(data, [
-               'funcionarioUid', 'funcionarioNome', 'categoria', 'itemNome',
-               'titulo', 'ordem'
-             ]) &&
-             hasOnlyAllowedFields(data, [
-               'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
-               'itemNome', 'refColecao', 'titulo', 'instrucoes', 'turno',
-               'continuo', 'metaDia', 'ordem', 'ativo', 'criadoEm', 'criadoPor',
-               'atualizadoEm'
-             ]) &&
-             isOptionalString(data, 'id', 80) &&
-             isNonEmptyString(data.funcionarioUid, 128) &&
-             isNonEmptyString(data.funcionarioNome, 150) &&
-             isValidEquipeCategoria(data.categoria) &&
-             isOptionalString(data, 'itemId', 120) &&
-             isNonEmptyString(data.itemNome, 250) &&
-             isOptionalString(data, 'refColecao', 64) &&
-             isNonEmptyString(data.titulo, 200) &&
-             isOptionalString(data, 'instrucoes', 2000) &&
-             isOptionalString(data, 'turno', 60) &&
-             isOptionalBool(data, 'continuo') &&
-             isOptionalNumber(data, 'metaDia', 1, 20) &&
-             data.ordem is number && data.ordem >= 0 && data.ordem <= 10000 &&
-             isOptionalBool(data, 'ativo') &&
-             isOptionalString(data, 'criadoEm', 64) &&
-             isOptionalString(data, 'criadoPor', 150) &&
-             isOptionalString(data, 'atualizadoEm', 64);
-    }
-
-    function isValidEquipeRotinaLog(data) {
-      return hasRequiredFields(data, [
-               'rotinaId', 'rotinaTitulo', 'categoria', 'funcionarioUid',
-               'funcionarioNome', 'data', 'concluidoEm'
-             ]) &&
-             hasOnlyAllowedFields(data, [
-               'rotinaId', 'rotinaTitulo', 'itemNome', 'categoria',
-               'funcionarioUid', 'funcionarioNome', 'data', 'concluidoEm',
-               'observacao', 'resumoOperacional', 'fotoUrl'
-             ]) &&
-             isNonEmptyString(data.rotinaId, 100) &&
-             isNonEmptyString(data.rotinaTitulo, 200) &&
-             isOptionalString(data, 'itemNome', 250) &&
-             isValidEquipeCategoria(data.categoria) &&
-             isNonEmptyString(data.funcionarioUid, 128) &&
-             isNonEmptyString(data.funcionarioNome, 150) &&
-             data.data is string && data.data.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
-             isNonEmptyString(data.concluidoEm, 64) &&
-             isOptionalString(data, 'observacao', 2000) &&
-             isOptionalString(data, 'resumoOperacional', 500) &&
-             isOptionalUrlOrEmpty(data, 'fotoUrl', 500);
-    }
-
-    // ========================================================================
-    // 4. RBAC & SYSTEM CONFIGURATION COLLECTIONS
-    // ========================================================================
-
-    // Unified configuracoes/{docId} block prevents any overlapping-match OR bypass
-    // on sistema_auth.
-    match /configuracoes/{docId} {
-      allow get: if docId in ['sistema_auth', 'identidade_visual', 'prefeitura_contato']
-                 || (docId != 'sistema_auth' && isActiveUser());
-
-      allow list: if isMaster();
-
-      allow create: if docId == 'sistema_auth'
-        ? (isSignedIn() &&
-           !exists(/databases/$(database)/documents/configuracoes/sistema_auth) &&
-           isValidSistemaAuth(request.resource.data) &&
-           request.resource.data.masterConfigurado == true &&
-           request.resource.data.masterUid == request.auth.uid)
-        : (docId == 'estoque_locais'
-            ? ((canEdit('configuracoes') || canEdit('estoque')) && isValidConfigDoc(request.resource.data))
-            : (docId == 'manutencao_plaquinhas'
-                ? ((canEdit('configuracoes') || canEdit('ronda') || canEdit('casas_cidade')) && isValidConfigDoc(request.resource.data))
-                : (canEdit('configuracoes') && isValidConfigDoc(request.resource.data))));
-
-      allow update: if docId == 'sistema_auth'
-        ? (isMaster() &&
-           isValidSistemaAuth(request.resource.data) &&
-           request.resource.data.masterConfigurado == true &&
-           request.resource.data.masterUid == resource.data.masterUid &&
-           areImmutableFieldsUnchanged(['masterUid', 'criadoEm']))
-        : (docId == 'estoque_locais'
-            ? ((canEdit('configuracoes') || canEdit('estoque')) && isValidConfigDoc(request.resource.data))
-            : (docId == 'manutencao_plaquinhas'
-                ? ((canEdit('configuracoes') || canEdit('ronda') || canEdit('casas_cidade')) && isValidConfigDoc(request.resource.data))
-                : (canEdit('configuracoes') && isValidConfigDoc(request.resource.data))));
-
-      // sistema_auth can NEVER be deleted (prevents Master bootstrap reset attack)
-      allow delete: if docId != 'sistema_auth' && isMaster();
-    }
-
-    match /usuarios_sistema/{uid} {
-      allow get: if isOwner(uid) || canManageUsers() || canView('equipe_prioridades');
-      allow list: if canManageUsers() || canView('equipe_prioridades');
-
-      allow create: if isValidUsuarioSistema(request.resource.data, uid) && (
-        // 1) Initial Master Bootstrap (only before configuracoes/sistema_auth exists)
-        (isOwner(uid) &&
-         uidUnchanged() &&
-         !exists(/databases/$(database)/documents/configuracoes/sistema_auth) &&
-         request.resource.data.uid == uid &&
-         request.resource.data.role == 'master' &&
-         request.resource.data.status == 'ativo')
-        ||
-        // 2) Self-Registration ("Solicitar Acesso") — strictly pending & zero privileges
-        (isOwner(uid) &&
-         uidUnchanged() &&
-         request.resource.data.uid == uid &&
-         request.resource.data.role == 'operador' &&
-         request.resource.data.status == 'pendente' &&
-         request.resource.data.extras.gerenciarUsuarios == false &&
-         request.resource.data.extras.podeExcluir == false &&
-         request.resource.data.extras.podeExportar == false &&
-         (!('acessoAppEquipe' in request.resource.data.extras) ||
-          request.resource.data.extras.acessoAppEquipe == false) &&
-         isAllModulesBlocked(request.resource.data.permissoesModulos))
-        ||
-        // 3) Admin Creation (Master or Co-Admin creating a non-master staff member)
-        (canManageUsers() &&
-         request.resource.data.uid == uid &&
-         request.resource.data.role == 'operador')
-      );
-
-      allow update: if isValidUsuarioSistema(request.resource.data, uid) &&
-                       uidNotModified() && (
-        // 1) Self updating ONLY ultimoAcesso
-        (isOwner(uid) &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoAcesso']))
-        ||
-        // 2) Master or Co-Admin managing non-master users (cannot promote to master or alter UID/role)
-        (canManageUsers() &&
-         resource.data.role != 'master' &&
-         request.resource.data.role == resource.data.role &&
-         request.resource.data.uid == resource.data.uid &&
-         areImmutableFieldsUnchanged(['uid', 'role', 'username', 'emailInterno', 'criadoEm']))
-      );
-
-      allow delete: if canManageUsers() && resource.data.role != 'master';
-    }
-
-    // ========================================================================
-    // 5. PUBLIC / FIELD QR PORTAL COLLECTIONS
-    // (Required for unauthenticated field pages: alojado.html, chamado.html,
-    //  limpeza.html, ronda.html, guarda.html)
-    // ========================================================================
-
-    match /config_sistema/portal_morador {
-      allow get: if true;
-      allow list: if false;
-      allow create, update: if (canEdit('portal_alojado') || canEdit('sorteio')) &&
-                               isValidPortalMorador(request.resource.data);
-      allow delete: if false;
-    }
-
-    match /ronda_config/{docId} {
-      allow get: if true;
-      allow list: if isActiveUser();
-      allow create, update: if (canEdit('ronda') || canEdit('casas_cidade') || canEdit('configuracoes')) &&
-                               isValidRondaConfig(request.resource.data);
-      allow delete: if isMaster();
-    }
-
-    match /chamados_suporte/{id} {
-      // Public get allows resident status lookup by known protocol ID only
-      allow get: if true;
-      allow list: if canView('chamados') || canView('dashboard');
-      allow create: if (canEdit('chamados') && isValidChamado(request.resource.data))
-                    || isValidPublicChamadoCreate(request.resource.data);
-      allow update: if canEdit('chamados') &&
-                       isValidChamado(request.resource.data) &&
-                       areImmutableFieldsUnchanged(['id', 'protocolo', 'criado_em']);
-      allow delete: if canEdit('chamados') && canDelete();
-    }
-
-    match /avaliacoes_refeicoes/{id} {
-      allow read: if canView('portal_alojado') || canView('dashboard') || canView('relatorios');
-      allow create: if isValidAvaliacaoRefeicao(request.resource.data) &&
-                       (canEdit('portal_alojado') || request.resource.data.status == 'pendente');
-      allow update: if canEdit('portal_alojado') &&
-                       isValidAvaliacaoRefeicao(request.resource.data) &&
-                       areImmutableFieldsUnchanged(['id', 'timestamp', 'nota', 'refeicao']);
-      allow delete: if canEdit('portal_alojado') && canDelete();
-    }
-
-    match /ronda_pontos/{id} {
-      allow read: if true;
-      allow create, update: if canEdit('ronda') && isValidRondaPonto(request.resource.data);
-      allow delete: if canEdit('ronda') && canDelete();
-    }
-
-    match /ronda_registros/{id} {
-      allow read: if true;
-      allow create: if isValidRondaRegistro(request.resource.data);
-      allow update: if (canEdit('ronda') || (canEdit('maquina_gelo') && resource.data.tipo == 'maquina_gelo')) &&
-                       isValidRondaRegistro(request.resource.data) &&
-                       areImmutableFieldsUnchanged(['id', 'criado_em']);
-      allow delete: if (canEdit('ronda') || (canEdit('maquina_gelo') && resource.data.tipo == 'maquina_gelo')) &&
-                       canDelete();
-    }
-
-    match /ronda_ocorrencias/{id} {
-      allow read: if canView('ronda') || canView('dashboard');
-      allow create: if isValidRondaOcorrencia(request.resource.data) &&
-                       (canEdit('ronda') || request.resource.data.status == 'aberto');
-      allow update: if canEdit('ronda') &&
-                       isValidRondaOcorrencia(request.resource.data) &&
-                       areImmutableFieldsUnchanged(['id', 'criado_em']);
-      allow delete: if canEdit('ronda') && canDelete();
-    }
-
-    match /casas_cidade/{id} {
-      // Public read needed by limpeza.html to identify houses/rooms via QR Code
-      allow read: if true;
-      allow create, update: if canEdit('casas_cidade') && isValidCasaCidade(request.resource.data);
-      allow delete: if canEdit('casas_cidade') && canDelete();
-    }
-
-    match /casas_limpezas/{id} {
-      allow read: if canView('casas_cidade') || canView('ronda') || canView('dashboard');
-      allow create: if isValidCasaLimpeza(request.resource.data);
-      allow update: if canEdit('casas_cidade') &&
-                       isValidCasaLimpeza(request.resource.data) &&
-                       areImmutableFieldsUnchanged(['id', 'criado_em']);
-      allow delete: if canEdit('casas_cidade') && canDelete();
-    }
-
-    match /ronda_vigilancia_registros/{id} {
-      allow read: if canView('ronda_vigilancia') || canView('dashboard');
-      allow create: if isValidVigilanciaRegistro(request.resource.data);
-      allow update: if canEdit('ronda_vigilancia') &&
-                       isValidVigilanciaRegistro(request.resource.data) &&
-                       areImmutableFieldsUnchanged(['id', 'timestamp']);
-      allow delete: if canEdit('ronda_vigilancia') && canDelete();
-    }
-
-    match /auditoria_logs/{id} {
-      allow read: if canView('auditoria') || isActiveUser();
-      // Append-only: field pages (limpeza.html / ronda.html) and staff can append validated logs
-      allow create: if isValidAuditoriaLog(request.resource.data);
-      allow update: if false;
-      allow delete: if isMaster();
-    }
-
-    // ========================================================================
-    // 6. STRICTLY PROTECTED ADMINISTRATIVE COLLECTIONS
-    // (Zero unauthenticated reads or writes)
-    // ========================================================================
-
-    match /alojados/{id} {
-      allow read: if isActiveUser();
-      allow create, update: if (canEdit('alojados') || canEdit('blocos') || canEdit('importacao') || canEdit('portal_alojado')) &&
-                               isValidAlojado(request.resource.data);
-      allow delete: if canEdit('alojados') && canDelete();
-    }
-
-    match /blocos/{id} {
-      allow read: if isActiveUser();
-      allow create, update: if (canEdit('blocos') || canEdit('gestao_cadastros') || canEdit('importacao') || canEdit('alojados')) &&
-                               isValidBloco(request.resource.data);
-      allow delete: if (canEdit('blocos') || canEdit('gestao_cadastros')) && canDelete();
-    }
-
-    match /quartos/{id} {
-      allow read: if isActiveUser();
-      allow create, update: if (canEdit('blocos') || canEdit('gestao_cadastros') || canEdit('importacao') || canEdit('alojados')) &&
-                               isValidQuarto(request.resource.data);
-      allow delete: if (canEdit('blocos') || canEdit('gestao_cadastros')) && canDelete();
-    }
-
-    match /empresas/{id} {
-      allow read: if isActiveUser();
-      allow create, update: if (canEdit('blocos') || canEdit('gestao_cadastros') || canEdit('importacao') || canEdit('alojados')) &&
-                               isValidEmpresa(request.resource.data);
-      allow delete: if (canEdit('blocos') || canEdit('gestao_cadastros')) && canDelete();
-    }
-
-    match /moveis_vistorias/{id} {
-      allow read: if isActiveUser();
-      allow create: if isValidMovelVistoria(request.resource.data) && (
-        (canEdit('moveis') || canEdit('blocos') || canEdit('casas_cidade') || canEdit('chamados'))
-        ||
-        (hasAppEquipeAccess() &&
-         hasOnlyAllowedFields(request.resource.data, [
-           'estado', 'precisa_manutencao', 'ultima_vistoria', 'observacoes'
-         ]) &&
-         isValidEquipeMovelVistoriaFields(request.resource.data))
-      );
-      allow update: if isValidMovelVistoria(request.resource.data) && (
-        (canEdit('moveis') || canEdit('blocos') || canEdit('casas_cidade') || canEdit('chamados'))
-        ||
-        (hasAppEquipeAccess() &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'estado', 'precisa_manutencao', 'ultima_vistoria', 'observacoes'
-         ]) &&
-         isValidEquipeMovelVistoriaFields(request.resource.data))
-      );
-      allow delete: if canEdit('moveis') && canDelete();
-    }
-
-    match /canteiro_metadata/{id} {
-      allow read: if isActiveUser();
-      allow create, update: if isActiveUser() && isValidCanteiroMetadata(request.resource.data);
-      allow delete: if isMaster();
-    }
-
-    match /casas_despesas/{id} {
-      allow read: if canView('casas_cidade') || canView('erp_canteiro') || canView('relatorios') || canView('dashboard');
-      allow create, update: if (canEdit('casas_cidade') || canEdit('erp_canteiro')) &&
-                               isValidCasaDespesa(request.resource.data);
-      allow delete: if (canEdit('casas_cidade') || canEdit('erp_canteiro')) && canDelete();
-    }
-
-    match /estoque_itens/{id} {
-      allow read: if canView('estoque') || canView('maquina_gelo') || canView('dashboard') || canView('relatorios');
-      allow create, update: if (canEdit('estoque') || canEdit('maquina_gelo')) &&
-                               isValidEstoqueItem(request.resource.data);
-      allow delete: if (canEdit('estoque') || canEdit('maquina_gelo')) && canDelete();
-    }
-
-    match /estoque_movimentacoes/{id} {
-      allow read: if canView('estoque') || canView('maquina_gelo') || canView('dashboard') || canView('relatorios');
-      allow create: if isValidEstoqueMovimentacao(request.resource.data) && (
-        canEdit('estoque') ||
-        canEdit('maquina_gelo') ||
-        (hasAppEquipeAccess() && isValidEquipeEstoqueMovimentacao(request.resource.data, id))
-      );
-      allow update: if (canEdit('estoque') || canEdit('maquina_gelo')) &&
-                       isValidEstoqueMovimentacao(request.resource.data);
-      allow delete: if (canEdit('estoque') || canEdit('maquina_gelo')) && canDelete();
-    }
-
-    match /pontos_vigilancia/{id} {
-      allow read: if isActiveUser();
-      allow create, update: if canEdit('ronda_vigilancia') && isValidPontoVigilancia(request.resource.data);
-      allow delete: if canEdit('ronda_vigilancia') && canDelete();
-    }
-
-    // ========================================================================
-    // 6B. APP DA EQUIPE & PRIORIDADES DE CAMPO (equipe.html / equipe_admin.js)
-    // ========================================================================
-
-    match /equipe_tarefas/{id} {
-      // Field employees can strictly read ONLY tasks assigned to their own UID
-      allow read: if canView('equipe_prioridades') ||
-                     (isActiveUser() && resource.data.funcionarioUid == request.auth.uid);
-
-      allow create: if canEdit('equipe_prioridades') &&
-                       isValidEquipeTarefa(request.resource.data) &&
-                       request.resource.data.status == 'pendente';
-
-      allow update: if isValidEquipeTarefa(request.resource.data) && (
-        // 1) Admin (Prefeito / Gestor with edit access): manage priority, order, visto, instructions
-        (canEdit('equipe_prioridades') &&
-         areImmutableFieldsUnchanged(['id', 'criadoEm', 'criadoPor']))
-        ||
-        // 2) Assigned Field Employee: execution-only updates (cannot tamper with priority/order/assignment)
-        (isActiveUser() &&
-         resource.data.funcionarioUid == request.auth.uid &&
-         hasAppEquipeAccess() &&
-         resource.data.status != 'concluido' &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'status', 'iniciadoEm', 'concluidoEm', 'atualizadoEm',
-           'observacaoConclusao', 'resumoOperacional', 'fotoConclusao',
-           'motivoImpedimento'
-         ]) &&
-         areImmutableFieldsUnchanged([
-           'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
-           'itemNome', 'refColecao', 'titulo', 'instrucoes', 'prioridade',
-           'ordem', 'baixaAutomatica', 'criadoEm', 'criadoPor', 'vistoPor', 'vistoEm'
-         ]) &&
-         (request.resource.data.status in ['em_andamento', 'impedimento', 'aguardando_visto'] ||
-          (request.resource.data.status == 'concluido' && resource.data.baixaAutomatica == true)))
-      );
-
-      allow delete: if canEdit('equipe_prioridades') && canDelete();
-    }
-
-    match /equipe_rotinas/{id} {
-      allow read: if canView('equipe_prioridades') ||
-                     (isActiveUser() && resource.data.funcionarioUid == request.auth.uid);
-
-      allow create: if canEdit('equipe_prioridades') &&
-                       isValidEquipeRotina(request.resource.data);
-
-      allow update: if canEdit('equipe_prioridades') &&
-                       isValidEquipeRotina(request.resource.data) &&
-                       areImmutableFieldsUnchanged(['id', 'criadoEm', 'criadoPor']);
-
-      allow delete: if canEdit('equipe_prioridades') && canDelete();
-    }
-
-    match /equipe_rotinas_logs/{id} {
-      allow read: if canView('equipe_prioridades') ||
-                     (isActiveUser() && resource.data.funcionarioUid == request.auth.uid);
-
-      allow create: if isValidEquipeRotinaLog(request.resource.data) && (
-        (isActiveUser() &&
-         request.resource.data.funcionarioUid == request.auth.uid &&
-         hasAppEquipeAccess())
-        ||
-        canEdit('equipe_prioridades')
-      );
-
-      // Append-only daily routine completion log
-      allow update: if false;
-
-      allow delete: if canEdit('equipe_prioridades') && canDelete();
-    }
-
-    // ========================================================================
-    // 7. EXPLICIT DEFAULT DENY CATCH-ALL
-    // ========================================================================
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
+match /databases/{database}/documents {
+// 1. RBAC HELPERS
+function isAuthenticated(){return request.auth!=null;}
+function me(){return request.auth.uid;}
+function rd(){return request.resource.data;}
+function rs(){return resource.data;}
+function isOwner(u){return isAuthenticated()&&me()==u;}
+function uidUnchanged(){return !('uid' in rd())||rd().uid==me();}
+function uidNotModified(){return !('uid' in rd())||rd().uid==rs().uid;}
+function uData(){return get(/databases/$(database)/documents/usuarios_sistema/$(me())).data;}
+function act(){return isAuthenticated()&&exists(/databases/$(database)/documents/usuarios_sistema/$(me()))&&uData().status=='ativo';}
+function mst(){return act()&&uData().role=='master';}
+function hasEx(k){return act()&&uData().get('extras',null) is map&&uData().extras.get(k,false)==true;}
+function mUsr(){return mst()||hasEx('gerenciarUsuarios');}
+function del(){return mst()||hasEx('podeExcluir');}
+function mLvl(m){return mst()?'editar':(act()&&uData().get('permissoesModulos',null) is map?uData().permissoesModulos.get(m,'bloqueado'):'bloqueado');}
+function vw(m){return mLvl(m) in ['ver','editar'];}
+function ed(m){return mLvl(m)=='editar';}
+function eD(m){return ed(m)&&del();}
+function eR(){return ed('ronda');}
+function eP(){return ed('portal_alojado');}
+function eC(){return ed('casas_cidade');}
+function eV(){return ed('ronda_vigilancia');}
+function vD(){return vw('dashboard');}
+function eCad(){return ed('blocos')||ed('gestao_cadastros')||ed('importacao')||ed('alojados');}
+function dCad(){return (ed('blocos')||ed('gestao_cadastros'))&&del();}
+function eEst(){return ed('estoque')||ed('maquina_gelo');}
+function vEst(){return vw('estoque')||vw('maquina_gelo')||vD()||vw('relatorios');}
+function eCfg(id){return id=='estoque_locais'?(ed('configuracoes')||ed('estoque')):(id=='manutencao_plaquinhas'?(ed('configuracoes')||eR()||eC()):ed('configuracoes'));}
+
+// 2. VALIDATION HELPERS
+function o(f){return rd().keys().hasOnly(f);}
+function im(f){return !rd().diff(rs()).affectedKeys().hasAny(f);}
+function imC(){return im(['id','criado_em']);}
+function dO(f){return rd().diff(rs()).affectedKeys().hasOnly(f);}
+function r(k,n){let v=rd().get(k,'');return v is string&&v.size()>0&&v.size()<=n;}
+function r4(a,b,c,e,n){return r(a,n)&&r(b,n)&&r(c,n)&&r(e,n);}
+function os(k,n){return rd().get(k,null)==null||(rd()[k] is string&&rd()[k].size()<=n);}
+function s2(a,b,n){return os(a,n)&&os(b,n);}
+function s4(a,b,c,e,n){return s2(a,b,n)&&s2(c,e,n);}
+function s6(a,b,c,d,e,f,n){return s4(a,b,c,d,n)&&s2(e,f,n);}
+function on(k,a,b){return rd().get(k,null)==null||(rd()[k] is number&&rd()[k]>=a&&rd()[k]<=b);}
+function on2(a,b,n){return on(a,0,n)&&on(b,0,n);}
+function ob(k){return rd().get(k,null)==null||rd()[k] is bool;}
+function rn(k,a,b){return k in rd()&&rd()[k] is number&&rd()[k]>=a&&rd()[k]<=b;}
+function en(k,arr){return rd().get(k,'') in arr;}
+function ol(k,n){return rd().get(k,null)==null||(rd()[k] is list&&rd()[k].size()<=n);}
+function ot(k){return rd().get(k,null)==null||rd()[k] is timestamp||(rd()[k] is string&&rd()[k].size()<=64);}
+function t2(a,b){return ot(a)&&ot(b);}
+function sn(k,n){return rd().get(k,null)==null||rd()[k] is number||(rd()[k] is string&&rd()[k].size()<=n);}
+function em(v){return v is string&&v.size()>=5&&v.size()<=200&&v.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");}
+function sz(n){let k=rd().keys().size();return k>0&&k<=n;}
+function vB(n){return sz(n)&&ot('atualizado_em');}
+function vC(n){return vB(n)&&sn('id',80)&&ob('excluido');}
+function mOk(p,m){return !(m in p)||p[m] in ['bloqueado','ver','editar'];}
+function m6(p,a,b,c,d,e,f){return mOk(p,a)&&mOk(p,b)&&mOk(p,c)&&mOk(p,d)&&mOk(p,e)&&mOk(p,f);}
+function bMap(){let b='bloqueado';return {'dashboard':b,'blocos':b,'alojados':b,'moveis':b,'casas_cidade':b,'chamados':b,'ronda':b,'maquina_gelo':b,'ronda_vigilancia':b,'portal_alojado':b,'sorteio':b,'estoque':b,'erp_canteiro':b,'gestao_cadastros':b,'relatorios':b,'importacao':b,'auditoria':b,'configuracoes':b};}
+
+// 3. DOMAIN VALIDATORS (CREATE & UPDATE)
+function vAu(){return o(['masterConfigurado','masterUid','masterUsername','criadoEm','atualizadoEm'])&&rd().get('masterConfigurado',false)==true&&r('masterUid',128)&&os('masterUsername',100)&&s2('criadoEm','atualizadoEm',64);}
+function vCf(){return vB(50)&&os('whatsapp_prefeito',40)&&s2('empresa_nome','obra_nome',150)&&os('atualizado_por',150)&&ol('locais',100);}
+function vPm(p){return p is map&&p.diff(bMap()).addedKeys().size()==0&&m6(p,'dashboard','blocos','alojados','moveis','casas_cidade','chamados')&&m6(p,'ronda','maquina_gelo','ronda_vigilancia','portal_alojado','sorteio','estoque')&&m6(p,'erp_canteiro','gestao_cadastros','relatorios','importacao','auditoria','configuracoes');}
+function sReg(u){let d=rd();let e=d.extras;return isOwner(u)&&uidUnchanged()&&d.role=='operador'&&d.status=='pendente'&&e.gerenciarUsuarios==false&&e.podeExcluir==false&&e.podeExportar==false&&d.permissoesModulos==bMap();}
+function vUs(u){
+ let d=rd();let e=d.get('extras',null);
+ return o(['uid','username','emailInterno','nome','cargo','role','status','perfilBase','permissoesModulos','extras','criadoEm','aprovadoPor','aprovadoEm','ultimoAcesso','atualizadoEm','atualizadoPor','motivo'])
+  &&d.get('uid','')==u&&r('username',64)&&em(d.get('emailInterno',''))&&r('nome',120)&&en('role',['master','operador'])&&en('status',['pendente','ativo','bloqueado','recusado'])
+  &&'permissoesModulos' in d&&vPm(d.permissoesModulos)&&e is map&&e.keys().hasOnly(['podeExcluir','podeExportar','gerenciarUsuarios'])&&e.get('podeExcluir',0) is bool&&e.get('podeExportar',0) is bool&&e.get('gerenciarUsuarios',0) is bool
+  &&s4('perfilBase','criadoEm','aprovadoEm','ultimoAcesso',64)&&os('atualizadoEm',64)&&s4('cargo','aprovadoPor','atualizadoPor','motivo',300);
+}
+function vCh(){
+ return vB(35)&&r('categoria',120)&&r('descricao',2000)&&en('status',['pendente','em_atendimento','concluido','aberto','resolvido','cancelado'])
+  &&s6('id','protocolo','criado_em','data_formatada','data_conclusao','whatsapp_solicitante',64)&&s6('tipo_local','unidade_id','quarto_id','casa_id','quarto','origem',100)
+  &&s6('bloco','comodo','casa_nome','nome_solicitante','atualizado_por','concluido_por',150)&&os('local_formatado',250)&&os('observacoes_prefeito',2000);
+}
+function vAv(){
+ return o(['id','data','timestamp','data_formatada','refeicao','nota','sentimento','observacao','anonimo','morador_id','morador_nome','matricula','bloco','quarto','status','resposta_prefeito','atualizado_em','atualizado_por'])
+  &&r('refeicao',60)&&rn('nota',1,5)&&en('status',['pendente','tratado','lida','respondida','arquivada'])&&s6('id','data','data_formatada','sentimento','bloco','morador_nome',150)
+  &&os('atualizado_por',150)&&on('timestamp',0,9999999999999)&&s2('observacao','resposta_prefeito',1500)&&ob('anonimo')&&sn('morador_id',80)&&sn('matricula',64)&&sn('quarto',64)&&ot('atualizado_em');
+}
+function vRR(){
+ return o(['id','ponto_id','ponto_nome','tipo','tipo_operacao','setor','data','hora','data_hora','responsavel','ordem_dia','meta_dia','checklist','avaliacao','observacoes','criado_em','atualizado_em','origem','gelo_unidade','gelo_produzido','gelo_saida','gelo_saldo','gelo_destinos'])
+  &&r4('ponto_id','tipo','data','responsavel',150)&&r('ponto_nome',250)&&s6('id','hora','data_hora','gelo_unidade','tipo_operacao','avaliacao',100)
+  &&s2('setor','origem',150)&&on('ordem_dia',0,100)&&on('meta_dia',0,50)&&ol('checklist',25)&&os('observacoes',1500)&&os('gelo_destinos',300)
+  &&on2('gelo_produzido','gelo_saida',1000000)&&on('gelo_saldo',0,1000000)&&t2('criado_em','atualizado_em');
+}
+function vRO(){
+ return o(['id','ponto_id','ponto_nome','tipo_ponto','setor','tipo_problema','descricao','solicitante','data','hora','data_hora','status','resolvido_em','resolvido_por','criado_em','atualizado_em'])
+  &&r('ponto_id',100)&&r('ponto_nome',150)&&r('tipo_problema',120)&&r('descricao',2000)&&en('status',['aberto','pendente','em_atendimento','resolvido','concluido'])
+  &&s4('id','tipo_ponto','data','hora',80)&&s4('data_hora','setor','solicitante','resolvido_por',150)&&t2('resolvido_em','criado_em')&&ot('atualizado_em');
+}
+function vLm(){
+ return o(['id','casa_id','casa_nome','tipo_local','quarto_id','quarto_numero','bloco_nome','tipo','subtipo','data','hora','data_hora','responsavel','avaliacao','observacoes','origem','criado_em','criado_por','atualizado_em'])
+  &&r4('casa_id','tipo','data','responsavel',150)&&r('casa_nome',250)&&s6('id','tipo_local','subtipo','hora','data_hora','bloco_nome',100)
+  &&s2('origem','avaliacao',120)&&sn('quarto_id',120)&&sn('quarto_numero',250)&&os('criado_por',150)&&os('observacoes',1500)&&t2('criado_em','atualizado_em');
+}
+function vVg(){
+ return o(['id','ponto_id','ponto_nome','guarda_nome','guarda_matricula','guarda_empresa','turno_id','data_turno','data_hora','timestamp','tem_ocorrencia','tipo_ocorrencia','detalhes_ocorrencia','latitude','longitude','atualizado_em','status','observacoes_prefeito'])
+  &&r4('ponto_id','guarda_nome','turno_id','data_turno',150)&&r('ponto_nome',250)&&rn('timestamp',1,9999999999999)
+  &&s6('id','guarda_matricula','data_hora','status','guarda_empresa','tipo_ocorrencia',150)&&s2('detalhes_ocorrencia','observacoes_prefeito',1500)
+  &&ob('tem_ocorrencia')&&on('latitude',-90,90)&&on('longitude',-180,180)&&ot('atualizado_em');
+}
+function vMv(){let p=rd().get('precisa_manutencao',null);return vC(50)&&os('estado',60)&&(p==null||p is bool||(p is number&&(p==0||p==1)))&&ot('ultima_vistoria')&&os('observacoes',2000);}
+function vSM(){return sz(40)&&on('quantidade',0,100000000)&&s2('motivo','observacoes',1500)&&ot('criado_em');}
+
+// 4. RBAC & CONFIG
+match /configuracoes/{id}{
+ allow get:if id in ['sistema_auth','identidade_visual','prefeitura_contato']||(id!='sistema_auth'&&act());
+ allow list:if mst();
+ allow create:if id=='sistema_auth'?(isAuthenticated()&&!exists(/databases/$(database)/documents/configuracoes/sistema_auth)&&vAu()&&rd().masterUid==me()):(eCfg(id)&&vCf());
+ allow update:if id=='sistema_auth'?(mst()&&vAu()&&rd().masterUid==rs().masterUid&&im(['masterUid','criadoEm'])):(eCfg(id)&&vCf());
+ allow delete:if id!='sistema_auth'&&mst();
+}
+match /usuarios_sistema/{u}{
+ allow get:if isOwner(u)||mUsr();allow list:if mUsr();
+ allow create:if vUs(u)&&((isOwner(u)&&uidUnchanged()&&!exists(/databases/$(database)/documents/configuracoes/sistema_auth)&&rd().role=='master'&&rd().status=='ativo')||sReg(u)||(mUsr()&&rd().role=='operador'));
+ allow update:if vUs(u)&&uidNotModified()&&((isOwner(u)&&dO(['ultimoAcesso']))||(mUsr()&&rs().role!='master'&&im(['uid','role','username','emailInterno','criadoEm'])));
+ allow delete:if mUsr()&&rs().role!='master';
+}
+
+// 5. QR PORTALS
+match /config_sistema/portal_morador{allow get:if true;allow list,delete:if false;allow create,update:if (eP()||ed('sorteio'))&&vB(40)&&os('whatsapp_prefeito',40)&&ol('avisos',100)&&ol('regras',50)&&ol('contatos',50)&&ol('alojados_sincronizados',2000)&&os('atualizado_por',150);}
+match /ronda_config/{id}{allow get:if true;allow list:if act();allow create,update:if (eR()||eC()||ed('configuracoes'))&&vB(30)&&os('senha_equipe',32)&&on2('freq_padrao_banheiro','freq_padrao_bebedouro',50);allow delete:if mst();}
+match /chamados_suporte/{id}{
+ allow get:if true;allow list:if vw('chamados')||vD();
+ allow create:if vCh()&&(ed('chamados')||(rd().status=='pendente'&&o(['id','protocolo','tipo_local','unidade_id','quarto_id','casa_id','quarto','bloco','casa_nome','comodo','local_formatado','nome_solicitante','whatsapp_solicitante','categoria','descricao','status','origem','criado_em','data_formatada'])));
+ allow update:if ed('chamados')&&vCh()&&im(['id','protocolo','criado_em']);allow delete:if eD('chamados');
+}
+match /avaliacoes_refeicoes/{id}{
+ allow read:if vw('portal_alojado')||vD()||vw('relatorios');allow create:if vAv()&&(eP()||rd().status=='pendente');
+ allow update:if eP()&&vAv()&&im(['id','timestamp','nota','refeicao']);allow delete:if eP()&&del();
+}
+match /ronda_pontos/{id}{allow read:if true;allow create,update:if eR()&&vB(25)&&r('nome',150)&&r('tipo',50)&&on('frequencia_diaria',0,50)&&os('observacoes',1000)&&ob('ativo');allow delete:if eR()&&del();}
+match /ronda_registros/{id}{allow read:if true;allow create:if vRR();allow update:if (eR()||(ed('maquina_gelo')&&rs().tipo=='maquina_gelo'))&&vRR()&&imC();allow delete:if (eR()||(ed('maquina_gelo')&&rs().tipo=='maquina_gelo'))&&del();}
+match /ronda_ocorrencias/{id}{allow read:if vw('ronda')||vD();allow create:if vRO()&&(eR()||rd().status=='aberto');allow update:if eR()&&vRO()&&imC();allow delete:if eR()&&del();}
+match /casas_cidade/{id}{allow read:if true;allow create,update:if eC()&&vB(60)&&os('nome',150)&&os('observacoes',2000)&&ol('moradores',200)&&ol('moveis',500);allow delete:if eC()&&del();}
+match /casas_limpezas/{id}{allow read:if vw('casas_cidade')||vw('ronda')||vD();allow create:if vLm();allow update:if eC()&&vLm()&&imC();allow delete:if eC()&&del();}
+match /ronda_vigilancia_registros/{id}{allow read:if vw('ronda_vigilancia')||vD();allow create:if vVg();allow update:if eV()&&vVg()&&im(['id','timestamp']);allow delete:if eV()&&del();}
+match /auditoria_logs/{id}{allow read:if vw('auditoria')||act();allow create:if o(['id','data_hora','timestamp','usuario','modulo','acao','entidade','detalhes'])&&r4('id','data_hora','modulo','acao',80)&&os('timestamp',64)&&r('usuario',150)&&r('entidade',200)&&r('detalhes',2000);allow update:if false;allow delete:if mst();}
+
+// 6. ADMIN (ACTIVE STAFF ONLY)
+match /alojados/{id}{allow read:if act();allow create,update:if (ed('alojados')||ed('blocos')||ed('importacao')||eP())&&vC(60)&&s2('nome_completo','nome',180)&&os('observacoes',2000)&&os('foto_url',600000);allow delete:if eD('alojados');}
+match /blocos/{id}{allow read:if act();allow create,update:if eCad()&&vC(40)&&os('nome',120);allow delete:if dCad();}
+match /quartos/{id}{allow read:if act();allow create,update:if eCad()&&vC(50)&&sn('numero',40)&&os('observacoes',2000);allow delete:if dCad();}
+match /empresas/{id}{allow read:if act();allow create,update:if eCad()&&vC(35)&&os('nome',150);allow delete:if dCad();}
+match /moveis_vistorias/{id}{allow read:if act();allow create,update:if (ed('moveis')||ed('blocos')||eC()||ed('chamados'))&&vMv();allow delete:if eD('moveis');}
+match /canteiro_metadata/{id}{allow read:if act();allow create,update:if act()&&vB(40);allow delete:if mst();}
+match /casas_despesas/{id}{allow read:if vw('casas_cidade')||vw('erp_canteiro')||vw('relatorios')||vD();allow create,update:if (eC()||ed('erp_canteiro'))&&vB(40)&&os('descricao',500)&&on('valor',0,100000000);allow delete:if (eC()||ed('erp_canteiro'))&&del();}
+match /estoque_itens/{id}{allow read:if vEst();allow create,update:if eEst()&&vB(45)&&os('nome',180)&&on2('quantidade','minimo',100000000);allow delete:if eEst()&&del();}
+match /estoque_movimentacoes/{id}{allow read:if vEst();allow create,update:if eEst()&&vSM();allow delete:if eEst()&&del();}
+match /pontos_vigilancia/{id}{allow read:if act();allow create,update:if eV()&&vB(30)&&os('nome',150)&&os('descricao',1000)&&ob('ativo');allow delete:if eV()&&del();}
+
+// 7. DEFAULT DENY
+match /{document=**}{allow read,write:if false;}
+}
 }

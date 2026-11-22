@@ -3048,9 +3048,6 @@ function iniciarAppAposLogin() {
   inicializarAuditoria();
   inicializarRondaCanteiro();
   inicializarConfigNotificacoes();
-  if (typeof window.EquipeAdmin !== 'undefined' && window.EquipeAdmin.initListeners) {
-    window.EquipeAdmin.initListeners();
-  }
   verificarAcaoUrlParametros();
 }
 window.iniciarAppAposLogin = iniciarAppAposLogin;
@@ -3155,7 +3152,6 @@ const mapaGrupoAba = {
   'alojados': 'grupo_alojamento',
   'moveis': 'grupo_alojamento',
   'casas_cidade': 'grupo_alojamento',
-  'equipe_prioridades': 'grupo_operacoes',
   'chamados': 'grupo_operacoes',
   'ronda': 'grupo_operacoes',
   'ronda_vigilancia': 'grupo_operacoes',
@@ -3300,8 +3296,6 @@ function switchTab(tabId) {
     carregarAuditoria();
   } else if (tabId === 'usuarios') {
     if (typeof window.PrefeituraAuth !== 'undefined') window.PrefeituraAuth.renderUsuariosGestao();
-  } else if (tabId === 'equipe_prioridades') {
-    if (typeof window.EquipeAdmin !== 'undefined') window.EquipeAdmin.renderPainel();
   } else if (tabId === 'erp_canteiro') {
     carregarErpCanteiro();
   } else if (tabId === 'configuracoes') {
