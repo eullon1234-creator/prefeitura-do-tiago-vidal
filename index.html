@@ -10776,13 +10776,15 @@ service cloud.firestore {
 
           <!-- 2. Categoria do Item Cadastrado -->
           <div>
-            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">2. Escolha o tipo de local / equipamento cadastrado</label>
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">2. Escolha a frente / local / equipamento cadastrado</label>
             <div class="flex flex-wrap gap-1.5">
-              <button type="button" data-cat="banheiro" onclick="EquipeAdmin.selecionarCategoriaModal('banheiro')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-extrabold bg-slate-900 text-amber-400 border border-slate-900"><i class="fa-solid fa-restroom"></i>Banheiro/Bebedouro</button>
+              <button type="button" data-cat="maquina_gelo" onclick="EquipeAdmin.selecionarCategoriaModal('maquina_gelo')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-extrabold bg-slate-900 text-amber-400 border border-slate-900"><i class="fa-solid fa-cubes"></i>Máquina de Gelo</button>
+              <button type="button" data-cat="banheiro" onclick="EquipeAdmin.selecionarCategoriaModal('banheiro')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-restroom"></i>Banheiro</button>
+              <button type="button" data-cat="bebedouro" onclick="EquipeAdmin.selecionarCategoriaModal('bebedouro')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-droplet"></i>Bebedouro</button>
               <button type="button" data-cat="alojamento" onclick="EquipeAdmin.selecionarCategoriaModal('alojamento')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-bed"></i>Alojamento/Quarto</button>
               <button type="button" data-cat="casa" onclick="EquipeAdmin.selecionarCategoriaModal('casa')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-house-chimney-user"></i>Casa na Cidade</button>
               <button type="button" data-cat="equipamento" onclick="EquipeAdmin.selecionarCategoriaModal('equipamento')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-screwdriver-wrench"></i>Equipamento/Móvel</button>
-              <button type="button" data-cat="estoque" onclick="EquipeAdmin.selecionarCategoriaModal('estoque')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-boxes-stacked"></i>Estoque/Gelo</button>
+              <button type="button" data-cat="estoque" onclick="EquipeAdmin.selecionarCategoriaModal('estoque')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-boxes-stacked"></i>Estoque</button>
               <button type="button" data-cat="chamado" onclick="EquipeAdmin.selecionarCategoriaModal('chamado')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-qrcode"></i>Chamado Aberto</button>
               <button type="button" data-cat="vigilancia" onclick="EquipeAdmin.selecionarCategoriaModal('vigilancia')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-shield-halved"></i>Ponto Vigilância</button>
               <button type="button" data-cat="outro" onclick="EquipeAdmin.selecionarCategoriaModal('outro')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-clipboard-list"></i>Outro</button>
@@ -10824,16 +10826,29 @@ service cloud.firestore {
             </label>
           </div>
 
-          <!-- Turno (para Rotina Fixa) -->
-          <div id="eqModalBlocoTurnoRotina" class="hidden">
-            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">Frequência / Turno Diário</label>
-            <select id="eqModalTurnoSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold bg-white">
-              <option value="Manhã">Manhã (Todo dia)</option>
-              <option value="Tarde">Tarde (Todo dia)</option>
-              <option value="Manhã e Tarde">Manhã e Tarde (2x ao dia)</option>
-              <option value="Noite">Plantão Noturno</option>
-              <option value="Diário">Diário (Horário livre)</option>
-            </select>
+          <!-- Turno + Contínuo + Meta Diária (para Rotina Fixa) -->
+          <div id="eqModalBlocoTurnoRotina" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+            <div>
+              <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">Turno / Frequência</label>
+              <select id="eqModalTurnoSelect" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold bg-white">
+                <option value="Manhã">Manhã (Todo dia)</option>
+                <option value="Tarde">Tarde (Todo dia)</option>
+                <option value="Manhã e Tarde">Manhã e Tarde</option>
+                <option value="Noite">Plantão Noturno</option>
+                <option value="Diário" selected>Diário / Contínuo</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">Meta / Dia</label>
+              <input id="eqModalRotinaMetaDia" type="number" min="1" max="20" value="1" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold bg-white">
+            </div>
+            <label class="flex items-start gap-2 p-2.5 rounded-xl border border-cyan-200 bg-cyan-50/70 cursor-pointer mt-2 sm:mt-5">
+              <input id="eqModalRotinaContinuo" type="checkbox" class="mt-0.5 w-4 h-4 rounded text-cyan-600">
+              <div>
+                <span class="block text-xs font-extrabold text-cyan-950">Frente Contínua</span>
+                <span class="block text-[10px] text-cyan-800">Vários lançamentos/dia (ex: Gelo)</span>
+              </div>
+            </label>
           </div>
 
           <!-- Instruções extras -->
@@ -10857,9 +10872,9 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-[110] flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Scripts da Aplicação e Sistema de Autenticação (RBAC) -->
-  <script src="auth.js?v=6.1"></script>
-  <script src="equipe_admin.js?v=6.1"></script>
-  <script src="app.js?v=6.1"></script>
+  <script src="auth.js?v=6.2"></script>
+  <script src="equipe_admin.js?v=6.2"></script>
+  <script src="app.js?v=6.2"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">

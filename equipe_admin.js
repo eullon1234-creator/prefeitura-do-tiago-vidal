@@ -7,13 +7,15 @@
   'use strict';
 
   const CATEGORIAS = {
-    banheiro: { label: 'Banheiro / Bebedouro', icone: 'fa-restroom', badge: 'bg-teal-50 text-teal-700 border-teal-200' },
-    alojamento: { label: 'Alojamento / Quarto', icone: 'fa-bed', badge: 'bg-sky-50 text-sky-700 border-sky-200' },
+    maquina_gelo: { label: 'Máquina de Gelo', icone: 'fa-cubes', badge: 'bg-cyan-50 text-cyan-800 border-cyan-200' },
+    banheiro: { label: 'Banheiro', icone: 'fa-restroom', badge: 'bg-teal-50 text-teal-700 border-teal-200' },
+    bebedouro: { label: 'Bebedouro', icone: 'fa-droplet', badge: 'bg-sky-50 text-sky-700 border-sky-200' },
+    alojamento: { label: 'Alojamento / Quarto', icone: 'fa-bed', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
     casa: { label: 'Casa na Cidade', icone: 'fa-house-chimney-user', badge: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
     equipamento: { label: 'Equipamento / Móvel', icone: 'fa-screwdriver-wrench', badge: 'bg-violet-50 text-violet-700 border-violet-200' },
-    estoque: { label: 'Estoque / Gelo', icone: 'fa-boxes-stacked', badge: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+    estoque: { label: 'Estoque / Almoxarifado', icone: 'fa-boxes-stacked', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     chamado: { label: 'Chamado QR Code', icone: 'fa-qrcode', badge: 'bg-amber-50 text-amber-800 border-amber-200' },
-    vigilancia: { label: 'Ponto Vigilância', icone: 'fa-shield-halved', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
+    vigilancia: { label: 'Ponto Vigilância', icone: 'fa-shield-halved', badge: 'bg-slate-100 text-indigo-700 border-indigo-200' },
     outro: { label: 'Outro / Tarefa Livre', icone: 'fa-clipboard-list', badge: 'bg-slate-100 text-slate-700 border-slate-200' }
   };
 
@@ -28,7 +30,7 @@
     subAba: 'tarefas', // 'tarefas' | 'rotinas'
     filtroStatus: 'abertas', // 'abertas' | 'visto' | 'impedimento' | 'concluidas' | 'todas'
     modalTipo: 'tarefa', // 'tarefa' | 'rotina'
-    modalCategoria: 'banheiro',
+    modalCategoria: 'maquina_gelo',
     catalogoCache: {
       ronda_pontos: [],
       casas_cidade: [],
@@ -74,7 +76,6 @@
 
     const hoje = getDataHojeISO();
 
-    // 1. Funcionários ativos (prioriza quem tem acessoAppEquipe === true)
     const u1 = db.collection('usuarios_sistema').where('status', '==', 'ativo').onSnapshot(snap => {
       const arr = [];
       snap.forEach(d => arr.push({ uid: d.id, ...d.data() }));
@@ -88,7 +89,6 @@
       renderPainelSeAtivo();
     }, err => console.warn('[EquipeAdmin] Erro usuarios:', err));
 
-    // 2. Tarefas / Prioridades
     const u2 = db.collection('equipe_tarefas').onSnapshot(snap => {
       const arr = [];
       snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
@@ -107,7 +107,6 @@
       renderPainelSeAtivo();
     }, err => console.warn('[EquipeAdmin] Erro tarefas:', err));
 
-    // 3. Rotinas Fixas Diárias
     const u3 = db.collection('equipe_rotinas').onSnapshot(snap => {
       const arr = [];
       snap.forEach(d => {
@@ -119,10 +118,10 @@
       renderPainelSeAtivo();
     }, err => console.warn('[EquipeAdmin] Erro rotinas:', err));
 
-    // 4. Logs das rotinas de HOJE
     const u4 = db.collection('equipe_rotinas_logs').where('data', '==', hoje).onSnapshot(snap => {
       const arr = [];
       snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+      arr.sort((a, b) => String(b.concluidoEm || '').localeCompare(String(a.concluidoEm || '')));
       state.rotinasLogsHoje = arr;
       renderPainelSeAtivo();
     }, err => console.warn('[EquipeAdmin] Erro logs rotina:', err));
@@ -179,13 +178,38 @@
     const dbMem = (window.StaticApiEngine && window.StaticApiEngine.dbState) ? window.StaticApiEngine.dbState : {};
     const opcoes = [];
 
-    if (cat === 'banheiro') {
+    if (cat === 'maquina_gelo') {
+      const pontosGelo = (state.catalogoCache.ronda_pontos || []).filter(p => p.ativo !== false && p.tipo === 'maquina_gelo');
+      if (pontosGelo.length) {
+        pontosGelo.forEach(p => {
+          opcoes.push({
+            id: p.id,
+            nome: `🧊 ${p.nome}${p.setor ? ' • ' + p.setor : ''}`,
+            refColecao: 'ronda_pontos'
+          });
+        });
+      } else {
+        opcoes.push({
+          id: 'ponto_maquina_gelo_principal',
+          nome: '🧊 Fábrica & Máquina de Gelo Principal (Canteiro)',
+          refColecao: 'ronda_pontos'
+        });
+      }
+    } else if (cat === 'banheiro') {
       (state.catalogoCache.ronda_pontos || []).forEach(p => {
-        if (p.ativo === false) return;
-        const tipoLbl = p.tipo === 'bebedouro' ? '💧 Bebedouro' : '🚽 Banheiro';
+        if (p.ativo === false || p.tipo !== 'banheiro') return;
         opcoes.push({
           id: p.id,
-          nome: `${tipoLbl}: ${p.nome}${p.setor ? ' • ' + p.setor : ''}`,
+          nome: `🚽 ${p.nome}${p.setor ? ' • ' + p.setor : ''}`,
+          refColecao: 'ronda_pontos'
+        });
+      });
+    } else if (cat === 'bebedouro') {
+      (state.catalogoCache.ronda_pontos || []).forEach(p => {
+        if (p.ativo === false || p.tipo !== 'bebedouro') return;
+        opcoes.push({
+          id: p.id,
+          nome: `💧 ${p.nome}${p.setor ? ' • ' + p.setor : ''}`,
           refColecao: 'ronda_pontos'
         });
       });
@@ -225,11 +249,11 @@
         });
       });
     } else if (cat === 'estoque') {
-      opcoes.push({ id: 'maquina_gelo', nome: '🧊 Fábrica & Máquina de Gelo (Produção / Freezer)', refColecao: 'ronda_registros' });
+      opcoes.push({ id: 'almoxarifado_geral', nome: '📦 Almoxarifado / Estoque Geral da Prefeitura', refColecao: 'estoque_itens' });
       (state.catalogoCache.estoque_itens || []).forEach(e => {
         opcoes.push({
           id: e.id,
-          nome: `📦 ${e.nome || e.item || 'Item Estoque'} (Qtd: ${e.quantidade ?? 0})`,
+          nome: `📦 ${e.nome || e.item || 'Item Estoque'} (Saldo: ${e.quantidade ?? 0})`,
           refColecao: 'estoque_itens'
         });
       });
@@ -272,7 +296,6 @@
     const funcionarios = getFuncionariosEquipe();
     const hoje = getDataHojeISO();
 
-    // KPIs Globais
     const abertas = state.tarefas.filter(t => ['pendente', 'em_andamento', 'impedimento'].includes(t.status));
     const urgentes = abertas.filter(t => t.prioridade === 'urgente');
     const aguardandoVisto = state.tarefas.filter(t => t.status === 'aguardando_visto');
@@ -332,10 +355,11 @@
       const visto = tFunc.filter(t => t.status === 'aguardando_visto').length;
 
       const rotFunc = state.rotinas.filter(r => r.funcionarioUid === f.uid);
-      const rotFeitas = rotFunc.filter(r => state.rotinasLogsHoje.some(l => l.rotinaId === r.id)).length;
+      const logsFunc = state.rotinasLogsHoje.filter(l => l.funcionarioUid === f.uid);
+      const rotConcluidas = rotFunc.filter(r => logsFunc.some(l => l.rotinaId === r.id)).length;
 
       const totalDia = abertas.length + visto + rotFunc.length;
-      const feitasDia = visto + rotFeitas;
+      const feitasDia = visto + rotConcluidas;
       const pct = totalDia > 0 ? Math.round((feitasDia / totalDia) * 100) : 100;
 
       return `
@@ -358,7 +382,7 @@
           <div class="mt-3 space-y-2">
             <div class="flex items-center gap-1.5 flex-wrap text-[10px] font-bold">
               <span class="px-2 py-0.5 rounded-full ${sel ? 'bg-white/10 text-amber-300' : 'bg-amber-50 text-amber-800 border border-amber-200'}">${abertas.length} na fila</span>
-              <span class="px-2 py-0.5 rounded-full ${sel ? 'bg-white/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">Rotina ${rotFeitas}/${rotFunc.length}</span>
+              <span class="px-2 py-0.5 rounded-full ${sel ? 'bg-white/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">${logsFunc.length} lanç. rotina</span>
               ${emAndamento > 0 ? `<span class="px-2 py-0.5 rounded-full bg-sky-500 text-white">Em campo</span>` : ''}
               ${visto > 0 ? `<span class="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950">${visto} p/ visto</span>` : ''}
               ${imp > 0 ? `<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white animate-pulse">${imp} travou</span>` : ''}
@@ -402,7 +426,7 @@
             <i class="fa-solid fa-list-check"></i>
           </div>
           <h4 class="text-sm font-bold text-slate-800">Nenhuma prioridade encontrada neste filtro</h4>
-          <p class="text-xs text-slate-500 mt-1">Clique em <strong>"+ Nova Prioridade"</strong> para atribuir equipamentos, banheiros, alojamentos, casas ou chamados para um funcionário.</p>
+          <p class="text-xs text-slate-500 mt-1">Clique em <strong>"+ Nova Prioridade"</strong> ou <strong>"+ Rotina Fixa Diária"</strong> para liberar Máquina de Gelo, Banheiros, Alojamentos, Casas, Equipamentos ou Chamados para o funcionário.</p>
         </div>
       `;
       return;
@@ -460,22 +484,21 @@
               </div>
             ` : ''}
 
-            ${(t.observacaoConclusao || t.fotoConclusao) ? `
+            ${(t.resumoOperacional || t.observacaoConclusao || t.fotoConclusao) ? `
               <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-950">
-                <div>
-                  <strong class="block text-emerald-800">Retorno do Funcionário:</strong>
-                  <span>${esc(t.observacaoConclusao || 'Concluído sem observação adicional.')}</span>
+                <div class="space-y-1">
+                  ${t.resumoOperacional ? `<div class="font-bold text-emerald-900"><i class="fa-solid fa-clipboard-check mr-1 text-emerald-600"></i>${esc(t.resumoOperacional)}</div>` : ''}
+                  ${t.observacaoConclusao ? `<div><strong class="text-emerald-800">Relato:</strong> ${esc(t.observacaoConclusao)}</div>` : ''}
                 </div>
                 ${t.fotoConclusao ? `
                   <a href="${esc(t.fotoConclusao)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold text-xs hover:bg-emerald-100 flex-shrink-0">
-                    <i class="fa-solid fa-camera"></i> Ver Foto de Comprovação
+                    <i class="fa-solid fa-camera"></i> Ver Foto
                   </a>
                 ` : ''}
               </div>
             ` : ''}
           </div>
 
-          <!-- Ações do Prefeito -->
           <div class="flex items-center gap-1.5 flex-wrap lg:justify-end flex-shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
             ${t.status === 'aguardando_visto' ? `
               <button type="button" onclick="EquipeAdmin.darVistoConclusao('${t.id}')" class="btn-prefeito px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition">
@@ -518,8 +541,8 @@
           <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-xl">
             <i class="fa-solid fa-arrows-rotate"></i>
           </div>
-          <h4 class="text-sm font-bold text-slate-800">Nenhuma rotina fixa diária cadastrada</h4>
-          <p class="text-xs text-slate-500 mt-1">Cadastre locais fixos (ex: Banheiro Bloco 1, Bebedouro Central, Casa 2) que renovam automaticamente toda manhã no app do funcionário.</p>
+          <h4 class="text-sm font-bold text-slate-800">Nenhuma frente / rotina fixa diária cadastrada</h4>
+          <p class="text-xs text-slate-500 mt-1">Cadastre frentes fixas (ex: Máquina de Gelo contínua, Banheiros 2x/dia, Bebedouros, Casas) para o funcionário controlar todo dia no celular.</p>
         </div>
       `;
       return;
@@ -527,12 +550,16 @@
 
     container.innerHTML = lista.map(r => {
       const cat = CATEGORIAS[r.categoria] || CATEGORIAS.outro;
-      const log = state.rotinasLogsHoje.find(l => l.rotinaId === r.id);
-      const feito = !!log;
+      const logsHoje = state.rotinasLogsHoje.filter(l => l.rotinaId === r.id);
+      const qtdHoje = logsHoje.length;
+      const metaDia = Number(r.metaDia || 1);
+      const continuo = !!r.continuo;
+      const ultimoLog = logsHoje[0];
+      const metaBatida = !continuo && qtdHoje >= metaDia;
 
       return `
-        <div class="bg-white rounded-2xl border ${feito ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'} p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="space-y-1 min-w-0">
+        <div class="bg-white rounded-2xl border ${metaBatida ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'} p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="space-y-1.5 min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold ${cat.badge}">
                 <i class="fa-solid ${cat.icone}"></i>${cat.label}
@@ -540,15 +567,22 @@
               <span class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold">
                 <i class="fa-solid fa-helmet-safety text-amber-500 mr-1"></i>${esc(r.funcionarioNome)}
               </span>
+              ${continuo
+                ? `<span class="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-extrabold"><i class="fa-solid fa-infinity mr-1"></i>Contínuo • ${qtdHoje} lançamento(s) hoje</span>`
+                : (metaBatida
+                  ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold"><i class="fa-solid fa-check mr-1"></i>${qtdHoje}/${metaDia} Feito Hoje</span>`
+                  : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">${qtdHoje}/${metaDia} Hoje</span>`)}
               ${r.turno ? `<span class="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-bold">${esc(r.turno)}</span>` : ''}
-              ${feito
-                ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold"><i class="fa-solid fa-check mr-1"></i>Feito Hoje às ${new Date(log.concluidoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>`
-                : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">Pendente Hoje</span>`}
             </div>
             <h4 class="text-sm font-extrabold text-slate-900">${esc(r.titulo)}</h4>
             <p class="text-xs font-semibold text-indigo-700"><i class="fa-solid fa-location-dot mr-1"></i>${esc(r.itemNome)}</p>
             ${r.instrucoes ? `<p class="text-xs text-slate-500">${esc(r.instrucoes)}</p>` : ''}
-            ${feito && log.fotoUrl ? `<a href="${esc(log.fotoUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 underline mt-1"><i class="fa-solid fa-camera"></i>Ver foto enviada hoje</a>` : ''}
+            ${ultimoLog ? `
+              <div class="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center justify-between gap-2 flex-wrap">
+                <span><strong>Último registro (${new Date(ultimoLog.concluidoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}):</strong> ${esc(ultimoLog.resumoOperacional || ultimoLog.observacao || 'Concluído')}</span>
+                ${ultimoLog.fotoUrl ? `<a href="${esc(ultimoLog.fotoUrl)}" target="_blank" rel="noopener noreferrer" class="underline font-bold text-emerald-700"><i class="fa-solid fa-camera mr-1"></i>Ver foto</a>` : ''}
+              </div>
+            ` : ''}
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <button type="button" onclick="EquipeAdmin.excluirRotina('${r.id}')" class="btn-prefeito px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs transition">
@@ -566,7 +600,7 @@
   async function abrirModalCriar(tipo = 'tarefa') {
     await carregarCatalogoItens();
     state.modalTipo = tipo;
-    state.modalCategoria = 'banheiro';
+    state.modalCategoria = 'maquina_gelo';
 
     const funcs = getFuncionariosEquipe();
     const selFunc = document.getElementById('eqModalFuncionarioUid');
@@ -575,11 +609,11 @@
     }
 
     document.getElementById('eqModalTituloHeader').textContent = tipo === 'rotina'
-      ? 'Nova Rotina Fixa Diária'
+      ? 'Nova Frente / Rotina Fixa Diária'
       : 'Nova Prioridade / Ordem de Serviço';
     document.getElementById('eqModalSubtituloHeader').textContent = tipo === 'rotina'
-      ? 'Este item renovará automaticamente toda manhã no App do funcionário.'
-      : 'Escolha um item cadastrado no sistema e defina o nível de prioridade.';
+      ? 'Libera o painel operacional dessa frente todos os dias no App do funcionário.'
+      : 'Escolha um item cadastrado no sistema e defina a prioridade.';
 
     document.getElementById('eqModalBlocoPrioridade').classList.toggle('hidden', tipo === 'rotina');
     document.getElementById('eqModalBlocoTurnoRotina').classList.toggle('hidden', tipo !== 'rotina');
@@ -590,7 +624,7 @@
     const chkAuto = document.getElementById('eqModalBaixaAuto');
     if (chkAuto) chkAuto.checked = false;
 
-    selecionarCategoriaModal('banheiro');
+    selecionarCategoriaModal('maquina_gelo');
     document.getElementById('modalNovaPrioridadeEquipe').classList.remove('hidden');
   }
 
@@ -602,6 +636,22 @@
         ? 'btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-extrabold bg-slate-900 text-amber-400 border border-slate-900 shadow-xs transition flex items-center gap-1.5'
         : 'btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition flex items-center gap-1.5';
     });
+
+    // Ajusta sugestão automática de Frente Contínua / Meta Diária para Rotinas
+    const chkCont = document.getElementById('eqModalRotinaContinuo');
+    const metaInp = document.getElementById('eqModalRotinaMetaDia');
+    if (chkCont && metaInp) {
+      if (cat === 'maquina_gelo' || cat === 'estoque' || cat === 'vigilancia') {
+        chkCont.checked = true;
+        metaInp.value = 1;
+      } else if (cat === 'banheiro') {
+        chkCont.checked = false;
+        metaInp.value = 2;
+      } else {
+        chkCont.checked = false;
+        metaInp.value = 1;
+      }
+    }
 
     const opcoes = obterOpcoesCategoria(cat);
     const wrapSelect = document.getElementById('eqModalItemSelectWrap');
@@ -616,6 +666,10 @@
       wrapLivre.classList.add('hidden');
       sel.innerHTML = `<option value="">-- Selecione o item cadastrado (${opcoes.length} disponíveis) --</option>` +
         opcoes.map(o => `<option value="${esc(o.id)}" data-nome="${esc(o.nome)}" data-col="${esc(o.refColecao || '')}" data-desc="${esc(o.extraDesc || '')}">${esc(o.nome)}</option>`).join('');
+      if (opcoes.length === 1) {
+        sel.selectedIndex = 1;
+        onItemCadastradoChange();
+      }
     }
   }
 
@@ -627,13 +681,15 @@
     const instInp = document.getElementById('eqModalInstrucoesInput');
     if (tituloInp && !tituloInp.value.trim()) {
       const prefixos = {
-        banheiro: 'Higienização / Conferência',
-        alojamento: 'Vistoria / Manutenção no Alojamento',
-        casa: 'Atendimento na Casa da Cidade',
-        equipamento: 'Manutenção de Equipamento',
-        estoque: 'Conferência / Reposição',
+        maquina_gelo: 'Controle de Produção, Freezer e Saídas de Gelo',
+        banheiro: 'Higienização & Ronda de Banheiro',
+        bebedouro: 'Higienização & Checagem de Bebedouro',
+        alojamento: 'Limpeza / Ar-Condicionado / Vistoria de Alojamento',
+        casa: 'Limpeza / Manutenção de Casa na Cidade',
+        equipamento: 'Vistoria / Manutenção de Equipamento',
+        estoque: 'Controle de Entradas e Saídas do Estoque',
         chamado: 'Atender Chamado QR Code',
-        vigilancia: 'Verificar Ponto de Vigilância'
+        vigilancia: 'Ronda & Bipe de Vigilância'
       };
       tituloInp.value = prefixos[state.modalCategoria] || 'Executar Serviço';
     }
@@ -679,6 +735,8 @@
     try {
       if (state.modalTipo === 'rotina') {
         const turno = document.getElementById('eqModalTurnoSelect')?.value || 'Diário';
+        const continuo = !!document.getElementById('eqModalRotinaContinuo')?.checked;
+        const metaDia = Math.max(1, Math.min(20, Number(document.getElementById('eqModalRotinaMetaDia')?.value || 1)));
         const rotId = `ROT-${Date.now()}`;
         const ordem = state.rotinas.filter(r => r.funcionarioUid === funcUid).length + 1;
         await db.collection('equipe_rotinas').doc(rotId).set({
@@ -692,12 +750,14 @@
           titulo,
           instrucoes,
           turno,
+          continuo,
+          metaDia,
           ordem,
           ativo: true,
           criadoEm: agora,
           criadoPor
         });
-        toast(`Rotina diária adicionada para ${funcObj.nome}!`, 'success');
+        toast(`Frente/Rotina diária liberada para ${funcObj.nome}!`, 'success');
       } else {
         const prioridade = document.getElementById('eqModalPrioridadeSelect')?.value || 'alta';
         const baixaAutomatica = !!document.getElementById('eqModalBaixaAuto')?.checked;
@@ -735,7 +795,7 @@
   }
 
   // ==========================================================================
-  // AÇÕES DO PREFEITO SOBRE TAREFAS (VISTO, ORDEM, PRIORIDADE, WHATSAPP)
+  // AÇÕES DO PREFEITO SOBRE TAREFAS
   // ==========================================================================
   async function darVistoConclusao(id) {
     const db = getDb();
@@ -754,7 +814,6 @@
         atualizadoEm: agora
       });
 
-      // Sincronização inteligente: se era vinculado a um Chamado QR Code, conclui o chamado também!
       if (t.refColecao === 'chamados_suporte' && t.itemId) {
         await db.collection('chamados_suporte').doc(String(t.itemId)).set({
           status: 'concluido',
@@ -813,7 +872,7 @@
   }
 
   async function excluirRotina(id) {
-    if (!confirm('Remover esta rotina fixa diária?')) return;
+    if (!confirm('Remover esta frente / rotina fixa diária?')) return;
     const db = getDb();
     if (!db) return;
     await db.collection('equipe_rotinas').doc(id).delete();
@@ -853,9 +912,13 @@
       msg += `\n`;
     }
     if (rotinas.length) {
-      msg += `🔄 *ROTINA FIXA DE HOJE (${rotinas.length} itens)*\n\n`;
+      msg += `🔄 *FRENTES & ROTINA DE HOJE (${rotinas.length}):*\n`;
+      rotinas.slice(0, 6).forEach(r => {
+        msg += `• ${r.itemNome}\n`;
+      });
+      msg += `\n`;
     }
-    msg += `📲 *Acesse seu App da Equipe com seu login (@${f.username}):*\n${link}`;
+    msg += `📲 *Acesse seu App da Equipe (@${f.username}):*\n${link}`;
 
     const fone = String(f.whatsapp || '').replace(/\D/g, '');
     const url = fone
@@ -864,7 +927,6 @@
     window.open(url, '_blank');
   }
 
-  // API Pública
   window.EquipeAdmin = {
     initListeners,
     renderPainel,

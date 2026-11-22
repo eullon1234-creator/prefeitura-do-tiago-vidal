@@ -134,7 +134,7 @@ rules_version = '2';
 //   - id: string (optional, immutable, max 80 chars)
 //   - funcionarioUid: string (required, immutable for employee, max 128 chars)
 //   - funcionarioNome: string (required, max 150 chars)
-//   - categoria: string (required, enum: banheiro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
+//   - categoria: string (required, enum: maquina_gelo|banheiro|bebedouro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
 //   - itemId: string (optional, max 120 chars)
 //   - itemNome: string (required, max 250 chars)
 //   - refColecao: string (optional, max 64 chars)
@@ -147,6 +147,7 @@ rules_version = '2';
 //   - criadoEm, atualizadoEm, iniciadoEm, concluidoEm, vistoEm: string (optional, max 64 chars)
 //   - criadoPor, vistoPor: string (optional, max 150 chars)
 //   - observacaoConclusao, motivoImpedimento: string (optional, max 2000 chars)
+//   - resumoOperacional: string (optional, max 500 chars)
 //   - fotoConclusao: string (optional URL or empty string, max 500 chars)
 //
 // Collection: equipe_rotinas
@@ -155,30 +156,33 @@ rules_version = '2';
 //   - id: string (optional, immutable, max 80 chars)
 //   - funcionarioUid: string (required, max 128 chars)
 //   - funcionarioNome: string (required, max 150 chars)
-//   - categoria: string (required, enum: banheiro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
+//   - categoria: string (required, enum: maquina_gelo|banheiro|bebedouro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
 //   - itemId: string (optional, max 120 chars)
 //   - itemNome: string (required, max 250 chars)
 //   - refColecao: string (optional, max 64 chars)
 //   - titulo: string (required, max 200 chars)
 //   - instrucoes: string (optional, max 2000 chars)
 //   - turno: string (optional, max 60 chars)
+//   - continuo: bool (optional)
+//   - metaDia: number (optional, 1..20)
 //   - ordem: number (required, 0..10000)
 //   - ativo: bool (optional)
 //   - criadoEm, atualizadoEm: string (optional, max 64 chars)
 //   - criadoPor: string (optional, max 150 chars)
 //
 // Collection: equipe_rotinas_logs (append-only)
-// Document ID: {rotinaId}_{YYYY-MM-DD}
+// Document ID: LOG-{timestamp} (supports multiple daily logs per routine)
 // Fields:
 //   - rotinaId: string (required, max 100 chars)
 //   - rotinaTitulo: string (required, max 200 chars)
 //   - itemNome: string (optional, max 250 chars)
-//   - categoria: string (required, enum: banheiro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
+//   - categoria: string (required, enum: maquina_gelo|banheiro|bebedouro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
 //   - funcionarioUid: string (required, must match auth.uid for employee, max 128 chars)
 //   - funcionarioNome: string (required, max 150 chars)
 //   - data: string (required, YYYY-MM-DD)
 //   - concluidoEm: string (required, max 64 chars)
 //   - observacao: string (optional, max 2000 chars)
+//   - resumoOperacional: string (optional, max 500 chars)
 //   - fotoUrl: string (optional URL or empty string, max 500 chars)
 //
 // Administrative Collections (strictly authenticated active staff only):
@@ -589,8 +593,8 @@ service cloud.firestore {
                'avaliacao', 'observacoes', 'criado_em', 'atualizado_em', 'origem',
                'gelo_unidade', 'gelo_produzido', 'gelo_saida', 'gelo_saldo', 'gelo_destinos'
              ]) &&
-             isNonEmptyString(data.ponto_id, 100) &&
-             isNonEmptyString(data.ponto_nome, 150) &&
+             isNonEmptyString(data.ponto_id, 120) &&
+             isNonEmptyString(data.ponto_nome, 250) &&
              isNonEmptyString(data.tipo, 50) &&
              isOptionalString(data, 'tipo_operacao', 40) &&
              isNonEmptyString(data.data, 32) &&
@@ -662,14 +666,14 @@ service cloud.firestore {
                'criado_em', 'criado_por', 'atualizado_em'
              ]) &&
              isNonEmptyString(data.casa_id, 120) &&
-             isNonEmptyString(data.casa_nome, 180) &&
+             isNonEmptyString(data.casa_nome, 250) &&
              isNonEmptyString(data.tipo, 60) &&
              isNonEmptyString(data.data, 32) &&
              isNonEmptyString(data.responsavel, 150) &&
              isOptionalString(data, 'id', 80) &&
              isOptionalString(data, 'tipo_local', 40) &&
-             isOptionalStringOrNumber(data, 'quarto_id', 80) &&
-             isOptionalStringOrNumber(data, 'quarto_numero', 40) &&
+             isOptionalStringOrNumber(data, 'quarto_id', 120) &&
+             isOptionalStringOrNumber(data, 'quarto_numero', 250) &&
              isOptionalString(data, 'bloco_nome', 100) &&
              isOptionalString(data, 'subtipo', 60) &&
              isOptionalString(data, 'hora', 16) &&
@@ -690,14 +694,14 @@ service cloud.firestore {
                'tem_ocorrencia', 'tipo_ocorrencia', 'detalhes_ocorrencia',
                'latitude', 'longitude', 'atualizado_em', 'status', 'observacoes_prefeito'
              ]) &&
-             isNonEmptyString(data.ponto_id, 100) &&
-             isNonEmptyString(data.ponto_nome, 150) &&
+             isNonEmptyString(data.ponto_id, 120) &&
+             isNonEmptyString(data.ponto_nome, 250) &&
              isNonEmptyString(data.guarda_nome, 150) &&
              isNonEmptyString(data.turno_id, 64) &&
              isNonEmptyString(data.data_turno, 32) &&
              data.timestamp is number && data.timestamp > 0 && data.timestamp <= 9999999999999 &&
              isOptionalString(data, 'id', 80) &&
-             isOptionalString(data, 'guarda_matricula', 64) &&
+             isOptionalString(data, 'guarda_matricula', 80) &&
              isOptionalString(data, 'guarda_empresa', 120) &&
              isOptionalString(data, 'data_hora', 64) &&
              isOptionalBool(data, 'tem_ocorrencia') &&
@@ -781,9 +785,27 @@ service cloud.firestore {
              isOptionalString(data, 'tipo', 100) &&
              isOptionalString(data, 'nome', 150) &&
              isOptionalString(data, 'status', 60) &&
+             isOptionalString(data, 'estado', 60) &&
+             (!('precisa_manutencao' in data) ||
+              data.precisa_manutencao == null ||
+              data.precisa_manutencao is bool ||
+              (data.precisa_manutencao is number &&
+               (data.precisa_manutencao == 0 || data.precisa_manutencao == 1))) &&
+             isOptionalTimestampOrString(data, 'ultima_vistoria', 64) &&
              isOptionalString(data, 'observacoes', 2000) &&
              isOptionalBool(data, 'excluido') &&
              isOptionalTimestampOrString(data, 'atualizado_em', 64);
+    }
+
+    function isValidEquipeMovelVistoriaFields(data) {
+      return ('estado' in data) &&
+             data.estado in ['Bom', 'Regular', 'Ruim', 'Danificado'] &&
+             ('precisa_manutencao' in data) &&
+             data.precisa_manutencao is bool &&
+             ('ultima_vistoria' in data) &&
+             data.ultima_vistoria is string &&
+             data.ultima_vistoria.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             isOptionalString(data, 'observacoes', 2000);
     }
 
     function isValidCanteiroMetadata(data) {
@@ -821,12 +843,38 @@ service cloud.firestore {
       return data.keys().size() > 0 &&
              data.keys().size() <= 40 &&
              isOptionalStringOrNumber(data, 'id', 80) &&
-             isOptionalString(data, 'item_id', 100) &&
+             isOptionalString(data, 'item_id', 120) &&
+             isOptionalString(data, 'item_nome', 250) &&
              isOptionalString(data, 'tipo', 40) &&
              isOptionalNumber(data, 'quantidade', 0, 100000000) &&
-             isOptionalString(data, 'motivo', 500) &&
+             isOptionalString(data, 'data', 64) &&
+             isOptionalString(data, 'motivo', 1500) &&
+             isOptionalString(data, 'responsavel', 150) &&
+             isOptionalString(data, 'local', 150) &&
              isOptionalString(data, 'observacoes', 1500) &&
              isOptionalTimestampOrString(data, 'criado_em', 64);
+    }
+
+    function isValidEquipeEstoqueMovimentacao(data, docId) {
+      return hasRequiredFields(data, [
+               'id', 'item_id', 'item_nome', 'tipo', 'quantidade',
+               'data', 'motivo', 'responsavel', 'local', 'criado_em'
+             ]) &&
+             hasOnlyAllowedFields(data, [
+               'id', 'item_id', 'item_nome', 'tipo', 'quantidade',
+               'data', 'motivo', 'responsavel', 'local', 'criado_em'
+             ]) &&
+             isNonEmptyString(data.id, 80) &&
+             data.id == docId &&
+             isNonEmptyString(data.item_id, 120) &&
+             isNonEmptyString(data.item_nome, 250) &&
+             data.tipo in ['entrada', 'saida'] &&
+             data.quantidade is number && data.quantidade > 0 && data.quantidade <= 100000000 &&
+             data.data is string && data.data.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             isNonEmptyString(data.motivo, 1500) &&
+             isNonEmptyString(data.responsavel, 150) &&
+             isNonEmptyString(data.local, 150) &&
+             isNonEmptyString(data.criado_em, 64);
     }
 
     function isValidPontoVigilancia(data) {
@@ -841,7 +889,10 @@ service cloud.firestore {
     }
 
     function isValidEquipeCategoria(cat) {
-      return cat in ['banheiro', 'alojamento', 'casa', 'equipamento', 'estoque', 'chamado', 'vigilancia', 'outro'];
+      return cat in [
+        'maquina_gelo', 'banheiro', 'bebedouro', 'alojamento', 'casa',
+        'equipamento', 'estoque', 'chamado', 'vigilancia', 'outro'
+      ];
     }
 
     function isValidEquipeTarefa(data) {
@@ -854,7 +905,8 @@ service cloud.firestore {
                'itemNome', 'refColecao', 'titulo', 'instrucoes', 'prioridade',
                'ordem', 'status', 'baixaAutomatica', 'criadoEm', 'atualizadoEm',
                'criadoPor', 'iniciadoEm', 'concluidoEm', 'observacaoConclusao',
-               'fotoConclusao', 'motivoImpedimento', 'vistoPor', 'vistoEm'
+               'resumoOperacional', 'fotoConclusao', 'motivoImpedimento',
+               'vistoPor', 'vistoEm'
              ]) &&
              isOptionalString(data, 'id', 80) &&
              isNonEmptyString(data.funcionarioUid, 128) &&
@@ -875,6 +927,7 @@ service cloud.firestore {
              isOptionalString(data, 'iniciadoEm', 64) &&
              isOptionalString(data, 'concluidoEm', 64) &&
              isOptionalString(data, 'observacaoConclusao', 2000) &&
+             isOptionalString(data, 'resumoOperacional', 500) &&
              isOptionalUrlOrEmpty(data, 'fotoConclusao', 500) &&
              isOptionalString(data, 'motivoImpedimento', 2000) &&
              isOptionalString(data, 'vistoPor', 150) &&
@@ -889,7 +942,8 @@ service cloud.firestore {
              hasOnlyAllowedFields(data, [
                'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
                'itemNome', 'refColecao', 'titulo', 'instrucoes', 'turno',
-               'ordem', 'ativo', 'criadoEm', 'criadoPor', 'atualizadoEm'
+               'continuo', 'metaDia', 'ordem', 'ativo', 'criadoEm', 'criadoPor',
+               'atualizadoEm'
              ]) &&
              isOptionalString(data, 'id', 80) &&
              isNonEmptyString(data.funcionarioUid, 128) &&
@@ -901,6 +955,8 @@ service cloud.firestore {
              isNonEmptyString(data.titulo, 200) &&
              isOptionalString(data, 'instrucoes', 2000) &&
              isOptionalString(data, 'turno', 60) &&
+             isOptionalBool(data, 'continuo') &&
+             isOptionalNumber(data, 'metaDia', 1, 20) &&
              data.ordem is number && data.ordem >= 0 && data.ordem <= 10000 &&
              isOptionalBool(data, 'ativo') &&
              isOptionalString(data, 'criadoEm', 64) &&
@@ -916,7 +972,7 @@ service cloud.firestore {
              hasOnlyAllowedFields(data, [
                'rotinaId', 'rotinaTitulo', 'itemNome', 'categoria',
                'funcionarioUid', 'funcionarioNome', 'data', 'concluidoEm',
-               'observacao', 'fotoUrl'
+               'observacao', 'resumoOperacional', 'fotoUrl'
              ]) &&
              isNonEmptyString(data.rotinaId, 100) &&
              isNonEmptyString(data.rotinaTitulo, 200) &&
@@ -927,6 +983,7 @@ service cloud.firestore {
              data.data is string && data.data.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
              isNonEmptyString(data.concluidoEm, 64) &&
              isOptionalString(data, 'observacao', 2000) &&
+             isOptionalString(data, 'resumoOperacional', 500) &&
              isOptionalUrlOrEmpty(data, 'fotoUrl', 500);
     }
 
@@ -1157,8 +1214,24 @@ service cloud.firestore {
 
     match /moveis_vistorias/{id} {
       allow read: if isActiveUser();
-      allow create, update: if (canEdit('moveis') || canEdit('blocos') || canEdit('casas_cidade') || canEdit('chamados')) &&
-                               isValidMovelVistoria(request.resource.data);
+      allow create: if isValidMovelVistoria(request.resource.data) && (
+        (canEdit('moveis') || canEdit('blocos') || canEdit('casas_cidade') || canEdit('chamados'))
+        ||
+        (hasAppEquipeAccess() &&
+         hasOnlyAllowedFields(request.resource.data, [
+           'estado', 'precisa_manutencao', 'ultima_vistoria', 'observacoes'
+         ]) &&
+         isValidEquipeMovelVistoriaFields(request.resource.data))
+      );
+      allow update: if isValidMovelVistoria(request.resource.data) && (
+        (canEdit('moveis') || canEdit('blocos') || canEdit('casas_cidade') || canEdit('chamados'))
+        ||
+        (hasAppEquipeAccess() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'estado', 'precisa_manutencao', 'ultima_vistoria', 'observacoes'
+         ]) &&
+         isValidEquipeMovelVistoriaFields(request.resource.data))
+      );
       allow delete: if canEdit('moveis') && canDelete();
     }
 
@@ -1184,8 +1257,13 @@ service cloud.firestore {
 
     match /estoque_movimentacoes/{id} {
       allow read: if canView('estoque') || canView('maquina_gelo') || canView('dashboard') || canView('relatorios');
-      allow create, update: if (canEdit('estoque') || canEdit('maquina_gelo')) &&
-                               isValidEstoqueMovimentacao(request.resource.data);
+      allow create: if isValidEstoqueMovimentacao(request.resource.data) && (
+        canEdit('estoque') ||
+        canEdit('maquina_gelo') ||
+        (hasAppEquipeAccess() && isValidEquipeEstoqueMovimentacao(request.resource.data, id))
+      );
+      allow update: if (canEdit('estoque') || canEdit('maquina_gelo')) &&
+                       isValidEstoqueMovimentacao(request.resource.data);
       allow delete: if (canEdit('estoque') || canEdit('maquina_gelo')) && canDelete();
     }
 
@@ -1220,7 +1298,8 @@ service cloud.firestore {
          resource.data.status != 'concluido' &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'status', 'iniciadoEm', 'concluidoEm', 'atualizadoEm',
-           'observacaoConclusao', 'fotoConclusao', 'motivoImpedimento'
+           'observacaoConclusao', 'resumoOperacional', 'fotoConclusao',
+           'motivoImpedimento'
          ]) &&
          areImmutableFieldsUnchanged([
            'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
