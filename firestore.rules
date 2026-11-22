@@ -28,11 +28,12 @@ rules_version = '2';
 //   - emailInterno: string (required, immutable, valid email format, max 200 chars)
 //   - nome: string (required, max 120 chars)
 //   - cargo: string (optional, max 120 chars)
+//   - whatsapp: string (optional, max 40 chars)
 //   - role: string (required, immutable, enum: 'master' | 'operador')
 //   - status: string (required, enum: 'pendente' | 'ativo' | 'bloqueado' | 'recusado')
 //   - perfilBase: string (optional, max 64 chars)
-//   - permissoesModulos: map (required, keys limited to the 18 official modules; values: 'bloqueado' | 'ver' | 'editar')
-//   - extras: map (required, exact keys: podeExcluir, podeExportar, gerenciarUsuarios — all bool)
+//   - permissoesModulos: map (required, keys limited to the 19 official modules; values: 'bloqueado' | 'ver' | 'editar')
+//   - extras: map (required, keys: podeExcluir, podeExportar, gerenciarUsuarios [required bool], acessoAppEquipe [optional bool])
 //   - criadoEm: string (optional, immutable, max 64 chars)
 //   - aprovadoPor: string | null (optional, max 120 chars)
 //   - aprovadoEm: string | null (optional, max 64 chars)
@@ -127,6 +128,59 @@ rules_version = '2';
 // Fields: id, data_hora, usuario, modulo, acao, entidade, detalhes (all required),
 //         timestamp (optional)
 //
+// Collection: equipe_tarefas
+// Document ID: {id} (e.g. TAR-...)
+// Fields:
+//   - id: string (optional, immutable, max 80 chars)
+//   - funcionarioUid: string (required, immutable for employee, max 128 chars)
+//   - funcionarioNome: string (required, max 150 chars)
+//   - categoria: string (required, enum: banheiro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
+//   - itemId: string (optional, max 120 chars)
+//   - itemNome: string (required, max 250 chars)
+//   - refColecao: string (optional, max 64 chars)
+//   - titulo: string (required, max 200 chars)
+//   - instrucoes: string (optional, max 2000 chars)
+//   - prioridade: string (required, enum: urgente|alta|normal)
+//   - ordem: number (required, 0..10000)
+//   - status: string (required, enum: pendente|em_andamento|impedimento|aguardando_visto|concluido)
+//   - baixaAutomatica: bool (required)
+//   - criadoEm, atualizadoEm, iniciadoEm, concluidoEm, vistoEm: string (optional, max 64 chars)
+//   - criadoPor, vistoPor: string (optional, max 150 chars)
+//   - observacaoConclusao, motivoImpedimento: string (optional, max 2000 chars)
+//   - fotoConclusao: string (optional URL or empty string, max 500 chars)
+//
+// Collection: equipe_rotinas
+// Document ID: {id} (e.g. ROT-...)
+// Fields:
+//   - id: string (optional, immutable, max 80 chars)
+//   - funcionarioUid: string (required, max 128 chars)
+//   - funcionarioNome: string (required, max 150 chars)
+//   - categoria: string (required, enum: banheiro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
+//   - itemId: string (optional, max 120 chars)
+//   - itemNome: string (required, max 250 chars)
+//   - refColecao: string (optional, max 64 chars)
+//   - titulo: string (required, max 200 chars)
+//   - instrucoes: string (optional, max 2000 chars)
+//   - turno: string (optional, max 60 chars)
+//   - ordem: number (required, 0..10000)
+//   - ativo: bool (optional)
+//   - criadoEm, atualizadoEm: string (optional, max 64 chars)
+//   - criadoPor: string (optional, max 150 chars)
+//
+// Collection: equipe_rotinas_logs (append-only)
+// Document ID: {rotinaId}_{YYYY-MM-DD}
+// Fields:
+//   - rotinaId: string (required, max 100 chars)
+//   - rotinaTitulo: string (required, max 200 chars)
+//   - itemNome: string (optional, max 250 chars)
+//   - categoria: string (required, enum: banheiro|alojamento|casa|equipamento|estoque|chamado|vigilancia|outro)
+//   - funcionarioUid: string (required, must match auth.uid for employee, max 128 chars)
+//   - funcionarioNome: string (required, max 150 chars)
+//   - data: string (required, YYYY-MM-DD)
+//   - concluidoEm: string (required, max 64 chars)
+//   - observacao: string (optional, max 2000 chars)
+//   - fotoUrl: string (optional URL or empty string, max 500 chars)
+//
 // Administrative Collections (strictly authenticated active staff only):
 //   alojados, blocos, quartos, empresas, moveis_vistorias, canteiro_metadata,
 //   casas_despesas, estoque_itens, estoque_movimentacoes, pontos_vigilancia
@@ -197,6 +251,15 @@ service cloud.firestore {
          userData().extras is map &&
          'podeExcluir' in userData().extras &&
          userData().extras.podeExcluir == true);
+    }
+
+    function hasAppEquipeAccess() {
+      return isMaster() ||
+        (isActiveUser() &&
+         'extras' in userData() &&
+         userData().extras is map &&
+         'acessoAppEquipe' in userData().extras &&
+         userData().extras.acessoAppEquipe == true);
     }
 
     function moduleLevel(mod) {
@@ -283,6 +346,16 @@ service cloud.firestore {
              email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
+    function isOptionalUrlOrEmpty(data, field, maxLen) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is string &&
+              data[field].size() <= maxLen &&
+              (data[field] == '' ||
+               data[field].matches("^https://.*") ||
+               data[field].matches("^http://.*")));
+    }
+
     // ========================================================================
     // 3. DOMAIN VALIDATORS (INVOKED IN BOTH CREATE AND UPDATE RULES)
     // ========================================================================
@@ -311,10 +384,11 @@ service cloud.firestore {
     function isValidExtrasMap(extras) {
       return extras is map &&
              hasRequiredFields(extras, ['podeExcluir', 'podeExportar', 'gerenciarUsuarios']) &&
-             hasOnlyAllowedFields(extras, ['podeExcluir', 'podeExportar', 'gerenciarUsuarios']) &&
+             hasOnlyAllowedFields(extras, ['podeExcluir', 'podeExportar', 'gerenciarUsuarios', 'acessoAppEquipe']) &&
              extras.podeExcluir is bool &&
              extras.podeExportar is bool &&
-             extras.gerenciarUsuarios is bool;
+             extras.gerenciarUsuarios is bool &&
+             isOptionalBool(extras, 'acessoAppEquipe');
     }
 
     function isValidModuleLevelOrMissing(perms, mod) {
@@ -326,7 +400,7 @@ service cloud.firestore {
              perms.keys().size() <= 20 &&
              hasOnlyAllowedFields(perms, [
                'dashboard', 'blocos', 'alojados', 'moveis', 'casas_cidade',
-               'chamados', 'ronda', 'maquina_gelo', 'ronda_vigilancia', 'portal_alojado', 'sorteio',
+               'equipe_prioridades', 'chamados', 'ronda', 'maquina_gelo', 'ronda_vigilancia', 'portal_alojado', 'sorteio',
                'estoque', 'erp_canteiro',
                'gestao_cadastros', 'relatorios', 'importacao', 'auditoria', 'configuracoes'
              ]) &&
@@ -335,6 +409,7 @@ service cloud.firestore {
              isValidModuleLevelOrMissing(perms, 'alojados') &&
              isValidModuleLevelOrMissing(perms, 'moveis') &&
              isValidModuleLevelOrMissing(perms, 'casas_cidade') &&
+             isValidModuleLevelOrMissing(perms, 'equipe_prioridades') &&
              isValidModuleLevelOrMissing(perms, 'chamados') &&
              isValidModuleLevelOrMissing(perms, 'ronda') &&
              isValidModuleLevelOrMissing(perms, 'maquina_gelo') &&
@@ -357,6 +432,7 @@ service cloud.firestore {
              (!('alojados' in perms) || perms.alojados == 'bloqueado') &&
              (!('moveis' in perms) || perms.moveis == 'bloqueado') &&
              (!('casas_cidade' in perms) || perms.casas_cidade == 'bloqueado') &&
+             (!('equipe_prioridades' in perms) || perms.equipe_prioridades == 'bloqueado') &&
              (!('chamados' in perms) || perms.chamados == 'bloqueado') &&
              (!('ronda' in perms) || perms.ronda == 'bloqueado') &&
              (!('maquina_gelo' in perms) || perms.maquina_gelo == 'bloqueado') &&
@@ -377,7 +453,7 @@ service cloud.firestore {
                'uid', 'username', 'emailInterno', 'nome', 'role', 'status', 'permissoesModulos', 'extras'
              ]) &&
              hasOnlyAllowedFields(data, [
-               'uid', 'username', 'emailInterno', 'nome', 'cargo', 'role', 'status',
+               'uid', 'username', 'emailInterno', 'nome', 'cargo', 'whatsapp', 'role', 'status',
                'perfilBase', 'permissoesModulos', 'extras', 'criadoEm', 'aprovadoPor',
                'aprovadoEm', 'ultimoAcesso', 'atualizadoEm', 'atualizadoPor', 'motivo'
              ]) &&
@@ -386,6 +462,7 @@ service cloud.firestore {
              isValidEmail(data.emailInterno) &&
              isNonEmptyString(data.nome, 120) &&
              isOptionalString(data, 'cargo', 120) &&
+             isOptionalString(data, 'whatsapp', 40) &&
              data.role in ['master', 'operador'] &&
              data.status in ['pendente', 'ativo', 'bloqueado', 'recusado'] &&
              isOptionalString(data, 'perfilBase', 64) &&
@@ -763,6 +840,96 @@ service cloud.firestore {
              isOptionalTimestampOrString(data, 'atualizado_em', 64);
     }
 
+    function isValidEquipeCategoria(cat) {
+      return cat in ['banheiro', 'alojamento', 'casa', 'equipamento', 'estoque', 'chamado', 'vigilancia', 'outro'];
+    }
+
+    function isValidEquipeTarefa(data) {
+      return hasRequiredFields(data, [
+               'funcionarioUid', 'funcionarioNome', 'categoria', 'itemNome',
+               'titulo', 'prioridade', 'ordem', 'status', 'baixaAutomatica'
+             ]) &&
+             hasOnlyAllowedFields(data, [
+               'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
+               'itemNome', 'refColecao', 'titulo', 'instrucoes', 'prioridade',
+               'ordem', 'status', 'baixaAutomatica', 'criadoEm', 'atualizadoEm',
+               'criadoPor', 'iniciadoEm', 'concluidoEm', 'observacaoConclusao',
+               'fotoConclusao', 'motivoImpedimento', 'vistoPor', 'vistoEm'
+             ]) &&
+             isOptionalString(data, 'id', 80) &&
+             isNonEmptyString(data.funcionarioUid, 128) &&
+             isNonEmptyString(data.funcionarioNome, 150) &&
+             isValidEquipeCategoria(data.categoria) &&
+             isOptionalString(data, 'itemId', 120) &&
+             isNonEmptyString(data.itemNome, 250) &&
+             isOptionalString(data, 'refColecao', 64) &&
+             isNonEmptyString(data.titulo, 200) &&
+             isOptionalString(data, 'instrucoes', 2000) &&
+             data.prioridade in ['urgente', 'alta', 'normal'] &&
+             data.ordem is number && data.ordem >= 0 && data.ordem <= 10000 &&
+             data.status in ['pendente', 'em_andamento', 'impedimento', 'aguardando_visto', 'concluido'] &&
+             data.baixaAutomatica is bool &&
+             isOptionalString(data, 'criadoEm', 64) &&
+             isOptionalString(data, 'atualizadoEm', 64) &&
+             isOptionalString(data, 'criadoPor', 150) &&
+             isOptionalString(data, 'iniciadoEm', 64) &&
+             isOptionalString(data, 'concluidoEm', 64) &&
+             isOptionalString(data, 'observacaoConclusao', 2000) &&
+             isOptionalUrlOrEmpty(data, 'fotoConclusao', 500) &&
+             isOptionalString(data, 'motivoImpedimento', 2000) &&
+             isOptionalString(data, 'vistoPor', 150) &&
+             isOptionalString(data, 'vistoEm', 64);
+    }
+
+    function isValidEquipeRotina(data) {
+      return hasRequiredFields(data, [
+               'funcionarioUid', 'funcionarioNome', 'categoria', 'itemNome',
+               'titulo', 'ordem'
+             ]) &&
+             hasOnlyAllowedFields(data, [
+               'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
+               'itemNome', 'refColecao', 'titulo', 'instrucoes', 'turno',
+               'ordem', 'ativo', 'criadoEm', 'criadoPor', 'atualizadoEm'
+             ]) &&
+             isOptionalString(data, 'id', 80) &&
+             isNonEmptyString(data.funcionarioUid, 128) &&
+             isNonEmptyString(data.funcionarioNome, 150) &&
+             isValidEquipeCategoria(data.categoria) &&
+             isOptionalString(data, 'itemId', 120) &&
+             isNonEmptyString(data.itemNome, 250) &&
+             isOptionalString(data, 'refColecao', 64) &&
+             isNonEmptyString(data.titulo, 200) &&
+             isOptionalString(data, 'instrucoes', 2000) &&
+             isOptionalString(data, 'turno', 60) &&
+             data.ordem is number && data.ordem >= 0 && data.ordem <= 10000 &&
+             isOptionalBool(data, 'ativo') &&
+             isOptionalString(data, 'criadoEm', 64) &&
+             isOptionalString(data, 'criadoPor', 150) &&
+             isOptionalString(data, 'atualizadoEm', 64);
+    }
+
+    function isValidEquipeRotinaLog(data) {
+      return hasRequiredFields(data, [
+               'rotinaId', 'rotinaTitulo', 'categoria', 'funcionarioUid',
+               'funcionarioNome', 'data', 'concluidoEm'
+             ]) &&
+             hasOnlyAllowedFields(data, [
+               'rotinaId', 'rotinaTitulo', 'itemNome', 'categoria',
+               'funcionarioUid', 'funcionarioNome', 'data', 'concluidoEm',
+               'observacao', 'fotoUrl'
+             ]) &&
+             isNonEmptyString(data.rotinaId, 100) &&
+             isNonEmptyString(data.rotinaTitulo, 200) &&
+             isOptionalString(data, 'itemNome', 250) &&
+             isValidEquipeCategoria(data.categoria) &&
+             isNonEmptyString(data.funcionarioUid, 128) &&
+             isNonEmptyString(data.funcionarioNome, 150) &&
+             data.data is string && data.data.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             isNonEmptyString(data.concluidoEm, 64) &&
+             isOptionalString(data, 'observacao', 2000) &&
+             isOptionalUrlOrEmpty(data, 'fotoUrl', 500);
+    }
+
     // ========================================================================
     // 4. RBAC & SYSTEM CONFIGURATION COLLECTIONS
     // ========================================================================
@@ -804,8 +971,8 @@ service cloud.firestore {
     }
 
     match /usuarios_sistema/{uid} {
-      allow get: if isOwner(uid) || canManageUsers();
-      allow list: if canManageUsers();
+      allow get: if isOwner(uid) || canManageUsers() || canView('equipe_prioridades');
+      allow list: if canManageUsers() || canView('equipe_prioridades');
 
       allow create: if isValidUsuarioSistema(request.resource.data, uid) && (
         // 1) Initial Master Bootstrap (only before configuracoes/sistema_auth exists)
@@ -825,6 +992,8 @@ service cloud.firestore {
          request.resource.data.extras.gerenciarUsuarios == false &&
          request.resource.data.extras.podeExcluir == false &&
          request.resource.data.extras.podeExportar == false &&
+         (!('acessoAppEquipe' in request.resource.data.extras) ||
+          request.resource.data.extras.acessoAppEquipe == false) &&
          isAllModulesBlocked(request.resource.data.permissoesModulos))
         ||
         // 3) Admin Creation (Master or Co-Admin creating a non-master staff member)
@@ -1024,6 +1193,77 @@ service cloud.firestore {
       allow read: if isActiveUser();
       allow create, update: if canEdit('ronda_vigilancia') && isValidPontoVigilancia(request.resource.data);
       allow delete: if canEdit('ronda_vigilancia') && canDelete();
+    }
+
+    // ========================================================================
+    // 6B. APP DA EQUIPE & PRIORIDADES DE CAMPO (equipe.html / equipe_admin.js)
+    // ========================================================================
+
+    match /equipe_tarefas/{id} {
+      // Field employees can strictly read ONLY tasks assigned to their own UID
+      allow read: if canView('equipe_prioridades') ||
+                     (isActiveUser() && resource.data.funcionarioUid == request.auth.uid);
+
+      allow create: if canEdit('equipe_prioridades') &&
+                       isValidEquipeTarefa(request.resource.data) &&
+                       request.resource.data.status == 'pendente';
+
+      allow update: if isValidEquipeTarefa(request.resource.data) && (
+        // 1) Admin (Prefeito / Gestor with edit access): manage priority, order, visto, instructions
+        (canEdit('equipe_prioridades') &&
+         areImmutableFieldsUnchanged(['id', 'criadoEm', 'criadoPor']))
+        ||
+        // 2) Assigned Field Employee: execution-only updates (cannot tamper with priority/order/assignment)
+        (isActiveUser() &&
+         resource.data.funcionarioUid == request.auth.uid &&
+         hasAppEquipeAccess() &&
+         resource.data.status != 'concluido' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'status', 'iniciadoEm', 'concluidoEm', 'atualizadoEm',
+           'observacaoConclusao', 'fotoConclusao', 'motivoImpedimento'
+         ]) &&
+         areImmutableFieldsUnchanged([
+           'id', 'funcionarioUid', 'funcionarioNome', 'categoria', 'itemId',
+           'itemNome', 'refColecao', 'titulo', 'instrucoes', 'prioridade',
+           'ordem', 'baixaAutomatica', 'criadoEm', 'criadoPor', 'vistoPor', 'vistoEm'
+         ]) &&
+         (request.resource.data.status in ['em_andamento', 'impedimento', 'aguardando_visto'] ||
+          (request.resource.data.status == 'concluido' && resource.data.baixaAutomatica == true)))
+      );
+
+      allow delete: if canEdit('equipe_prioridades') && canDelete();
+    }
+
+    match /equipe_rotinas/{id} {
+      allow read: if canView('equipe_prioridades') ||
+                     (isActiveUser() && resource.data.funcionarioUid == request.auth.uid);
+
+      allow create: if canEdit('equipe_prioridades') &&
+                       isValidEquipeRotina(request.resource.data);
+
+      allow update: if canEdit('equipe_prioridades') &&
+                       isValidEquipeRotina(request.resource.data) &&
+                       areImmutableFieldsUnchanged(['id', 'criadoEm', 'criadoPor']);
+
+      allow delete: if canEdit('equipe_prioridades') && canDelete();
+    }
+
+    match /equipe_rotinas_logs/{id} {
+      allow read: if canView('equipe_prioridades') ||
+                     (isActiveUser() && resource.data.funcionarioUid == request.auth.uid);
+
+      allow create: if isValidEquipeRotinaLog(request.resource.data) && (
+        (isActiveUser() &&
+         request.resource.data.funcionarioUid == request.auth.uid &&
+         hasAppEquipeAccess())
+        ||
+        canEdit('equipe_prioridades')
+      );
+
+      // Append-only daily routine completion log
+      allow update: if false;
+
+      allow delete: if canEdit('equipe_prioridades') && canDelete();
     }
 
     // ========================================================================

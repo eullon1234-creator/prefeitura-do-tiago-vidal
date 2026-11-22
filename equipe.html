@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>App da Equipe | Prefeitura de Canteiro — GEL</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <script>
+    const _origWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      _origWarn.apply(console, args);
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    html, body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: contain;
+    }
+    .glass-card {
+      background: linear-gradient(155deg, rgba(15, 23, 42, 0.86) 0%, rgba(15, 23, 42, 0.72) 100%);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+    .glass-input {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      transition: all 0.2s ease;
+    }
+    .glass-input:focus {
+      background: rgba(15, 23, 42, 0.95);
+      border-color: rgba(245, 158, 11, 0.85);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+      outline: none;
+    }
+    @keyframes pulseUrgent {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.35); }
+      50% { box-shadow: 0 0 0 6px rgba(244, 63, 94, 0); }
+    }
+    .urgent-pulse {
+      animation: pulseUrgent 2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+
+  <!-- ================= OVERLAY DE LOGIN GLASSMORPHISM ================= -->
+  <div id="equipeAuthGate" class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-slate-950">
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <img src="banner_pavilhao.jpg" alt="" class="w-full h-full object-cover scale-105 blur-md opacity-35">
+      <div class="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-slate-900/85 to-slate-950/95"></div>
+      <div class="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-amber-500/20 blur-3xl"></div>
+      <div class="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-emerald-500/15 blur-3xl"></div>
+    </div>
+
+    <div class="relative z-10 w-full max-w-md my-auto">
+      <div class="glass-card rounded-3xl overflow-hidden border border-white/10">
+        <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-500"></div>
+
+        <!-- Cabeçalho -->
+        <div class="px-6 pt-7 pb-5 text-center border-b border-white/10">
+          <div class="inline-flex items-center justify-center bg-white/95 px-4 py-2 rounded-2xl shadow-lg mb-3 border border-amber-400/30">
+            <img src="logo_gel_oficial.png" alt="GEL Engenharia" class="h-8 w-auto object-contain">
+          </div>
+          <div class="flex items-center justify-center gap-2">
+            <h1 class="text-lg font-extrabold text-white tracking-tight">App da Equipe de Campo</h1>
+            <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold uppercase">Prioridades</span>
+          </div>
+          <p class="text-xs text-slate-300/80 mt-1">Prefeitura de Canteiro • Obra Taboca 2</p>
+        </div>
+
+        <!-- VIEW LOADING -->
+        <div id="eqViewLoading" class="p-8 text-center space-y-3">
+          <div class="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-helmet-safety text-2xl animate-pulse"></i>
+          </div>
+          <p class="text-sm font-bold text-white">Carregando suas prioridades...</p>
+        </div>
+
+        <!-- VIEW LOGIN -->
+        <form id="eqViewLogin" onsubmit="EquipeApp.handleLogin(event)" class="hidden p-6 sm:p-7 space-y-4">
+          <div id="eqLoginError" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-medium flex items-start gap-2"></div>
+
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Seu Usuário</label>
+            <div class="relative">
+              <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 text-sm"></i>
+              <input id="eqLoginUser" type="text" required autocomplete="username" placeholder="Ex: joao.manutencao" class="glass-input w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white placeholder-slate-400">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Sua Senha</label>
+            <div class="relative">
+              <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <input id="eqLoginPass" type="password" required autocomplete="current-password" placeholder="Digite sua senha" class="glass-input w-full h-12 pl-10 pr-11 rounded-xl text-sm text-white placeholder-slate-400">
+              <button type="button" onclick="EquipeApp.toggleSenha()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1.5">
+                <i id="eqIconOlho" class="fa-solid fa-eye text-sm"></i>
+              </button>
+            </div>
+          </div>
+
+          <button id="eqBtnEntrar" type="submit" class="w-full h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/25 transition active:scale-[0.98] flex items-center justify-center gap-2">
+            <i class="fa-solid fa-right-to-bracket"></i>
+            <span>Ver Minhas Prioridades</span>
+          </button>
+
+          <p class="text-[11px] text-center text-slate-400 pt-1">
+            Use o mesmo usuário e senha cadastrados pelo Prefeito da Obra.
+          </p>
+        </form>
+
+        <!-- VIEW BLOQUEADO / PENDENTE -->
+        <div id="eqViewBloqueado" class="hidden p-7 text-center space-y-4">
+          <div class="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-user-lock text-2xl"></i>
+          </div>
+          <h2 id="eqBloqTitulo" class="text-lg font-extrabold text-white">Acesso Aguardando Liberação</h2>
+          <p id="eqBloqMsg" class="text-xs text-slate-300 leading-relaxed">Sua conta ainda não está liberada para o App da Equipe. Solicite autorização ao Prefeito da Obra.</p>
+          <button type="button" onclick="EquipeApp.logout()" class="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs transition">
+            <i class="fa-solid fa-right-from-bracket mr-1.5"></i>Sair e trocar de conta
+          </button>
+        </div>
+
+        <div class="px-6 py-3.5 bg-slate-950/60 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+          <a href="alojado.html" class="hover:text-amber-300 transition"><i class="fa-solid fa-id-card-clip mr-1 text-amber-400"></i>Portal do Alojado</a>
+          <a href="index.html" class="hover:text-emerald-300 transition"><i class="fa-solid fa-shield-halved mr-1 text-emerald-400"></i>Painel Gestão</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= APP PRINCIPAL DO FUNCIONÁRIO ================= -->
+  <div id="equipeMainApp" class="hidden min-h-screen flex flex-col pb-24">
+
+    <!-- Header Fixo -->
+    <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-lg">
+      <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div id="eqHeaderAvatar" class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black text-sm flex items-center justify-center flex-shrink-0 shadow-sm">
+            EQ
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <h1 id="eqHeaderNome" class="text-sm font-extrabold text-white truncate">Funcionário</h1>
+              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold border border-emerald-500/30">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>AO VIVO
+              </span>
+            </div>
+            <p id="eqHeaderCargo" class="text-[11px] text-slate-400 truncate">Equipe de Canteiro</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <a id="eqBtnIrPainel" href="index.html" class="hidden px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold transition" title="Ir para Painel de Gestão">
+            <i class="fa-solid fa-gauge-high"></i>
+          </a>
+          <button type="button" onclick="EquipeApp.logout()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/50 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span class="hidden sm:inline">Sair</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Conteúdo -->
+    <main class="max-w-2xl w-full mx-auto px-4 pt-4 space-y-4 flex-1">
+
+      <!-- Card de Resumo & Progresso do Dia -->
+      <section class="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border border-slate-700/80 p-4 sm:p-5 shadow-xl space-y-3.5">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p id="eqDataHojeLabel" class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Hoje</p>
+            <h2 class="text-base sm:text-lg font-extrabold text-white">Minhas Prioridades de Hoje</h2>
+          </div>
+          <div class="text-right">
+            <p id="eqProgressoPct" class="text-2xl font-black text-emerald-400 leading-none">0%</p>
+            <p id="eqProgressoTxt" class="text-[11px] text-slate-400 mt-0.5">0 de 0 feitas</p>
+          </div>
+        </div>
+
+        <div class="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden border border-slate-700">
+          <div id="eqProgressoBar" class="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-400 transition-all duration-500" style="width: 0%"></div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 pt-1">
+          <div class="p-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-center">
+            <p id="eqKpiUrgentes" class="text-lg font-black text-rose-400 leading-none">0</p>
+            <p class="text-[10px] font-bold text-rose-200/80 uppercase mt-1">Urgentes</p>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-center">
+            <p id="eqKpiPendentes" class="text-lg font-black text-amber-400 leading-none">0</p>
+            <p class="text-[10px] font-bold text-amber-200/80 uppercase mt-1">Na Fila</p>
+          </div>
+          <div class="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center">
+            <p id="eqKpiConcluidas" class="text-lg font-black text-emerald-400 leading-none">0</p>
+            <p class="text-[10px] font-bold text-emerald-200/80 uppercase mt-1">Feitas Hoje</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Abas de Navegação Rápida -->
+      <div class="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
+        <button id="eqTabPrioridades" type="button" onclick="EquipeApp.setAba('prioridades')" class="h-11 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 bg-amber-500 text-slate-950 shadow-sm">
+          <i class="fa-solid fa-fire"></i>
+          <span>Prioridades</span>
+          <span id="eqBadgeTabPrio" class="px-1.5 py-0.5 rounded-full bg-slate-950/20 text-[10px] font-black">0</span>
+        </button>
+        <button id="eqTabRotina" type="button" onclick="EquipeApp.setAba('rotina')" class="h-11 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:bg-slate-800">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span>Rotina Hoje</span>
+          <span id="eqBadgeTabRotina" class="px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-black">0</span>
+        </button>
+        <button id="eqTabConcluidas" type="button" onclick="EquipeApp.setAba('concluidas')" class="h-11 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:bg-slate-800">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>Concluídas</span>
+        </button>
+      </div>
+
+      <!-- Lista Dinâmica -->
+      <div id="eqListaContainer" class="space-y-3">
+        <!-- Populado em tempo real via Firestore -->
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= MODAL: CONCLUIR TAREFA / ROTINA (+ FOTO OPCIONAL) ================= -->
+  <div id="eqModalConcluir" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 bg-emerald-950/60 border-b border-emerald-500/30 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center">
+            <i class="fa-solid fa-check-double"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-extrabold text-white">Concluir Serviço</h3>
+            <p id="eqConcluirSubtitulo" class="text-[11px] text-emerald-300 truncate max-w-[230px]">Tarefa</p>
+          </div>
+        </div>
+        <button type="button" onclick="EquipeApp.fecharModais()" class="text-slate-400 hover:text-white p-1.5">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="EquipeApp.confirmarConclusao(event)" class="p-5 space-y-4">
+        <!-- Foto Opcional pela Câmera -->
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-2">Foto de Comprovação (opcional)</label>
+          <input id="eqInputFoto" type="file" accept="image/*" capture="environment" onchange="EquipeApp.onSelecionarFoto(this)" class="hidden">
+          <div id="eqPreviewFotoBox" class="hidden relative mb-2 rounded-2xl overflow-hidden border border-slate-700">
+            <img id="eqPreviewFotoImg" src="" alt="Preview" class="w-full max-h-52 object-cover">
+            <button type="button" onclick="EquipeApp.limparFoto()" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-slate-950/80 text-rose-400 flex items-center justify-center">
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+          </div>
+          <button type="button" onclick="document.getElementById('eqInputFoto').click()" class="w-full h-12 rounded-xl bg-slate-800 hover:bg-slate-750 border border-dashed border-slate-600 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-camera text-amber-400 text-base"></i>
+            <span id="eqBtnFotoLabel">Tirar Foto / Anexar Imagem</span>
+          </button>
+        </div>
+
+        <!-- Observação -->
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5">Observação do Serviço (opcional)</label>
+          <textarea id="eqInputObsConclusao" rows="3" placeholder="Ex: Lâmpada trocada e testada, tudo funcionando..." class="glass-input w-full p-3 rounded-xl text-sm text-white placeholder-slate-400"></textarea>
+        </div>
+
+        <button id="eqBtnConfirmarConclusao" type="submit" class="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-extrabold text-sm shadow-lg transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>Confirmar Conclusão</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: REPORTAR IMPEDIMENTO ================= -->
+  <div id="eqModalImpedimento" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-slate-900 border border-rose-500/40 w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 bg-rose-950/60 border-b border-rose-500/30 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-extrabold text-white">Reportar Impedimento</h3>
+            <p class="text-[11px] text-rose-200">O Prefeito receberá o alerta na hora no painel</p>
+          </div>
+        </div>
+        <button type="button" onclick="EquipeApp.fecharModais()" class="text-slate-400 hover:text-white p-1.5">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="EquipeApp.confirmarImpedimento(event)" class="p-5 space-y-4">
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" onclick="EquipeApp.preencherMotivo('Faltou material ou peça no almoxarifado')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700">Faltou material</button>
+          <button type="button" onclick="EquipeApp.preencherMotivo('Quarto ou local estava trancado')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700">Local trancado</button>
+          <button type="button" onclick="EquipeApp.preencherMotivo('Precisa de apoio técnico / eletricista')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700">Precisa de apoio</button>
+          <button type="button" onclick="EquipeApp.preencherMotivo('Equipamento danificado sem reparo local')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700">Sem reparo</button>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1.5">Explique o que impediu o serviço *</label>
+          <textarea id="eqInputMotivoImpedimento" required rows="3" placeholder="Descreva o motivo para o Prefeito..." class="glass-input w-full p-3 rounded-xl text-sm text-white placeholder-slate-400"></textarea>
+        </div>
+
+        <button id="eqBtnConfirmarImpedimento" type="submit" class="w-full h-12 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-sm shadow-lg transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Enviar Alerta ao Prefeito</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lightbox Foto -->
+  <div id="eqModalFotoZoom" onclick="this.classList.add('hidden')" class="fixed inset-0 z-[60] bg-black/90 hidden flex items-center justify-center p-4">
+    <img id="eqFotoZoomImg" src="" alt="Foto" class="max-w-full max-h-[90vh] rounded-2xl shadow-2xl">
+  </div>
+
+  <!-- Toast -->
+  <div id="eqToastContainer" class="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-[70] flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const AUTH_INTERNAL_DOMAIN = 'prefeitura-taboca.gel.local';
+      const IMGBB_API_KEY = '655783f08b2e45a3cd6b1b7a7e6ce91b';
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyCd1Uu_dRx8k4EcgifWUmsmfeqnAcB4PHw",
+        authDomain: "prefeitura-cc71b.firebaseapp.com",
+        projectId: "prefeitura-cc71b",
+        storageBucket: "prefeitura-cc71b.firebasestorage.app",
+        messagingSenderId: "395936672533",
+        appId: "1:395936672533:web:d7d17537d2c38c47bc971c",
+        measurementId: "G-YYXMDWCM4Q"
+      };
+
+      const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+      const auth = app.auth();
+      const db = app.firestore();
+      db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+
+      const CATEGORIAS_META = {
+        banheiro: { label: 'Banheiro / Bebedouro', icone: 'fa-restroom', cor: 'text-teal-400 bg-teal-500/15 border-teal-500/30' },
+        alojamento: { label: 'Alojamento / Quarto', icone: 'fa-bed', cor: 'text-sky-400 bg-sky-500/15 border-sky-500/30' },
+        casa: { label: 'Casa na Cidade', icone: 'fa-house-chimney-user', cor: 'text-indigo-400 bg-indigo-500/15 border-indigo-500/30' },
+        equipamento: { label: 'Equipamento / Móvel', icone: 'fa-screwdriver-wrench', cor: 'text-violet-400 bg-violet-500/15 border-violet-500/30' },
+        estoque: { label: 'Estoque / Gelo', icone: 'fa-boxes-stacked', cor: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/30' },
+        chamado: { label: 'Chamado QR Code', icone: 'fa-qrcode', cor: 'text-amber-400 bg-amber-500/15 border-amber-500/30' },
+        vigilancia: { label: 'Ponto Vigilância', icone: 'fa-shield-halved', cor: 'text-blue-400 bg-blue-500/15 border-blue-500/30' },
+        outro: { label: 'Tarefa Geral', icone: 'fa-clipboard-list', cor: 'text-slate-300 bg-slate-500/15 border-slate-500/30' }
+      };
+
+      const state = {
+        uid: null,
+        perfil: null,
+        abaAtiva: 'prioridades',
+        tarefas: [],
+        rotinas: [],
+        rotinasLogsHoje: {},
+        unsubs: [],
+        modalTargetTipo: null, // 'tarefa' | 'rotina'
+        modalTargetId: null,
+        fotoBase64: null
+      };
+
+      function getDataHojeISO() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+
+      function esc(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function iniciais(nome) {
+        const p = String(nome || 'EQ').trim().split(/\s+/).filter(Boolean);
+        return p.length === 1 ? p[0].slice(0, 2).toUpperCase() : (p[0][0] + p[p.length - 1][0]).toUpperCase();
+      }
+
+      function normalizarUsername(raw) {
+        let s = String(raw || '').trim().toLowerCase();
+        if (s.includes('@')) return s;
+        s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '');
+        return s ? `${s}@${AUTH_INTERNAL_DOMAIN}` : '';
+      }
+
+      function toast(msg, tipo = 'info') {
+        const box = document.getElementById('eqToastContainer');
+        if (!box) return;
+        const cores = {
+          success: 'bg-emerald-600 text-white border-emerald-400',
+          warning: 'bg-amber-500 text-slate-950 border-amber-300',
+          error: 'bg-rose-600 text-white border-rose-400',
+          info: 'bg-slate-800 text-white border-slate-600'
+        };
+        const el = document.createElement('div');
+        el.className = `px-4 py-3 rounded-2xl border shadow-2xl text-xs font-bold pointer-events-auto ${cores[tipo] || cores.info}`;
+        el.textContent = msg;
+        box.appendChild(el);
+        setTimeout(() => el.remove(), 3800);
+      }
+
+      function mostrarGateView(id) {
+        document.getElementById('equipeAuthGate').classList.remove('hidden');
+        document.getElementById('equipeMainApp').classList.add('hidden');
+        ['eqViewLoading', 'eqViewLogin', 'eqViewBloqueado'].forEach(v => {
+          document.getElementById(v).classList.toggle('hidden', v !== id);
+        });
+      }
+
+      function limparListeners() {
+        state.unsubs.forEach(fn => { try { fn(); } catch {} });
+        state.unsubs = [];
+      }
+
+      function iniciarListenersEquipe(uid) {
+        limparListeners();
+        const hoje = getDataHojeISO();
+
+        // 1. Tarefas / Prioridades atribuídas a este funcionário
+        const u1 = db.collection('equipe_tarefas')
+          .where('funcionarioUid', '==', uid)
+          .onSnapshot(snap => {
+            const arr = [];
+            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            const pesoPrio = { urgente: 1, alta: 2, normal: 3 };
+            arr.sort((a, b) => {
+              const pa = pesoPrio[a.prioridade] || 3;
+              const pb = pesoPrio[b.prioridade] || 3;
+              if (pa !== pb) return pa - pb;
+              const oa = Number(a.ordem || 999);
+              const ob = Number(b.ordem || 999);
+              if (oa !== ob) return oa - ob;
+              return String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
+            });
+            state.tarefas = arr;
+            renderTudo();
+          }, err => console.warn('[Equipe] Erro tarefas:', err));
+
+        // 2. Rotinas Fixas Diárias atribuídas a este funcionário
+        const u2 = db.collection('equipe_rotinas')
+          .where('funcionarioUid', '==', uid)
+          .onSnapshot(snap => {
+            const arr = [];
+            snap.forEach(d => {
+              const data = d.data();
+              if (data.ativo !== false) arr.push({ id: d.id, ...data });
+            });
+            arr.sort((a, b) => Number(a.ordem || 999) - Number(b.ordem || 999));
+            state.rotinas = arr;
+            renderTudo();
+          }, err => console.warn('[Equipe] Erro rotinas:', err));
+
+        // 3. Execuções das rotinas de HOJE
+        const u3 = db.collection('equipe_rotinas_logs')
+          .where('funcionarioUid', '==', uid)
+          .where('data', '==', hoje)
+          .onSnapshot(snap => {
+            const map = {};
+            snap.forEach(d => {
+              const data = d.data();
+              if (data.rotinaId) map[data.rotinaId] = { id: d.id, ...data };
+            });
+            state.rotinasLogsHoje = map;
+            renderTudo();
+          }, err => console.warn('[Equipe] Erro logs rotina:', err));
+
+        state.unsubs.push(u1, u2, u3);
+      }
+
+      function renderTudo() {
+        const hoje = getDataHojeISO();
+        const elData = document.getElementById('eqDataHojeLabel');
+        if (elData) {
+          elData.textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+        }
+
+        const abertas = state.tarefas.filter(t => ['pendente', 'em_andamento', 'impedimento'].includes(t.status));
+        const concluidasHojeTarefas = state.tarefas.filter(t =>
+          ['aguardando_visto', 'concluido'].includes(t.status) &&
+          String(t.concluidoEm || t.atualizadoEm || '').startsWith(hoje)
+        );
+        const todasConcluidas = state.tarefas.filter(t => ['aguardando_visto', 'concluido'].includes(t.status));
+        const urgentes = abertas.filter(t => t.prioridade === 'urgente');
+
+        const totalRotinas = state.rotinas.length;
+        const rotinasFeitas = state.rotinas.filter(r => !!state.rotinasLogsHoje[r.id]).length;
+        const rotinasPendentes = totalRotinas - rotinasFeitas;
+
+        const totalDia = abertas.length + concluidasHojeTarefas.length + totalRotinas;
+        const feitasDia = concluidasHojeTarefas.length + rotinasFeitas;
+        const pct = totalDia > 0 ? Math.round((feitasDia / totalDia) * 100) : 100;
+
+        document.getElementById('eqKpiUrgentes').textContent = urgentes.length;
+        document.getElementById('eqKpiPendentes').textContent = abertas.length + rotinasPendentes;
+        document.getElementById('eqKpiConcluidas').textContent = feitasDia;
+        document.getElementById('eqProgressoPct').textContent = `${pct}%`;
+        document.getElementById('eqProgressoTxt').textContent = `${feitasDia} de ${totalDia} feitas`;
+        document.getElementById('eqProgressoBar').style.width = `${pct}%`;
+
+        document.getElementById('eqBadgeTabPrio').textContent = abertas.length;
+        document.getElementById('eqBadgeTabRotina').textContent = `${rotinasFeitas}/${totalRotinas}`;
+
+        const container = document.getElementById('eqListaContainer');
+        if (state.abaAtiva === 'prioridades') {
+          renderListaTarefas(container, abertas, false);
+        } else if (state.abaAtiva === 'rotina') {
+          renderListaRotinas(container);
+        } else {
+          renderListaTarefas(container, todasConcluidas, true);
+        }
+      }
+
+      function renderListaTarefas(container, lista, modoConcluidas) {
+        if (!lista.length) {
+          container.innerHTML = `
+            <div class="rounded-3xl bg-slate-900/90 border border-slate-800 p-8 text-center space-y-2">
+              <div class="w-14 h-14 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid ${modoConcluidas ? 'fa-clipboard-check' : 'fa-circle-check'}"></i>
+              </div>
+              <h3 class="text-sm font-extrabold text-white">${modoConcluidas ? 'Nenhuma tarefa concluída ainda' : 'Tudo em dia nas prioridades!'}</h3>
+              <p class="text-xs text-slate-400">${modoConcluidas ? 'Quando você finalizar serviços, eles aparecerão aqui.' : 'Assim que o Prefeito enviar novas prioridades para você, elas aparecerão aqui automaticamente.'}</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = lista.map((t, idx) => {
+          const cat = CATEGORIAS_META[t.categoria] || CATEGORIAS_META.outro;
+          let prioBadge = '';
+          let cardStyle = 'border-slate-800 bg-slate-900';
+
+          if (t.prioridade === 'urgente') {
+            prioBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider urgent-pulse"><i class="fa-solid fa-fire"></i> URGENTE</span>`;
+            cardStyle = 'border-rose-500/60 bg-gradient-to-br from-slate-900 to-rose-950/30';
+          } else if (t.prioridade === 'alta') {
+            prioBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider"><i class="fa-solid fa-bolt"></i> ALTA</span>`;
+            cardStyle = 'border-amber-500/40 bg-slate-900';
+          } else {
+            prioBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold uppercase tracking-wider">NORMAL</span>`;
+          }
+
+          let statusPill = '';
+          if (t.status === 'em_andamento') {
+            statusPill = `<span class="px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[10px] font-bold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Em Andamento</span>`;
+          } else if (t.status === 'impedimento') {
+            statusPill = `<span class="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Impedimento Reportado</span>`;
+          } else if (t.status === 'aguardando_visto') {
+            statusPill = `<span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold"><i class="fa-solid fa-clock mr-1"></i>Aguardando Visto do Prefeito</span>`;
+          } else if (t.status === 'concluido') {
+            statusPill = `<span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold"><i class="fa-solid fa-check-double mr-1"></i>Concluído e Aprovado</span>`;
+          }
+
+          let botoes = '';
+          if (!modoConcluidas) {
+            if (t.status === 'pendente' || t.status === 'impedimento') {
+              botoes = `
+                <div class="grid grid-cols-5 gap-2 pt-3 border-t border-slate-800/80">
+                  <button type="button" onclick="EquipeApp.iniciarTarefa('${t.id}')" class="col-span-3 h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition">
+                    <i class="fa-solid fa-play"></i>
+                    <span>${t.status === 'impedimento' ? 'Retomar Serviço' : 'Iniciar Agora'}</span>
+                  </button>
+                  <button type="button" onclick="EquipeApp.abrirModalImpedimento('${t.id}')" class="col-span-2 h-12 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-rose-300 border border-rose-500/30 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Problema</span>
+                  </button>
+                </div>
+              `;
+            } else if (t.status === 'em_andamento') {
+              botoes = `
+                <div class="grid grid-cols-5 gap-2 pt-3 border-t border-slate-800/80">
+                  <button type="button" onclick="EquipeApp.abrirModalConcluir('tarefa', '${t.id}')" class="col-span-3 h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Concluir Serviço</span>
+                  </button>
+                  <button type="button" onclick="EquipeApp.abrirModalImpedimento('${t.id}')" class="col-span-2 h-12 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-rose-300 border border-rose-500/30 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Travou</span>
+                  </button>
+                </div>
+              `;
+            }
+          }
+
+          return `
+            <article class="rounded-3xl border ${cardStyle} p-4 sm:p-5 space-y-3 shadow-lg">
+              <div class="flex items-center justify-between gap-2 flex-wrap">
+                <div class="flex items-center gap-2">
+                  ${!modoConcluidas ? `<span class="w-6 h-6 rounded-lg bg-slate-800 text-amber-400 text-xs font-black flex items-center justify-center border border-slate-700">#${idx + 1}</span>` : ''}
+                  ${prioBadge}
+                  ${statusPill}
+                </div>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold ${cat.cor}">
+                  <i class="fa-solid ${cat.icone}"></i>${cat.label}
+                </span>
+              </div>
+
+              <div>
+                <h3 class="text-base font-extrabold text-white leading-snug">${esc(t.titulo)}</h3>
+                <p class="text-xs font-semibold text-amber-300 mt-1 flex items-center gap-1.5">
+                  <i class="fa-solid fa-location-dot"></i>
+                  <span>${esc(t.itemNome || 'Local não especificado')}</span>
+                </p>
+                ${t.instrucoes ? `<p class="text-xs text-slate-300 mt-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800 leading-relaxed">${esc(t.instrucoes)}</p>` : ''}
+                ${t.status === 'impedimento' && t.motivoImpedimento ? `
+                  <div class="mt-2 p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-200">
+                    <strong>Impedimento enviado:</strong> ${esc(t.motivoImpedimento)}
+                  </div>
+                ` : ''}
+                ${modoConcluidas && t.observacaoConclusao ? `
+                  <p class="mt-2 text-xs text-emerald-200/90 bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/20">
+                    <strong>Relato:</strong> ${esc(t.observacaoConclusao)}
+                  </p>
+                ` : ''}
+                ${t.fotoConclusao ? `
+                  <button type="button" onclick="EquipeApp.verFoto('${esc(t.fotoConclusao)}')" class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-sky-300 border border-slate-700">
+                    <i class="fa-solid fa-image"></i> Ver foto enviada
+                  </button>
+                ` : ''}
+              </div>
+
+              ${botoes}
+            </article>
+          `;
+        }).join('');
+      }
+
+      function renderListaRotinas(container) {
+        if (!state.rotinas.length) {
+          container.innerHTML = `
+            <div class="rounded-3xl bg-slate-900/90 border border-slate-800 p-8 text-center space-y-2">
+              <div class="w-14 h-14 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-calendar-check"></i>
+              </div>
+              <h3 class="text-sm font-extrabold text-white">Sem rotina fixa cadastrada</h3>
+              <p class="text-xs text-slate-400">O Prefeito pode cadastrar aqui seus banheiros, blocos, casas ou equipamentos de rotina diária.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = state.rotinas.map(r => {
+          const cat = CATEGORIAS_META[r.categoria] || CATEGORIAS_META.outro;
+          const log = state.rotinasLogsHoje[r.id];
+          const feito = !!log;
+
+          return `
+            <article class="rounded-3xl border ${feito ? 'border-emerald-500/40 bg-emerald-950/20' : 'border-slate-800 bg-slate-900'} p-4 space-y-3 shadow-md">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5 flex-wrap mb-1">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10px] font-bold ${cat.cor}">
+                      <i class="fa-solid ${cat.icone}"></i>${cat.label}
+                    </span>
+                    ${r.turno ? `<span class="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold border border-slate-700"><i class="fa-regular fa-clock mr-1"></i>${esc(r.turno)}</span>` : ''}
+                  </div>
+                  <h3 class="text-sm sm:text-base font-extrabold ${feito ? 'text-emerald-300 line-through' : 'text-white'}">${esc(r.titulo)}</h3>
+                  <p class="text-xs text-amber-300 font-semibold mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>${esc(r.itemNome)}</p>
+                  ${r.instrucoes ? `<p class="text-xs text-slate-400 mt-1">${esc(r.instrucoes)}</p>` : ''}
+                </div>
+                ${feito ? `<span class="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-check text-base"></i></span>` : ''}
+              </div>
+
+              ${feito ? `
+                <div class="flex items-center justify-between text-[11px] text-emerald-300 pt-2 border-t border-emerald-500/20">
+                  <span><i class="fa-solid fa-check-double mr-1"></i>Feito hoje às ${new Date(log.concluidoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  ${log.fotoUrl ? `<button type="button" onclick="EquipeApp.verFoto('${esc(log.fotoUrl)}')" class="underline font-bold">Ver foto</button>` : ''}
+                </div>
+              ` : `
+                <button type="button" onclick="EquipeApp.abrirModalConcluir('rotina', '${r.id}')" class="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition">
+                  <i class="fa-solid fa-check-circle"></i>
+                  <span>Marcar Rotina como Feita Hoje</span>
+                </button>
+              `}
+            </article>
+          `;
+        }).join('');
+      }
+
+      async function comprimirEEnviarFoto(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = async () => {
+              try {
+                const max = 1024;
+                let w = img.width, h = img.height;
+                if (w > max || h > max) {
+                  if (w > h) { h = Math.round(h * max / w); w = max; }
+                  else { w = Math.round(w * max / h); h = max; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+                resolve(dataUrl);
+              } catch (e) { reject(e); }
+            };
+            img.onerror = reject;
+            img.src = reader.result;
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function uploadImgBB(dataUrl) {
+        if (!dataUrl) return null;
+        try {
+          const base64 = dataUrl.split(',')[1];
+          const form = new FormData();
+          form.append('image', base64);
+          const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: form });
+          const json = await res.json();
+          if (json && json.success && json.data && json.data.display_url) {
+            return json.data.display_url;
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      }
+
+      // API Pública do App da Equipe
+      window.EquipeApp = {
+        toggleSenha() {
+          const inp = document.getElementById('eqLoginPass');
+          const ico = document.getElementById('eqIconOlho');
+          const isP = inp.type === 'password';
+          inp.type = isP ? 'text' : 'password';
+          ico.className = isP ? 'fa-solid fa-eye-slash text-sm' : 'fa-solid fa-eye text-sm';
+        },
+
+        async handleLogin(e) {
+          e.preventDefault();
+          const errBox = document.getElementById('eqLoginError');
+          errBox.classList.add('hidden');
+          const email = normalizarUsername(document.getElementById('eqLoginUser').value);
+          const pass = document.getElementById('eqLoginPass').value;
+          const btn = document.getElementById('eqBtnEntrar');
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Entrando...';
+          try {
+            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+            await auth.signInWithEmailAndPassword(email, pass);
+          } catch (err) {
+            errBox.textContent = 'Usuário ou senha incorretos. Verifique com o Prefeito.';
+            errBox.classList.remove('hidden');
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i><span>Ver Minhas Prioridades</span>';
+          }
+        },
+
+        async logout() {
+          limparListeners();
+          await auth.signOut();
+          mostrarGateView('eqViewLogin');
+        },
+
+        setAba(aba) {
+          state.abaAtiva = aba;
+          const map = { prioridades: 'eqTabPrioridades', rotina: 'eqTabRotina', concluidas: 'eqTabConcluidas' };
+          Object.entries(map).forEach(([k, id]) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.className = k === aba
+              ? 'h-11 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 bg-amber-500 text-slate-950 shadow-sm'
+              : 'h-11 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:bg-slate-800';
+          });
+          renderTudo();
+        },
+
+        async iniciarTarefa(id) {
+          try {
+            const agora = new Date().toISOString();
+            await db.collection('equipe_tarefas').doc(id).update({
+              status: 'em_andamento',
+              iniciadoEm: agora,
+              atualizadoEm: agora
+            });
+            toast('Serviço iniciado! O Prefeito já vê em tempo real.', 'info');
+          } catch (err) {
+            toast('Erro ao iniciar tarefa: ' + err.message, 'error');
+          }
+        },
+
+        abrirModalConcluir(tipo, id) {
+          state.modalTargetTipo = tipo;
+          state.modalTargetId = id;
+          state.fotoBase64 = null;
+          document.getElementById('eqInputObsConclusao').value = '';
+          document.getElementById('eqPreviewFotoBox').classList.add('hidden');
+          document.getElementById('eqBtnFotoLabel').textContent = 'Tirar Foto / Anexar Imagem';
+          const item = tipo === 'tarefa'
+            ? state.tarefas.find(x => x.id === id)
+            : state.rotinas.find(x => x.id === id);
+          document.getElementById('eqConcluirSubtitulo').textContent = item ? `${item.titulo} • ${item.itemNome}` : 'Serviço';
+          document.getElementById('eqModalConcluir').classList.remove('hidden');
+        },
+
+        async onSelecionarFoto(input) {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          try {
+            state.fotoBase64 = await comprimirEEnviarFoto(file);
+            document.getElementById('eqPreviewFotoImg').src = state.fotoBase64;
+            document.getElementById('eqPreviewFotoBox').classList.remove('hidden');
+            document.getElementById('eqBtnFotoLabel').textContent = 'Trocar Foto';
+          } catch {
+            toast('Não foi possível ler a imagem selecionada.', 'error');
+          }
+        },
+
+        limparFoto() {
+          state.fotoBase64 = null;
+          document.getElementById('eqInputFoto').value = '';
+          document.getElementById('eqPreviewFotoBox').classList.add('hidden');
+          document.getElementById('eqBtnFotoLabel').textContent = 'Tirar Foto / Anexar Imagem';
+        },
+
+        async confirmarConclusao(e) {
+          e.preventDefault();
+          const btn = document.getElementById('eqBtnConfirmarConclusao');
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Enviando...';
+
+          try {
+            const obs = (document.getElementById('eqInputObsConclusao').value || '').trim();
+            const agora = new Date().toISOString();
+            let fotoUrl = null;
+            if (state.fotoBase64) {
+              fotoUrl = await uploadImgBB(state.fotoBase64);
+            }
+
+            if (state.modalTargetTipo === 'tarefa') {
+              const t = state.tarefas.find(x => x.id === state.modalTargetId);
+              const novoStatus = (t && t.baixaAutomatica) ? 'concluido' : 'aguardando_visto';
+              await db.collection('equipe_tarefas').doc(state.modalTargetId).update({
+                status: novoStatus,
+                concluidoEm: agora,
+                atualizadoEm: agora,
+                observacaoConclusao: obs || '',
+                fotoConclusao: fotoUrl || ''
+              });
+              toast(
+                novoStatus === 'concluido'
+                  ? 'Serviço concluído com sucesso!'
+                  : 'Concluído! Enviado para o visto do Prefeito.',
+                'success'
+              );
+            } else {
+              const r = state.rotinas.find(x => x.id === state.modalTargetId);
+              const hoje = getDataHojeISO();
+              const logId = `${state.modalTargetId}_${hoje}`;
+              await db.collection('equipe_rotinas_logs').doc(logId).set({
+                rotinaId: state.modalTargetId,
+                rotinaTitulo: r ? r.titulo : 'Rotina',
+                itemNome: r ? r.itemNome : '',
+                categoria: r ? r.categoria : 'outro',
+                funcionarioUid: state.uid,
+                funcionarioNome: state.perfil ? state.perfil.nome : 'Equipe',
+                data: hoje,
+                concluidoEm: agora,
+                observacao: obs || '',
+                fotoUrl: fotoUrl || ''
+              });
+              toast('Rotina de hoje marcada como concluída!', 'success');
+            }
+
+            this.fecharModais();
+          } catch (err) {
+            toast('Erro ao concluir: ' + err.message, 'error');
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Confirmar Conclusão</span>';
+          }
+        },
+
+        abrirModalImpedimento(id) {
+          state.modalTargetTipo = 'tarefa';
+          state.modalTargetId = id;
+          document.getElementById('eqInputMotivoImpedimento').value = '';
+          document.getElementById('eqModalImpedimento').classList.remove('hidden');
+        },
+
+        preencherMotivo(txt) {
+          document.getElementById('eqInputMotivoImpedimento').value = txt;
+        },
+
+        async confirmarImpedimento(e) {
+          e.preventDefault();
+          const motivo = (document.getElementById('eqInputMotivoImpedimento').value || '').trim();
+          if (!motivo) return;
+          const btn = document.getElementById('eqBtnConfirmarImpedimento');
+          btn.disabled = true;
+          try {
+            const agora = new Date().toISOString();
+            await db.collection('equipe_tarefas').doc(state.modalTargetId).update({
+              status: 'impedimento',
+              motivoImpedimento: motivo,
+              atualizadoEm: agora
+            });
+            toast('Impedimento enviado ao Prefeito em tempo real!', 'warning');
+            this.fecharModais();
+          } catch (err) {
+            toast('Erro ao enviar impedimento: ' + err.message, 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        },
+
+        fecharModais() {
+          document.getElementById('eqModalConcluir').classList.add('hidden');
+          document.getElementById('eqModalImpedimento').classList.add('hidden');
+        },
+
+        verFoto(url) {
+          document.getElementById('eqFotoZoomImg').src = url;
+          document.getElementById('eqModalFotoZoom').classList.remove('hidden');
+        }
+      };
+
+      // Boot Auth
+      mostrarGateView('eqViewLoading');
+      auth.onAuthStateChanged(fbUser => {
+        if (!fbUser) {
+          limparListeners();
+          state.uid = null;
+          state.perfil = null;
+          mostrarGateView('eqViewLogin');
+          return;
+        }
+        state.uid = fbUser.uid;
+        db.collection('usuarios_sistema').doc(fbUser.uid).onSnapshot(snap => {
+          if (!snap.exists) {
+            mostrarGateView('eqViewBloqueado');
+            return;
+          }
+          const p = snap.data();
+          state.perfil = p;
+
+          const temAcessoEquipe = p.status === 'ativo' && (
+            p.role === 'master' ||
+            (p.extras && p.extras.acessoAppEquipe === true)
+          );
+
+          if (!temAcessoEquipe) {
+            document.getElementById('eqBloqTitulo').textContent = p.status === 'pendente'
+              ? 'Conta Aguardando Aprovação'
+              : 'App da Equipe Não Liberado';
+            document.getElementById('eqBloqMsg').textContent = p.status === 'pendente'
+              ? 'Sua conta ainda está pendente. Peça ao Prefeito para aprovar e ativar o "App da Equipe" no seu perfil.'
+              : 'Seu perfil ainda não tem permissão para o App da Equipe. Peça ao Prefeito para ativar a opção "App da Equipe (Campo)".';
+            mostrarGateView('eqViewBloqueado');
+            return;
+          }
+
+          document.getElementById('eqHeaderAvatar').textContent = iniciais(p.nome);
+          document.getElementById('eqHeaderNome').textContent = (p.nome || 'Equipe').split(' ')[0];
+          document.getElementById('eqHeaderCargo').textContent = p.cargo || 'Equipe de Canteiro';
+
+          // Mostra atalho para o Painel de Gestão se o usuário também tiver módulos admin
+          const temPainelAdmin = p.role === 'master' ||
+            Object.values(p.permissoesModulos || {}).some(v => v === 'ver' || v === 'editar');
+          document.getElementById('eqBtnIrPainel').classList.toggle('hidden', !temPainelAdmin);
+
+          document.getElementById('equipeAuthGate').classList.add('hidden');
+          document.getElementById('equipeMainApp').classList.remove('hidden');
+
+          iniciarListenersEquipe(fbUser.uid);
+        }, () => mostrarGateView('eqViewLogin'));
+      });
+    })();
+  </script>
+</body>
+</html>

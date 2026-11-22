@@ -749,12 +749,32 @@
           </button>
         </div>
 
-        <!-- Rodapé Discreto: Atalho para o Portal do Alojado -->
-        <div class="px-6 py-4 bg-slate-950/60 border-t border-white/10 text-center">
-          <a href="alojado.html" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-amber-300 transition group">
+        <!-- VIEW 7: CONTA EXCLUSIVA DO APP DA EQUIPE (REDIRECIONAMENTO AMIGÁVEL) -->
+        <div id="authViewSomenteEquipe" class="hidden p-7 text-center space-y-5">
+          <div class="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-400/50 text-amber-400 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-helmet-safety text-2xl"></i>
+          </div>
+          <div class="space-y-1.5">
+            <h2 class="text-lg font-extrabold text-white">Olá, <span id="somenteEquipeNome">Colaborador</span>!</h2>
+            <p class="text-xs text-slate-300 leading-relaxed">Sua conta está configurada para o <strong>App da Equipe de Campo</strong>. Toque no botão abaixo para abrir suas prioridades e rotina de hoje.</p>
+          </div>
+          <a href="equipe.html" class="w-full h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition">
+            <i class="fa-solid fa-list-check"></i>Abrir Meu App de Prioridades
+          </a>
+          <button type="button" onclick="PrefeituraAuth.logout()" class="w-full h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs transition">
+            <i class="fa-solid fa-right-from-bracket mr-1.5"></i>Sair / Trocar Conta
+          </button>
+        </div>
+
+        <!-- Rodapé Discreto: Atalhos para Alojado & Equipe -->
+        <div class="px-6 py-4 bg-slate-950/60 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-center">
+          <a href="alojado.html" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-amber-300 transition">
             <i class="fa-solid fa-id-card-clip text-amber-400"></i>
-            <span>É colaborador alojado? <strong class="underline decoration-amber-400/50 group-hover:decoration-amber-300">Acessar Portal do Alojado</strong></span>
-            <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-0.5 transition-transform"></i>
+            <span>Portal do Alojado</span>
+          </a>
+          <a href="equipe.html" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-emerald-300 transition">
+            <i class="fa-solid fa-helmet-safety text-emerald-400"></i>
+            <span>App da Equipe (Campo)</span>
           </a>
         </div>
       </div>
@@ -970,6 +990,11 @@
           </button>
           
           <div id="grupo_operacoes_itens" class="space-y-0.5 pl-1.5 pt-1 pb-1 hidden">
+            <button onclick="switchTab('equipe_prioridades')" data-tab="equipe_prioridades" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
+              <i class="fa-solid fa-helmet-safety w-5 text-amber-400"></i>
+              <span>Equipe & Prioridades</span>
+              <span id="sideCountEquipePrioridades" class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500 text-white font-black hidden animate-pulse">0</span>
+            </button>
             <button onclick="switchTab('chamados')" data-tab="chamados" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-300 hover:bg-slate-800 hover:text-white">
               <i class="fa-solid fa-qrcode w-5 text-amber-400"></i>
               <span>Chamados QR Code</span>
@@ -5934,6 +5959,94 @@ service cloud.firestore {
 
       </div>
 
+      <!-- ================= TAB: EQUIPE & PRIORIDADES DE CAMPO ================= -->
+      <div id="tab-equipe_prioridades" class="tab-content hidden space-y-6">
+        <!-- Cabeçalho -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Equipe & Prioridades de Campo</h2>
+              <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold uppercase">Tempo Real</span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Distribua banheiros, alojamentos, casas, equipamentos e chamados para cada funcionário com ordem de prioridade no App da Equipe.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="EquipeAdmin.copiarLinkAppEquipe()" class="px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs flex items-center gap-1.5 shadow-xs transition">
+              <i class="fa-solid fa-link text-indigo-600"></i>
+              <span>Copiar Link App Equipe</span>
+            </button>
+            <button type="button" onclick="EquipeAdmin.abrirModalCriar('rotina')" class="btn-prefeito px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition">
+              <i class="fa-solid fa-arrows-rotate text-emerald-400"></i>
+              <span>+ Rotina Fixa Diária</span>
+            </button>
+            <button type="button" onclick="EquipeAdmin.abrirModalCriar('tarefa')" class="btn-prefeito px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition active:scale-95">
+              <i class="fa-solid fa-fire"></i>
+              <span>+ Nova Prioridade</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+            <p class="text-[10px] font-bold uppercase text-slate-400">Funcionários</p>
+            <p id="eqAdmKpiEquipe" class="text-2xl font-black text-slate-900 mt-0.5">0</p>
+          </div>
+          <div class="bg-white p-3.5 rounded-2xl border border-rose-200 shadow-xs">
+            <p class="text-[10px] font-bold uppercase text-rose-500">Urgentes Abertas</p>
+            <p id="eqAdmKpiUrgentes" class="text-2xl font-black text-rose-600 mt-0.5">0</p>
+          </div>
+          <div class="bg-white p-3.5 rounded-2xl border border-amber-200 shadow-xs cursor-pointer hover:border-amber-400" onclick="EquipeAdmin.setSubAba('tarefas'); EquipeAdmin.setFiltroStatus('visto')">
+            <p class="text-[10px] font-bold uppercase text-amber-600">Aguardando Visto</p>
+            <p id="eqAdmKpiVisto" class="text-2xl font-black text-amber-600 mt-0.5">0</p>
+          </div>
+          <div class="bg-white p-3.5 rounded-2xl border border-rose-200 shadow-xs cursor-pointer hover:border-rose-400" onclick="EquipeAdmin.setSubAba('tarefas'); EquipeAdmin.setFiltroStatus('impedimento')">
+            <p class="text-[10px] font-bold uppercase text-rose-600">Impedimentos</p>
+            <p id="eqAdmKpiImpedimentos" class="text-2xl font-black text-rose-700 mt-0.5">0</p>
+          </div>
+          <div class="bg-white p-3.5 rounded-2xl border border-emerald-200 shadow-xs col-span-2 sm:col-span-1">
+            <p class="text-[10px] font-bold uppercase text-emerald-600">Feitas Hoje</p>
+            <p id="eqAdmKpiConcluidasHoje" class="text-2xl font-black text-emerald-700 mt-0.5">0</p>
+          </div>
+        </div>
+
+        <!-- Seletor Visual de Funcionários (Placar em Tempo Real) -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Clique em um funcionário para ver e ordenar a fila dele</h3>
+            <a href="equipe.html" target="_blank" class="text-xs font-bold text-indigo-600 hover:underline"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Abrir App da Equipe</a>
+          </div>
+          <div id="eqAdmListaFuncionarios" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <!-- Populado via equipe_admin.js -->
+          </div>
+        </div>
+
+        <!-- Barra de Sub-Abas (Prioridades vs Rotinas Fixas) + Filtros -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <button id="eqAdmSubBtnTarefas" type="button" onclick="EquipeAdmin.setSubAba('tarefas')" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-slate-900 text-amber-400 shadow-xs transition">
+              <i class="fa-solid fa-fire mr-1.5"></i>Ordens & Prioridades
+            </button>
+            <button id="eqAdmSubBtnRotinas" type="button" onclick="EquipeAdmin.setSubAba('rotinas')" class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">
+              <i class="fa-solid fa-arrows-rotate mr-1.5"></i>Rotinas Fixas Diárias
+            </button>
+          </div>
+
+          <div id="eqAdmBarraFiltrosTarefas" class="flex items-center gap-1.5 flex-wrap">
+            <button type="button" data-st="abertas" onclick="EquipeAdmin.setFiltroStatus('abertas')" class="btn-eq-adm-filtro px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 shadow-xs transition">Na Fila</button>
+            <button type="button" data-st="visto" onclick="EquipeAdmin.setFiltroStatus('visto')" class="btn-eq-adm-filtro px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">Aguardando Visto</button>
+            <button type="button" data-st="impedimento" onclick="EquipeAdmin.setFiltroStatus('impedimento')" class="btn-eq-adm-filtro px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">Impedimentos</button>
+            <button type="button" data-st="concluidas" onclick="EquipeAdmin.setFiltroStatus('concluidas')" class="btn-eq-adm-filtro px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">Concluídas</button>
+            <button type="button" data-st="todas" onclick="EquipeAdmin.setFiltroStatus('todas')" class="btn-eq-adm-filtro px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition">Todas</button>
+          </div>
+        </div>
+
+        <!-- Lista Principal de Prioridades / Rotinas -->
+        <div id="eqAdmListaPrincipal" class="space-y-3">
+          <!-- Populado via equipe_admin.js -->
+        </div>
+      </div>
+
       <!-- ================= TAB: USUÁRIOS & CONTROLE DE ACESSOS (RBAC) ================= -->
       <div id="tab-usuarios" class="tab-content hidden space-y-6">
         <!-- Cabeçalho -->
@@ -8839,6 +8952,15 @@ service cloud.firestore {
           <span class="text-[10px] text-amber-200/80">Aprovar contas e liberar módulos da equipe</span>
         </button>
 
+        <button data-mob-drawer-tab="equipe_prioridades" onclick="fecharMenuMobileMais(); switchTab('equipe_prioridades')" class="flex flex-col items-start p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/20 text-left transition col-span-2">
+          <div class="flex items-center justify-between w-full">
+            <i class="fa-solid fa-helmet-safety text-emerald-400 text-lg mb-1.5"></i>
+            <span id="drawerBadgeEquipePrioridades" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">Ao Vivo</span>
+          </div>
+          <span class="text-xs font-bold text-white">Equipe & Prioridades de Campo</span>
+          <span class="text-[10px] text-slate-300">Distribuir tarefas, rotinas e dar visto na equipe</span>
+        </button>
+
         <button data-mob-drawer-tab="chamados" onclick="fecharMenuMobileMais(); switchTab('chamados')" class="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 border border-amber-500/40 hover:bg-slate-800 text-left transition col-span-2">
           <div class="flex items-center justify-between w-full">
             <i class="fa-solid fa-qrcode text-amber-400 text-lg mb-1.5"></i>
@@ -10463,6 +10585,10 @@ service cloud.firestore {
                   </button>
                 </div>
               </div>
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">WhatsApp do Funcionário (opcional — para envio rápido de prioridades)</label>
+                <input id="novoUserWhatsapp" type="tel" placeholder="Ex: 31999998888" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+              </div>
             </div>
           </div>
 
@@ -10472,7 +10598,7 @@ service cloud.firestore {
               <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Colaborador Selecionado</h4>
               <span id="editUserLoginBadge" class="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">@usuario</span>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label class="block text-[11px] font-bold text-slate-700 mb-1">Nome</label>
                 <input id="editUserNomeInput" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
@@ -10480,6 +10606,10 @@ service cloud.firestore {
               <div>
                 <label class="block text-[11px] font-bold text-slate-700 mb-1">Cargo / Setor</label>
                 <input id="editUserCargoInput" type="text" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">WhatsApp</label>
+                <input id="editUserWhatsappInput" type="tel" placeholder="Ex: 31999998888" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
               </div>
             </div>
           </div>
@@ -10502,7 +10632,14 @@ service cloud.firestore {
             <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
               <i class="fa-solid fa-shield-halved text-indigo-500"></i> Permissões Especiais
             </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <label class="flex items-start gap-2.5 p-3 rounded-xl border border-amber-300 bg-amber-50/50 hover:bg-amber-50 cursor-pointer">
+                <input id="chkPermAppEquipe" type="checkbox" class="mt-0.5 w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
+                <div>
+                  <span class="block text-xs font-extrabold text-amber-950"><i class="fa-solid fa-helmet-safety text-amber-600 mr-1"></i>App da Equipe (Campo)</span>
+                  <span class="block text-[10px] text-amber-800">Recebe e executa prioridades no equipe.html</span>
+                </div>
+              </label>
               <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
                 <input id="chkPermPodeExcluir" type="checkbox" class="mt-0.5 w-4 h-4 rounded text-rose-600 focus:ring-rose-500">
                 <div>
@@ -10611,12 +10748,118 @@ service cloud.firestore {
     </div>
   </div>
 
+  <!-- ================= MODAL: NOVA PRIORIDADE OU ROTINA FIXA PARA FUNCIONÁRIO ================= -->
+  <div id="modalNovaPrioridadeEquipe" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[90] flex items-center justify-center p-2 sm:p-4 hidden no-print">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden border border-slate-200">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+            <i class="fa-solid fa-helmet-safety text-lg"></i>
+          </div>
+          <div>
+            <h3 id="eqModalTituloHeader" class="text-sm sm:text-base font-extrabold text-white">Nova Prioridade / Ordem de Serviço</h3>
+            <p id="eqModalSubtituloHeader" class="text-[11px] text-slate-400">Escolha um item cadastrado no sistema e envie direto para o celular do funcionário.</p>
+          </div>
+        </div>
+        <button type="button" onclick="EquipeAdmin.fecharModalCriar()" class="text-slate-400 hover:text-white p-1.5 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="EquipeAdmin.salvarNovaPrioridadeOuRotina(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div class="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+          <!-- 1. Funcionário -->
+          <div>
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">1. Para qual funcionário? *</label>
+            <select id="eqModalFuncionarioUid" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:ring-2 focus:ring-amber-400 outline-none bg-white"></select>
+          </div>
+
+          <!-- 2. Categoria do Item Cadastrado -->
+          <div>
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">2. Escolha o tipo de local / equipamento cadastrado</label>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" data-cat="banheiro" onclick="EquipeAdmin.selecionarCategoriaModal('banheiro')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-extrabold bg-slate-900 text-amber-400 border border-slate-900"><i class="fa-solid fa-restroom"></i>Banheiro/Bebedouro</button>
+              <button type="button" data-cat="alojamento" onclick="EquipeAdmin.selecionarCategoriaModal('alojamento')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-bed"></i>Alojamento/Quarto</button>
+              <button type="button" data-cat="casa" onclick="EquipeAdmin.selecionarCategoriaModal('casa')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-house-chimney-user"></i>Casa na Cidade</button>
+              <button type="button" data-cat="equipamento" onclick="EquipeAdmin.selecionarCategoriaModal('equipamento')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-screwdriver-wrench"></i>Equipamento/Móvel</button>
+              <button type="button" data-cat="estoque" onclick="EquipeAdmin.selecionarCategoriaModal('estoque')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-boxes-stacked"></i>Estoque/Gelo</button>
+              <button type="button" data-cat="chamado" onclick="EquipeAdmin.selecionarCategoriaModal('chamado')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-qrcode"></i>Chamado Aberto</button>
+              <button type="button" data-cat="vigilancia" onclick="EquipeAdmin.selecionarCategoriaModal('vigilancia')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-shield-halved"></i>Ponto Vigilância</button>
+              <button type="button" data-cat="outro" onclick="EquipeAdmin.selecionarCategoriaModal('outro')" class="btn-cat-eq-modal px-3 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200"><i class="fa-solid fa-clipboard-list"></i>Outro</button>
+            </div>
+          </div>
+
+          <!-- 3. Item específico cadastrado -->
+          <div id="eqModalItemSelectWrap">
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">3. Selecione o item cadastrado no sistema</label>
+            <select id="eqModalItemSelect" onchange="EquipeAdmin.onItemCadastradoChange()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white"></select>
+          </div>
+          <div id="eqModalItemLivreWrap" class="hidden">
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">3. Local ou Equipamento</label>
+            <input id="eqModalItemLivreInput" type="text" placeholder="Ex: Refeitório Central, Portaria Principal, Gerador 02..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+          </div>
+
+          <!-- 4. O que fazer -->
+          <div>
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">4. O que precisa ser feito? *</label>
+            <input id="eqModalTituloInput" type="text" required placeholder="Ex: Trocar ar-condicionado, Limpeza completa, Consertar torneira..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:ring-2 focus:ring-amber-400 outline-none">
+          </div>
+
+          <!-- Prioridade (para Ordens Pontuais) -->
+          <div id="eqModalBlocoPrioridade" class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <div>
+              <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">Nível de Prioridade</label>
+              <select id="eqModalPrioridadeSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold focus:ring-2 focus:ring-amber-400 outline-none bg-white">
+                <option value="urgente">🔥 URGENTE (Topo da fila)</option>
+                <option value="alta" selected>⚡ ALTA (Prioridade do dia)</option>
+                <option value="normal">📋 NORMAL (Rotina da fila)</option>
+              </select>
+            </div>
+            <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer mt-2 sm:mt-5">
+              <input id="eqModalBaixaAuto" type="checkbox" class="mt-0.5 w-4 h-4 rounded text-emerald-600">
+              <div>
+                <span class="block text-xs font-bold text-slate-800">Baixa automática</span>
+                <span class="block text-[10px] text-slate-500">Conclui direto sem aguardar seu visto</span>
+              </div>
+            </label>
+          </div>
+
+          <!-- Turno (para Rotina Fixa) -->
+          <div id="eqModalBlocoTurnoRotina" class="hidden">
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">Frequência / Turno Diário</label>
+            <select id="eqModalTurnoSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold bg-white">
+              <option value="Manhã">Manhã (Todo dia)</option>
+              <option value="Tarde">Tarde (Todo dia)</option>
+              <option value="Manhã e Tarde">Manhã e Tarde (2x ao dia)</option>
+              <option value="Noite">Plantão Noturno</option>
+              <option value="Diário">Diário (Horário livre)</option>
+            </select>
+          </div>
+
+          <!-- Instruções extras -->
+          <div>
+            <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-1.5">Instruções / Detalhes para o Funcionário (opcional)</label>
+            <textarea id="eqModalInstrucoesInput" rows="2" placeholder="Ex: Pegar a chave reserva na portaria e tirar foto depois de pronto..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-amber-400 outline-none"></textarea>
+          </div>
+        </div>
+
+        <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5 flex-shrink-0">
+          <button type="button" onclick="EquipeAdmin.fecharModalCriar()" class="px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition">Cancelar</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-slate-950 font-extrabold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i>Salvar e Enviar para o App
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toastContainer" class="fixed bottom-4 right-4 z-[110] flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Scripts da Aplicação e Sistema de Autenticação (RBAC) -->
-  <script src="auth.js?v=6.0"></script>
-  <script src="app.js?v=6.0"></script>
+  <script src="auth.js?v=6.1"></script>
+  <script src="equipe_admin.js?v=6.1"></script>
+  <script src="app.js?v=6.1"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">

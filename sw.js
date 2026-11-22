@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v6.0';
+const CACHE_NAME = 'prefeitura-pwa-v6.1';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
@@ -10,7 +10,9 @@ const ASSETS_TO_CACHE = [
   'ronda.html',
   'guarda.html',
   'alojado.html',
+  'equipe.html',
   'auth.js',
+  'equipe_admin.js',
   'app.js',
   'qrcode.min.js',
   'xlsx.bundle.js',
@@ -85,7 +87,9 @@ self.addEventListener('fetch', (event) => {
   // Network-First para auth.js, app.js, index.html e dados_iniciais_taboca.json
   const isDynamicAsset = event.request.mode === 'navigate' ||
                          url.pathname.endsWith('index.html') ||
+                         url.pathname.endsWith('equipe.html') ||
                          url.pathname.endsWith('auth.js') ||
+                         url.pathname.endsWith('equipe_admin.js') ||
                          url.pathname.endsWith('app.js') ||
                          url.pathname.endsWith('ronda.html') ||
                          url.pathname.endsWith('limpeza.html') ||
