@@ -1,6 +1,7 @@
 {
+  "id": "/prefeitura-gestao",
   "name": "GEL • Prefeitura de Canteiro - Tiago Vidal",
-  "short_name": "GEL Canteiro",
+  "short_name": "GEL Gestão",
   "description": "Sistema de Gestão e Controle de Alojamentos em Canteiro de Obras",
   "start_url": "./index.html",
   "scope": "./",

@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v6.0';
+const CACHE_NAME = 'prefeitura-pwa-v6.1';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
@@ -15,10 +15,13 @@ const ASSETS_TO_CACHE = [
   'qrcode.min.js',
   'xlsx.bundle.js',
   'manifest.json',
+  'manifest-alojado.json',
   'dados_iniciais_taboca.json',
   'favicon.ico',
   'icon-192.png',
   'icon-512.png',
+  'icon-alojado-192.png',
+  'icon-alojado-512.png',
   'apple-touch-icon.png',
   'banner_pavilhao.jpg',
   'logo_gel.png',
@@ -102,10 +105,17 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       }).catch(() => {
-        // Fallback offline do cache
+        // Fallback offline do cache (respeitando cada app sem misturar Alojado com Gestão)
         return caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
           if (cachedResponse) return cachedResponse;
-          if (event.request.mode === 'navigate') return caches.match('index.html');
+          if (event.request.mode === 'navigate') {
+            if (url.pathname.includes('alojado')) return caches.match('alojado.html');
+            if (url.pathname.includes('chamado')) return caches.match('chamado.html');
+            if (url.pathname.includes('ronda')) return caches.match('ronda.html');
+            if (url.pathname.includes('limpeza')) return caches.match('limpeza.html');
+            if (url.pathname.includes('guarda')) return caches.match('guarda.html');
+            return caches.match('index.html');
+          }
         });
       })
     );

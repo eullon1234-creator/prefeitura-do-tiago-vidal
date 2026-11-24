@@ -5,12 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Portal do Alojado • Canteiro PCH Taboca 2 | GEL Engenharia</title>
 
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" type="image/png" href="icon-alojado-192.png">
+  <link rel="apple-touch-icon" href="icon-alojado-192.png">
+  <link rel="manifest" href="manifest-alojado.json">
+  <meta name="theme-color" content="#020617">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Meu Canteiro">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -152,6 +154,10 @@
       </div>
 
       <div class="flex items-center gap-1.5">
+        <button type="button" id="btnInstalarAlojadoTopo" onclick="iniciarInstalacaoAppAlojado()" class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black flex items-center gap-1 shadow-sm transition active:scale-95" title="Instalar App Meu Canteiro no Celular">
+          <i class="fa-solid fa-download"></i>
+          <span>App</span>
+        </button>
         <button type="button" id="btnAtualizarPortalTopo" onclick="sincronizarPortalManual()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition active:scale-95" title="Atualizar Cardápio e Avisos">
           <i class="fa-solid fa-arrows-rotate" id="iconeSyncPortal"></i>
         </button>
@@ -231,6 +237,22 @@
           <span>Acessar Meu Portal</span>
         </button>
       </form>
+
+      <!-- Card Discreto de Instalação do App Independente (Oculto quando já instalado) -->
+      <div id="bannerInstalarAlojadoLogin" class="pt-3 border-t border-slate-800">
+        <button type="button" onclick="iniciarInstalacaoAppAlojado()" class="w-full p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800/80 border border-amber-500/30 flex items-center justify-between gap-3 text-left transition active:scale-[0.99]">
+          <div class="flex items-center gap-3 min-w-0">
+            <img src="icon-alojado-192.png" alt="App Meu Canteiro" class="w-10 h-10 rounded-xl shadow-md flex-shrink-0 border border-amber-500/40">
+            <div class="min-w-0">
+              <p class="text-xs font-extrabold text-white truncate">Instalar App "Meu Canteiro"</p>
+              <p class="text-[11px] text-slate-400 truncate">Ícone próprio na tela inicial • Sem ocupar memória</p>
+            </div>
+          </div>
+          <span class="px-2.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-black flex-shrink-0">
+            Instalar
+          </span>
+        </button>
+      </div>
     </section>
 
     <!-- ================= PAINEL DO MORADOR LOGADO ================= -->
@@ -1919,7 +1941,124 @@
           iniciarSessaoMoradorLogado();
         } catch (e) {}
       }
+
+      inicializarPwaAlojado();
     });
+
+    // =========================================================================
+    // PWA INDEPENDENTE DO PORTAL DO ALOJADO (ANDROID 1-CLIQUE & IPHONE SAFARI)
+    // =========================================================================
+    let deferredPromptAlojado = null;
+
+    function appAlojadoJaInstalado() {
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+
+    function atualizarVisibilidadeBotaoInstalarAlojado() {
+      const instalado = appAlojadoJaInstalado();
+      const btnTopo = document.getElementById('btnInstalarAlojadoTopo');
+      const bannerLogin = document.getElementById('bannerInstalarAlojadoLogin');
+      if (btnTopo) btnTopo.classList.toggle('hidden', instalado);
+      if (bannerLogin) bannerLogin.classList.toggle('hidden', instalado);
+    }
+
+    function inicializarPwaAlojado() {
+      atualizarVisibilidadeBotaoInstalarAlojado();
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+          console.warn('[PWA Alojado] Service Worker aviso:', err);
+        });
+      }
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPromptAlojado = e;
+        atualizarVisibilidadeBotaoInstalarAlojado();
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredPromptAlojado = null;
+        atualizarVisibilidadeBotaoInstalarAlojado();
+        fecharModalInstalarAlojado();
+      });
+    }
+
+    async function iniciarInstalacaoAppAlojado() {
+      if (appAlojadoJaInstalado()) {
+        return;
+      }
+      if (deferredPromptAlojado) {
+        try {
+          deferredPromptAlojado.prompt();
+          const choice = await deferredPromptAlojado.userChoice;
+          if (choice && choice.outcome === 'accepted') {
+            deferredPromptAlojado = null;
+            atualizarVisibilidadeBotaoInstalarAlojado();
+          }
+          return;
+        } catch (e) {
+          console.warn('[PWA Alojado] Erro no prompt nativo:', e);
+        }
+      }
+
+      // Fallback amigável (iPhone Safari ou Android quando o prompt nativo ainda não disparou)
+      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const boxIos = document.getElementById('guiaInstallAlojadoIos');
+      const boxAndroid = document.getElementById('guiaInstallAlojadoAndroid');
+      if (boxIos) boxIos.classList.toggle('hidden', !isIos);
+      if (boxAndroid) boxAndroid.classList.toggle('hidden', isIos);
+
+      const modal = document.getElementById('modalInstalarAppAlojado');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function fecharModalInstalarAlojado() {
+      const modal = document.getElementById('modalInstalarAppAlojado');
+      if (modal) modal.classList.add('hidden');
+    }
   </script>
+
+  <!-- ================= MODAL GUIA DE INSTALAÇÃO DO APP DO ALOJADO ================= -->
+  <div id="modalInstalarAppAlojado" onclick="fecharModalInstalarAlojado()" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div onclick="event.stopPropagation()" class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+      <div class="p-5 bg-gradient-to-br from-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <img src="icon-alojado-192.png" alt="Meu Canteiro" class="w-12 h-12 rounded-2xl border border-amber-500/40 shadow-md">
+          <div>
+            <h3 class="text-sm font-black text-white">Instalar App "Meu Canteiro"</h3>
+            <p class="text-[11px] text-amber-300 font-semibold">Portal exclusivo do colaborador alojado</p>
+          </div>
+        </div>
+        <button type="button" onclick="fecharModalInstalarAlojado()" class="text-slate-400 hover:text-white p-1.5">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div id="guiaInstallAlojadoIos" class="hidden space-y-2.5 text-xs text-slate-200">
+          <p class="font-bold text-amber-300 uppercase text-[11px] tracking-wider"><i class="fa-brands fa-apple mr-1"></i> Como instalar no iPhone (Safari):</p>
+          <div class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 leading-relaxed">
+            <p>1. Toque no botão <strong>Compartilhar</strong> (<i class="fa-solid fa-arrow-up-from-bracket text-sky-400 mx-0.5"></i>) na barra inferior do Safari.</p>
+            <p>2. Role para baixo e toque em <strong>"Adicionar à Tela de Início"</strong> (<i class="fa-regular fa-square-plus text-amber-400 mx-0.5"></i>).</p>
+            <p>3. Toque em <strong>"Adicionar"</strong> no canto superior direito. Pronto!</p>
+          </div>
+        </div>
+
+        <div id="guiaInstallAlojadoAndroid" class="space-y-2.5 text-xs text-slate-200">
+          <p class="font-bold text-emerald-400 uppercase text-[11px] tracking-wider"><i class="fa-brands fa-android mr-1"></i> Como instalar no Android (Chrome):</p>
+          <div class="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 leading-relaxed">
+            <p>1. Toque nos <strong>3 pontinhos (⋮)</strong> no canto superior direito do Chrome.</p>
+            <p>2. Toque em <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</p>
+            <p>3. Confirme em <strong>"Instalar"</strong> — o ícone exclusivo <strong>Meu Canteiro</strong> aparecerá na sua tela!</p>
+          </div>
+        </div>
+
+        <button type="button" onclick="fecharModalInstalarAlojado()" class="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase transition">
+          Entendi
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

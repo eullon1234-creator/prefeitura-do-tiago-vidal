@@ -1,0 +1,46 @@
+{
+  "id": "/portal-alojado",
+  "name": "Meu Canteiro • Portal do Alojado",
+  "short_name": "Meu Canteiro",
+  "description": "Consulte seu quarto, cardápio do dia, avisos da prefeitura, crachá digital, sorteios e solicite manutenções.",
+  "start_url": "./alojado.html",
+  "scope": "./",
+  "display": "standalone",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "orientation": "portrait-primary",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "icon-alojado-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-alojado-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Meu Espaço & Crachá",
+      "url": "./alojado.html#inicio",
+      "description": "Ver seu quarto, crachá digital e colegas"
+    },
+    {
+      "name": "Cardápio & Avisos",
+      "url": "./alojado.html#mural",
+      "description": "Consultar refeições e comunicados do canteiro"
+    },
+    {
+      "name": "Pedir Manutenção",
+      "url": "./alojado.html#chamados",
+      "description": "Abrir chamado rápido para seu quarto"
+    }
+  ]
+}

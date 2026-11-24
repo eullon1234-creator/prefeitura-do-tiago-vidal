@@ -12,6 +12,11 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
+[[headers]]
+  for = "/manifest-alojado.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 # Cache otimizado para arquivos estáticos pesados
 [[headers]]
   for = "/*.png"
