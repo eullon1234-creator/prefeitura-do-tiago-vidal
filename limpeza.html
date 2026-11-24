@@ -23,7 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-  <script src="campo_auth.js?v=6.3"></script>
+  <script src="campo_auth.js?v=6.4"></script>
 
   <style>
     body {
@@ -34,6 +34,25 @@
       border-color: #0d9488;
       background-color: rgba(13, 148, 136, 0.15);
       box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25);
+    }
+    .servico-card {
+      position: relative;
+      min-height: 92px;
+      transition: transform 0.14s ease, border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+    .servico-card:active {
+      transform: scale(0.97);
+    }
+    .servico-check-badge {
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease, background-color 0.18s ease, border-color 0.18s ease;
+    }
+    .servico-card[aria-checked="true"] .servico-check-badge {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .servico-card[aria-checked="false"] .servico-check-badge {
+      transform: scale(0.82);
+      opacity: 0.45;
     }
     .avaliacao-chip.active {
       border-color: #0d9488;
@@ -114,18 +133,23 @@
     <!-- Card de Identificação da Unidade (Casa na Cidade ou Quarto do Alojamento) -->
     <div class="bg-gradient-to-br from-slate-800 to-slate-850 p-4 rounded-2xl border border-slate-700/80 shadow-lg space-y-2">
       <div class="flex items-start justify-between gap-3">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 min-w-0">
           <div id="iconeUnidadeBox" class="w-11 h-11 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center flex-shrink-0 text-xl border border-teal-500/30">
             <i id="iconeUnidade" class="fa-solid fa-house"></i>
           </div>
-          <div>
+          <div class="min-w-0">
             <span id="labelTipoUnidade" class="text-[10px] font-bold uppercase tracking-wider text-teal-400 block">Unidade Identificada</span>
-            <h2 id="displayCasaNome" class="text-base font-black text-white leading-tight">Carregando local...</h2>
+            <h2 id="displayCasaNome" class="text-base font-black text-white leading-tight truncate">Carregando local...</h2>
           </div>
         </div>
-        <span id="badgeQrIdentificado" class="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 font-bold border border-emerald-800 whitespace-nowrap">
-          <i class="fa-solid fa-qrcode mr-1"></i> QR Ativo
-        </span>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button type="button" id="btnTrocarLocalManual" onclick="abrirTrocaLocalManual()" class="hidden text-[10px] px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-700 text-teal-300 font-bold border border-slate-700 whitespace-nowrap transition">
+            <i class="fa-solid fa-repeat mr-1"></i>Trocar
+          </button>
+          <span id="badgeQrIdentificado" class="hidden text-[10px] px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 font-bold border border-emerald-800 whitespace-nowrap">
+            <i class="fa-solid fa-qrcode mr-1"></i> QR Ativo
+          </span>
+        </div>
       </div>
       <p id="displayCasaEndereco" class="text-xs text-slate-300 flex items-center gap-1.5 pt-1 border-t border-slate-700/50">
         <i class="fa-solid fa-location-dot text-rose-400"></i>
@@ -133,8 +157,8 @@
       </p>
 
       <!-- Dropdown alternativo se a unidade não tiver sido passada na URL -->
-      <div id="containerSelecaoCasa" class="hidden pt-2 space-y-2">
-        <div class="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+      <div id="containerSelecaoCasa" class="hidden pt-2 space-y-2.5">
+        <div id="grupoBotoesTipoLocal" class="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
           <button type="button" id="btnFiltroSelCasa" onclick="alternarTipoSelecaoManual('casa')" class="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition">
             🏡 Casa na Cidade
           </button>
@@ -143,11 +167,34 @@
           </button>
         </div>
 
-        <div id="boxSelectCasaManual">
-          <label for="selectCasaManual" class="block text-xs font-bold text-slate-300 mb-1">
-            Selecione a Casa na Cidade:
-          </label>
-          <select id="selectCasaManual" onchange="selecionarCasaManual(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-teal-500">
+        <div id="boxSelectCasaManual" class="space-y-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <label for="selectCasaManual" class="block text-xs font-bold text-slate-300">
+              Selecione a Casa na Cidade:
+            </label>
+            <span id="contadorCasasFiltradas" class="text-[10px] font-semibold text-slate-400"></span>
+          </div>
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              type="text"
+              id="inputBuscaCasaManual"
+              oninput="filtrarListaCasasManual(this.value)"
+              placeholder="Filtrar por nome, rua ou bairro..."
+              autocomplete="off"
+              class="w-full bg-slate-950/90 border border-slate-700 focus:border-teal-500 rounded-xl pl-8 pr-8 py-2 text-xs text-white font-semibold outline-none placeholder-slate-500 transition"
+            >
+            <button
+              type="button"
+              id="btnLimparBuscaCasa"
+              onclick="limparBuscaCasaManual()"
+              class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] flex items-center justify-center transition"
+              title="Limpar filtro"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <select id="selectCasaManual" onchange="selecionarCasaManual(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-semibold outline-none focus:border-teal-500">
             <option value="">Carregando lista de casas...</option>
           </select>
         </div>
@@ -175,22 +222,22 @@
     </div>
 
     
-    <!-- IDENTIFICAÇÃO DO QUARTO / CASA ESCANEADO (DIRETO E SEM TABELAS) -->
-    <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-2 shadow-lg">
+    <!-- IDENTIFICAÇÃO DO QUARTO / CASA ESCANEADO (EXIBIDO APENAS APÓS SELECIONAR LOCAL VÁLIDO) -->
+    <div id="cardStatusLocalEscaneado" class="hidden bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-2 shadow-lg">
       <div class="flex items-center gap-2.5">
         <div class="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg flex-shrink-0 border border-teal-500/30">
           <i class="fa-solid fa-door-open"></i>
         </div>
         <div>
-          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Local Escaneado</span>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Local Selecionado</span>
           <h2 id="plaquinhaIdentificacaoAparelho" class="text-sm sm:text-base font-black text-white uppercase leading-tight">
-            Aparelho / Acomodação
+            -
           </h2>
         </div>
       </div>
       <div>
-        <span id="badgeStatusCicloPlaquinha" class="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
-          <i class="fa-solid fa-circle-check text-emerald-400"></i> <span id="textoStatusCicloPlaquinha">Em Dia (Ciclo 30d)</span>
+        <span id="badgeStatusCicloPlaquinha" class="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wide bg-slate-700/60 text-slate-200 border border-slate-600/60 flex items-center gap-1.5">
+          <i class="fa-solid fa-clock text-slate-400"></i> <span id="textoStatusCicloPlaquinha">Consultando ciclo...</span>
         </span>
       </div>
     </div>
@@ -287,28 +334,102 @@
         </div>
       </div>
 
-      <!-- Seleção do Tipo de Serviço -->
-      <div>
-        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <i class="fa-solid fa-list-check text-teal-400"></i> Qual serviço foi realizado? *
-        </label>
-        <div class="grid grid-cols-2 gap-2.5">
-          <div onclick="escolherTipoServico('rotina')" id="cardTipoRotina" class="tipo-card active cursor-pointer border-2 border-teal-500 bg-teal-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none">
-            <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg mb-1.5">
-              <i class="fa-solid fa-broom"></i>
-            </div>
-            <span class="text-xs font-extrabold text-white">Limpeza Rotina</span>
-            <span class="text-[10px] text-slate-400 mt-0.5">Faxina Diária Geral</span>
+      <!-- Seleção Múltipla de Serviços Realizados (Grade Tátil 2x2) -->
+      <div class="space-y-2.5">
+        <div class="flex items-start justify-between gap-2 flex-wrap">
+          <div>
+            <label class="block text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-list-check text-teal-400"></i>
+              <span>Qual serviço foi realizado? *</span>
+            </label>
+            <p class="text-[10px] text-slate-400 font-semibold mt-0.5">
+              Pode marcar mais de 1 serviço
+            </p>
           </div>
-
-          <div onclick="escolherTipoServico('ar_condicionado')" id="cardTipoAr" class="tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100">
-            <div class="w-10 h-10 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-lg mb-1.5">
-              <i class="fa-solid fa-snowflake"></i>
-            </div>
-            <span class="text-xs font-extrabold text-white">Ar Condicionado</span>
-            <span class="text-[10px] text-slate-400 mt-0.5">Higienização (30d)</span>
-          </div>
+          <span id="contadorServicosSelecionados" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-teal-500/20 text-teal-300 border border-teal-500/40 whitespace-nowrap">
+            <i class="fa-solid fa-check-double text-[9px]"></i>
+            <span>1 serviço selecionado</span>
+          </span>
         </div>
+
+        <div class="grid grid-cols-2 gap-2.5" role="group" aria-label="Serviços realizados">
+          <button
+            type="button"
+            id="cardTipoRotina"
+            role="checkbox"
+            aria-checked="true"
+            onclick="toggleServicoRealizado('rotina')"
+            class="servico-card tipo-card active cursor-pointer border-2 border-teal-500 bg-teal-950/35 shadow-md shadow-teal-950/40 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none"
+          >
+            <span id="checkServicoRotina" class="servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-teal-500 text-slate-950 border border-teal-300 flex items-center justify-center text-[10px] shadow-sm">
+              <i class="fa-solid fa-check"></i>
+            </span>
+            <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center justify-center text-base mb-1.5">
+              <span>🧹</span>
+            </div>
+            <span class="text-[11px] font-extrabold text-white leading-tight">Limpeza / Faxina Geral</span>
+            <span class="text-[10px] text-slate-300/80 mt-0.5 leading-snug">Faxina diária, piso e banheiro</span>
+          </button>
+
+          <button
+            type="button"
+            id="cardTipoAr"
+            role="checkbox"
+            aria-checked="false"
+            onclick="toggleServicoRealizado('ar_condicionado')"
+            class="servico-card tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/70 hover:border-slate-600 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none opacity-85 hover:opacity-100"
+          >
+            <span id="checkServicoAr" class="servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-950/80 text-transparent border border-slate-600 flex items-center justify-center text-[10px]">
+              <i class="fa-solid fa-check"></i>
+            </span>
+            <div class="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-300 border border-sky-500/25 flex items-center justify-center text-base mb-1.5">
+              <span>❄️</span>
+            </div>
+            <span class="text-[11px] font-extrabold text-white leading-tight">Ar-Condicionado</span>
+            <span class="text-[10px] text-slate-400 mt-0.5 leading-snug">Filtro / Total / Corretiva</span>
+          </button>
+
+          <button
+            type="button"
+            id="cardTipoEnxoval"
+            role="checkbox"
+            aria-checked="false"
+            onclick="toggleServicoRealizado('enxoval')"
+            class="servico-card tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/70 hover:border-slate-600 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none opacity-85 hover:opacity-100"
+          >
+            <span id="checkServicoEnxoval" class="servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-950/80 text-transparent border border-slate-600 flex items-center justify-center text-[10px]">
+              <i class="fa-solid fa-check"></i>
+            </span>
+            <div class="w-9 h-9 rounded-xl bg-violet-500/15 text-violet-300 border border-violet-500/25 flex items-center justify-center text-base mb-1.5">
+              <span>🛏️</span>
+            </div>
+            <span class="text-[11px] font-extrabold text-white leading-tight">Troca de Enxoval</span>
+            <span class="text-[10px] text-slate-400 mt-0.5 leading-snug">Lençóis, fronhas e toalhas</span>
+          </button>
+
+          <button
+            type="button"
+            id="cardTipoManutencao"
+            role="checkbox"
+            aria-checked="false"
+            onclick="toggleServicoRealizado('manutencao')"
+            class="servico-card tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/70 hover:border-slate-600 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none opacity-85 hover:opacity-100"
+          >
+            <span id="checkServicoManutencao" class="servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-950/80 text-transparent border border-slate-600 flex items-center justify-center text-[10px]">
+              <i class="fa-solid fa-check"></i>
+            </span>
+            <div class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/25 flex items-center justify-center text-base mb-1.5">
+              <span>🔧</span>
+            </div>
+            <span class="text-[11px] font-extrabold text-white leading-tight">Pequeno Reparo</span>
+            <span class="text-[10px] text-slate-400 mt-0.5 leading-snug">Lâmpada, torneira, elétrica, fechadura</span>
+          </button>
+        </div>
+
+        <p id="avisoMinimoServico" class="hidden text-[11px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-info text-amber-400"></i>
+          <span>Mantenha pelo menos 1 serviço selecionado.</span>
+        </p>
       </div>
 
       
@@ -318,22 +439,22 @@
           <i class="fa-solid fa-screwdriver-wrench text-sky-400"></i> Tipo de Manutenção no Ar Condicionado *
         </label>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <label class="cursor-pointer p-2.5 rounded-xl border border-sky-500/50 bg-sky-950/30 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
-            <input type="radio" name="subtipo_ar" value="filtro" checked class="text-sky-500 focus:ring-sky-500">
+          <label data-subtipo-label="filtro" class="cursor-pointer p-2.5 rounded-xl border border-sky-500/60 bg-sky-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
+            <input type="radio" name="subtipo_ar" value="filtro" checked onchange="atualizarEstiloSubtipoAr()" class="text-sky-500 focus:ring-sky-500">
             <div>
               <div class="text-[11px] font-black text-sky-200">Limpeza de Filtro</div>
               <div class="text-[9px] text-slate-400 font-normal">Telas lavadas e desinfetadas</div>
             </div>
           </label>
-          <label class="cursor-pointer p-2.5 rounded-xl border border-slate-700 bg-slate-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
-            <input type="radio" name="subtipo_ar" value="total" class="text-sky-500 focus:ring-sky-500">
+          <label data-subtipo-label="total" class="cursor-pointer p-2.5 rounded-xl border border-slate-700 bg-slate-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
+            <input type="radio" name="subtipo_ar" value="total" onchange="atualizarEstiloSubtipoAr()" class="text-sky-500 focus:ring-sky-500">
             <div>
               <div class="text-[11px] font-black text-emerald-300">Higienização Total</div>
               <div class="text-[9px] text-slate-400 font-normal">Serpentina + Dreno + Bactericida</div>
             </div>
           </label>
-          <label class="cursor-pointer p-2.5 rounded-xl border border-slate-700 bg-slate-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
-            <input type="radio" name="subtipo_ar" value="corretiva" class="text-sky-500 focus:ring-sky-500">
+          <label data-subtipo-label="corretiva" class="cursor-pointer p-2.5 rounded-xl border border-slate-700 bg-slate-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition">
+            <input type="radio" name="subtipo_ar" value="corretiva" onchange="atualizarEstiloSubtipoAr()" class="text-sky-500 focus:ring-sky-500">
             <div>
               <div class="text-[11px] font-black text-amber-300">Corretiva / Reparo</div>
               <div class="text-[9px] text-slate-400 font-normal">Gás, dreno ou elétrica</div>
@@ -437,7 +558,8 @@
         <textarea 
           id="inputObservacoes" 
           rows="2" 
-          placeholder="Ex: Quarto limpo, banheiro higienizado, filtro do ar lavado..." 
+          maxlength="1200"
+          placeholder="Ex: Quarto limpo, banheiro higienizado, filtro do ar lavado, enxoval trocado..." 
           class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white text-xs outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500 resize-none"
         ></textarea>
       </div>
@@ -700,6 +822,48 @@
     let perfilAtualLimpeza = null;
     let campoAuthControllerLimpeza = null;
     let jaDesbloqueouUmaVezLimpeza = false;
+    let urlTipoLocalSolicitado = ""; // 'casa' | 'alojamento' | ''
+    let veioDeQrCodeUnidade = false;
+    let timerHistoricoQuartoManual = null;
+    let timerAvisoMinimoServico = null;
+
+    const SERVICOS_DISPONIVEIS = [
+      {
+        key: "rotina",
+        cardId: "cardTipoRotina",
+        checkId: "checkServicoRotina",
+        nome: "Limpeza / Faxina Geral",
+        activeCardClass: "servico-card tipo-card active cursor-pointer border-2 border-teal-500 bg-teal-950/35 shadow-md shadow-teal-950/40 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none",
+        activeCheckClass: "servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-teal-500 text-slate-950 border border-teal-300 flex items-center justify-center text-[10px] shadow-sm"
+      },
+      {
+        key: "ar_condicionado",
+        cardId: "cardTipoAr",
+        checkId: "checkServicoAr",
+        nome: "Ar-Condicionado",
+        activeCardClass: "servico-card tipo-card active cursor-pointer border-2 border-sky-500 bg-sky-950/35 shadow-md shadow-sky-950/40 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none",
+        activeCheckClass: "servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-sky-500 text-slate-950 border border-sky-300 flex items-center justify-center text-[10px] shadow-sm"
+      },
+      {
+        key: "enxoval",
+        cardId: "cardTipoEnxoval",
+        checkId: "checkServicoEnxoval",
+        nome: "Troca de Enxoval",
+        activeCardClass: "servico-card tipo-card active cursor-pointer border-2 border-violet-500 bg-violet-950/35 shadow-md shadow-violet-950/40 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none",
+        activeCheckClass: "servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-violet-500 text-slate-950 border border-violet-300 flex items-center justify-center text-[10px] shadow-sm"
+      },
+      {
+        key: "manutencao",
+        cardId: "cardTipoManutencao",
+        checkId: "checkServicoManutencao",
+        nome: "Pequeno Reparo",
+        activeCardClass: "servico-card tipo-card active cursor-pointer border-2 border-amber-500 bg-amber-950/35 shadow-md shadow-amber-950/40 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none",
+        activeCheckClass: "servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-amber-500 text-slate-950 border border-amber-300 flex items-center justify-center text-[10px] shadow-sm"
+      }
+    ];
+    const INACTIVE_SERVICO_CARD_CLASS = "servico-card tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/70 hover:border-slate-600 rounded-2xl pt-3.5 pb-3 px-2.5 min-h-[92px] flex flex-col items-center justify-center text-center select-none opacity-85 hover:opacity-100";
+    const INACTIVE_SERVICO_CHECK_CLASS = "servico-check-badge absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-950/80 text-transparent border border-slate-600 flex items-center justify-center text-[10px]";
+    let servicosSelecionados = new Set(["rotina"]);
 
     // Inicialização do Firebase
     try {
@@ -784,6 +948,7 @@
           if (avisoEl) avisoEl.classList.add('hidden');
 
           aplicarPerfilOperadorLimpeza(perfil);
+          aplicarPermissoesTipoLocal(perfil);
 
           if (!jaDesbloqueouUmaVezLimpeza) {
             jaDesbloqueouUmaVezLimpeza = true;
@@ -804,6 +969,7 @@
           jaDesbloqueouUmaVezLimpeza = false;
 
           aplicarPerfilOperadorLimpeza(null);
+          aplicarPermissoesTipoLocal(null);
 
           const mountEl = document.getElementById('campoAuthLimpezaMount');
           const avisoEl = document.getElementById('avisoSemPermissaoLimpeza');
@@ -825,6 +991,78 @@
       });
     }
 
+    function usuarioPodeCasas(perfil) {
+      if (!perfil || perfil.status !== 'ativo') return false;
+      if (perfil.role === 'master') return true;
+      if (window.CampoAuth && typeof window.CampoAuth.hasFrontAccess === 'function' && window.CampoAuth.hasFrontAccess(perfil, 'casas')) {
+        return true;
+      }
+      return Boolean(perfil.permissoesModulos && perfil.permissoesModulos.casas_cidade === 'editar');
+    }
+
+    function usuarioPodeAlojamentos(perfil) {
+      if (!perfil || perfil.status !== 'ativo') return false;
+      if (perfil.role === 'master') return true;
+      if (window.CampoAuth && typeof window.CampoAuth.hasFrontAccess === 'function' && window.CampoAuth.hasFrontAccess(perfil, 'alojamentos')) {
+        return true;
+      }
+      return Boolean(perfil.permissoesModulos && perfil.permissoesModulos.blocos === 'editar');
+    }
+
+    function aplicarPermissoesTipoLocal(perfil) {
+      const grupo = document.getElementById('grupoBotoesTipoLocal');
+      const btnCasa = document.getElementById('btnFiltroSelCasa');
+      const btnQuarto = document.getElementById('btnFiltroSelQuarto');
+      if (!btnCasa || !btnQuarto) return;
+
+      // No modo Ouvidoria pública (morador sem login) ou usuário não autenticado, ambos os tipos ficam disponíveis
+      if (modoAtual === 'problema' || !perfil || perfil.status !== 'ativo') {
+        btnCasa.classList.remove('hidden');
+        btnQuarto.classList.remove('hidden');
+        if (grupo) {
+          grupo.classList.remove('grid-cols-1');
+          grupo.classList.add('grid-cols-2');
+        }
+        return;
+      }
+
+      const podeCasa = usuarioPodeCasas(perfil);
+      const podeAloj = usuarioPodeAlojamentos(perfil);
+
+      if (podeCasa && !podeAloj) {
+        btnCasa.classList.remove('hidden');
+        btnQuarto.classList.add('hidden');
+        if (grupo) {
+          grupo.classList.remove('grid-cols-2');
+          grupo.classList.add('grid-cols-1');
+        }
+        if (!veioDeQrCodeUnidade) {
+          alternarTipoSelecaoManual('casa');
+        }
+      } else if (podeAloj && !podeCasa) {
+        btnCasa.classList.add('hidden');
+        btnQuarto.classList.remove('hidden');
+        if (grupo) {
+          grupo.classList.remove('grid-cols-2');
+          grupo.classList.add('grid-cols-1');
+        }
+        if (!veioDeQrCodeUnidade) {
+          alternarTipoSelecaoManual('alojamento');
+        }
+      } else {
+        btnCasa.classList.remove('hidden');
+        btnQuarto.classList.remove('hidden');
+        if (grupo) {
+          grupo.classList.remove('grid-cols-1');
+          grupo.classList.add('grid-cols-2');
+        }
+        const localJaEscolhido = Boolean(document.getElementById('inputCasaId')?.value);
+        if (!veioDeQrCodeUnidade && !localJaEscolhido && (urlTipoLocalSolicitado === 'casa' || urlTipoLocalSolicitado === 'alojamento')) {
+          alternarTipoSelecaoManual(urlTipoLocalSolicitado);
+        }
+      }
+    }
+
     function trocarModoLimpeza(novoModo) {
       modoAtual = novoModo;
       const btnLimp = document.getElementById('btnModoLimpeza');
@@ -840,6 +1078,7 @@
         btnProb.className = "py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-amber-500 text-slate-950 shadow-sm";
         btnLimp.className = "py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900";
       }
+      aplicarPermissoesTipoLocal(perfilAtualLimpeza);
       atualizarVisibilidadeModo();
     }
 
@@ -892,6 +1131,12 @@
       const urlTipo = urlParams.get('tipo');
       const urlAcao = urlParams.get('acao');
       const urlModo = urlParams.get('modo');
+      const rawTipoLocal = String(urlParams.get('tipo_local') || '').trim().toLowerCase();
+      if (rawTipoLocal === 'casa' || rawTipoLocal === 'casas' || rawTipoLocal === 'casa_cidade') {
+        urlTipoLocalSolicitado = 'casa';
+      } else if (rawTipoLocal === 'alojamento' || rawTipoLocal === 'alojamentos' || rawTipoLocal === 'quarto' || rawTipoLocal === 'bloco') {
+        urlTipoLocalSolicitado = 'alojamento';
+      }
 
       // Processar parâmetro genérico ?id=... de forma inteligente
       const rawId = urlParams.get('id') || urlParams.get('ID');
@@ -915,6 +1160,7 @@
 
       // Se houver parâmetros de Casa ou Quarto válidos, NUNCA redirecionar para ronda
       const isAlvoLimpeza = Boolean(urlCasaId || urlQuartoId || urlQuartoNum || urlBloco || urlBlocoId);
+      veioDeQrCodeUnidade = isAlvoLimpeza;
 
       if (!isAlvoLimpeza) {
         // Se por engano o leitor abriu limpeza.html com QR Code de Ronda / Sanitário / Bebedouro, redirecionar imediatamente
@@ -931,6 +1177,8 @@
         }
       }
 
+      atualizarUIServicosSelecionados();
+
       if (urlModo === 'problema' || urlModo === 'ocorrencia') {
         trocarModoLimpeza('problema');
       }
@@ -945,8 +1193,167 @@
         aplicarDadosBlocoAlojamento(urlBloco.replace(/^bloco_/i, ''));
       } else {
         carregarCasa(urlCasaId);
+        if (!urlCasaId && urlTipoLocalSolicitado === 'alojamento') {
+          alternarTipoSelecaoManual('alojamento');
+        }
       }
     });
+
+    function atualizarVisibilidadeCardLocal(mostrar) {
+      const card = document.getElementById('cardStatusLocalEscaneado');
+      if (!card) return;
+      card.classList.toggle('hidden', !mostrar);
+    }
+
+    function resetarLocalNaoSelecionado(tipoPreferido = 'casa') {
+      casaCarregada = null;
+      const inpCasaId = document.getElementById('inputCasaId');
+      const inpCasaNome = document.getElementById('inputCasaNome');
+      const inpTipoLocal = document.getElementById('inputTipoLocal');
+      const inpQuartoId = document.getElementById('inputQuartoId');
+      const inpQuartoNum = document.getElementById('inputQuartoNumero');
+      const inpBloco = document.getElementById('inputBlocoNome');
+
+      if (inpCasaId) inpCasaId.value = '';
+      if (inpCasaNome) inpCasaNome.value = '';
+      if (inpTipoLocal) inpTipoLocal.value = tipoPreferido === 'alojamento' ? 'alojamento' : 'casa';
+      if (inpQuartoId) inpQuartoId.value = '';
+      if (inpQuartoNum) inpQuartoNum.value = '';
+      if (inpBloco) inpBloco.value = '';
+
+      const lblTipo = document.getElementById('labelTipoUnidade');
+      const dispNome = document.getElementById('displayCasaNome');
+      const dispEnd = document.getElementById('displayCasaEndereco');
+      const icone = document.getElementById('iconeUnidade');
+      const badgeQr = document.getElementById('badgeQrIdentificado');
+      const btnTrocar = document.getElementById('btnTrocarLocalManual');
+      const contSel = document.getElementById('containerSelecaoCasa');
+
+      if (tipoPreferido === 'alojamento') {
+        if (lblTipo) lblTipo.textContent = 'Alojamento do Canteiro';
+        if (dispNome) dispNome.textContent = 'Informe o Quarto Abaixo';
+        if (dispEnd) dispEnd.innerHTML = '<i class="fa-solid fa-building-user text-sky-400"></i> Escolha o bloco e digite o número do quarto:';
+        if (icone) icone.className = 'fa-solid fa-bed';
+      } else {
+        if (lblTipo) lblTipo.textContent = 'Unidade para Atendimento';
+        if (dispNome) dispNome.textContent = 'Selecione o Local Abaixo';
+        if (dispEnd) dispEnd.innerHTML = '<i class="fa-solid fa-circle-info text-amber-400"></i> Escolha a residência ou quarto que está atendendo:';
+        if (icone) icone.className = 'fa-solid fa-house';
+      }
+
+      if (badgeQr) badgeQr.classList.add('hidden');
+      if (btnTrocar) btnTrocar.classList.add('hidden');
+      if (contSel) contSel.classList.remove('hidden');
+      atualizarVisibilidadeCardLocal(false);
+    }
+
+    function normalizarTextoBusca(str) {
+      return String(str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+    }
+
+    function escapeHtmlAttr(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderizarOpcoesCasasManual(termoFiltro) {
+      const selEl = document.getElementById('selectCasaManual');
+      const contEl = document.getElementById('contadorCasasFiltradas');
+      const inputBusca = document.getElementById('inputBuscaCasaManual');
+      const btnLimpar = document.getElementById('btnLimparBuscaCasa');
+      if (!selEl) return;
+
+      const termoAtual = typeof termoFiltro === 'string'
+        ? termoFiltro
+        : (inputBusca ? inputBusca.value : '');
+      const termoNorm = normalizarTextoBusca(termoAtual);
+
+      if (btnLimpar) {
+        btnLimpar.classList.toggle('hidden', !termoAtual.trim());
+      }
+
+      const todas = Array.isArray(listaCasasDisponiveis) ? listaCasasDisponiveis : [];
+      const ordenadas = [...todas].sort((a, b) =>
+        String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { numeric: true })
+      );
+      const filtradas = termoNorm
+        ? ordenadas.filter(c => {
+            const alvo = normalizarTextoBusca(`${c.nome || ''} ${c.endereco || ''} ${c.bairro || ''} ${c.cep || ''} ${c.id || ''}`);
+            return alvo.includes(termoNorm);
+          })
+        : ordenadas;
+
+      const valorAnterior = selEl.value || (casaCarregada ? casaCarregada.id : '');
+
+      if (todas.length === 0) {
+        selEl.innerHTML = '<option value="">Carregando lista de casas...</option>';
+        if (contEl) contEl.textContent = '';
+        return;
+      }
+
+      if (filtradas.length === 0) {
+        selEl.innerHTML = '<option value="">Nenhuma casa encontrada para este filtro...</option>';
+        if (contEl) contEl.textContent = `0 de ${todas.length}`;
+        return;
+      }
+
+      const labelPadrao = termoNorm
+        ? `Selecione uma casa (${filtradas.length} encontrada${filtradas.length > 1 ? 's' : ''})...`
+        : 'Selecione uma casa...';
+
+      selEl.innerHTML = `<option value="">${labelPadrao}</option>` +
+        filtradas.map(c => {
+          const endResumo = [c.endereco, c.bairro].filter(Boolean).join(' • ');
+          const rotulo = endResumo ? `${c.nome || c.id} — ${endResumo}` : (c.nome || c.id);
+          return `<option value="${escapeHtmlAttr(c.id)}">${escapeHtmlAttr(rotulo)}</option>`;
+        }).join('');
+
+      if (valorAnterior && filtradas.some(c => c.id === valorAnterior)) {
+        selEl.value = valorAnterior;
+      }
+
+      if (contEl) {
+        contEl.textContent = termoNorm
+          ? `${filtradas.length} de ${todas.length}`
+          : `${todas.length} casa${todas.length > 1 ? 's' : ''}`;
+      }
+    }
+
+    function filtrarListaCasasManual(termo) {
+      renderizarOpcoesCasasManual(termo);
+    }
+
+    function limparBuscaCasaManual() {
+      const inputBusca = document.getElementById('inputBuscaCasaManual');
+      if (inputBusca) {
+        inputBusca.value = '';
+        inputBusca.focus();
+      }
+      renderizarOpcoesCasasManual('');
+    }
+
+    function abrirTrocaLocalManual() {
+      const contSel = document.getElementById('containerSelecaoCasa');
+      if (contSel) contSel.classList.remove('hidden');
+      const btnTrocar = document.getElementById('btnTrocarLocalManual');
+      if (btnTrocar) btnTrocar.classList.add('hidden');
+      const tipoAtual = document.getElementById('inputTipoLocal')?.value || 'casa';
+      if (tipoAtual === 'casa') {
+        const inputBusca = document.getElementById('inputBuscaCasaManual');
+        if (inputBusca) inputBusca.focus();
+      } else {
+        const inputQ = document.getElementById('inputQuartoManualNum');
+        if (inputQ) inputQ.focus();
+      }
+    }
 
     function aplicarDadosBlocoAlojamento(blocoNome) {
       document.getElementById('inputTipoLocal').value = 'alojamento';
@@ -960,6 +1367,12 @@
       document.getElementById('iconeUnidade').className = 'fa-solid fa-hotel';
       document.getElementById('badgeQrIdentificado').classList.remove('hidden');
       document.getElementById('badgeQrIdentificado').innerHTML = `<i class="fa-solid fa-qrcode mr-1"></i> QR Bloco Ativo`;
+      const btnTrocar = document.getElementById('btnTrocarLocalManual');
+      if (btnTrocar) btnTrocar.classList.add('hidden');
+
+      const elIdent = document.getElementById('plaquinhaIdentificacaoAparelho');
+      if (elIdent) elIdent.textContent = String(blocoNome).toUpperCase();
+      atualizarVisibilidadeCardLocal(true);
       
       document.getElementById('boxComodoOcorrencia').classList.add('hidden');
       document.getElementById('boxQuartoOcorrenciaAlojamento').classList.remove('hidden');
@@ -973,7 +1386,7 @@
       if (input) input.value = 'Todos (Bloco Inteiro)';
     }
 
-    function aplicarDadosQuartoAlojamento(quartoId, quartoNum, blocoNome) {
+    function aplicarDadosQuartoAlojamento(quartoId, quartoNum, blocoNome, pularBuscaHistorico = false) {
       const idLimpo = String(quartoId || '').replace(/^quarto_/i, '').trim();
       const numLimpo = String(quartoNum || idLimpo).replace(/^quarto_/i, '').trim();
       const idUnificado = `quarto_${idLimpo}`;
@@ -994,36 +1407,78 @@
       document.getElementById('boxQuartoOcorrenciaAlojamento').classList.add('hidden');
       document.getElementById('boxQuartoAtendidoLimpeza').classList.add('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
-      document.getElementById('badgeQrIdentificado').classList.remove('hidden');
-      carregarHistoricoPlaquinhaLimpeza(idUnificado, idLimpo, blocoNome);
+      document.getElementById('badgeQrIdentificado').classList.toggle('hidden', !veioDeQrCodeUnidade);
+      const btnTrocar = document.getElementById('btnTrocarLocalManual');
+      if (btnTrocar) btnTrocar.classList.add('hidden');
+
+      const elIdent = document.getElementById('plaquinhaIdentificacaoAparelho');
+      if (elIdent) elIdent.textContent = nomeFormatado.toUpperCase();
+      atualizarVisibilidadeCardLocal(true);
+
+      if (!pularBuscaHistorico) {
+        carregarHistoricoPlaquinhaLimpeza(idUnificado, idLimpo, blocoNome);
+      }
     }
 
     function alternarTipoSelecaoManual(tipo) {
+      if (modoAtual === 'limpeza' && senhaLiberadaNestaSessao && perfilAtualLimpeza) {
+        const podeCasa = usuarioPodeCasas(perfilAtualLimpeza);
+        const podeAloj = usuarioPodeAlojamentos(perfilAtualLimpeza);
+        if (tipo === 'alojamento' && !podeAloj && podeCasa) tipo = 'casa';
+        if (tipo === 'casa' && !podeCasa && podeAloj) tipo = 'alojamento';
+      }
+
       const btnCasa = document.getElementById('btnFiltroSelCasa');
       const btnQuarto = document.getElementById('btnFiltroSelQuarto');
       const boxCasa = document.getElementById('boxSelectCasaManual');
       const boxQuarto = document.getElementById('boxSelectQuartoManual');
 
       if (tipo === 'alojamento') {
-        btnQuarto.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition";
-        btnCasa.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition";
-        boxCasa.classList.add('hidden');
-        boxQuarto.classList.remove('hidden');
-        aplicarQuartoManual();
+        if (btnQuarto) btnQuarto.className = `${btnQuarto.classList.contains('hidden') ? 'hidden ' : ''}py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition`;
+        if (btnCasa) btnCasa.className = `${btnCasa.classList.contains('hidden') ? 'hidden ' : ''}py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition`;
+        if (boxCasa) boxCasa.classList.add('hidden');
+        if (boxQuarto) boxQuarto.classList.remove('hidden');
+        const numAtual = (document.getElementById('inputQuartoManualNum')?.value || '').trim();
+        if (numAtual) {
+          aplicarQuartoManual();
+        } else {
+          resetarLocalNaoSelecionado('alojamento');
+        }
       } else {
-        btnCasa.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition";
-        btnQuarto.className = "py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition";
-        boxQuarto.classList.add('hidden');
-        boxCasa.classList.remove('hidden');
+        if (btnCasa) btnCasa.className = `${btnCasa.classList.contains('hidden') ? 'hidden ' : ''}py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white transition`;
+        if (btnQuarto) btnQuarto.className = `${btnQuarto.classList.contains('hidden') ? 'hidden ' : ''}py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition`;
+        if (boxQuarto) boxQuarto.classList.add('hidden');
+        if (boxCasa) boxCasa.classList.remove('hidden');
+        const casaSelId = document.getElementById('selectCasaManual')?.value || '';
+        if (casaSelId) {
+          selecionarCasaManual(casaSelId);
+        } else {
+          resetarLocalNaoSelecionado('casa');
+        }
       }
     }
 
     function aplicarQuartoManual() {
-      const bloco = document.getElementById('selectBlocoManual').value || 'Bloco 1';
-      const num = (document.getElementById('inputQuartoManualNum').value || '').trim();
-      if (!num) return;
-      aplicarDadosQuartoAlojamento(`${bloco}_${num}`, num, bloco);
+      const bloco = document.getElementById('selectBlocoManual')?.value || 'Bloco 1';
+      const num = (document.getElementById('inputQuartoManualNum')?.value || '').trim();
+      if (!num) {
+        if (timerHistoricoQuartoManual) {
+          clearTimeout(timerHistoricoQuartoManual);
+          timerHistoricoQuartoManual = null;
+        }
+        resetarLocalNaoSelecionado('alojamento');
+        return;
+      }
+      aplicarDadosQuartoAlojamento(`${bloco}_${num}`, num, bloco, true);
       document.getElementById('containerSelecaoCasa').classList.remove('hidden');
+      const badgeQr = document.getElementById('badgeQrIdentificado');
+      if (badgeQr) badgeQr.classList.add('hidden');
+
+      if (timerHistoricoQuartoManual) clearTimeout(timerHistoricoQuartoManual);
+      const idLimpo = `${bloco}_${num}`;
+      timerHistoricoQuartoManual = setTimeout(() => {
+        carregarHistoricoPlaquinhaLimpeza(`quarto_${idLimpo}`, idLimpo, bloco);
+      }, 350);
     }
 
     function carregarCasa(casaId) {
@@ -1064,18 +1519,10 @@
       if (casaCarregada) {
         aplicarDadosCasa(casaCarregada);
       } else {
-        document.getElementById('displayCasaNome').textContent = 'Selecione o Local Abaixo';
-        document.getElementById('displayCasaEndereco').innerHTML = '<i class="fa-solid fa-circle-info text-amber-400"></i> Escolha a residência ou quarto que está atendendo:';
-        document.getElementById('containerSelecaoCasa').classList.remove('hidden');
-        document.getElementById('badgeQrIdentificado').classList.add('hidden');
+        resetarLocalNaoSelecionado('casa');
       }
 
-      const selEl = document.getElementById('selectCasaManual');
-      if (selEl && listaCasasDisponiveis.length > 0) {
-        selEl.innerHTML = '<option value="">Selecione uma casa...</option>' + 
-          listaCasasDisponiveis.map(c => `<option value="${c.id}">${c.nome} - ${c.endereco || ''}</option>`).join('');
-        if (casaCarregada) selEl.value = casaCarregada.id;
-      }
+      renderizarOpcoesCasasManual();
 
       // Sincronização em segundo plano (background) com Firestore
       if (firestoreDb && navigator.onLine) {
@@ -1086,6 +1533,7 @@
             if (remotas.length > 0) {
               listaCasasDisponiveis = remotas;
               localStorage.setItem('casas_cidade_cache', JSON.stringify(listaCasasDisponiveis));
+              renderizarOpcoesCasasManual();
               if (casaId) {
                 const atualizada = remotas.find(c => c.id === casaId);
                 if (atualizada) {
@@ -1118,11 +1566,19 @@
       `;
       document.getElementById('iconeUnidade').className = 'fa-solid fa-house';
       document.getElementById('boxComodoOcorrencia').classList.remove('hidden');
+      document.getElementById('boxQuartoOcorrenciaAlojamento').classList.add('hidden');
+      document.getElementById('boxQuartoAtendidoLimpeza').classList.add('hidden');
       document.getElementById('containerSelecaoCasa').classList.add('hidden');
-      document.getElementById('badgeQrIdentificado').classList.remove('hidden');
+      document.getElementById('badgeQrIdentificado').classList.toggle('hidden', !veioDeQrCodeUnidade);
+      const btnTrocar = document.getElementById('btnTrocarLocalManual');
+      if (btnTrocar) btnTrocar.classList.toggle('hidden', veioDeQrCodeUnidade);
 
       const selEl = document.getElementById('selectCasaManual');
       if (selEl) selEl.value = c.id;
+
+      const elIdent = document.getElementById('plaquinhaIdentificacaoAparelho');
+      if (elIdent) elIdent.textContent = String(c.nome || 'Residência').toUpperCase();
+      atualizarVisibilidadeCardLocal(true);
 
       if (typeof carregarHistoricoPlaquinhaLimpeza === 'function') {
         carregarHistoricoPlaquinhaLimpeza(c.id, null, null);
@@ -1159,6 +1615,10 @@
     }
 
     function selecionarCasaManual(id) {
+      if (!id) {
+        resetarLocalNaoSelecionado('casa');
+        return;
+      }
       const c = listaCasasDisponiveis.find(x => x.id === id);
       if (c) {
         casaCarregada = c;
@@ -1166,21 +1626,142 @@
       }
     }
 
-    function escolherTipoServico(tipo) {
-      document.getElementById('inputTipo').value = tipo;
-      const cardRotina = document.getElementById('cardTipoRotina');
-      const cardAr = document.getElementById('cardTipoAr');
-      const boxSubtipoAr = document.getElementById('boxSubtipoAr');
+    function toggleServicoRealizado(chave) {
+      if (!SERVICOS_DISPONIVEIS.some(s => s.key === chave)) return;
+      const avisoEl = document.getElementById('avisoMinimoServico');
 
-      if (tipo === 'rotina') {
-        cardRotina.className = 'tipo-card active cursor-pointer border-2 border-teal-500 bg-teal-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none';
-        cardAr.className = 'tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100';
-        if (boxSubtipoAr) boxSubtipoAr.classList.add('hidden');
+      if (servicosSelecionados.has(chave)) {
+        if (servicosSelecionados.size <= 1) {
+          dispararFeedbackTati('alerta');
+          if (avisoEl) {
+            avisoEl.classList.remove('hidden');
+            if (timerAvisoMinimoServico) clearTimeout(timerAvisoMinimoServico);
+            timerAvisoMinimoServico = setTimeout(() => {
+              avisoEl.classList.add('hidden');
+            }, 2600);
+          }
+          return;
+        }
+        servicosSelecionados.delete(chave);
       } else {
-        cardRotina.className = 'tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100';
-        cardAr.className = 'tipo-card active cursor-pointer border-2 border-sky-500 bg-sky-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none';
-        if (boxSubtipoAr) boxSubtipoAr.classList.remove('hidden');
+        servicosSelecionados.add(chave);
       }
+
+      if (avisoEl) avisoEl.classList.add('hidden');
+      dispararFeedbackTati('scan');
+      atualizarUIServicosSelecionados();
+    }
+
+    function escolherTipoServico(tipo) {
+      const chaveValida = SERVICOS_DISPONIVEIS.some(s => s.key === tipo) ? tipo : 'rotina';
+      servicosSelecionados = new Set([chaveValida]);
+      const avisoEl = document.getElementById('avisoMinimoServico');
+      if (avisoEl) avisoEl.classList.add('hidden');
+      atualizarUIServicosSelecionados();
+    }
+
+    function atualizarEstiloSubtipoAr() {
+      const rad = document.querySelector('input[name="subtipo_ar"]:checked');
+      const val = rad ? rad.value : 'filtro';
+      document.querySelectorAll('[data-subtipo-label]').forEach(lbl => {
+        const isSelected = lbl.getAttribute('data-subtipo-label') === val;
+        lbl.className = isSelected
+          ? 'cursor-pointer p-2.5 rounded-xl border border-sky-500/60 bg-sky-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition'
+          : 'cursor-pointer p-2.5 rounded-xl border border-slate-700 bg-slate-950/40 flex items-center gap-2 text-xs font-bold text-white hover:bg-sky-900/40 transition';
+      });
+    }
+
+    function atualizarUIServicosSelecionados() {
+      if (servicosSelecionados.size === 0) {
+        servicosSelecionados.add('rotina');
+      }
+
+      SERVICOS_DISPONIVEIS.forEach(s => {
+        const ativo = servicosSelecionados.has(s.key);
+        const card = document.getElementById(s.cardId);
+        const check = document.getElementById(s.checkId);
+        if (card) {
+          card.setAttribute('aria-checked', ativo ? 'true' : 'false');
+          card.className = ativo ? s.activeCardClass : INACTIVE_SERVICO_CARD_CLASS;
+        }
+        if (check) {
+          check.className = ativo ? s.activeCheckClass : INACTIVE_SERVICO_CHECK_CLASS;
+        }
+      });
+
+      const temAr = servicosSelecionados.has('ar_condicionado');
+      const inputTipo = document.getElementById('inputTipo');
+      if (inputTipo) {
+        inputTipo.value = temAr ? 'ar_condicionado' : 'rotina';
+      }
+
+      const boxSubtipoAr = document.getElementById('boxSubtipoAr');
+      if (boxSubtipoAr) {
+        boxSubtipoAr.classList.toggle('hidden', !temAr);
+      }
+      if (temAr) {
+        atualizarEstiloSubtipoAr();
+      }
+
+      const qtd = servicosSelecionados.size;
+      const contEl = document.getElementById('contadorServicosSelecionados');
+      if (contEl) {
+        contEl.innerHTML = `<i class="fa-solid fa-check-double text-[9px]"></i> <span>${qtd} ${qtd === 1 ? 'serviço selecionado' : 'serviços selecionados'}</span>`;
+        contEl.className = qtd > 1
+          ? 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 whitespace-nowrap'
+          : 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-teal-500/20 text-teal-300 border border-teal-500/40 whitespace-nowrap';
+      }
+    }
+
+    function obterResumoServicosSelecionados() {
+      if (servicosSelecionados.size === 0) {
+        servicosSelecionados.add('rotina');
+      }
+      const temAr = servicosSelecionados.has('ar_condicionado');
+      let subtipoAr = '';
+      if (temAr) {
+        const rad = document.querySelector('input[name="subtipo_ar"]:checked');
+        const val = rad ? rad.value : 'filtro';
+        subtipoAr = (val === 'filtro' || val === 'total' || val === 'corretiva') ? val : 'filtro';
+      }
+
+      const subtipoTexto = subtipoAr === 'total'
+        ? 'Higienização Total'
+        : (subtipoAr === 'corretiva' ? 'Corretiva / Reparo' : 'Limpeza de Filtro');
+
+      const nomes = [];
+      SERVICOS_DISPONIVEIS.forEach(s => {
+        if (!servicosSelecionados.has(s.key)) return;
+        if (s.key === 'ar_condicionado') {
+          nomes.push(`Ar-Condicionado (${subtipoTexto})`);
+        } else {
+          nomes.push(s.nome);
+        }
+      });
+
+      const tipoFirestore = temAr ? 'ar_condicionado' : 'rotina';
+      const precisaPrefixo = servicosSelecionados.size > 1 ||
+        servicosSelecionados.has('enxoval') ||
+        servicosSelecionados.has('manutencao');
+
+      let descTipo = nomes.join(' + ');
+      if (servicosSelecionados.size === 1) {
+        if (servicosSelecionados.has('rotina')) {
+          descTipo = 'Limpeza / Faxina Geral';
+        } else if (temAr) {
+          if (subtipoAr === 'filtro') descTipo = 'Limpeza de Filtro de Ar';
+          else if (subtipoAr === 'total') descTipo = 'Higienização Total de Ar (Ciclo 30d)';
+          else if (subtipoAr === 'corretiva') descTipo = 'Manutenção Corretiva de Ar';
+        }
+      }
+
+      return {
+        tipoFirestore,
+        subtipoAr,
+        nomes,
+        precisaPrefixo,
+        descTipo
+      };
     }
 
     function escolherAvaliacao(btn, valor) {
@@ -1296,35 +1877,40 @@
       const agora = new Date();
       const protocolo = 'LIMP-' + Math.floor(100000 + Math.random() * 900000);
       const dataHoraStr = `${data}T${hora}:00`;
-      let subtipoAr = '';
-      if (tipo === 'ar_condicionado') {
-        const rad = document.querySelector('input[name="subtipo_ar"]:checked');
-        subtipoAr = rad ? rad.value : 'filtro';
+      const resumoServicos = obterResumoServicosSelecionados();
+      const tipoFinal = resumoServicos.tipoFirestore; // estritamente 'ar_condicionado' ou 'rotina'
+      const subtipoAr = resumoServicos.subtipoAr; // 'filtro' | 'total' | 'corretiva' quando ar, senão ''
+      const descTipo = resumoServicos.descTipo;
+
+      // Garantir compatibilidade estrita com firestore.rules (vLm: observacoes <= 1500 chars)
+      let observacoesFinal = observacoes;
+      if (resumoServicos.precisaPrefixo) {
+        const prefixoServicos = `[Serviços: ${resumoServicos.nomes.join(' + ')}]`;
+        observacoesFinal = observacoes ? `${prefixoServicos} ${observacoes}` : prefixoServicos;
       }
-      let descTipo = tipo === 'rotina' ? 'Limpeza de Rotina (Diária)' : 'Higienização de Ar Condicionado';
-      if (subtipoAr === 'filtro') descTipo = 'Limpeza de Filtro de Ar';
-      else if (subtipoAr === 'total') descTipo = 'Higienização Total de Ar (Ciclo 30d)';
-      else if (subtipoAr === 'corretiva') descTipo = 'Manutenção Corretiva de Ar';
+      if (observacoesFinal.length > 1500) {
+        observacoesFinal = observacoesFinal.slice(0, 1500);
+      }
 
       const registro = {
         id: protocolo,
-        casa_id: casaId,
-        casa_nome: casaNome,
-        tipo_local: tipoLocal,
-        quarto_id: quartoId ? String(quartoId) : '',
-        quarto_numero: quartoNumero ? String(quartoNumero) : '',
-        bloco_nome: blocoNome || '',
-        tipo: tipo,
+        casa_id: String(casaId).slice(0, 150),
+        casa_nome: String(casaNome).slice(0, 250),
+        tipo_local: String(tipoLocal).slice(0, 100),
+        quarto_id: quartoId ? String(quartoId).slice(0, 120) : '',
+        quarto_numero: quartoNumero ? String(quartoNumero).slice(0, 250) : '',
+        bloco_nome: blocoNome ? String(blocoNome).slice(0, 100) : '',
+        tipo: tipoFinal,
         subtipo: subtipoAr,
-        data: data,
-        hora: hora,
-        data_hora: dataHoraStr,
-        responsavel: responsavel,
-        avaliacao: avaliacao || 'Normal',
-        observacoes: observacoes || '',
+        data: String(data).slice(0, 150),
+        hora: String(hora).slice(0, 100),
+        data_hora: String(dataHoraStr).slice(0, 100),
+        responsavel: String(responsavel).slice(0, 150),
+        avaliacao: String(avaliacao || 'Normal').slice(0, 120),
+        observacoes: observacoesFinal,
         origem: 'QR Code (Equipe Autenticada)',
         criado_em: agora.toISOString(),
-        criado_por: responsavel
+        criado_por: String(responsavel).slice(0, 150)
       };
 
       try {
@@ -1351,14 +1937,14 @@
             try {
               const logId = 'LOG-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
               const logObj = {
-                id: logId,
-                data_hora: `${formatarDataSeguraBR(data)} ${hora}`,
+                id: String(logId).slice(0, 80),
+                data_hora: `${formatarDataSeguraBR(data)} ${hora}`.slice(0, 80),
                 timestamp: agora.toISOString(),
-                usuario: String(responsavel),
+                usuario: String(responsavel).slice(0, 150),
                 modulo: tipoLocal === 'alojamento' ? 'alojamentos' : 'casas',
                 acao: 'LIMPEZA',
-                entidade: String(casaNome),
-                detalhes: `${descTipo} realizada por ${responsavel} via QR Code. Estado: ${avaliacao}. Obs: ${observacoes || 'Nenhuma'}`
+                entidade: String(casaNome).slice(0, 200),
+                detalhes: `${descTipo} realizada por ${responsavel} via QR Code. Estado: ${avaliacao}. Obs: ${observacoesFinal || 'Nenhuma'}`.slice(0, 2000)
               };
               firestoreDb.collection('auditoria_logs').doc(logId).set(logObj).catch(() => {});
             } catch (err) {}
@@ -1681,7 +2267,7 @@
       document.getElementById('inputData').value = getDataHojeLocal(agora);
       document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
       document.getElementById('inputObservacoes').value = '';
-      escolherTipoServico('ar_condicionado');
+      escolherTipoServico('rotina');
 
       const btn = document.getElementById('btnConfirmar');
       btn.disabled = false;
@@ -1809,13 +2395,12 @@
 
     function atualizarBadgeCicloPlaquinha(registros) {
       const badge = document.getElementById('badgeStatusCicloPlaquinha');
-      const texto = document.getElementById('textoStatusCicloPlaquinha');
-      if (!badge || !texto) return;
+      if (!badge) return;
 
       const manutencoesAr = (registros || []).filter(r => r.tipo === 'ar_condicionado');
       if (manutencoesAr.length === 0) {
         badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1';
-        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-600"></i> <span>Aguardando 1ª Limpeza</span>';
+        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-600"></i> <span id="textoStatusCicloPlaquinha">Aguardando 1ª Limpeza Ar</span>';
         return;
       }
 
@@ -1823,17 +2408,17 @@
       const dataUlt = new Date(ult.data || ult.criado_em);
       const hoje = new Date();
       const diffMs = hoje - dataUlt;
-      const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffDias = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 
       if (diffDias <= 24) {
         badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1';
-        badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> <span>Em Dia (${diffDias}d atrás)</span>`;
+        badge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> <span id="textoStatusCicloPlaquinha">Em Dia (${diffDias}d atrás)</span>`;
       } else if (diffDias <= 30) {
         badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1';
-        badge.innerHTML = `<i class="fa-solid fa-clock text-amber-600"></i> <span>Atenção (${diffDias}d - Próximo)</span>`;
+        badge.innerHTML = `<i class="fa-solid fa-clock text-amber-600"></i> <span id="textoStatusCicloPlaquinha">Atenção (${diffDias}d - Próximo)</span>`;
       } else {
         badge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1';
-        badge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600"></i> <span>Vencido (${diffDias}d - Limpar)</span>`;
+        badge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-600"></i> <span id="textoStatusCicloPlaquinha">Vencido (${diffDias}d - Limpar)</span>`;
       }
     }
 

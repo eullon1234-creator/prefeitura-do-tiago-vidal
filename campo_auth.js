@@ -44,9 +44,13 @@
 
   const FRENTE_LABELS = {
     maquina_gelo: 'Fábrica & Máquina de Gelo',
-    ronda: 'Banheiros & Bebedouros (Ronda)',
+    ronda: 'Banheiros & Bebedouros',
+    casas: 'Casas na Cidade',
+    alojamentos: 'Alojamentos & Quartos',
     limpeza: 'Casas na Cidade & Quartos (Limpeza / Ar)'
   };
+
+  const GRANULAR_FRONTS = ['maquina_gelo', 'ronda', 'casas', 'alojamentos'];
 
   const internal = {
     app: null,
@@ -184,18 +188,25 @@
     if (frente === 'ronda') {
       return mods.ronda === 'editar';
     }
+    if (frente === 'casas') {
+      return mods.casas_cidade === 'editar';
+    }
+    if (frente === 'alojamentos') {
+      return mods.blocos === 'editar';
+    }
     if (frente === 'limpeza') {
       return mods.casas_cidade === 'editar' || mods.blocos === 'editar';
     }
     return false;
   }
 
+  function getAllowedFronts(perfil) {
+    if (!perfil || perfil.status !== 'ativo') return [];
+    return GRANULAR_FRONTS.filter(frente => hasFrontAccess(perfil, frente));
+  }
+
   function hasAnyFrontAccess(perfil) {
-    return (
-      hasFrontAccess(perfil, 'maquina_gelo') ||
-      hasFrontAccess(perfil, 'ronda') ||
-      hasFrontAccess(perfil, 'limpeza')
-    );
+    return getAllowedFronts(perfil).length > 0;
   }
 
   function hasAdminPanelAccess(perfil) {
@@ -902,6 +913,7 @@
     solicitarAcesso,
     logout,
     hasFrontAccess,
+    getAllowedFronts,
     hasAnyFrontAccess,
     hasAdminPanelAccess,
     watchAuth,

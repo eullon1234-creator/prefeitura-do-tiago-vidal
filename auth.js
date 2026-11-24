@@ -40,6 +40,42 @@
     { id: 'configuracoes', nome: 'Configurações & Firebase', grupo: 'grupo_gestao', grupoNome: 'Gestão & Sistema', icone: 'fa-sliders', cor: 'text-slate-600' }
   ];
 
+  // Frentes de Campo (multi-seleção independente no modal de permissões — 100% compatível com os 18 módulos existentes)
+  const AUTH_FRENTES_CAMPO = [
+    {
+      id: 'maquina_gelo',
+      emoji: '🧊',
+      titulo: 'Fábrica & Máquina de Gelo',
+      subtitulo: 'Produção, freezer e saídas',
+      badgeCurto: '🧊 Gelo',
+      badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-200'
+    },
+    {
+      id: 'ronda',
+      emoji: '🚽',
+      titulo: 'Banheiros & Bebedouros',
+      subtitulo: 'Ronda de higienização e checklists',
+      badgeCurto: '🚽 Ronda',
+      badgeClass: 'bg-teal-50 text-teal-800 border-teal-200'
+    },
+    {
+      id: 'casas_cidade',
+      emoji: '🏠',
+      titulo: 'Casas na Cidade',
+      subtitulo: 'Limpeza, ar-condicionado e enxoval',
+      badgeCurto: '🏠 Casas',
+      badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-200'
+    },
+    {
+      id: 'blocos',
+      emoji: '🛏️',
+      titulo: 'Alojamentos & Quartos',
+      subtitulo: 'Limpeza de quartos, ar e enxoval',
+      badgeCurto: '🛏️ Quartos',
+      badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200'
+    }
+  ];
+
   function criarMapaPermissoes(padrao = 'bloqueado', overrides = {}) {
     const map = {};
     AUTH_MODULOS.forEach(m => { map[m.id] = padrao; });
@@ -678,8 +714,11 @@
       if (perms.ronda === 'editar') {
         frentes.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-200 border border-teal-400/30 text-[11px] font-bold"><i class="fa-solid fa-faucet-drip"></i>Banheiros & Bebedouros</span>');
       }
-      if (perms.casas_cidade === 'editar' || perms.blocos === 'editar') {
-        frentes.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 text-[11px] font-bold"><i class="fa-solid fa-broom"></i>Casas & Quartos</span>');
+      if (perms.casas_cidade === 'editar') {
+        frentes.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-200 border border-indigo-400/30 text-[11px] font-bold"><i class="fa-solid fa-house-chimney-user"></i>Casas na Cidade</span>');
+      }
+      if (perms.blocos === 'editar') {
+        frentes.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 text-[11px] font-bold"><i class="fa-solid fa-bed"></i>Alojamentos & Quartos</span>');
       }
       elBadges.innerHTML = frentes.length > 0
         ? frentes.join('')
@@ -1196,6 +1235,12 @@
         ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200 uppercase"><i class="fa-solid fa-helmet-safety"></i> Somente Campo</span>`
         : '';
 
+      const permsU = u.permissoesModulos || {};
+      const frentesBadgesHtml = AUTH_FRENTES_CAMPO
+        .filter(f => ehMaster || permsU[f.id] === 'editar')
+        .map(f => `<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg border ${f.badgeClass}">${f.badgeCurto}</span>`)
+        .join('');
+
       const avatarBg = ehMaster
         ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950'
         : (u.status === 'pendente'
@@ -1265,6 +1310,12 @@
                   ${u.extras && u.extras.podeExcluir ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-trash mr-1"></i>Pode Excluir</span>' : ''}
                   ${u.extras && u.extras.podeExportar ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-green-50 text-green-700 border border-green-200"><i class="fa-solid fa-file-excel mr-1"></i>Exporta Excel</span>' : ''}
                 </div>
+                ${frentesBadgesHtml ? `
+                  <div class="flex items-center gap-1.5 flex-wrap mt-2">
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mr-0.5">Frentes:</span>
+                    ${frentesBadgesHtml}
+                  </div>
+                ` : ''}
               ` : `
                 <p class="text-[11px] text-amber-800 mt-2 font-medium">
                   <i class="fa-solid fa-circle-info mr-1"></i>Solicitou acesso em ${formatarDataHoraCurta(u.criadoEm)}. Bloqueado até você aprovar e liberar módulos.
@@ -1363,12 +1414,64 @@
       }
     }
 
+    renderFrentesCampoModal();
     renderPresetsModal();
     renderMatrizModulosModal();
     sincronizarCheckboxesExtrasModal();
 
     const modal = document.getElementById('modalUsuarioPermissoes');
     if (modal) modal.classList.remove('hidden');
+  }
+
+  function renderFrentesCampoModal() {
+    const container = document.getElementById('modalFrentesCampoContainer');
+    const contador = document.getElementById('modalFrentesCampoContador');
+    const selecionadas = AUTH_FRENTES_CAMPO.filter(f => state.modalPermissoesTemp[f.id] === 'editar').length;
+
+    if (contador) {
+      contador.textContent = selecionadas === 1 ? '1 selecionada' : `${selecionadas} selecionadas`;
+      contador.className = selecionadas > 0
+        ? 'text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300'
+        : 'text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200';
+    }
+
+    if (!container) return;
+
+    container.innerHTML = AUTH_FRENTES_CAMPO.map(f => {
+      const nivel = state.modalPermissoesTemp[f.id] || 'bloqueado';
+      const ativo = nivel === 'editar';
+      const soVer = nivel === 'ver';
+      return `
+        <button type="button" onclick="PrefeituraAuth.toggleFrenteCampoModal('${f.id}')" aria-pressed="${ativo ? 'true' : 'false'}" class="w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-center gap-3 active:scale-[0.99] ${ativo ? 'border-emerald-500 bg-emerald-50/90 ring-2 ring-emerald-500/20 shadow-xs' : 'border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/30'}">
+          <div class="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition ${ativo ? 'bg-emerald-600 text-white shadow-xs' : 'border-2 border-slate-300 bg-white text-transparent'}">
+            <i class="fa-solid fa-check text-xs"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs sm:text-sm font-extrabold ${ativo ? 'text-emerald-950' : 'text-slate-800'} truncate">${f.emoji} ${f.titulo}</span>
+              ${ativo
+                ? '<span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-emerald-600 text-white flex-shrink-0">Liberada</span>'
+                : (soVer ? '<span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-700 border border-sky-200 flex-shrink-0">Só Ver</span>' : '')}
+            </div>
+            <span class="block text-[11px] ${ativo ? 'text-emerald-800/80' : 'text-slate-500'} truncate mt-0.5">${f.subtitulo}</span>
+          </div>
+        </button>
+      `;
+    }).join('');
+  }
+
+  function toggleFrenteCampoModal(modId) {
+    if (!AUTH_FRENTES_CAMPO.some(f => f.id === modId)) return;
+    const nivelAtual = state.modalPermissoesTemp[modId];
+    state.modalPermissoesTemp[modId] = (nivelAtual === 'editar') ? 'bloqueado' : 'editar';
+
+    const chkCampo = document.getElementById('chkPermSomenteCampo');
+    const somenteCampo = chkCampo ? chkCampo.checked : isPerfilSomenteCampo(state.modalPerfilBaseTemp);
+    state.modalPerfilBaseTemp = somenteCampo ? 'campo_personalizado' : 'personalizado';
+
+    renderFrentesCampoModal();
+    renderPresetsModal();
+    renderMatrizModulosModal();
   }
 
   function renderPresetsModal() {
@@ -1405,6 +1508,7 @@
     state.modalPermissoesTemp = { ...preset.modulos };
     state.modalExtrasTemp = { ...preset.extras };
     if (reRender) {
+      renderFrentesCampoModal();
       renderPresetsModal();
       renderMatrizModulosModal();
       sincronizarCheckboxesExtrasModal();
@@ -1416,6 +1520,7 @@
     const chkCampo = document.getElementById('chkPermSomenteCampo');
     const somenteCampo = chkCampo ? chkCampo.checked : isPerfilSomenteCampo(state.modalPerfilBaseTemp);
     state.modalPerfilBaseTemp = somenteCampo ? 'campo_personalizado' : 'personalizado';
+    renderFrentesCampoModal();
     renderPresetsModal();
     renderMatrizModulosModal();
   }
@@ -1427,6 +1532,7 @@
     const chkCampo = document.getElementById('chkPermSomenteCampo');
     const somenteCampo = chkCampo ? chkCampo.checked : isPerfilSomenteCampo(state.modalPerfilBaseTemp);
     state.modalPerfilBaseTemp = somenteCampo ? 'campo_personalizado' : 'personalizado';
+    renderFrentesCampoModal();
     renderPresetsModal();
     renderMatrizModulosModal();
   }
@@ -1854,6 +1960,8 @@
     setBuscaUsuarios,
     abrirModalUsuario,
     fecharModalUsuarioPermissoes,
+    renderFrentesCampoModal,
+    toggleFrenteCampoModal,
     aplicarPerfilProntoModal,
     setPermissaoModuloModal,
     setPermissaoGrupoModal,

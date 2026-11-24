@@ -10520,6 +10520,25 @@ service cloud.firestore {
             </div>
           </div>
 
+          <!-- Frentes de Campo Liberadas (Multi-seleção Independente) -->
+          <div class="bg-gradient-to-br from-teal-50/80 via-white to-emerald-50/60 p-4 rounded-2xl border-2 border-teal-200/80 shadow-xs space-y-3">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                <i class="fa-solid fa-helmet-safety text-teal-600"></i> Frentes de Campo Liberadas (Marque quantas quiser)
+              </h4>
+              <span id="modalFrentesCampoContador" class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                0 selecionadas
+              </span>
+            </div>
+            <div id="modalFrentesCampoContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- Populado via auth.js -->
+            </div>
+            <p class="text-[11px] text-teal-800/85 font-medium flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-info text-teal-600 flex-shrink-0"></i>
+              <span>Você pode marcar 1, 2 ou todas as frentes acima ao mesmo tempo para este funcionário.</span>
+            </p>
+          </div>
+
           <!-- Perfis Prontos (1 Clique) -->
           <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-2.5">
             <div class="flex items-center justify-between gap-2">
@@ -10658,7 +10677,7 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-[110] flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Scripts da Aplicação e Sistema de Autenticação (RBAC) -->
-  <script src="auth.js?v=6.3"></script>
+  <script src="auth.js?v=6.4"></script>
   <script src="app.js?v=6.0"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
