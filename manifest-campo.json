@@ -1,0 +1,29 @@
+{
+  "id": "/portal-campo",
+  "name": "GEL Campo • App do Funcionário",
+  "short_name": "GEL Campo",
+  "description": "Aplicativo oficial da equipe de campo da Prefeitura de Canteiro (Taboca 2) — Máquina de Gelo, Ronda de Sanitários/Bebedouros e Limpeza de Casas/Quartos.",
+  "start_url": "./campo.html",
+  "scope": "./",
+  "display": "standalone",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon-campo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-campo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

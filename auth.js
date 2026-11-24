@@ -124,6 +124,46 @@
       cor: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
       modulos: criarMapaPermissoes('editar'),
       extras: { podeExcluir: true, podeExportar: true, gerenciarUsuarios: true }
+    },
+    campo_gelo: {
+      nome: 'Operador de Gelo (Só Campo)',
+      icone: 'fa-cubes',
+      cor: 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100',
+      modulos: criarMapaPermissoes('bloqueado', {
+        maquina_gelo: 'editar'
+      }),
+      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false }
+    },
+    campo_ronda: {
+      nome: 'Equipe Banheiros/Bebedouros (Só Campo)',
+      icone: 'fa-faucet-drip',
+      cor: 'bg-teal-50 text-teal-800 border-teal-200 hover:bg-teal-100',
+      modulos: criarMapaPermissoes('bloqueado', {
+        ronda: 'editar'
+      }),
+      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false }
+    },
+    campo_limpeza: {
+      nome: 'Equipe Limpeza Casas/Quartos (Só Campo)',
+      icone: 'fa-broom',
+      cor: 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100',
+      modulos: criarMapaPermissoes('bloqueado', {
+        casas_cidade: 'editar',
+        blocos: 'editar'
+      }),
+      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false }
+    },
+    campo_completo: {
+      nome: 'Operador Campo Geral (Gelo+Ronda+Casas)',
+      icone: 'fa-helmet-safety',
+      cor: 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100',
+      modulos: criarMapaPermissoes('bloqueado', {
+        maquina_gelo: 'editar',
+        ronda: 'editar',
+        casas_cidade: 'editar',
+        blocos: 'editar'
+      }),
+      extras: { podeExcluir: false, podeExportar: false, gerenciarUsuarios: false }
     }
   };
 
@@ -254,12 +294,16 @@
   // ==========================================================================
   // CONTROLE VISUAL DO OVERLAY GLASSMORPHISM
   // ==========================================================================
+  function isPerfilSomenteCampo(perfilBase) {
+    return String(perfilBase || '').startsWith('campo_');
+  }
+
   function mostrarTelaGate(viewName) {
     const gate = document.getElementById('authGateOverlay');
     if (gate) gate.classList.remove('hidden');
     document.body.classList.add('auth-locked');
 
-    const views = ['authViewLoading', 'authViewSetupMaster', 'authViewAuth', 'authViewPending', 'authViewBlocked', 'authViewConfigError'];
+    const views = ['authViewLoading', 'authViewSetupMaster', 'authViewAuth', 'authViewPending', 'authViewBlocked', 'authViewConfigError', 'authViewSomenteCampo'];
     views.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.toggle('hidden', id !== viewName);
@@ -616,7 +660,45 @@
     }
   }
 
+  function preencherTelaSomenteCampo(perfil) {
+    const elNome = document.getElementById('somenteCampoUserNome');
+    const elLogin = document.getElementById('somenteCampoUserLogin');
+    const elCargo = document.getElementById('somenteCampoUserCargo');
+    const elBadges = document.getElementById('somenteCampoFrentesBadges');
+    if (elNome) elNome.textContent = perfil.nome || 'Colaborador';
+    if (elLogin) elLogin.textContent = '@' + (perfil.username || 'usuario');
+    if (elCargo) elCargo.textContent = perfil.cargo || 'Equipe de Campo';
+
+    if (elBadges) {
+      const perms = perfil.permissoesModulos || {};
+      const frentes = [];
+      if (perms.maquina_gelo === 'editar') {
+        frentes.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-200 border border-cyan-400/30 text-[11px] font-bold"><i class="fa-solid fa-cubes"></i>Máquina de Gelo</span>');
+      }
+      if (perms.ronda === 'editar') {
+        frentes.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-200 border border-teal-400/30 text-[11px] font-bold"><i class="fa-solid fa-faucet-drip"></i>Banheiros & Bebedouros</span>');
+      }
+      if (perms.casas_cidade === 'editar' || perms.blocos === 'editar') {
+        frentes.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 text-[11px] font-bold"><i class="fa-solid fa-broom"></i>Casas & Quartos</span>');
+      }
+      elBadges.innerHTML = frentes.length > 0
+        ? frentes.join('')
+        : '<span class="text-[11px] text-slate-400">Nenhuma frente de campo liberada ainda.</span>';
+    }
+  }
+
   function ativarSessaoNoPainel(perfil) {
+    // Bloqueia entrada no Painel do Prefeito para perfis marcados como "Somente Apps de Campo"
+    if (!isMaster() && isPerfilSomenteCampo(perfil.perfilBase)) {
+      if (state.unsubTodosUsuarios) {
+        state.unsubTodosUsuarios();
+        state.unsubTodosUsuarios = null;
+      }
+      preencherTelaSomenteCampo(perfil);
+      mostrarTelaGate('authViewSomenteCampo');
+      return;
+    }
+
     // Atualiza nome global usado nos logs de auditoria do app.js
     if (typeof window !== 'undefined') {
       try {
@@ -1110,6 +1192,10 @@
           ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 uppercase">Co-Admin</span>`
           : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">Equipe</span>`);
 
+      const campoBadge = (!ehMaster && isPerfilSomenteCampo(u.perfilBase))
+        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200 uppercase"><i class="fa-solid fa-helmet-safety"></i> Somente Campo</span>`
+        : '';
+
       const avatarBg = ehMaster
         ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950'
         : (u.status === 'pendente'
@@ -1160,6 +1246,7 @@
                 <h4 class="font-bold text-slate-900 text-sm sm:text-base truncate">${escaparHtml(u.nome)}</h4>
                 ${ehEu ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-bold">Você</span>' : ''}
                 ${roleBadge}
+                ${campoBadge}
                 ${statusBadge}
               </div>
               <div class="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-slate-500 mt-1">
@@ -1256,6 +1343,8 @@
             gerenciarUsuarios: !!(usuario.extras && usuario.extras.gerenciarUsuarios)
           };
           state.modalPerfilBaseTemp = usuario.perfilBase || 'personalizado';
+        } else if (isPerfilSomenteCampo(usuario.perfilBase)) {
+          aplicarPerfilProntoModal('campo_completo', false);
         } else {
           aplicarPerfilProntoModal('fiscal_ronda', false);
         }
@@ -1285,7 +1374,11 @@
   function renderPresetsModal() {
     const container = document.getElementById('modalPerfisProntosContainer');
     if (!container) return;
-    container.innerHTML = Object.entries(AUTH_PERFIS_PRONTOS).map(([key, p]) => {
+    const entries = Object.entries(AUTH_PERFIS_PRONTOS);
+    const adminEntries = entries.filter(([key]) => !isPerfilSomenteCampo(key));
+    const campoEntries = entries.filter(([key]) => isPerfilSomenteCampo(key));
+
+    const renderBtn = ([key, p]) => {
       const ativo = state.modalPerfilBaseTemp === key;
       return `
         <button type="button" onclick="PrefeituraAuth.aplicarPerfilProntoModal('${key}', true)" class="px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${p.cor} ${ativo ? 'ring-2 ring-slate-900 shadow-sm' : ''}">
@@ -1293,7 +1386,16 @@
           <span>${p.nome}</span>
         </button>
       `;
-    }).join('');
+    };
+
+    container.innerHTML = `
+      ${adminEntries.map(renderBtn).join('')}
+      <div class="w-full pt-2 mt-1 border-t border-slate-100 flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-teal-700">
+        <i class="fa-solid fa-helmet-safety"></i>
+        <span>Perfis de Campo (Apenas App do Funcionário — bloqueia entrada no Painel)</span>
+      </div>
+      ${campoEntries.map(renderBtn).join('')}
+    `;
   }
 
   function aplicarPerfilProntoModal(perfilKey, reRender = true) {
@@ -1311,7 +1413,9 @@
 
   function setPermissaoModuloModal(modId, nivel) {
     state.modalPermissoesTemp[modId] = nivel;
-    state.modalPerfilBaseTemp = 'personalizado';
+    const chkCampo = document.getElementById('chkPermSomenteCampo');
+    const somenteCampo = chkCampo ? chkCampo.checked : isPerfilSomenteCampo(state.modalPerfilBaseTemp);
+    state.modalPerfilBaseTemp = somenteCampo ? 'campo_personalizado' : 'personalizado';
     renderPresetsModal();
     renderMatrizModulosModal();
   }
@@ -1320,18 +1424,36 @@
     AUTH_MODULOS.filter(m => m.grupo === grupoId).forEach(m => {
       state.modalPermissoesTemp[m.id] = nivel;
     });
-    state.modalPerfilBaseTemp = 'personalizado';
+    const chkCampo = document.getElementById('chkPermSomenteCampo');
+    const somenteCampo = chkCampo ? chkCampo.checked : isPerfilSomenteCampo(state.modalPerfilBaseTemp);
+    state.modalPerfilBaseTemp = somenteCampo ? 'campo_personalizado' : 'personalizado';
     renderPresetsModal();
     renderMatrizModulosModal();
+  }
+
+  function toggleSomenteCampoModal(checked) {
+    if (checked) {
+      if (!isPerfilSomenteCampo(state.modalPerfilBaseTemp)) {
+        state.modalPerfilBaseTemp = 'campo_personalizado';
+      }
+    } else if (isPerfilSomenteCampo(state.modalPerfilBaseTemp)) {
+      const semPrefixo = String(state.modalPerfilBaseTemp).replace(/^campo_/, '');
+      state.modalPerfilBaseTemp = (AUTH_PERFIS_PRONTOS[semPrefixo] && !isPerfilSomenteCampo(semPrefixo))
+        ? semPrefixo
+        : 'personalizado';
+    }
+    renderPresetsModal();
   }
 
   function sincronizarCheckboxesExtrasModal() {
     const cExc = document.getElementById('chkPermPodeExcluir');
     const cExp = document.getElementById('chkPermPodeExportar');
     const cUsu = document.getElementById('chkPermGerenciarUsuarios');
+    const cCampo = document.getElementById('chkPermSomenteCampo');
     if (cExc) cExc.checked = !!state.modalExtrasTemp.podeExcluir;
     if (cExp) cExp.checked = !!state.modalExtrasTemp.podeExportar;
     if (cUsu) cUsu.checked = !!state.modalExtrasTemp.gerenciarUsuarios;
+    if (cCampo) cCampo.checked = isPerfilSomenteCampo(state.modalPerfilBaseTemp);
   }
 
   function renderMatrizModulosModal() {
@@ -1406,6 +1528,20 @@
       podeExportar: !!document.getElementById('chkPermPodeExportar')?.checked,
       gerenciarUsuarios: !!document.getElementById('chkPermGerenciarUsuarios')?.checked
     };
+
+    const somenteCampo = !!document.getElementById('chkPermSomenteCampo')?.checked;
+    let perfilBaseFinal = String(state.modalPerfilBaseTemp || 'personalizado').trim() || 'personalizado';
+    if (somenteCampo) {
+      if (!isPerfilSomenteCampo(perfilBaseFinal)) {
+        perfilBaseFinal = 'campo_personalizado';
+      }
+    } else if (isPerfilSomenteCampo(perfilBaseFinal)) {
+      const semPrefixo = perfilBaseFinal.replace(/^campo_/, '');
+      perfilBaseFinal = (AUTH_PERFIS_PRONTOS[semPrefixo] && !isPerfilSomenteCampo(semPrefixo))
+        ? semPrefixo
+        : 'personalizado';
+    }
+    state.modalPerfilBaseTemp = perfilBaseFinal;
 
     const temAlgumModulo = Object.values(state.modalPermissoesTemp).some(v => v === 'ver' || v === 'editar') || extras.gerenciarUsuarios;
     if (!temAlgumModulo) {
@@ -1721,6 +1857,8 @@
     aplicarPerfilProntoModal,
     setPermissaoModuloModal,
     setPermissaoGrupoModal,
+    toggleSomenteCampoModal,
+    isPerfilSomenteCampo,
     salvarModalUsuarioPermissoes,
     alterarStatusUsuario,
     excluirRegistroUsuario,

@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v6.1';
+const CACHE_NAME = 'prefeitura-pwa-v6.3';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
@@ -10,18 +10,33 @@ const ASSETS_TO_CACHE = [
   'ronda.html',
   'guarda.html',
   'alojado.html',
+  'campo.html',
   'auth.js',
+  'campo_auth.js',
   'app.js',
+  'pwa_portal.js',
   'qrcode.min.js',
   'xlsx.bundle.js',
   'manifest.json',
   'manifest-alojado.json',
+  'manifest-ronda.json',
+  'manifest-limpeza.json',
+  'manifest-guarda.json',
+  'manifest-campo.json',
   'dados_iniciais_taboca.json',
   'favicon.ico',
   'icon-192.png',
   'icon-512.png',
   'icon-alojado-192.png',
   'icon-alojado-512.png',
+  'icon-ronda-192.png',
+  'icon-ronda-512.png',
+  'icon-limpeza-192.png',
+  'icon-limpeza-512.png',
+  'icon-guarda-192.png',
+  'icon-guarda-512.png',
+  'icon-campo-192.png',
+  'icon-campo-512.png',
   'apple-touch-icon.png',
   'banner_pavilhao.jpg',
   'logo_gel.png',
@@ -89,7 +104,9 @@ self.addEventListener('fetch', (event) => {
   const isDynamicAsset = event.request.mode === 'navigate' ||
                          url.pathname.endsWith('index.html') ||
                          url.pathname.endsWith('auth.js') ||
+                         url.pathname.endsWith('campo_auth.js') ||
                          url.pathname.endsWith('app.js') ||
+                         url.pathname.endsWith('campo.html') ||
                          url.pathname.endsWith('ronda.html') ||
                          url.pathname.endsWith('limpeza.html') ||
                          url.pathname.endsWith('chamado.html') ||
@@ -111,6 +128,7 @@ self.addEventListener('fetch', (event) => {
           if (event.request.mode === 'navigate') {
             if (url.pathname.includes('alojado')) return caches.match('alojado.html');
             if (url.pathname.includes('chamado')) return caches.match('chamado.html');
+            if (url.pathname.includes('campo')) return caches.match('campo.html');
             if (url.pathname.includes('ronda')) return caches.match('ronda.html');
             if (url.pathname.includes('limpeza')) return caches.match('limpeza.html');
             if (url.pathname.includes('guarda')) return caches.match('guarda.html');

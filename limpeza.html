@@ -5,9 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Controle de Limpeza & Ouvidoria | GEL Engenharia</title>
   
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icon-limpeza-192.png">
+  <link rel="apple-touch-icon" href="icon-limpeza-192.png">
+  <link rel="manifest" href="manifest-limpeza.json">
   <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GEL Limpeza">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +22,8 @@
   <!-- Firebase SDKs compat v10 -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="campo_auth.js?v=6.3"></script>
 
   <style>
     body {
@@ -59,20 +66,25 @@
           </p>
         </div>
       </div>
-      <div class="text-right">
+      <div class="flex items-center gap-1.5">
+        <button type="button" data-pwa-install-btn onclick="window.PwaPortal && window.PwaPortal.instalar()" class="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black flex items-center gap-1 shadow-sm transition active:scale-95" title="Instalar App GEL Limpeza no Celular">
+          <i class="fa-solid fa-download"></i>
+          <span>App</span>
+        </button>
         <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800">
-          <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span> QR Conectado
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span> QR
         </span>
       </div>
     </div>
   </header>
 
-  <!-- Barra de Alternância Rápida para Ronda de Sanitários/Bebedouros -->
+  <!-- Barra de Alternância Rápida para Menu Campo e Ronda de Sanitários/Bebedouros -->
   <div class="bg-slate-950/70 border-b border-slate-800/80 px-4 py-2">
-    <div class="max-w-md mx-auto flex items-center justify-between text-xs">
-      <span class="text-slate-400 flex items-center gap-1.5 text-[11px]">
-        <i class="fa-solid fa-house-chimney text-teal-400"></i> Ficha de Residência / Quarto
-      </span>
+    <div class="max-w-md mx-auto flex items-center justify-between text-xs gap-2">
+      <a href="campo.html" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200 hover:underline">
+        <i class="fa-solid fa-helmet-safety text-amber-400"></i>
+        <span>Menu Campo</span>
+      </a>
       <a href="ronda.html" class="inline-flex items-center gap-1 text-[11px] font-bold text-teal-400 hover:text-teal-300 hover:underline">
         <span>Ir para Banheiros/Bebedouros</span>
         <i class="fa-solid fa-arrow-right text-[10px]"></i>
@@ -206,83 +218,50 @@
       </button>
     </div>
 
-    <!-- BLOQUEIO DE SENHA DA EQUIPE DE LIMPEZA -->
+    <!-- AUTENTICAÇÃO DA EQUIPE DE LIMPEZA (FIREBASE AUTH + RBAC TEMPO REAL) -->
     <div id="containerSenhaLimpeza" class="bg-slate-800/90 backdrop-blur rounded-2xl p-4 sm:p-5 border border-teal-500/40 shadow-xl space-y-3.5">
-      <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg border border-teal-500/30 flex-shrink-0">
-          <i class="fa-solid fa-lock"></i>
+      <!-- Mount dinâmico do CampoAuth (Login / Solicitar Acesso / Aguardando Aprovação / Bloqueado) -->
+      <div id="campoAuthLimpezaMount"></div>
+
+      <!-- Aviso dedicado quando o usuário logado não tem permissão para a frente de limpeza -->
+      <div id="avisoSemPermissaoLimpeza" class="hidden py-3 text-center space-y-3.5">
+        <div class="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-400/40 text-amber-400 flex items-center justify-center mx-auto">
+          <i class="fa-solid fa-shield-halved text-2xl"></i>
         </div>
-        <div>
-          <h3 class="text-sm font-black text-white uppercase tracking-wide">Acesso da Equipe de Limpeza</h3>
-          <p class="text-[11px] text-slate-300 leading-snug">
-            Toque no teclado numérico ou digite o PIN fornecido pelo Prefeito.
+        <div class="space-y-1.5">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-[11px] text-slate-200 font-semibold">
+            <i class="fa-solid fa-user-check text-emerald-400 text-[10px]"></i>
+            <span id="semPermissaoNomeLimpeza">Colaborador</span>
+          </div>
+          <h3 class="text-sm font-black text-white pt-1">Frente Não Liberada</h3>
+          <p class="text-xs text-amber-200 font-semibold leading-relaxed">
+            O Prefeito ainda não liberou a frente de Casas / Alojamentos para sua conta.
+          </p>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            Peça a liberação na aba <strong>Usuários &amp; Acessos</strong> ou volte ao menu GEL Campo para abrir suas frentes ativas.
           </p>
         </div>
-      </div>
-
-      <!-- Indicadores Visuais de Dígitos do PIN -->
-      <div class="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 text-center space-y-2">
-        <div class="flex justify-center items-center gap-2.5 py-1">
-          <span id="pinDot1" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinDot2" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinDot3" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinDot4" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinDot5" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinDot6" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-        </div>
-
-        <div class="relative flex items-center">
-          <input 
-            type="password" 
-            id="inputSenhaEquipe" 
-            inputmode="numeric"
-            placeholder="Ou digite o PIN..." 
-            oninput="atualizarIndicadoresPinKeypad()"
-            onkeydown="if(event.key==='Enter'){event.preventDefault();validarSenhaEquipe();}"
-            class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-4 py-2 text-white font-mono font-bold text-center tracking-widest text-sm outline-none transition placeholder-slate-500"
-          >
-          <button 
-            type="button" 
-            onclick="validarSenhaEquipe()" 
-            class="ml-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-bold text-xs uppercase tracking-wider shadow-md transition flex items-center gap-1"
-          >
-            <i class="fa-solid fa-unlock-keyhole"></i> OK
+        <div class="flex flex-col sm:flex-row gap-2 pt-1">
+          <a href="campo.html" class="flex-1 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow transition">
+            <i class="fa-solid fa-helmet-safety"></i><span>Menu Campo</span>
+          </a>
+          <button type="button" onclick="sairContaEquipeLimpeza()" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-right-from-bracket"></i><span>Sair / Trocar Conta</span>
           </button>
         </div>
-
-        <p id="erroSenhaEquipe" class="hidden text-xs text-rose-400 font-bold mt-1.5 flex items-center justify-center gap-1">
-          <i class="fa-solid fa-circle-exclamation"></i> Senha incorreta! Solicite ao Prefeito da Obra.
-        </p>
       </div>
 
-      <!-- Keypad Numérico Virtual (Teclas de 52px para uso com uma mão só ou luva) -->
-      <div class="max-w-xs mx-auto grid grid-cols-3 gap-2 pt-1 select-none">
-        <button type="button" onclick="digitarPinKeypad('1')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">1</button>
-        <button type="button" onclick="digitarPinKeypad('2')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">2</button>
-        <button type="button" onclick="digitarPinKeypad('3')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">3</button>
-        <button type="button" onclick="digitarPinKeypad('4')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">4</button>
-        <button type="button" onclick="digitarPinKeypad('5')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">5</button>
-        <button type="button" onclick="digitarPinKeypad('6')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">6</button>
-        <button type="button" onclick="digitarPinKeypad('7')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">7</button>
-        <button type="button" onclick="digitarPinKeypad('8')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">8</button>
-        <button type="button" onclick="digitarPinKeypad('9')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">9</button>
-        <button type="button" onclick="limparPinKeypad()" class="min-h-[52px] h-13 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold text-xs hover:text-white active:scale-95 transition">Limpar</button>
-        <button type="button" onclick="digitarPinKeypad('0')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">0</button>
-        <button type="button" onclick="apagarPinKeypad()" class="min-h-[52px] h-13 rounded-2xl bg-slate-950 border border-slate-800 text-rose-400 hover:text-rose-300 text-base active:scale-95 transition" title="Apagar último"><i class="fa-solid fa-delete-left"></i></button>
-      </div>
-
-      <div class="flex items-center justify-between pt-2 border-t border-slate-700/60 text-xs">
-        <label class="flex items-center gap-2 text-slate-300 cursor-pointer select-none">
-          <input type="checkbox" id="checkLembrarSenhaHoje" checked class="rounded border-slate-600 text-teal-500 focus:ring-teal-500 bg-slate-900">
-          <span>Lembrar senha neste celular hoje</span>
-        </label>
+      <div class="flex items-center justify-between pt-2.5 border-t border-slate-700/60 text-xs gap-2">
+        <span class="text-[11px] text-slate-400 flex items-center gap-1.5">
+          <i class="fa-solid fa-house-user text-teal-400"></i> Morador ou Alojado?
+        </span>
         <button type="button" onclick="trocarModoLimpeza('problema')" class="text-amber-400 hover:text-amber-300 font-bold underline text-[11px]">
-          Sou morador (Sem senha)
+          Sou morador (Sem login)
         </button>
       </div>
     </div>
 
-    <!-- MODO 1: Formulário de Registro de Limpeza (Liberado após Senha) -->
+    <!-- MODO 1: Formulário de Registro de Limpeza (Liberado após Login Autorizado) -->
     <form id="formLimpeza" onsubmit="salvarLimpezaPublica(event)" class="hidden bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-slate-700/80 shadow-xl space-y-4">
       <input type="hidden" id="inputCasaId">
       <input type="hidden" id="inputCasaNome">
@@ -293,13 +272,19 @@
       <input type="hidden" id="inputTipo" value="rotina">
       <input type="hidden" id="inputAvaliacao" value="Excelente / Tudo Limpo">
 
-      <div class="flex items-center justify-between bg-emerald-950/50 border border-emerald-800/60 rounded-xl px-3 py-2 text-xs">
-        <span class="text-emerald-300 font-bold flex items-center gap-1.5">
-          <i class="fa-solid fa-shield-check text-emerald-400"></i> Equipe Autenticada
+      <div class="flex items-center justify-between gap-2 flex-wrap bg-emerald-950/50 border border-emerald-800/60 rounded-xl px-3 py-2 text-xs">
+        <span class="text-emerald-300 font-bold flex items-center gap-1.5 min-w-0">
+          <i class="fa-solid fa-user-shield text-emerald-400 flex-shrink-0"></i>
+          <span id="limpezaNomeOperadorBadge" class="truncate">Equipe Autenticada</span>
         </span>
-        <button type="button" onclick="bloquearSessaoEquipe()" class="text-[11px] text-amber-300 hover:text-amber-200 underline font-semibold flex items-center gap-1 transition">
-          <i class="fa-solid fa-lock text-[10px]"></i> Sair / Bloquear Senha
-        </button>
+        <div class="flex items-center gap-2.5 flex-shrink-0">
+          <a href="campo.html" class="text-[11px] text-teal-300 hover:text-teal-200 underline font-semibold flex items-center gap-1 transition">
+            <i class="fa-solid fa-helmet-safety text-[10px]"></i> Menu Campo
+          </a>
+          <button type="button" onclick="sairContaEquipeLimpeza()" class="text-[11px] text-amber-300 hover:text-amber-200 underline font-semibold flex items-center gap-1 transition">
+            <i class="fa-solid fa-right-from-bracket text-[10px]"></i> Sair
+          </button>
+        </div>
       </div>
 
       <!-- Seleção do Tipo de Serviço -->
@@ -381,17 +366,19 @@
         </div>
       </div>
 
-      <!-- Nome da Responsável / Faxineira -->
+      <!-- Nome da Responsável / Faxineira (Preenchido Automaticamente pela Conta Autenticada) -->
       <div>
-        <label for="inputResponsavel" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-          <i class="fa-solid fa-user-check text-emerald-400"></i> Seu Nome Completo *
+        <label for="inputResponsavel" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between gap-1.5">
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-user-check text-emerald-400"></i> Responsável Autenticado *</span>
+          <span class="text-[10px] font-semibold text-emerald-400 normal-case">Conta verificada</span>
         </label>
         <input 
           type="text" 
           id="inputResponsavel" 
           required 
-          placeholder="Ex: Maria Auxiliadora, Ana Paula..." 
-          class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white font-semibold text-sm outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500"
+          readonly
+          placeholder="Preenchido automaticamente pelo login..." 
+          class="w-full bg-slate-900/70 border border-emerald-700/60 rounded-xl px-3.5 py-2.5 text-emerald-200 font-bold text-sm outline-none cursor-not-allowed"
         >
       </div>
 
@@ -708,9 +695,11 @@
     let firestoreDb = null;
     let listaCasasDisponiveis = [];
     let casaCarregada = null;
-    let senhaEquipeConfigurada = "1234";
     let modoAtual = "limpeza"; // 'limpeza' ou 'problema'
     let senhaLiberadaNestaSessao = false;
+    let perfilAtualLimpeza = null;
+    let campoAuthControllerLimpeza = null;
+    let jaDesbloqueouUmaVezLimpeza = false;
 
     // Inicialização do Firebase
     try {
@@ -736,27 +725,9 @@
       return `${y}-${m}-${day}`;
     }
 
-    // Carregar senha configurada pelo Prefeito e WhatsApp
+    // Carregar contato WhatsApp do Prefeito para a Ouvidoria Pública
     async function carregarConfiguracoesSeguranca() {
-      try {
-        const cacheConf = localStorage.getItem('ronda_config_cache');
-        if (cacheConf) {
-          const parsed = JSON.parse(cacheConf);
-          if (parsed && parsed.senha_equipe) {
-            senhaEquipeConfigurada = String(parsed.senha_equipe).trim();
-          }
-        }
-      } catch (e) {}
-
       if (firestoreDb) {
-        try {
-          const doc = await firestoreDb.collection('ronda_config').doc('geral').get();
-          if (doc.exists && doc.data().senha_equipe) {
-            senhaEquipeConfigurada = String(doc.data().senha_equipe).trim();
-            localStorage.setItem('ronda_config_cache', JSON.stringify(doc.data()));
-          }
-        } catch (e) {}
-
         try {
           const docZap = await firestoreDb.collection('configuracoes').doc('prefeitura_contato').get();
           if (docZap.exists && docZap.data().whatsapp_prefeito) {
@@ -768,15 +739,90 @@
           }
         } catch (e) {}
       }
+    }
 
-      // Verificar se a senha já foi validada hoje neste aparelho
+    function aplicarPerfilOperadorLimpeza(perfil) {
+      const nomeReal = (perfil && (perfil.nome || perfil.username)) ? String(perfil.nome || perfil.username).trim() : '';
+      const badgeEl = document.getElementById('limpezaNomeOperadorBadge');
+      if (badgeEl) {
+        badgeEl.textContent = nomeReal ? nomeReal : 'Equipe Autenticada';
+      }
+      const inpResp = document.getElementById('inputResponsavel');
+      if (inpResp) {
+        inpResp.value = nomeReal;
+        inpResp.readOnly = true;
+      }
+    }
+
+    async function sairContaEquipeLimpeza() {
       try {
-        const salvoHoje = localStorage.getItem('equipe_limpeza_auth_' + getDataHojeLocal());
-        if (salvoHoje && salvoHoje === senhaEquipeConfigurada) {
+        if (window.CampoAuth && typeof window.CampoAuth.logout === 'function') {
+          await window.CampoAuth.logout();
+        }
+      } catch (err) {
+        console.warn('Erro ao sair da conta de limpeza:', err);
+      }
+    }
+
+    function iniciarAutenticacaoCampoLimpeza() {
+      if (!window.CampoAuth || typeof window.CampoAuth.mountInlineAuthBox !== 'function') {
+        console.error('[Limpeza] campo_auth.js não carregado corretamente.');
+        return;
+      }
+      if (campoAuthControllerLimpeza) return;
+
+      campoAuthControllerLimpeza = window.CampoAuth.mountInlineAuthBox('campoAuthLimpezaMount', {
+        frente: 'limpeza',
+        tituloFrente: 'Casas / Alojamentos (Limpeza & Ar)',
+        onUnlocked: (perfil) => {
           senhaLiberadaNestaSessao = true;
+          perfilAtualLimpeza = perfil;
+
+          const mountEl = document.getElementById('campoAuthLimpezaMount');
+          const avisoEl = document.getElementById('avisoSemPermissaoLimpeza');
+          if (mountEl) mountEl.classList.remove('hidden');
+          if (avisoEl) avisoEl.classList.add('hidden');
+
+          aplicarPerfilOperadorLimpeza(perfil);
+
+          if (!jaDesbloqueouUmaVezLimpeza) {
+            jaDesbloqueouUmaVezLimpeza = true;
+            dispararFeedbackTati('scan');
+            const cId = document.getElementById('inputCasaId')?.value || '';
+            const qId = document.getElementById('inputQuartoId')?.value || '';
+            const bNome = document.getElementById('inputBlocoNome')?.value || '';
+            if (cId || qId || bNome) {
+              carregarHistoricoPlaquinhaLimpeza(cId || null, qId || null, bNome || null);
+            }
+          }
+
+          atualizarVisibilidadeModo();
+        },
+        onLocked: (reason, info) => {
+          senhaLiberadaNestaSessao = false;
+          perfilAtualLimpeza = null;
+          jaDesbloqueouUmaVezLimpeza = false;
+
+          aplicarPerfilOperadorLimpeza(null);
+
+          const mountEl = document.getElementById('campoAuthLimpezaMount');
+          const avisoEl = document.getElementById('avisoSemPermissaoLimpeza');
+          if (reason === 'no_front_access') {
+            const p = info && info.perfil ? info.perfil : null;
+            const nomeTxt = p && p.nome ? p.nome : 'Colaborador';
+            const userTxt = p && p.username ? ` (@${p.username})` : '';
+            const nomeEl = document.getElementById('semPermissaoNomeLimpeza');
+            if (nomeEl) nomeEl.textContent = nomeTxt + userTxt;
+            if (mountEl) mountEl.classList.add('hidden');
+            if (avisoEl) avisoEl.classList.remove('hidden');
+          } else {
+            if (mountEl) mountEl.classList.remove('hidden');
+            if (avisoEl) avisoEl.classList.add('hidden');
+          }
+
           atualizarVisibilidadeModo();
         }
-      } catch (e) {}
+      });
     }
 
     function trocarModoLimpeza(novoModo) {
@@ -801,100 +847,33 @@
       const boxSenha = document.getElementById('containerSenhaLimpeza');
       const formLimp = document.getElementById('formLimpeza');
       const formProb = document.getElementById('formOcorrenciaLocal');
+      const telaSuc = document.getElementById('telaSucesso');
+      const telaSucProb = document.getElementById('telaSucessoProblema');
+      const barraThumb = document.getElementById('barraFixaThumbLimpeza');
+      const labelThumb = document.getElementById('labelBarraFixaThumb');
 
       if (modoAtual === 'problema') {
         boxSenha.classList.add('hidden');
         formLimp.classList.add('hidden');
-        formProb.classList.remove('hidden');
+        const emSucessoProb = Boolean(telaSucProb && !telaSucProb.classList.contains('hidden'));
+        if (!emSucessoProb) formProb.classList.remove('hidden');
+        if (barraThumb) barraThumb.classList.toggle('hidden', emSucessoProb);
+        if (labelThumb) labelThumb.textContent = 'Enviar Observação ao Prefeito';
       } else {
         formProb.classList.add('hidden');
         if (senhaLiberadaNestaSessao) {
           boxSenha.classList.add('hidden');
-          formLimp.classList.remove('hidden');
+          const emSucessoLimp = Boolean(telaSuc && !telaSuc.classList.contains('hidden'));
+          if (!emSucessoLimp) formLimp.classList.remove('hidden');
+          if (barraThumb) barraThumb.classList.toggle('hidden', emSucessoLimp);
+          if (labelThumb) labelThumb.textContent = 'Confirmar Registro de Limpeza';
         } else {
           boxSenha.classList.remove('hidden');
           formLimp.classList.add('hidden');
+          if (telaSuc) telaSuc.classList.add('hidden');
+          if (barraThumb) barraThumb.classList.add('hidden');
         }
       }
-    }
-
-    
-    // FUNÇÕES DO KEYPAD NUMÉRICO VIRTUAL (USABILIDADE DE CAMPO / ERGONOMIA)
-    function digitarPinKeypad(digito) {
-      const inp = document.getElementById('inputSenhaEquipe');
-      if (!inp) return;
-      if (inp.value.length >= 8) return;
-      inp.value += String(digito);
-      atualizarIndicadoresPinKeypad();
-      if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(30);
-
-      // Se atingir tamanho da senha e for correta, libera instantaneamente!
-      if (inp.value === senhaEquipeConfigurada) {
-        validarSenhaEquipe();
-      }
-    }
-
-    function apagarPinKeypad() {
-      const inp = document.getElementById('inputSenhaEquipe');
-      if (!inp) return;
-      inp.value = inp.value.slice(0, -1);
-      atualizarIndicadoresPinKeypad();
-      if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(25);
-    }
-
-    function limparPinKeypad() {
-      const inp = document.getElementById('inputSenhaEquipe');
-      if (!inp) return;
-      inp.value = '';
-      atualizarIndicadoresPinKeypad();
-      const erroEl = document.getElementById('erroSenhaEquipe');
-      if (erroEl) erroEl.classList.add('hidden');
-    }
-
-    function atualizarIndicadoresPinKeypad() {
-      const inp = document.getElementById('inputSenhaEquipe');
-      const len = inp ? inp.value.length : 0;
-      for (let i = 1; i <= 6; i++) {
-        const dot = document.getElementById('pinDot' + i);
-        if (dot) {
-          if (i <= len) {
-            dot.className = 'w-3.5 h-3.5 rounded-full border-2 border-teal-400 bg-teal-400 transition-all scale-110';
-          } else {
-            dot.className = 'w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all';
-          }
-        }
-      }
-    }
-
-    function validarSenhaEquipe() {
-      const digitada = (document.getElementById('inputSenhaEquipe').value || '').trim();
-      const erroEl = document.getElementById('erroSenhaEquipe');
-
-      if (digitada === senhaEquipeConfigurada) {
-        senhaLiberadaNestaSessao = true;
-        erroEl.classList.add('hidden');
-        dispararFeedbackTati('scan');
-        if (document.getElementById('checkLembrarSenhaHoje')?.checked) {
-          try {
-            localStorage.setItem('equipe_limpeza_auth_' + getDataHojeLocal(), digitada);
-          } catch (e) {}
-        }
-        atualizarVisibilidadeModo();
-      } else {
-        dispararFeedbackTati('alerta');
-        erroEl.classList.remove('hidden');
-        document.getElementById('inputSenhaEquipe').select();
-      }
-    }
-
-    function bloquearSessaoEquipe() {
-      try {
-        localStorage.removeItem('equipe_limpeza_auth_' + getDataHojeLocal());
-      } catch (e) {}
-      senhaLiberadaNestaSessao = false;
-      const inp = document.getElementById('inputSenhaEquipe');
-      if (inp) inp.value = '';
-      atualizarVisibilidadeModo();
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -903,6 +882,7 @@
       document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
 
       carregarConfiguracoesSeguranca();
+      iniciarAutenticacaoCampoLimpeza();
 
       const urlParams = new URLSearchParams(window.location.search);
       let urlCasaId = urlParams.get('casa_id') || urlParams.get('casa');
@@ -1190,13 +1170,16 @@
       document.getElementById('inputTipo').value = tipo;
       const cardRotina = document.getElementById('cardTipoRotina');
       const cardAr = document.getElementById('cardTipoAr');
+      const boxSubtipoAr = document.getElementById('boxSubtipoAr');
 
       if (tipo === 'rotina') {
         cardRotina.className = 'tipo-card active cursor-pointer border-2 border-teal-500 bg-teal-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none';
         cardAr.className = 'tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100';
+        if (boxSubtipoAr) boxSubtipoAr.classList.add('hidden');
       } else {
         cardRotina.className = 'tipo-card cursor-pointer border-2 border-slate-700 bg-slate-900/60 rounded-xl p-3 flex flex-col items-center text-center transition select-none opacity-80 hover:opacity-100';
         cardAr.className = 'tipo-card active cursor-pointer border-2 border-sky-500 bg-sky-950/20 rounded-xl p-3 flex flex-col items-center text-center transition select-none';
+        if (boxSubtipoAr) boxSubtipoAr.classList.remove('hidden');
       }
     }
 
@@ -1235,16 +1218,24 @@
         salvarOcorrenciaLocalPublica(null, 'app');
       } else {
         const formLimp = document.getElementById('formLimpeza');
-        if (formLimp && !formLimp.classList.contains('hidden')) {
+        if (senhaLiberadaNestaSessao && formLimp && !formLimp.classList.contains('hidden')) {
           salvarLimpezaPublica();
         } else {
-          validarSenhaEquipe();
+          const boxAuth = document.getElementById('containerSenhaLimpeza');
+          if (boxAuth) boxAuth.scrollIntoView({ behavior: 'smooth' });
         }
       }
     }
 
     async function salvarLimpezaPublica(e) {
       if (e) e.preventDefault();
+
+      if (!senhaLiberadaNestaSessao || !perfilAtualLimpeza) {
+        dispararFeedbackTati('alerta');
+        alert('Faça login com sua conta de campo autorizada para registrar a limpeza.');
+        atualizarVisibilidadeModo();
+        return;
+      }
 
       // Proteção anti-duplo clique (debounce)
       if (isSubmetendoLimpeza) return;
@@ -1257,7 +1248,7 @@
       let quartoNumero = document.getElementById('inputQuartoNumero').value || '';
       const blocoNome = document.getElementById('inputBlocoNome').value || '';
       const tipo = document.getElementById('inputTipo').value || 'rotina';
-      const responsavel = (document.getElementById('inputResponsavel')?.value || '').trim();
+      const responsavel = ((perfilAtualLimpeza && (perfilAtualLimpeza.nome || perfilAtualLimpeza.username)) || document.getElementById('inputResponsavel')?.value || '').trim();
       const data = document.getElementById('inputData')?.value || getDataHojeLocal();
       const hora = document.getElementById('inputHora')?.value || getHoraAgoraLocal();
       const avaliacao = document.getElementById('inputAvaliacao')?.value || 'Excelente / Tudo Limpo';
@@ -1419,6 +1410,7 @@
         if (formLimp) formLimp.classList.add('hidden');
         const telaSuc = document.getElementById('telaSucesso');
         if (telaSuc) telaSuc.classList.remove('hidden');
+        atualizarVisibilidadeModo();
 
         dispararFeedbackTati('sucesso');
         atualizarBarraStatusConexao();
@@ -1675,6 +1667,7 @@
 
       document.getElementById('formOcorrenciaLocal').classList.add('hidden');
       document.getElementById('telaSucessoProblema').classList.remove('hidden');
+      atualizarVisibilidadeModo();
 
       btnApp.disabled = false;
       btnZap.disabled = false;
@@ -1694,15 +1687,16 @@
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-check text-base mr-1"></i><span>Confirmar Registro de Limpeza</span>';
 
+      aplicarPerfilOperadorLimpeza(perfilAtualLimpeza);
       document.getElementById('telaSucesso').classList.add('hidden');
-      document.getElementById('formLimpeza').classList.remove('hidden');
+      atualizarVisibilidadeModo();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function novaOcorrenciaReset() {
       document.getElementById('inputDescricaoOcorrencia').value = '';
       document.getElementById('telaSucessoProblema').classList.add('hidden');
-      document.getElementById('formOcorrenciaLocal').classList.remove('hidden');
+      atualizarVisibilidadeModo();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   
@@ -1742,17 +1736,15 @@
     function irParaFormularioNovaManutencao() {
       const containerSenha = document.getElementById('containerSenhaLimpeza');
       const formLimpeza = document.getElementById('formLimpeza') || document.getElementById('formRegistroLimpeza');
-      
+
       trocarModoLimpeza('limpeza');
 
       if (formLimpeza && !formLimpeza.classList.contains('hidden')) {
         formLimpeza.scrollIntoView({ behavior: 'smooth' });
-        const inputNome = document.getElementById('inputResponsavel');
-        if (inputNome) inputNome.focus();
       } else if (containerSenha) {
         containerSenha.scrollIntoView({ behavior: 'smooth' });
-        const inputSenha = document.getElementById('inputSenhaEquipe');
-        if (inputSenha) inputSenha.focus();
+        const firstInput = containerSenha.querySelector('input:not([type="hidden"])');
+        if (firstInput) firstInput.focus();
       }
     }
 
@@ -1931,5 +1923,6 @@
     </div>
   </aside>
 
+  <script src="pwa_portal.js?v=6.2" data-app-name="GEL Limpeza" data-app-sub="Casas na Cidade, Alojamentos & Ar-Condicionado" data-app-icon="icon-limpeza-192.png" data-accent="emerald"></script>
 </body>
 </html>

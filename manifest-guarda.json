@@ -1,0 +1,29 @@
+{
+  "id": "/portal-guarda",
+  "name": "GEL Vigilância • Ronda Noturna",
+  "short_name": "GEL Vigilância",
+  "description": "Controle oficial de ronda patrimonial noturna com leitura de QR Code, GPS e registro de ocorrências.",
+  "start_url": "./guarda.html",
+  "scope": "./",
+  "display": "standalone",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "orientation": "portrait-primary",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "icon-guarda-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-guarda-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

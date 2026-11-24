@@ -17,6 +17,26 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
+[[headers]]
+  for = "/manifest-ronda.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest-limpeza.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest-guarda.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest-campo.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 # Cache otimizado para arquivos estáticos pesados
 [[headers]]
   for = "/*.png"

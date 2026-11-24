@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>GEL Campo • App do Funcionário | GEL Engenharia</title>
+
+  <link rel="icon" type="image/png" href="icon-campo-192.png">
+  <link rel="apple-touch-icon" href="icon-campo-192.png">
+  <link rel="manifest" href="manifest-campo.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GEL Campo">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+  <!-- Firebase SDKs compat v10 -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Motor Compartilhado de Autenticação & RBAC de Campo -->
+  <script src="campo_auth.js?v=6.3"></script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    @keyframes authFloatGlow {
+      0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.45; }
+      50% { transform: translate(16px, -12px) scale(1.08); opacity: 0.72; }
+    }
+    @keyframes cardEnter {
+      0% { opacity: 0; transform: translateY(14px) scale(0.985); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .campo-glow-orb {
+      animation: authFloatGlow 8s ease-in-out infinite;
+    }
+    .campo-card-enter {
+      animation: cardEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .campo-glass {
+      background: linear-gradient(155deg, rgba(15, 23, 42, 0.86) 0%, rgba(15, 23, 42, 0.72) 100%);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .campo-input {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      transition: all 0.2s ease;
+    }
+    .campo-input:focus {
+      background: rgba(15, 23, 42, 0.94);
+      border-color: rgba(245, 158, 11, 0.85);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+      outline: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- =========================================================================
+       TELA DE AUTENTICAÇÃO GLASSMORPHISM (LOGIN / SOLICITAR / PENDENTE / BLOQUEADO)
+       ========================================================================= -->
+  <div id="campoGateOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 overflow-y-auto bg-slate-950">
+    <!-- Fundo Cinematográfico com Foto do Pavilhão + Gradiente Escuro + Auras Âmbar/Teal -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <img src="banner_pavilhao.jpg" alt="" class="w-full h-full object-cover scale-105 blur-md opacity-40">
+      <div class="absolute inset-0 bg-gradient-to-br from-slate-950/92 via-slate-900/82 to-slate-950/95"></div>
+      <div class="campo-glow-orb absolute -top-24 -left-24 w-80 h-80 rounded-full bg-amber-500/20 blur-3xl"></div>
+      <div class="campo-glow-orb absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-teal-500/20 blur-3xl" style="animation-delay: -4s;"></div>
+    </div>
+
+    <!-- Botão Rápido de Instalar App no Topo (Tela de Login) -->
+    <div class="relative z-10 w-full max-w-md flex justify-end mb-2.5">
+      <button type="button" data-pwa-install-btn onclick="window.PwaPortal && window.PwaPortal.instalar()" class="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-[11px] font-black flex items-center gap-1.5 shadow-lg shadow-teal-500/20 transition active:scale-95" title="Instalar App GEL Campo no Celular">
+        <i class="fa-solid fa-download"></i>
+        <span>Instalar App</span>
+      </button>
+    </div>
+
+    <!-- Card Central Glassmorphism -->
+    <div class="relative z-10 w-full max-w-md my-auto campo-card-enter">
+      <div class="campo-glass rounded-3xl overflow-hidden border border-white/10">
+        <!-- Faixa Superior Âmbar -> Teal -->
+        <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-yellow-400 to-teal-400"></div>
+
+        <!-- Cabeçalho Institucional GEL Campo -->
+        <div class="px-6 pt-6 pb-5 text-center border-b border-white/10">
+          <div class="inline-flex items-center justify-center bg-white/95 px-4 py-2 rounded-2xl shadow-lg shadow-black/30 mb-3 border border-amber-400/30">
+            <img src="logo_gel_oficial.png" alt="GEL Engenharia" class="h-8 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+          </div>
+          <div class="flex items-center justify-center gap-2">
+            <h1 class="text-lg sm:text-xl font-black text-white tracking-tight">GEL Campo</h1>
+            <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-extrabold uppercase tracking-wider">Taboca 2</span>
+          </div>
+          <p class="text-xs text-teal-300/90 font-semibold mt-1">App do Funcionário • Prefeitura de Canteiro</p>
+        </div>
+
+        <!-- VIEW 1: CARREGANDO -->
+        <div id="campoViewLoading" class="p-8 text-center space-y-4">
+          <div class="w-14 h-14 rounded-2xl bg-teal-500/15 border border-teal-400/30 text-teal-400 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-helmet-safety text-2xl animate-pulse"></i>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-white">Verificando seu acesso...</p>
+            <p class="text-xs text-slate-400 mt-1">Conectando ao servidor da Prefeitura de Canteiro</p>
+          </div>
+        </div>
+
+        <!-- VIEW 2: ENTRAR & SOLICITAR ACESSO -->
+        <div id="campoViewAuth" class="hidden p-5 sm:p-6 space-y-4">
+          <!-- Abas -->
+          <div class="flex p-1 rounded-2xl bg-slate-950/75 border border-white/10">
+            <button id="campoTabBtnEntrar" type="button" onclick="alternarAbaCampo('entrar')" class="flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
+              <i class="fa-solid fa-right-to-bracket mr-1.5"></i>Entrar
+            </button>
+            <button id="campoTabBtnSolicitar" type="button" onclick="alternarAbaCampo('solicitar')" class="flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-300 hover:text-white">
+              <i class="fa-solid fa-user-plus mr-1.5"></i>Solicitar Acesso
+            </button>
+          </div>
+
+          <!-- FORM LOGIN -->
+          <form id="formCampoLogin" onsubmit="handleCampoLogin(event)" class="space-y-3.5">
+            <div id="campoLoginError" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-medium flex items-start gap-2"></div>
+
+            <div>
+              <label for="campoLoginUsername" class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Usuário</label>
+              <div class="relative">
+                <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400/90 text-sm"></i>
+                <input id="campoLoginUsername" type="text" required autocomplete="username" placeholder="Ex: joao.silva" class="campo-input w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white placeholder-slate-400">
+              </div>
+            </div>
+
+            <div>
+              <label for="campoLoginSenha" class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Senha</label>
+              <div class="relative">
+                <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="campoLoginSenha" type="password" required autocomplete="current-password" placeholder="Digite sua senha" class="campo-input w-full h-12 pl-10 pr-11 rounded-xl text-sm text-white placeholder-slate-400">
+                <button type="button" onclick="toggleSenhaCampo('campoLoginSenha', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1.5" aria-label="Mostrar ou ocultar senha">
+                  <i class="fa-solid fa-eye text-sm"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs pt-0.5">
+              <label class="inline-flex items-center gap-2 text-slate-300 cursor-pointer select-none">
+                <input id="campoLoginLembrar" type="checkbox" checked class="w-4 h-4 rounded border-slate-600 bg-slate-800 accent-amber-500">
+                <span>Manter conectado</span>
+              </label>
+              <span class="text-[11px] text-teal-300/90 font-semibold"><i class="fa-solid fa-shield-halved mr-1"></i>Individual</span>
+            </div>
+
+            <button id="btnCampoLogin" type="submit" class="w-full h-12 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 transition transform active:scale-[0.98] flex items-center justify-center gap-2">
+              <i class="fa-solid fa-right-to-bracket"></i><span>Entrar no App de Campo</span>
+            </button>
+          </form>
+
+          <!-- FORM SOLICITAR ACESSO -->
+          <form id="formCampoRegister" onsubmit="handleCampoSolicitar(event)" class="hidden space-y-3">
+            <div class="p-3 rounded-xl bg-teal-500/10 border border-teal-400/25 text-[11px] text-teal-100 flex items-start gap-2">
+              <i class="fa-solid fa-circle-info text-teal-400 mt-0.5 flex-shrink-0"></i>
+              <span>Sua conta ficará <strong>aguardando liberação do Prefeito</strong>, que escolherá suas frentes (Gelo, Ronda ou Limpeza).</span>
+            </div>
+
+            <div id="campoRegisterError" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-medium flex items-start gap-2"></div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label for="campoRegNome" class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Nome Completo</label>
+                <input id="campoRegNome" type="text" required placeholder="Seu nome" class="campo-input w-full h-11 px-3.5 rounded-xl text-sm text-white placeholder-slate-400">
+              </div>
+              <div>
+                <label for="campoRegCargo" class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Cargo / Função</label>
+                <input id="campoRegCargo" type="text" required placeholder="Ex: Aux. Limpeza, Gelo" class="campo-input w-full h-11 px-3.5 rounded-xl text-sm text-white placeholder-slate-400">
+              </div>
+            </div>
+
+            <div>
+              <label for="campoRegUsername" class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Usuário de Login</label>
+              <div class="relative">
+                <i class="fa-solid fa-at absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 text-sm"></i>
+                <input id="campoRegUsername" type="text" required autocomplete="username" placeholder="Ex: carlos.campo" class="campo-input w-full h-11 pl-9 pr-4 rounded-xl text-sm text-white placeholder-slate-400 lowercase">
+              </div>
+            </div>
+
+            <div>
+              <label for="campoRegSenha" class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Crie sua Senha</label>
+              <div class="relative">
+                <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input id="campoRegSenha" type="password" required minlength="6" autocomplete="new-password" oninput="atualizarForcaSenhaCampo()" placeholder="Mínimo 6 caracteres" class="campo-input w-full h-11 pl-9 pr-11 rounded-xl text-sm text-white placeholder-slate-400">
+                <button type="button" onclick="toggleSenhaCampo('campoRegSenha', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" aria-label="Mostrar ou ocultar senha">
+                  <i class="fa-solid fa-eye text-sm"></i>
+                </button>
+              </div>
+              <div class="mt-1.5 flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div id="campoForcaBar" class="h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <span id="campoForcaLbl" class="text-[10px] font-semibold text-slate-300"></span>
+              </div>
+            </div>
+
+            <div>
+              <label for="campoRegConfirmar" class="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">Confirmar Senha</label>
+              <input id="campoRegConfirmar" type="password" required minlength="6" autocomplete="new-password" placeholder="Repita sua senha" class="campo-input w-full h-11 px-3.5 rounded-xl text-sm text-white placeholder-slate-400">
+            </div>
+
+            <button id="btnCampoRegister" type="submit" class="w-full h-12 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-sm shadow-lg shadow-teal-500/20 transition transform active:scale-[0.98] flex items-center justify-center gap-2">
+              <i class="fa-solid fa-paper-plane"></i><span>Enviar Solicitação de Acesso</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- VIEW 3: AGUARDANDO LIBERAÇÃO DO PREFEITO -->
+        <div id="campoViewPending" class="hidden p-7 text-center space-y-5">
+          <div class="relative w-16 h-16 mx-auto">
+            <div class="absolute inset-0 rounded-2xl bg-amber-500/30 animate-ping"></div>
+            <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/25 to-amber-600/20 border border-amber-400/50 text-amber-400 flex items-center justify-center">
+              <i class="fa-solid fa-hourglass-half text-2xl"></i>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[11px] font-bold uppercase tracking-wider">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>Aguardando Liberação
+            </span>
+            <h2 class="text-lg font-extrabold text-white pt-1">Solicitação Recebida!</h2>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Olá, <strong id="campoPendingNome" class="text-white">Colaborador</strong>! Sua conta (<span id="campoPendingUser" class="font-mono text-amber-300">@usuario</span> • <span id="campoPendingCargo">Equipe</span>) aguarda aprovação do <strong>Prefeito da Obra</strong>.
+            </p>
+          </div>
+
+          <div class="p-3.5 rounded-2xl bg-teal-500/10 border border-teal-500/25 text-[11px] text-teal-200 flex items-center justify-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+            <span>Assim que o Prefeito liberar suas frentes, esta tela abre automaticamente.</span>
+          </div>
+
+          <button type="button" onclick="handleCampoLogout()" class="w-full h-11 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-right-from-bracket"></i><span>Sair e voltar para o login</span>
+          </button>
+        </div>
+
+        <!-- VIEW 4: BLOQUEADO / RECUSADO -->
+        <div id="campoViewBlocked" class="hidden p-7 text-center space-y-5">
+          <div class="w-16 h-16 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+            <i class="fa-solid fa-user-lock text-2xl"></i>
+          </div>
+          <div class="space-y-1.5">
+            <h2 class="text-lg font-extrabold text-white">Acesso Bloqueado</h2>
+            <p id="campoBlockedNome" class="text-xs font-semibold text-rose-300">Usuário</p>
+            <p id="campoBlockedMotivo" class="text-xs text-slate-300 leading-relaxed">Seu acesso foi suspenso ou recusado pela administração. Procure o Prefeito da Obra.</p>
+          </div>
+          <button type="button" onclick="handleCampoLogout()" class="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-xs transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrow-left"></i><span>Voltar para o Login</span>
+          </button>
+        </div>
+
+        <!-- Rodapé Discreto -->
+        <div class="px-6 py-3.5 bg-slate-950/65 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+          <a href="alojado.html" class="inline-flex items-center gap-1.5 hover:text-amber-300 transition font-semibold">
+            <i class="fa-solid fa-id-card-clip text-amber-400"></i>
+            <span>Portal do Alojado</span>
+          </a>
+          <a href="index.html" class="inline-flex items-center gap-1.5 hover:text-teal-300 transition font-semibold">
+            <i class="fa-solid fa-building-shield text-teal-400"></i>
+            <span>Gestão (Prefeito)</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       PAINEL PRINCIPAL DO FUNCIONÁRIO DE CAMPO (AUTENTICADO & ATIVO)
+       ========================================================================= -->
+  <div id="campoAppMain" class="hidden min-h-screen flex flex-col justify-between bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 pb-8">
+
+    <!-- Header Sticky -->
+    <header class="bg-slate-950/92 backdrop-blur-md border-b border-slate-800/90 sticky top-0 z-30 px-4 py-3 shadow-md">
+      <div class="max-w-md mx-auto flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="h-10 px-2.5 py-1 rounded-xl bg-white flex items-center justify-center shadow-sm border border-slate-700/50 flex-shrink-0">
+            <img src="logo_gel_oficial.png" alt="Logo GEL" class="h-7 w-auto object-contain" onerror="this.src='logo_gel_cropped.png'">
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <h1 class="text-sm font-black text-white leading-tight uppercase tracking-wide truncate">GEL Campo</h1>
+              <span class="text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex-shrink-0">Taboca 2</span>
+            </div>
+            <p class="text-[11px] text-teal-400 font-semibold flex items-center gap-1 truncate">
+              <i class="fa-solid fa-helmet-safety text-[10px]"></i> App do Funcionário
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button type="button" data-pwa-install-btn onclick="window.PwaPortal && window.PwaPortal.instalar()" class="px-2.5 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-[10px] font-black flex items-center gap-1 shadow-sm transition active:scale-95" title="Instalar App GEL Campo no Celular">
+            <i class="fa-solid fa-download"></i>
+            <span>App</span>
+          </button>
+          <button type="button" onclick="handleCampoLogout()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-200 hover:text-rose-200 border border-slate-700 text-[10px] font-bold flex items-center gap-1 transition active:scale-95" title="Sair da conta">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Sair</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+
+      <!-- Cartão de Identidade do Funcionário -->
+      <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-800/95 via-slate-900 to-slate-950 border border-slate-700/80 p-4 sm:p-5 shadow-xl">
+        <div class="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-amber-500/10 blur-2xl pointer-events-none"></div>
+        <div class="absolute -left-8 -bottom-8 w-28 h-28 rounded-full bg-teal-500/10 blur-2xl pointer-events-none"></div>
+
+        <div class="relative flex items-center gap-3.5">
+          <div id="campoUserAvatar" class="w-13 h-13 min-w-[52px] min-h-[52px] rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center shadow-lg shadow-amber-500/20 border border-amber-300/60">
+            US
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ativo
+              </span>
+              <span id="campoUserRoleBadge" class="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[10px] font-bold">
+                Equipe de Campo
+              </span>
+            </div>
+            <h2 id="campoUserNome" class="text-base font-black text-white truncate mt-1">Colaborador</h2>
+            <p class="text-[11px] text-slate-400 truncate">
+              <span id="campoUserLogin" class="font-mono text-amber-300/90">@usuario</span>
+              <span class="mx-1">•</span>
+              <span id="campoUserCargo">Setor</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Cabeçalho das Frentes Liberadas -->
+      <div class="flex items-center justify-between px-1 pt-1">
+        <h3 class="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <i class="fa-solid fa-layer-group text-amber-400"></i>
+          <span>Suas Frentes de Trabalho</span>
+        </h3>
+        <span id="campoQtdFrentesBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-teal-300 border border-slate-700">
+          0 liberadas
+        </span>
+      </div>
+
+      <!-- Lista Dinâmica de Cards (SOMENTE as frentes liberadas pelo Prefeito) -->
+      <div id="campoFrentesContainer" class="space-y-3"></div>
+
+      <!-- Aviso Amigável se Nenhuma Frente Estiver Liberada -->
+      <section id="campoSemFrentesBox" class="hidden rounded-3xl bg-slate-800/80 border border-amber-500/35 p-6 text-center space-y-3.5 shadow-xl">
+        <div class="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto text-2xl">
+          <i class="fa-solid fa-clipboard-question"></i>
+        </div>
+        <div class="space-y-1">
+          <h3 class="text-sm font-black text-white">Nenhuma frente de campo liberada ainda</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Sua conta está ativa, mas o Prefeito ainda não marcou nenhuma frente operacional para você. Peça a ele para liberar <strong>Máquina de Gelo</strong>, <strong>Ronda</strong> ou <strong>Limpeza</strong> na aba <strong>Usuários &amp; Acessos</strong>.
+          </p>
+        </div>
+        <div class="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-200 flex items-center justify-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+          <span>Os botões aparecerão aqui em tempo real assim que ele salvar.</span>
+        </div>
+      </section>
+
+      <!-- Atalho Sutil para o Painel Administrativo (somente se não for restrito a campo_*) -->
+      <div id="campoAdminLinkBox" class="hidden pt-2">
+        <a href="index.html" class="group flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 transition shadow-sm">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+              <i class="fa-solid fa-gauge-high text-sm"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-slate-200 group-hover:text-white truncate">Painel Administrativo da Prefeitura</p>
+              <p class="text-[10px] text-slate-400 truncate">Sua conta também tem acesso à gestão (index.html)</p>
+            </div>
+          </div>
+          <i class="fa-solid fa-arrow-right text-xs text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition"></i>
+        </a>
+      </div>
+
+    </main>
+
+    <!-- Rodapé Institucional -->
+    <footer class="max-w-md mx-auto px-4 text-center text-[11px] text-slate-500 mt-4 pb-3 space-y-1 select-none">
+      <p>Prefeitura de Canteiro • GEL Engenharia (Obra Taboca 2)</p>
+      <p class="text-slate-600 text-[10px]">Sessão sincronizada em tempo real com as permissões do Prefeito</p>
+    </footer>
+  </div>
+
+  <!-- Motor de Instalação PWA Dedicado (sem conflito com Gestão) -->
+  <script src="pwa_portal.js"
+    data-app-name="GEL Campo"
+    data-app-sub="App do Funcionário • Gelo, Ronda & Limpeza"
+    data-app-icon="icon-campo-192.png"
+    data-accent="teal"></script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      function mostrarViewGate(viewId) {
+        const overlay = document.getElementById('campoGateOverlay');
+        const main = document.getElementById('campoAppMain');
+        if (overlay) overlay.classList.remove('hidden');
+        if (main) main.classList.add('hidden');
+
+        ['campoViewLoading', 'campoViewAuth', 'campoViewPending', 'campoViewBlocked'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.toggle('hidden', id !== viewId);
+        });
+      }
+
+      function mostrarAppMain() {
+        const overlay = document.getElementById('campoGateOverlay');
+        const main = document.getElementById('campoAppMain');
+        if (overlay) overlay.classList.add('hidden');
+        if (main) main.classList.remove('hidden');
+      }
+
+      function exibirErro(boxId, msg) {
+        const box = document.getElementById(boxId);
+        if (!box) return;
+        if (!msg) {
+          box.classList.add('hidden');
+          box.innerHTML = '';
+        } else {
+          box.classList.remove('hidden');
+          box.innerHTML = `<i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span>${window.CampoAuth.escaparHtml(msg)}</span>`;
+        }
+      }
+
+      window.alternarAbaCampo = function (aba) {
+        const btnEntrar = document.getElementById('campoTabBtnEntrar');
+        const btnSolicitar = document.getElementById('campoTabBtnSolicitar');
+        const formLogin = document.getElementById('formCampoLogin');
+        const formReg = document.getElementById('formCampoRegister');
+        exibirErro('campoLoginError', '');
+        exibirErro('campoRegisterError', '');
+
+        const isSolicitar = aba === 'solicitar';
+        if (formLogin) formLogin.classList.toggle('hidden', isSolicitar);
+        if (formReg) formReg.classList.toggle('hidden', !isSolicitar);
+
+        const activeCls = 'flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/20';
+        const idleCls = 'flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all text-slate-300 hover:text-white';
+        if (btnEntrar) btnEntrar.className = isSolicitar ? idleCls : activeCls;
+        if (btnSolicitar) btnSolicitar.className = isSolicitar ? activeCls : idleCls;
+      };
+
+      window.toggleSenhaCampo = function (inputId, btn) {
+        const inp = document.getElementById(inputId);
+        if (!inp) return;
+        const isPass = inp.type === 'password';
+        inp.type = isPass ? 'text' : 'password';
+        const icon = btn ? btn.querySelector('i') : null;
+        if (icon) icon.className = isPass ? 'fa-solid fa-eye-slash text-sm' : 'fa-solid fa-eye text-sm';
+      };
+
+      window.atualizarForcaSenhaCampo = function () {
+        const val = document.getElementById('campoRegSenha')?.value || '';
+        const bar = document.getElementById('campoForcaBar');
+        const lbl = document.getElementById('campoForcaLbl');
+        if (!bar || !lbl) return;
+
+        if (!val) {
+          bar.style.width = '0%';
+          bar.className = 'h-full rounded-full transition-all duration-300 bg-slate-600';
+          lbl.textContent = '';
+          return;
+        }
+        let score = 0;
+        if (val.length >= 6) score++;
+        if (val.length >= 8) score++;
+        if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
+
+        if (val.length < 6) {
+          bar.style.width = '20%';
+          bar.className = 'h-full rounded-full transition-all duration-300 bg-rose-500';
+          lbl.textContent = 'Muito curta (mín. 6)';
+        } else if (score <= 2) {
+          bar.style.width = '45%';
+          bar.className = 'h-full rounded-full transition-all duration-300 bg-amber-500';
+          lbl.textContent = 'Senha fraca';
+        } else if (score === 3) {
+          bar.style.width = '75%';
+          bar.className = 'h-full rounded-full transition-all duration-300 bg-sky-400';
+          lbl.textContent = 'Senha boa';
+        } else {
+          bar.style.width = '100%';
+          bar.className = 'h-full rounded-full transition-all duration-300 bg-emerald-400';
+          lbl.textContent = 'Senha forte';
+        }
+      };
+
+      window.handleCampoLogin = async function (e) {
+        if (e) e.preventDefault();
+        exibirErro('campoLoginError', '');
+
+        const user = document.getElementById('campoLoginUsername')?.value || '';
+        const senha = document.getElementById('campoLoginSenha')?.value || '';
+        const lembrar = document.getElementById('campoLoginLembrar')?.checked !== false;
+        const btn = document.getElementById('btnCampoLogin');
+        const orig = btn ? btn.innerHTML : '';
+
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Entrando...</span>';
+        }
+
+        try {
+          await window.CampoAuth.login(user, senha, lembrar);
+        } catch (err) {
+          exibirErro('campoLoginError', window.CampoAuth.traduzirErroAuth(err));
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+          }
+        }
+      };
+
+      window.handleCampoSolicitar = async function (e) {
+        if (e) e.preventDefault();
+        exibirErro('campoRegisterError', '');
+
+        const nome = document.getElementById('campoRegNome')?.value || '';
+        const cargo = document.getElementById('campoRegCargo')?.value || '';
+        const user = document.getElementById('campoRegUsername')?.value || '';
+        const senha = document.getElementById('campoRegSenha')?.value || '';
+        const confirmar = document.getElementById('campoRegConfirmar')?.value || '';
+
+        if (senha !== confirmar) {
+          exibirErro('campoRegisterError', 'As senhas digitadas não conferem.');
+          return;
+        }
+
+        const btn = document.getElementById('btnCampoRegister');
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Enviando solicitação...</span>';
+        }
+
+        try {
+          await window.CampoAuth.solicitarAcesso(nome, cargo, user, senha);
+        } catch (err) {
+          exibirErro('campoRegisterError', window.CampoAuth.traduzirErroAuth(err));
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+          }
+        }
+      };
+
+      window.handleCampoLogout = async function () {
+        try {
+          await window.CampoAuth.logout();
+          const inpPass = document.getElementById('campoLoginSenha');
+          if (inpPass) inpPass.value = '';
+        } catch (err) {
+          console.error('[GEL Campo] Erro ao sair:', err);
+        }
+      };
+
+      function renderPainelAtivo(perfil) {
+        const nome = perfil.nome || 'Colaborador';
+        const username = perfil.username || '';
+        const cargo = perfil.cargo || 'Equipe de Campo';
+
+        const avatarEl = document.getElementById('campoUserAvatar');
+        const nomeEl = document.getElementById('campoUserNome');
+        const loginEl = document.getElementById('campoUserLogin');
+        const cargoEl = document.getElementById('campoUserCargo');
+        const roleEl = document.getElementById('campoUserRoleBadge');
+
+        if (avatarEl) avatarEl.textContent = window.CampoAuth.gerarIniciais(nome);
+        if (nomeEl) nomeEl.textContent = nome;
+        if (loginEl) loginEl.textContent = username ? '@' + username : '';
+        if (cargoEl) cargoEl.textContent = cargo;
+        if (roleEl) {
+          roleEl.textContent = perfil.role === 'master' ? 'Prefeito Master' : 'Equipe de Campo';
+        }
+
+        // Montar exclusivamente os cards das frentes liberadas
+        const frentes = [];
+
+        if (window.CampoAuth.hasFrontAccess(perfil, 'maquina_gelo')) {
+          frentes.push({
+            href: 'ronda.html?ponto=ponto_maquina_gelo_principal&tipo=maquina_gelo',
+            emoji: '🧊',
+            titulo: 'Fábrica & Máquina de Gelo',
+            subtitulo: 'Produção diária, saídas em sacos/kg, saldo do freezer, destinos e checklist.',
+            badge: 'Controle de Gelo',
+            borderCls: 'border-cyan-500/40 hover:border-cyan-400',
+            iconBgCls: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/35',
+            badgeCls: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+            btnCls: 'bg-cyan-500/20 text-cyan-200 group-hover:bg-cyan-500 group-hover:text-slate-950'
+          });
+        }
+
+        if (window.CampoAuth.hasFrontAccess(perfil, 'ronda')) {
+          frentes.push({
+            href: 'ronda.html',
+            emoji: '🚽',
+            titulo: 'Banheiros & Bebedouros (Ronda)',
+            subtitulo: 'Higienização de sanitários químicos, bebedouros, checklist de ronda e QR Code.',
+            badge: 'Ronda Sanitária',
+            borderCls: 'border-teal-500/40 hover:border-teal-400',
+            iconBgCls: 'bg-teal-500/15 text-teal-300 border-teal-500/35',
+            badgeCls: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
+            btnCls: 'bg-teal-500/20 text-teal-200 group-hover:bg-teal-500 group-hover:text-slate-950'
+          });
+        }
+
+        if (window.CampoAuth.hasFrontAccess(perfil, 'limpeza')) {
+          frentes.push({
+            href: 'limpeza.html',
+            emoji: '🏠',
+            titulo: 'Casas na Cidade & Quartos (Limpeza / Ar)',
+            subtitulo: 'Limpeza de rotina, manutenção de ar-condicionado em casas da cidade e blocos.',
+            badge: 'Limpeza & Ar',
+            borderCls: 'border-emerald-500/40 hover:border-emerald-400',
+            iconBgCls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35',
+            badgeCls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+            btnCls: 'bg-emerald-500/20 text-emerald-200 group-hover:bg-emerald-500 group-hover:text-slate-950'
+          });
+        }
+
+        const container = document.getElementById('campoFrentesContainer');
+        const emptyBox = document.getElementById('campoSemFrentesBox');
+        const qtdBadge = document.getElementById('campoQtdFrentesBadge');
+
+        if (qtdBadge) {
+          qtdBadge.textContent = frentes.length === 1 ? '1 frente liberada' : `${frentes.length} frentes liberadas`;
+        }
+
+        if (container) {
+          if (frentes.length === 0) {
+            container.innerHTML = '';
+            if (emptyBox) emptyBox.classList.remove('hidden');
+          } else {
+            if (emptyBox) emptyBox.classList.add('hidden');
+            container.innerHTML = frentes.map(f => `
+              <a href="${f.href}" class="group block rounded-3xl bg-slate-800/85 hover:bg-slate-800 border ${f.borderCls} p-4 sm:p-5 shadow-lg transition-all duration-200 active:scale-[0.985]">
+                <div class="flex items-start gap-3.5">
+                  <div class="w-13 h-13 min-w-[52px] min-h-[52px] rounded-2xl border ${f.iconBgCls} flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
+                    <span>${f.emoji}</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full border ${f.badgeCls} text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                      ${f.badge}
+                    </span>
+                    <h4 class="text-sm sm:text-base font-black text-white leading-snug">
+                      ${f.emoji} ${f.titulo}
+                    </h4>
+                    <p class="text-[11px] text-slate-300/90 mt-1 leading-relaxed">
+                      ${f.subtitulo}
+                    </p>
+                    <div class="mt-3 flex items-center justify-end">
+                      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition ${f.btnCls}">
+                        <span>Abrir Frente</span>
+                        <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-0.5 transition-transform"></i>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            `).join('');
+          }
+        }
+
+        const adminBox = document.getElementById('campoAdminLinkBox');
+        if (adminBox) {
+          const podePainel = window.CampoAuth.hasAdminPanelAccess(perfil);
+          adminBox.classList.toggle('hidden', !podePainel);
+        }
+
+        mostrarAppMain();
+      }
+
+      // Inicializa monitoramento de autenticação e RBAC em tempo real
+      document.addEventListener('DOMContentLoaded', () => {
+        if (!window.CampoAuth) {
+          mostrarViewGate('campoViewBlocked');
+          const motivo = document.getElementById('campoBlockedMotivo');
+          if (motivo) motivo.textContent = 'Erro ao carregar módulo de autenticação (campo_auth.js). Recarregue a página.';
+          return;
+        }
+
+        window.CampoAuth.watchAuth(({ state, perfil }) => {
+          if (state === 'loading') {
+            mostrarViewGate('campoViewLoading');
+            return;
+          }
+
+          if (state === 'unauthenticated') {
+            mostrarViewGate('campoViewAuth');
+            return;
+          }
+
+          if (state === 'pending') {
+            const pNome = document.getElementById('campoPendingNome');
+            const pUser = document.getElementById('campoPendingUser');
+            const pCargo = document.getElementById('campoPendingCargo');
+            if (pNome) pNome.textContent = (perfil && perfil.nome) || 'Colaborador';
+            if (pUser) pUser.textContent = (perfil && perfil.username) ? '@' + perfil.username : '@usuario';
+            if (pCargo) pCargo.textContent = (perfil && perfil.cargo) || 'Equipe de Campo';
+            mostrarViewGate('campoViewPending');
+            return;
+          }
+
+          if (state === 'blocked') {
+            const bNome = document.getElementById('campoBlockedNome');
+            const bMotivo = document.getElementById('campoBlockedMotivo');
+            if (bNome) bNome.textContent = (perfil && perfil.nome) || 'Usuário';
+            if (bMotivo) {
+              bMotivo.textContent = (perfil && perfil.motivo) ||
+                'Seu acesso foi suspenso ou recusado pela administração. Procure o Prefeito da Obra.';
+            }
+            mostrarViewGate('campoViewBlocked');
+            return;
+          }
+
+          if (state === 'active' && perfil) {
+            renderPainelAtivo(perfil);
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

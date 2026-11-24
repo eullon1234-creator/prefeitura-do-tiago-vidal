@@ -749,11 +749,47 @@
           </button>
         </div>
 
-        <!-- Rodapé Discreto: Atalho para o Portal do Alojado -->
-        <div class="px-6 py-4 bg-slate-950/60 border-t border-white/10 text-center">
-          <a href="alojado.html" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-amber-300 transition group">
+        <!-- VIEW 7: USUÁRIO EXCLUSIVO DE CAMPO (BLOQUEIA PAINEL DO PREFEITO) -->
+        <div id="authViewSomenteCampo" class="hidden p-7 text-center space-y-5">
+          <div class="w-16 h-16 rounded-2xl bg-teal-500/15 border border-teal-400/40 text-teal-300 flex items-center justify-center mx-auto shadow-lg shadow-teal-500/10">
+            <i class="fa-solid fa-helmet-safety text-2xl"></i>
+          </div>
+
+          <div class="space-y-1.5">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/15 text-teal-300 border border-teal-400/30 text-[11px] font-bold uppercase tracking-wider">
+              <i class="fa-solid fa-mobile-screen-button text-[10px]"></i>Acesso Exclusivo de Campo
+            </span>
+            <h2 class="text-lg font-extrabold text-white pt-1">Use o App do Funcionário</h2>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Olá, <strong id="somenteCampoUserNome" class="text-white">Colaborador</strong> (<span id="somenteCampoUserLogin" class="font-mono text-amber-300">@usuario</span> • <span id="somenteCampoUserCargo">Equipe de Campo</span>)! Sua conta está liberada exclusivamente para os <strong>Apps de Campo</strong> e não possui entrada no Painel Administrativo do Prefeito.
+            </p>
+          </div>
+
+          <div id="somenteCampoFrentesBadges" class="flex flex-wrap items-center justify-center gap-1.5"></div>
+
+          <div class="space-y-2.5 pt-1">
+            <a href="campo.html" class="w-full h-12 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 transition active:scale-[0.98]">
+              <i class="fa-solid fa-helmet-safety"></i>
+              <span>Abrir Meu App de Campo</span>
+              <i class="fa-solid fa-arrow-right text-xs"></i>
+            </a>
+            <button type="button" onclick="PrefeituraAuth.logout()" class="w-full h-11 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-right-from-bracket"></i>Sair e trocar de conta
+            </button>
+          </div>
+        </div>
+
+        <!-- Rodapé Discreto: Atalhos para Portal do Alojado e App de Campo -->
+        <div class="px-5 py-3.5 bg-slate-950/60 border-t border-white/10 flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-5 text-center">
+          <a href="alojado.html" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-amber-300 transition group">
             <i class="fa-solid fa-id-card-clip text-amber-400"></i>
-            <span>É colaborador alojado? <strong class="underline decoration-amber-400/50 group-hover:decoration-amber-300">Acessar Portal do Alojado</strong></span>
+            <span><strong class="underline decoration-amber-400/50 group-hover:decoration-amber-300">Portal do Alojado</strong></span>
+            <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-0.5 transition-transform"></i>
+          </a>
+          <span class="hidden sm:inline text-slate-600 text-xs">•</span>
+          <a href="campo.html" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-teal-300 transition group">
+            <i class="fa-solid fa-helmet-safety text-teal-400"></i>
+            <span><strong class="underline decoration-teal-400/50 group-hover:decoration-teal-300">App do Funcionário (Campo)</strong></span>
             <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-0.5 transition-transform"></i>
           </a>
         </div>
@@ -10525,6 +10561,13 @@ service cloud.firestore {
                 </div>
               </label>
             </div>
+            <label class="flex items-start gap-2.5 p-3 rounded-xl border border-teal-200 bg-teal-50/60 hover:bg-teal-50 cursor-pointer transition">
+              <input id="chkPermSomenteCampo" type="checkbox" onchange="PrefeituraAuth.toggleSomenteCampoModal(this.checked)" class="mt-0.5 w-4 h-4 rounded text-teal-600 focus:ring-teal-500">
+              <div>
+                <span class="block text-xs font-extrabold text-teal-900"><i class="fa-solid fa-helmet-safety mr-1 text-teal-600"></i>Somente Apps de Campo — não entra no Painel do Prefeito</span>
+                <span class="block text-[10px] text-teal-800/80">Restringe este usuário ao App do Funcionário (<code>campo.html</code>, Gelo, Ronda e Limpeza). Se tentar abrir o painel principal, será redirecionado para o App de Campo.</span>
+              </div>
+            </label>
           </div>
 
           <!-- Matriz dos 18 Módulos -->
@@ -10615,7 +10658,7 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-[110] flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Scripts da Aplicação e Sistema de Autenticação (RBAC) -->
-  <script src="auth.js?v=6.0"></script>
+  <script src="auth.js?v=6.3"></script>
   <script src="app.js?v=6.0"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->

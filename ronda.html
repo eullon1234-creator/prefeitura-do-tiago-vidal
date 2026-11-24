@@ -5,9 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Ronda do Canteiro • Higiene & Bebedouros | GEL Engenharia</title>
   
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icon-ronda-192.png">
+  <link rel="apple-touch-icon" href="icon-ronda-192.png">
+  <link rel="manifest" href="manifest-ronda.json">
   <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GEL Ronda">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +22,8 @@
   <!-- Firebase SDKs compat v10 -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="campo_auth.js?v=6.3"></script>
 
   <style>
     body {
@@ -64,9 +71,13 @@
           </p>
         </div>
       </div>
-      <div class="text-right">
+      <div class="flex items-center gap-1.5">
+        <button type="button" data-pwa-install-btn onclick="window.PwaPortal && window.PwaPortal.instalar()" class="px-2.5 py-1 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-[10px] font-black flex items-center gap-1 shadow-sm transition active:scale-95" title="Instalar App GEL Ronda no Celular">
+          <i class="fa-solid fa-download"></i>
+          <span>App</span>
+        </button>
         <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800">
-          <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span> QR Ativo
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span> QR
         </span>
       </div>
     </div>
@@ -121,10 +132,16 @@
         </span>
       </div>
 
-      <p id="displayPontoSetor" class="text-xs text-slate-300 flex items-center gap-1.5 pt-1 border-t border-slate-700/50">
-        <i class="fa-solid fa-location-dot text-rose-400"></i>
-        <span id="displayPontoSetorTexto">Canteiro de Obras • GEL Engenharia</span>
-      </p>
+      <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-700/50">
+        <p id="displayPontoSetor" class="text-xs text-slate-300 flex items-center gap-1.5 min-w-0">
+          <i class="fa-solid fa-location-dot text-rose-400 flex-shrink-0"></i>
+          <span id="displayPontoSetorTexto" class="truncate">Canteiro de Obras • GEL Engenharia</span>
+        </p>
+        <button type="button" id="btnTrocarPontoManual" onclick="abrirSelecaoPontoManual()" class="text-[10px] font-bold text-teal-400 hover:text-teal-300 whitespace-nowrap flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900/80 border border-slate-700/80 transition flex-shrink-0" title="Trocar ponto de atendimento">
+          <i class="fa-solid fa-repeat text-[9px]"></i>
+          <span>Trocar</span>
+        </button>
+      </div>
 
       <!-- Resumo das limpezas de hoje -->
       <div id="resumoLimpezasHojeContainer" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/70 text-xs space-y-1">
@@ -192,86 +209,35 @@
       </button>
     </div>
 
-    <!-- BLOCO 1: AUTENTICAÇÃO COM SENHA DA EQUIPE DE LIMPEZA -->
+    <!-- BLOCO 1: AUTENTICAÇÃO FIREBASE + RBAC DA EQUIPE DE CAMPO (CampoAuth) -->
     <div id="containerSenhaLimpeza" class="bg-slate-800/90 backdrop-blur rounded-2xl p-4 sm:p-5 border border-teal-500/40 shadow-xl space-y-3.5">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-lg flex-shrink-0 border border-teal-500/30">
-          <i class="fa-solid fa-key"></i>
+      <div class="py-6 text-center space-y-2">
+        <div class="w-11 h-11 rounded-2xl bg-teal-500/15 border border-teal-500/30 text-teal-400 flex items-center justify-center mx-auto">
+          <i class="fa-solid fa-circle-notch fa-spin text-lg"></i>
         </div>
-        <div>
-          <h3 class="text-sm font-black text-white uppercase tracking-wide">Acesso da Equipe de Limpeza</h3>
-          <p class="text-[11px] text-slate-300 leading-snug">Toque no teclado numérico ou digite o PIN fornecido pelo Prefeito.</p>
-        </div>
-      </div>
-
-      <!-- Indicadores de Dígitos do PIN -->
-      <div class="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 text-center space-y-2">
-        <div class="flex justify-center items-center gap-2.5 py-1">
-          <span id="pinRondaDot1" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinRondaDot2" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinRondaDot3" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinRondaDot4" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinRondaDot5" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-          <span id="pinRondaDot6" class="w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all"></span>
-        </div>
-
-        <div class="relative flex items-center">
-          <input 
-            type="password" 
-            id="inputSenhaEquipeRonda" 
-            inputmode="numeric"
-            placeholder="Ou digite o PIN..." 
-            oninput="atualizarIndicadoresPinKeypadRonda()"
-            class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-4 py-2 text-center text-sm font-mono font-bold tracking-widest text-white outline-none transition placeholder-slate-500"
-            onkeydown="if(event.key === 'Enter') validarSenhaEquipeRonda()"
-          >
-          <button 
-            type="button" 
-            onclick="validarSenhaEquipeRonda()" 
-            class="ml-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-bold text-xs uppercase tracking-wider shadow-md transition flex items-center gap-1"
-          >
-            <i class="fa-solid fa-unlock"></i> OK
-          </button>
-        </div>
-
-        <div id="msgErroSenhaRonda" class="hidden p-2 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs text-center font-bold">
-          <i class="fa-solid fa-circle-exclamation mr-1"></i> Senha incorreta! Solicite ao Prefeito da Obra.
-        </div>
-      </div>
-
-      <!-- Keypad Numérico Virtual (52px por tecla para uso com luva ou campo) -->
-      <div class="max-w-xs mx-auto grid grid-cols-3 gap-2 pt-1 select-none">
-        <button type="button" onclick="digitarPinKeypadRonda('1')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">1</button>
-        <button type="button" onclick="digitarPinKeypadRonda('2')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">2</button>
-        <button type="button" onclick="digitarPinKeypadRonda('3')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">3</button>
-        <button type="button" onclick="digitarPinKeypadRonda('4')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">4</button>
-        <button type="button" onclick="digitarPinKeypadRonda('5')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">5</button>
-        <button type="button" onclick="digitarPinKeypadRonda('6')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">6</button>
-        <button type="button" onclick="digitarPinKeypadRonda('7')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">7</button>
-        <button type="button" onclick="digitarPinKeypadRonda('8')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">8</button>
-        <button type="button" onclick="digitarPinKeypadRonda('9')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">9</button>
-        <button type="button" onclick="limparPinKeypadRonda()" class="min-h-[52px] h-13 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 font-bold text-xs hover:text-white active:scale-95 transition">Limpar</button>
-        <button type="button" onclick="digitarPinKeypadRonda('0')" class="min-h-[52px] h-13 rounded-2xl bg-slate-900 border border-slate-700/80 text-white font-black text-xl hover:bg-slate-800 active:bg-teal-600 active:scale-95 transition shadow-sm">0</button>
-        <button type="button" onclick="apagarPinKeypadRonda()" class="min-h-[52px] h-13 rounded-2xl bg-slate-950 border border-slate-800 text-rose-400 hover:text-rose-300 text-base active:scale-95 transition" title="Apagar último"><i class="fa-solid fa-delete-left"></i></button>
-      </div>
-
-      <div class="flex items-center justify-between text-xs text-slate-300 pt-1 border-t border-slate-800">
-        <label class="flex items-center gap-2 cursor-pointer select-none">
-          <input type="checkbox" id="checkLembrarSenhaHoje" checked class="w-4 h-4 accent-teal-500 rounded">
-          <span class="text-[11px]">Lembrar senha neste aparelho hoje</span>
-        </label>
+        <p class="text-xs font-bold text-slate-300">Verificando credenciais da equipe...</p>
       </div>
     </div>
 
-    <!-- Formulário de Registro (Acessado pela Equipe de Limpeza após Senha) -->
+    <!-- Formulário de Registro (Acessado pela Equipe Autenticada com RBAC Ativo) -->
     <form id="formRonda" onsubmit="salvarRondaPublica(event)" class="hidden bg-slate-800/80 backdrop-blur rounded-2xl p-4 sm:p-5 border border-teal-500/40 shadow-xl space-y-4">
-      <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
-        <span class="text-[11px] font-bold text-teal-400 flex items-center gap-1.5">
-          <i class="fa-solid fa-shield-check text-xs"></i> Acesso Liberado para Equipe
-        </span>
-        <button type="button" onclick="bloquearAcessoEquipeRonda()" class="text-[11px] text-slate-400 hover:text-rose-400 transition font-medium">
-          <i class="fa-solid fa-lock mr-1"></i> Bloquear / Sair
-        </button>
+      <div id="barraUsuarioAutenticadoRonda" class="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-700/60">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+          <i class="fa-solid fa-user-shield text-teal-400 text-xs flex-shrink-0"></i>
+          <span id="authNomeUsuarioRonda" class="text-xs font-bold text-white truncate">Equipe Autenticada</span>
+          <span id="authFrenteBadgeRonda" class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-500/30 flex-shrink-0">Ronda</span>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <a href="campo.html" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-bold transition">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            <span>Menu Campo</span>
+          </a>
+          <button type="button" onclick="sairEquipeRonda()" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 hover:bg-rose-950/80 text-rose-300 border border-slate-700 hover:border-rose-500/40 text-[10px] font-bold transition">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Sair</span>
+          </button>
+        </div>
       </div>
 
       <input type="hidden" id="inputPontoId">
@@ -281,18 +247,21 @@
       <input type="hidden" id="inputPontoMeta" value="2">
       <input type="hidden" id="inputAvaliacao" value="Excelente / Em Ordem">
 
-      <!-- Nome do Responsável com Memória Local -->
+      <!-- Nome do Responsável (Preenchido Automaticamente pela Conta Firebase Autenticada) -->
       <div>
         <label for="inputResponsavel" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-          <span><i class="fa-solid fa-user-check text-teal-400 mr-1"></i> Seu Nome (Responsável) *</span>
-          <span class="text-[10px] text-slate-400 font-normal">Identificação</span>
+          <span><i class="fa-solid fa-user-check text-teal-400 mr-1"></i> Responsável Autenticado *</span>
+          <span class="text-[10px] text-teal-400/90 font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-lock text-[9px]"></i> Conta Verificada
+          </span>
         </label>
         <input 
           type="text" 
           id="inputResponsavel" 
           required 
-          placeholder="Ex: Maria Silva / João Santos" 
-          class="w-full bg-slate-900 border border-slate-700 focus:border-teal-500 rounded-xl px-3.5 py-2.5 text-white font-semibold text-xs outline-none transition placeholder-slate-500 focus:ring-1 focus:ring-teal-500"
+          readonly
+          placeholder="Carregando usuário autenticado..." 
+          class="w-full bg-slate-900/60 border border-teal-500/35 rounded-xl px-3.5 py-2.5 text-teal-200 font-semibold text-xs outline-none cursor-not-allowed select-none"
         >
       </div>
 
@@ -836,11 +805,12 @@
     let unidadeGeloAtual = 'sacos';
     let configRonda = {
       freq_padrao_banheiro: 2,
-      freq_padrao_bebedouro: 1,
-      senha_equipe: '1234'
+      freq_padrao_bebedouro: 1
     };
     let modoAtual = 'limpeza';
     let equipeAutenticada = false;
+    let perfilEquipeAtual = null;
+    let campoAuthController = null;
 
     // Inicialização do Firebase
     try {
@@ -863,7 +833,7 @@
       return `${y}-${m}-${day}`;
     }
 
-    // Carregar configurações de Ronda (incluindo senha do Prefeito)
+    // Carregar configurações de Ronda (frequências padrão)
     function carregarConfigRonda() {
       try {
         const cached = localStorage.getItem('ronda_config_cache');
@@ -882,7 +852,126 @@
       }
     }
 
-    // Alternar entre modo Limpeza e Relatar Problema
+    // ========================================================
+    // AUTENTICAÇÃO FIREBASE + RBAC EM TEMPO REAL (CampoAuth)
+    // ========================================================
+    function obterFrenteObrigatoriaRonda() {
+      const inputTipo = document.getElementById('inputPontoTipo');
+      const tipo = (inputTipo && inputTipo.value) || (pontoCarregado && pontoCarregado.tipo) || 'banheiro';
+      return tipo === 'maquina_gelo' ? 'maquina_gelo' : 'ronda';
+    }
+
+    function obterTituloFrenteRonda(frenteKey) {
+      const frente = frenteKey || obterFrenteObrigatoriaRonda();
+      return frente === 'maquina_gelo' ? 'Máquina de Gelo' : 'Ronda';
+    }
+
+    function sincronizarVisibilidadeBlocoEquipe() {
+      const containerSenha = document.getElementById('containerSenhaLimpeza');
+      const formRonda = document.getElementById('formRonda');
+      const telaSucessoRonda = document.getElementById('telaSucessoRonda');
+      const sucessoVisivel = Boolean(telaSucessoRonda && !telaSucessoRonda.classList.contains('hidden'));
+
+      if (modoAtual !== 'limpeza') {
+        if (containerSenha) containerSenha.classList.add('hidden');
+        if (formRonda) formRonda.classList.add('hidden');
+        return;
+      }
+
+      if (equipeAutenticada) {
+        if (containerSenha) containerSenha.classList.add('hidden');
+        if (formRonda) {
+          if (sucessoVisivel) formRonda.classList.add('hidden');
+          else formRonda.classList.remove('hidden');
+        }
+      } else {
+        if (telaSucessoRonda) telaSucessoRonda.classList.add('hidden');
+        if (formRonda) formRonda.classList.add('hidden');
+        if (containerSenha) containerSenha.classList.remove('hidden');
+      }
+    }
+
+    function atualizarFrenteCampoAuth() {
+      if (!campoAuthController) return;
+      const frente = obterFrenteObrigatoriaRonda();
+      const titulo = obterTituloFrenteRonda(frente);
+      campoAuthController.setFrente(frente, titulo);
+    }
+
+    function inicializarCampoAuthRonda() {
+      if (!window.CampoAuth || typeof window.CampoAuth.mountInlineAuthBox !== 'function') {
+        console.error('[Ronda] CampoAuth não carregado.');
+        return;
+      }
+      if (campoAuthController) {
+        atualizarFrenteCampoAuth();
+        return;
+      }
+
+      campoAuthController = window.CampoAuth.mountInlineAuthBox('containerSenhaLimpeza', {
+        frente: obterFrenteObrigatoriaRonda,
+        tituloFrente: obterTituloFrenteRonda,
+        onUnlocked: (perfil, user, frenteKey) => {
+          const recemDesbloqueado = !equipeAutenticada;
+          equipeAutenticada = true;
+          perfilEquipeAtual = perfil || null;
+
+          const nomeReal = (perfil && perfil.nome) ? String(perfil.nome).trim() : '';
+          const elNomeBarra = document.getElementById('authNomeUsuarioRonda');
+          if (elNomeBarra) elNomeBarra.textContent = nomeReal || 'Equipe Autenticada';
+
+          const elBadgeFrente = document.getElementById('authFrenteBadgeRonda');
+          if (elBadgeFrente) {
+            elBadgeFrente.textContent = frenteKey === 'maquina_gelo' ? 'Máquina de Gelo' : 'Ronda';
+          }
+
+          const elResp = document.getElementById('inputResponsavel');
+          if (elResp) {
+            elResp.value = nomeReal;
+            elResp.readOnly = true;
+          }
+
+          if (recemDesbloqueado) {
+            dispararFeedbackTati('scan');
+          }
+          sincronizarVisibilidadeBlocoEquipe();
+        },
+        onLocked: (reason, ctx) => {
+          equipeAutenticada = false;
+          perfilEquipeAtual = (ctx && ctx.perfil) ? ctx.perfil : null;
+
+          const elResp = document.getElementById('inputResponsavel');
+          if (elResp) {
+            elResp.value = '';
+            elResp.readOnly = true;
+          }
+
+          sincronizarVisibilidadeBlocoEquipe();
+        }
+      });
+    }
+
+    async function sairEquipeRonda() {
+      try {
+        if (window.CampoAuth && typeof window.CampoAuth.logout === 'function') {
+          await window.CampoAuth.logout();
+        }
+      } catch (err) {
+        console.warn('[Ronda] Erro ao encerrar sessão:', err);
+      }
+    }
+
+    function abrirSelecaoPontoManual() {
+      const box = document.getElementById('containerSelecaoPonto');
+      if (!box) return;
+      box.classList.toggle('hidden');
+      const sel = document.getElementById('selectPontoManual');
+      if (sel && pontoCarregado && pontoCarregado.id) {
+        sel.value = pontoCarregado.id;
+      }
+    }
+
+    // Alternar entre modo Limpeza e Relatar Problema (Bloco 2 permanece 100% público sem login)
     function trocarModoRonda(modo) {
       modoAtual = modo;
       const btnLimp = document.getElementById('btnModoLimpeza');
@@ -900,14 +989,7 @@
         if (btnLimp) btnLimp.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-teal-600 text-white shadow-sm';
         if (btnProb) btnProb.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900';
         if (formProb) formProb.classList.add('hidden');
-
-        if (equipeAutenticada) {
-          if (containerSenha) containerSenha.classList.add('hidden');
-          if (formRonda) formRonda.classList.remove('hidden');
-        } else {
-          if (containerSenha) containerSenha.classList.remove('hidden');
-          if (formRonda) formRonda.classList.add('hidden');
-        }
+        sincronizarVisibilidadeBlocoEquipe();
       } else {
         if (btnProb) btnProb.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition bg-amber-500 text-slate-950 font-black shadow-sm';
         if (btnLimp) btnLimp.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition text-slate-300 hover:text-white hover:bg-slate-900';
@@ -915,126 +997,6 @@
         if (formRonda) formRonda.classList.add('hidden');
         if (formProb) formProb.classList.remove('hidden');
       }
-    }
-
-    // Validar Senha da Equipe de Limpeza
-    
-    // FUNÇÕES DO KEYPAD NUMÉRICO VIRTUAL (USABILIDADE DE CAMPO / RONDA)
-    function digitarPinKeypadRonda(digito) {
-      const inp = document.getElementById('inputSenhaEquipeRonda');
-      if (!inp) return;
-      if (inp.value.length >= 8) return;
-      inp.value += String(digito);
-      atualizarIndicadoresPinKeypadRonda();
-      if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(30);
-
-      const senhaEsperada = String(configRonda.senha_equipe || '1234').trim();
-      if (inp.value === senhaEsperada) {
-        validarSenhaEquipeRonda();
-      }
-    }
-
-    function apagarPinKeypadRonda() {
-      const inp = document.getElementById('inputSenhaEquipeRonda');
-      if (!inp) return;
-      inp.value = inp.value.slice(0, -1);
-      atualizarIndicadoresPinKeypadRonda();
-      if (typeof dispararFeedbackTati === 'function') dispararFeedbackTati(25);
-    }
-
-    function limparPinKeypadRonda() {
-      const inp = document.getElementById('inputSenhaEquipeRonda');
-      if (!inp) return;
-      inp.value = '';
-      atualizarIndicadoresPinKeypadRonda();
-      const erro = document.getElementById('msgErroSenhaRonda');
-      if (erro) erro.classList.add('hidden');
-    }
-
-    function atualizarIndicadoresPinKeypadRonda() {
-      const inp = document.getElementById('inputSenhaEquipeRonda');
-      const len = inp ? inp.value.length : 0;
-      for (let i = 1; i <= 6; i++) {
-        const dot = document.getElementById('pinRondaDot' + i);
-        if (dot) {
-          if (i <= len) {
-            dot.className = 'w-3.5 h-3.5 rounded-full border-2 border-teal-400 bg-teal-400 transition-all scale-110';
-          } else {
-            dot.className = 'w-3.5 h-3.5 rounded-full border-2 border-slate-600 bg-slate-900 transition-all';
-          }
-        }
-      }
-    }
-
-    function validarSenhaEquipeRonda() {
-      const input = document.getElementById('inputSenhaEquipeRonda');
-      const erro = document.getElementById('msgErroSenhaRonda');
-      const val = (input ? input.value : '').trim();
-      const senhaEsperada = String(configRonda.senha_equipe || '1234').trim();
-
-      if (val === senhaEsperada) {
-        if (erro) erro.classList.add('hidden');
-        equipeAutenticada = true;
-        sessionStorage.setItem('ronda_equipe_autenticada', 'true');
-        dispararFeedbackTati('scan');
-
-        const checkLembrar = document.getElementById('checkLembrarSenhaHoje');
-        if (checkLembrar && checkLembrar.checked) {
-          localStorage.setItem('ronda_lembrar_senha_data', getDataHojeLocal());
-          localStorage.setItem('ronda_equipe_autenticada_local', 'true');
-        }
-
-        const containerSenha = document.getElementById('containerSenhaLimpeza');
-        const formRonda = document.getElementById('formRonda');
-        if (containerSenha) containerSenha.classList.add('hidden');
-        if (formRonda) formRonda.classList.remove('hidden');
-      } else {
-        dispararFeedbackTati('alerta');
-        if (erro) erro.classList.remove('hidden');
-        if (input) {
-          input.focus();
-          input.select();
-        }
-      }
-    }
-
-    function alternarVisibilidadeSenhaRonda() {
-      const input = document.getElementById('inputSenhaEquipeRonda');
-      const icone = document.getElementById('iconeOlhoSenhaRonda');
-      if (!input) return;
-      if (input.type === 'password') {
-        input.type = 'text';
-        if (icone) { icone.classList.remove('fa-eye'); icone.classList.add('fa-eye-slash'); }
-      } else {
-        input.type = 'password';
-        if (icone) { icone.classList.remove('fa-eye-slash'); icone.classList.add('fa-eye'); }
-      }
-    }
-
-    function bloquearAcessoEquipeRonda() {
-      equipeAutenticada = false;
-      sessionStorage.removeItem('ronda_equipe_autenticada');
-      localStorage.removeItem('ronda_equipe_autenticada_local');
-      localStorage.removeItem('ronda_lembrar_senha_data');
-      const input = document.getElementById('inputSenhaEquipeRonda');
-      if (input) input.value = '';
-      trocarModoRonda('limpeza');
-    }
-
-    function verificarAutenticacaoEquipeHoje() {
-      try {
-        const hojeLocal = getDataHojeLocal();
-        const authSessao = sessionStorage.getItem('ronda_equipe_autenticada') === 'true';
-        const authLocalData = localStorage.getItem('ronda_lembrar_senha_data');
-        const authLocal = localStorage.getItem('ronda_equipe_autenticada_local') === 'true' && authLocalData === hojeLocal;
-        if (authSessao || authLocal) {
-          equipeAutenticada = true;
-          const containerSenha = document.getElementById('containerSenhaLimpeza');
-          const formRonda = document.getElementById('formRonda');
-          if (containerSenha) containerSenha.classList.add('hidden');
-          if (formRonda) formRonda.classList.remove('hidden');
-        }
-      } catch (e) {}
     }
 
     // Alternar tipo de problema relatado
@@ -1161,19 +1123,7 @@
       if (elData) elData.value = hojeLocal;
       if (elHora) elHora.value = agora.toTimeString().slice(0, 5);
 
-      // 2. Preencher nome do responsável se já salvo anteriormente
-      try {
-        const salvoNome = localStorage.getItem('ronda_responsavel_nome');
-        if (salvoNome) {
-          const elResp = document.getElementById('inputResponsavel');
-          if (elResp) elResp.value = salvoNome;
-        }
-      } catch (e) {}
-
-      // 3. Checar se a equipe já autenticou com a senha hoje
-      verificarAutenticacaoEquipeHoje();
-
-      // 4. Capturar parâmetros da URL de forma tolerante e sem travar
+      // 2. Capturar parâmetros da URL de forma tolerante e sem travar
       const urlParams = new URLSearchParams(window.location.search);
       
       // Se a URL contiver parâmetros de Casa ou Quarto, redirecionar imediatamente para limpeza.html
@@ -1224,8 +1174,11 @@
                        
       let urlTipo = urlParams.get('tipo') || urlParams.get('TIPO') || urlParams.get('type');
 
-      // 5. Carregar ponto de forma imediata e síncrona
+      // 3. Carregar ponto de forma imediata e síncrona
       carregarPontoRonda(urlPontoId, urlTipo);
+
+      // 4. Montar autenticação Firebase + RBAC em tempo real (após identificar o tipo do ponto)
+      inicializarCampoAuthRonda();
     });
 
     // Carregar informações do ponto
@@ -1275,13 +1228,16 @@
 
         // Fallback resiliente imediato: se pontoId informado não estiver na lista (ex: offline ou recém criado), sintetizar para nunca travar
         if (!pontoEncontrado) {
-          const isBebedouro = idBuscado.includes('bebedouro') || idBuscado.includes('purificador') || (tipoParam === 'bebedouro');
-          const isBanheiro = idBuscado.includes('banheiro') || idBuscado.includes('sanitario') || (tipoParam === 'banheiro');
-          const tipoAuto = isBebedouro ? 'bebedouro' : (isBanheiro ? 'banheiro' : (tipoParam || 'banheiro'));
+          const isGelo = idBuscado.includes('gelo') || (tipoParam === 'maquina_gelo');
+          const isBebedouro = !isGelo && (idBuscado.includes('bebedouro') || idBuscado.includes('purificador') || (tipoParam === 'bebedouro'));
+          const isBanheiro = !isGelo && (idBuscado.includes('banheiro') || idBuscado.includes('sanitario') || (tipoParam === 'banheiro'));
+          const tipoAuto = isGelo ? 'maquina_gelo' : (isBebedouro ? 'bebedouro' : (isBanheiro ? 'banheiro' : (tipoParam || 'banheiro')));
           
           let nomeAuto = pontoId.replace(/^ponto_/, '').replace(/_/g, ' ');
           nomeAuto = nomeAuto.charAt(0).toUpperCase() + nomeAuto.slice(1);
-          if (!isBanheiro && !isBebedouro && !tipoParam) {
+          if (isGelo && !nomeAuto.toLowerCase().includes('máquina')) {
+            nomeAuto = nomeAuto.replace(/^maquina\b/i, 'Máquina');
+          } else if (!isBanheiro && !isBebedouro && !isGelo && !tipoParam) {
             nomeAuto = `Ponto Sanitário (${nomeAuto})`;
           }
 
@@ -1290,8 +1246,8 @@
             nome: nomeAuto,
             tipo: tipoAuto,
             setor: 'Canteiro Geral',
-            frequencia_diaria: tipoAuto === 'banheiro' ? 2 : 1,
-            horarios_sugeridos: tipoAuto === 'banheiro' ? '08:00 e 14:00' : '08:00',
+            frequencia_diaria: (tipoAuto === 'banheiro' || tipoAuto === 'maquina_gelo') ? 2 : 1,
+            horarios_sugeridos: (tipoAuto === 'banheiro' || tipoAuto === 'maquina_gelo') ? '08:00 e 14:00' : '08:00',
             observacoes: 'Ponto identificado via QR Code',
             ativo: true
           };
@@ -1340,8 +1296,13 @@
     function popularSelectPontosManual() {
       const selEl = document.getElementById('selectPontoManual');
       if (selEl && listaPontosDisponiveis.length > 0) {
+        const valorAtual = selEl.value || (pontoCarregado && pontoCarregado.id) || '';
         selEl.innerHTML = '<option value="">Selecione o ponto de ronda...</option>' + 
-          listaPontosDisponiveis.map(p => `<option value="${p.id}">${p.tipo === 'banheiro' ? '🚻' : '🚰'} ${p.nome} (${p.setor || 'Canteiro'})` + '</option>').join('');
+          listaPontosDisponiveis.map(p => {
+            const ico = p.tipo === 'maquina_gelo' ? '🧊' : (p.tipo === 'banheiro' ? '🚻' : '🚰');
+            return `<option value="${p.id}">${ico} ${p.nome} (${p.setor || 'Canteiro'})</option>`;
+          }).join('');
+        if (valorAtual) selEl.value = valorAtual;
       }
     }
 
@@ -1467,6 +1428,11 @@
         if (boxGelo) boxGelo.classList.add('hidden');
       }
 
+      // Sincronizar dropdown manual e reavaliar permissão RBAC da frente selecionada
+      const selManual = document.getElementById('selectPontoManual');
+      if (selManual) selManual.value = p.id || '';
+      atualizarFrenteCampoAuth();
+
       // Buscar registros do dia de hoje para calcular progresso
       carregarRegistrosPontoHoje(p.id, meta);
       carregarHistoricoPlaquinhaRonda(p.id, p.tipo, p.nome, p.setor);
@@ -1575,10 +1541,15 @@
         salvarOcorrenciaPublica();
       } else {
         const formRonda = document.getElementById('formRonda');
-        if (formRonda && !formRonda.classList.contains('hidden')) {
+        if (equipeAutenticada && formRonda && !formRonda.classList.contains('hidden')) {
           salvarRondaPublica();
         } else {
-          validarSenhaEquipeRonda();
+          const containerSenha = document.getElementById('containerSenhaLimpeza');
+          if (containerSenha) {
+            containerSenha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const primeiroInput = containerSenha.querySelector('input:not([type="checkbox"])');
+            if (primeiroInput) primeiroInput.focus();
+          }
         }
       }
     }
@@ -1590,12 +1561,22 @@
       if (isSubmetendoRonda) return;
       isSubmetendoRonda = true;
 
+      // Guard RBAC em tempo real antes de gravar
+      const frenteNecessaria = obterFrenteObrigatoriaRonda();
+      if (!equipeAutenticada || !perfilEquipeAtual || (window.CampoAuth && !window.CampoAuth.hasFrontAccess(perfilEquipeAtual, frenteNecessaria))) {
+        dispararFeedbackTati('alerta');
+        alert('Acesso não autorizado para esta frente. Faça login com uma conta liberada pelo Prefeito.');
+        isSubmetendoRonda = false;
+        atualizarFrenteCampoAuth();
+        return;
+      }
+
       const pontoId = document.getElementById('inputPontoId').value;
       const pontoNome = document.getElementById('inputPontoNome').value || document.getElementById('displayPontoNome').textContent;
       const pontoTipo = document.getElementById('inputPontoTipo').value || 'banheiro';
       const pontoSetor = document.getElementById('inputPontoSetor').value || 'Canteiro Central';
       const meta = parseInt(document.getElementById('inputPontoMeta').value || '1', 10);
-      const responsavel = document.getElementById('inputResponsavel').value.trim();
+      const responsavel = (perfilEquipeAtual && perfilEquipeAtual.nome ? String(perfilEquipeAtual.nome).trim() : '') || document.getElementById('inputResponsavel').value.trim();
       const data = document.getElementById('inputData').value;
       const hora = document.getElementById('inputHora').value;
       const avaliacao = document.getElementById('inputAvaliacao').value;
@@ -1655,11 +1636,6 @@
         }
         geloDestinos = (document.getElementById('inputGeloDestinos')?.value || '').trim();
       }
-
-      // Salvar nome do responsável na memória local para agilizar próximos pontos
-      try {
-        localStorage.setItem('ronda_responsavel_nome', responsavel);
-      } catch (e) {}
 
       const btn = document.getElementById('btnConfirmarRonda');
       if (btn) {
@@ -1740,7 +1716,7 @@
 
         // 3. Exibir Tela de Sucesso com status transparente
         try {
-          carregarHistoricoPlaquinhaRonda(pontoId, p.tipo, p.nome, p.setor);
+          carregarHistoricoPlaquinhaRonda(pontoId, pontoTipo, pontoNome, pontoSetor);
         } catch (e) {}
 
         const elProt = document.getElementById('sucessoProtocolo');
@@ -1924,12 +1900,20 @@
       document.getElementById('inputHora').value = agora.toTimeString().slice(0, 5);
       document.getElementById('inputObservacoes').value = '';
 
+      if (perfilEquipeAtual && perfilEquipeAtual.nome) {
+        const elResp = document.getElementById('inputResponsavel');
+        if (elResp) {
+          elResp.value = String(perfilEquipeAtual.nome).trim();
+          elResp.readOnly = true;
+        }
+      }
+
       const btn = document.getElementById('btnConfirmarRonda');
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-check text-base mr-2"></i><span>Confirmar Registro de Ronda</span>';
 
       document.getElementById('telaSucessoRonda').classList.add('hidden');
-      document.getElementById('formRonda').classList.remove('hidden');
+      sincronizarVisibilidadeBlocoEquipe();
 
       // Se temos o ponto carregado, recarrega os contadores do dia
       if (pontoCarregado) {
@@ -1950,14 +1934,12 @@
 
       trocarModoRonda('limpeza');
 
-      if (formRonda && !formRonda.classList.contains('hidden')) {
+      if (equipeAutenticada && formRonda && !formRonda.classList.contains('hidden')) {
         formRonda.scrollIntoView({ behavior: 'smooth' });
-        const inputNome = document.getElementById('inputResponsavel');
-        if (inputNome) inputNome.focus();
       } else if (containerSenha) {
         containerSenha.scrollIntoView({ behavior: 'smooth' });
-        const inputSenha = document.getElementById('inputSenhaEquipeRonda');
-        if (inputSenha) inputSenha.focus();
+        const primeiroInput = containerSenha.querySelector('input:not([type="checkbox"])');
+        if (primeiroInput) primeiroInput.focus();
       }
     }
 
@@ -2138,5 +2120,6 @@
     </div>
   </aside>
 
+  <script src="pwa_portal.js?v=6.2" data-app-name="GEL Ronda" data-app-sub="Sanitários, Bebedouros & Máquina de Gelo" data-app-icon="icon-ronda-192.png" data-accent="teal"></script>
 </body>
 </html>
