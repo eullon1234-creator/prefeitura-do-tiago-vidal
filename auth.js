@@ -426,13 +426,54 @@
   }
 
   // ==========================================================================
-  // VERIFICAÇÃO DE MASTER INICIAL
+  // VERIFICAÇÃO DE MASTER INICIAL (COM CACHE + TIMEOUT CONTRA TRAVAMENTO)
   // ==========================================================================
-  async function verificarSeMasterExiste() {
+  const MASTER_CACHE_KEY = 'prefeitura_master_configurado_v1';
+  const PERFIL_CACHE_PREFIX = 'prefeitura_perfil_cache_';
+
+  function salvarPerfilCacheLocal(uid, perfil) {
     try {
-      const doc = await state.db.collection('configuracoes').doc(DOC_AUTH_CONFIG).get();
-      if (doc.exists && doc.data().masterConfigurado) {
+      if (uid && perfil) localStorage.setItem(PERFIL_CACHE_PREFIX + uid, JSON.stringify(perfil));
+    } catch (_) {}
+  }
+
+  function lerPerfilCacheLocal(uid) {
+    try {
+      const raw = uid ? localStorage.getItem(PERFIL_CACHE_PREFIX + uid) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function limparPerfilCacheLocal(uid) {
+    try {
+      if (uid) localStorage.removeItem(PERFIL_CACHE_PREFIX + uid);
+    } catch (_) {}
+  }
+
+  async function verificarSeMasterExiste() {
+    // Se já confirmou antes neste aparelho, abre tela de login em 0ms sem travar no Firestore
+    try {
+      if (localStorage.getItem(MASTER_CACHE_KEY) === '1') {
         state.masterConfigurado = true;
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      const consulta = state.db.collection('configuracoes').doc(DOC_AUTH_CONFIG).get();
+      const timeout = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 3500));
+      const doc = await Promise.race([consulta, timeout]);
+
+      if (doc === 'TIMEOUT') {
+        console.warn('[Auth] Timeout ao consultar sistema_auth — abrindo tela de login.');
+        return true;
+      }
+
+      if (doc && doc.exists && doc.data().masterConfigurado) {
+        state.masterConfigurado = true;
+        try { localStorage.setItem(MASTER_CACHE_KEY, '1'); } catch (_) {}
         return true;
       }
       state.masterConfigurado = false;
@@ -598,6 +639,8 @@
 
   async function logout() {
     try {
+      const uidSair = state.firebaseUser ? state.firebaseUser.uid : null;
+      limparPerfilCacheLocal(uidSair);
       if (state.unsubMeuPerfil) { state.unsubMeuPerfil(); state.unsubMeuPerfil = null; }
       if (state.unsubTodosUsuarios) { state.unsubTodosUsuarios(); state.unsubTodosUsuarios = null; }
       state.perfilAtual = null;
@@ -626,8 +669,55 @@
 
     const docRef = state.db.collection(COLLECTION_USERS).doc(fbUser.uid);
 
+    // Fallback instantâneo para iPhone/4G lento: se onSnapshot demorar > 2.5s, tenta get() e cache local
+    let perfilResolvido = false;
+    const timerPerfilFallback = setTimeout(async () => {
+      if (perfilResolvido) return;
+      const cache = lerPerfilCacheLocal(fbUser.uid);
+      if (cache && cache.status === 'ativo') {
+        console.warn('[Auth] Perfil carregado do cache local enquanto sincroniza com Firestore.');
+        perfilResolvido = true;
+        state.perfilAtual = cache;
+        ativarSessaoNoPainel(cache);
+        return;
+      }
+      try {
+        const snapGet = await Promise.race([
+          docRef.get(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3500))
+        ]);
+        if (perfilResolvido) return;
+        if (snapGet && snapGet.exists) {
+          const p = snapGet.data();
+          p.uid = snapGet.id;
+          perfilResolvido = true;
+          state.perfilAtual = p;
+          if (p.status === 'ativo') {
+            salvarPerfilCacheLocal(fbUser.uid, p);
+            ativarSessaoNoPainel(p);
+          } else if (p.status === 'pendente') {
+            preencherTelaPendente(p);
+            mostrarTelaGate('authViewPending');
+          } else {
+            preencherTelaBloqueado(p);
+            mostrarTelaGate('authViewBlocked');
+          }
+        }
+      } catch (e) {
+        if (!perfilResolvido) {
+          console.warn('[Auth] Timeout ao buscar perfil no Firestore:', e);
+          exibirErroInline('authLoginError', 'Conexão lenta ao verificar sua conta. Tente entrar novamente.');
+          mostrarTelaGate('authViewAuth');
+          alternarAbaAuth('entrar');
+        }
+      }
+    }, 2500);
+
     state.unsubMeuPerfil = docRef.onSnapshot(async (snap) => {
+      perfilResolvido = true;
+      clearTimeout(timerPerfilFallback);
       if (!snap.exists) {
+        limparPerfilCacheLocal(fbUser.uid);
         // Caso o usuário exista no Firebase Auth mas seu documento foi removido pelo Prefeito
         const usernameFallback = (fbUser.email || '').split('@')[0] || 'usuario';
         state.perfilAtual = null;
@@ -645,18 +735,22 @@
       state.perfilAtual = perfil;
 
       if (perfil.status === 'pendente') {
+        limparPerfilCacheLocal(fbUser.uid);
         preencherTelaPendente(perfil);
         mostrarTelaGate('authViewPending');
         return;
       }
 
       if (perfil.status === 'bloqueado' || perfil.status === 'recusado') {
+        limparPerfilCacheLocal(fbUser.uid);
         preencherTelaBloqueado(perfil);
         mostrarTelaGate('authViewBlocked');
         return;
       }
 
       if (perfil.status === 'ativo') {
+        salvarPerfilCacheLocal(fbUser.uid, perfil);
+        try { localStorage.setItem(MASTER_CACHE_KEY, '1'); } catch (_) {}
         // Atualiza ultimoAcesso silenciosamente (máx 1x por sessão)
         if (!state._ultimoAcessoGravado) {
           state._ultimoAcessoGravado = true;
@@ -666,8 +760,16 @@
         ativarSessaoNoPainel(perfil);
       }
     }, (err) => {
+      perfilResolvido = true;
+      clearTimeout(timerPerfilFallback);
       console.error('[Auth] Erro ao escutar perfil do usuário:', err);
-      exibirErroInline('authLoginError', 'Erro ao verificar suas permissões no Firebase. Verifique as regras do Firestore.');
+      const cache = lerPerfilCacheLocal(fbUser.uid);
+      if (cache && cache.status === 'ativo') {
+        state.perfilAtual = cache;
+        ativarSessaoNoPainel(cache);
+        return;
+      }
+      exibirErroInline('authLoginError', 'Erro ao verificar suas permissões no Firebase. Verifique sua conexão e tente novamente.');
       mostrarTelaGate('authViewAuth');
     });
   }
@@ -1887,8 +1989,22 @@
     }
   }
 
+  async function limparCacheERecarregar() {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+    } catch (_) {}
+    window.location.reload(true);
+  }
+
   // ==========================================================================
-  // INICIALIZAÇÃO PRINCIPAL
+  // INICIALIZAÇÃO PRINCIPAL (COM WATCHDOG ANTI-TRAVAMENTO PARA IOS/ANDROID)
   // ==========================================================================
   function init() {
     if (state.initialized) return;
@@ -1899,6 +2015,15 @@
 
     mostrarTelaGate('authViewLoading');
 
+    // Mostra botão de escape após 3s caso a rede esteja muito lenta
+    setTimeout(() => {
+      const loadView = document.getElementById('authViewLoading');
+      const escapeBox = document.getElementById('authLoadingEscapeBox');
+      if (escapeBox && loadView && !loadView.classList.contains('hidden')) {
+        escapeBox.classList.remove('hidden');
+      }
+    }, 3000);
+
     if (typeof firebase === 'undefined' || !firebase.auth || !firebase.firestore) {
       console.error('[Auth] SDK do Firebase Auth/Firestore não carregado.');
       exibirErroInline('authLoginError', 'Erro ao carregar módulos de autenticação do Firebase. Recarregue a página.');
@@ -1906,10 +2031,34 @@
       return;
     }
 
+    // Garante app inicializado caso app.js ainda não tenha chamado initFirebase()
+    if (!firebase.apps || !firebase.apps.length) {
+      if (typeof firebaseConfig !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+      }
+    }
+
     state.auth = firebase.auth();
     state.db = firebase.firestore();
+    try {
+      state.db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
+    } catch (_) {}
+
+    // Watchdog de segurança (5.5s): NUNCA deixa o usuário preso em "Verificando credenciais..."
+    let authRespondeu = false;
+    const watchdogTimer = setTimeout(() => {
+      if (authRespondeu) return;
+      const loadView = document.getElementById('authViewLoading');
+      if (loadView && !loadView.classList.contains('hidden')) {
+        console.warn('[Auth] Watchdog ativado: liberando tela de login após 5.5s.');
+        mostrarTelaGate('authViewAuth');
+        alternarAbaAuth('entrar');
+      }
+    }, 5500);
 
     state.auth.onAuthStateChanged(async (fbUser) => {
+      authRespondeu = true;
+      clearTimeout(watchdogTimer);
       state.firebaseUser = fbUser;
       if (!fbUser) {
         if (state.unsubMeuPerfil) { state.unsubMeuPerfil(); state.unsubMeuPerfil = null; }
@@ -1932,11 +2081,23 @@
     });
   }
 
+  // Fallback de auto-inicialização caso um cache antigo do app.js não chame PrefeituraAuth.init()
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      if (!state.initialized) {
+        console.warn('[Auth] Auto-inicialização de segurança ativada.');
+        init();
+      }
+    }, 800);
+  });
+
   // Expõe API pública limpa
   window.PrefeituraAuth = {
     AUTH_MODULOS,
     AUTH_PERFIS_PRONTOS,
     init,
+    limparCacheERecarregar,
+    irParaLoginDireto: () => { mostrarTelaGate('authViewAuth'); alternarAbaAuth('entrar'); },
     handleSetupMaster,
     handleLogin,
     handleSolicitarAcesso,

@@ -1799,21 +1799,30 @@ function initFirebase() {
         firebaseApp = firebase.app();
       }
       firestoreDb = firebaseApp.firestore();
+      try {
+        firestoreDb.settings({ experimentalAutoDetectLongPolling: true, merge: true });
+      } catch (e) {}
 
-      // PARTE 1: Ativar Persistência Offline (Cache Local no Celular e PC para ZERO Leituras)
-      firestoreDb.enablePersistence({ synchronizeTabs: true })
-        .then(() => {
-          console.log("Firebase Offline Persistence (Cache Local) ativada com sucesso!");
-          const el = document.getElementById('firebaseCacheStatusBadge');
-          if (el) el.innerHTML = '<i class="fa-solid fa-bolt text-amber-500 mr-1"></i> Cache Offline Ativo (0 Leituras)';
-        })
-        .catch((err) => {
-          if (err.code === 'failed-precondition') {
-            console.warn("Persistência offline falhou: múltiplas abas abertas.");
-          } else if (err.code === 'unimplemented') {
-            console.warn("Persistência offline não suportada neste navegador.");
-          }
-        });
+      // PARTE 1: Persistência Offline segura (evita deadlock de IndexedDB no iOS Safari / iPhone PWA)
+      const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!isIOSDevice) {
+        firestoreDb.enablePersistence({ synchronizeTabs: true })
+          .then(() => {
+            console.log("Firebase Offline Persistence (Cache Local) ativada com sucesso!");
+            const el = document.getElementById('firebaseCacheStatusBadge');
+            if (el) el.innerHTML = '<i class="fa-solid fa-bolt text-amber-500 mr-1"></i> Cache Offline Ativo (0 Leituras)';
+          })
+          .catch((err) => {
+            if (err.code === 'failed-precondition') {
+              console.warn("Persistência offline falhou: múltiplas abas abertas.");
+            } else if (err.code === 'unimplemented') {
+              console.warn("Persistência offline não suportada neste navegador.");
+            }
+          });
+      } else {
+        console.log("iOS detectado: modo WebKit estável (LongPolling auto + sem lock IndexedDB).");
+      }
 
       firebaseInitialized = true;
       atualizarBadgeFirebaseUI(true, "Firebase Conectado");
@@ -3060,9 +3069,9 @@ function sincronizarEstadoUsuarioApp(role, nome) {
 window.sincronizarEstadoUsuarioApp = sincronizarEstadoUsuarioApp;
 
 document.addEventListener('DOMContentLoaded', () => {
-  aplicarIdentidadeVisual();
-  inicializarTamanhoFonte();
-  initFirebase();
+  try { aplicarIdentidadeVisual(); } catch (e) { console.warn(e); }
+  try { inicializarTamanhoFonte(); } catch (e) { console.warn(e); }
+  try { initFirebase(); } catch (e) { console.warn(e); }
   if (typeof window.PrefeituraAuth !== 'undefined' && typeof window.PrefeituraAuth.init === 'function') {
     window.PrefeituraAuth.init();
   } else {

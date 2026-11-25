@@ -88,6 +88,9 @@
 
     internal.auth = firebase.auth();
     internal.db = firebase.firestore();
+    try {
+      internal.db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
+    } catch (_) {}
     return { app: internal.app, auth: internal.auth, db: internal.db };
   }
 
@@ -327,12 +330,33 @@
     });
   }
 
+  function salvarCacheCampo(uid, perfil) {
+    try { if (uid && perfil) localStorage.setItem('campo_perfil_cache_' + uid, JSON.stringify(perfil)); } catch (_) {}
+  }
+
+  function lerCacheCampo(uid) {
+    try {
+      const raw = uid ? localStorage.getItem('campo_perfil_cache_' + uid) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+
   function iniciarWatcherSeNecessario() {
     if (internal.watcherStarted) return;
     const { auth, db } = init();
     internal.watcherStarted = true;
 
+    let authRespondeu = false;
+    const authWatchdog = setTimeout(() => {
+      if (!authRespondeu && internal.lastSnapshot.state === 'loading') {
+        console.warn('[CampoAuth] Watchdog 5s: exibindo login.');
+        emitirEstado({ state: 'unauthenticated', user: null, perfil: null });
+      }
+    }, 5000);
+
     internal.unsubAuth = auth.onAuthStateChanged((fbUser) => {
+      authRespondeu = true;
+      clearTimeout(authWatchdog);
       if (internal.unsubDoc) {
         internal.unsubDoc();
         internal.unsubDoc = null;
@@ -347,8 +371,44 @@
       emitirEstado({ state: 'loading', user: fbUser, perfil: null });
 
       const docRef = db.collection(COLLECTION_USERS).doc(fbUser.uid);
+      let perfilResolvido = false;
+      const docWatchdog = setTimeout(async () => {
+        if (perfilResolvido) return;
+        const cached = lerCacheCampo(fbUser.uid);
+        if (cached && cached.status === 'ativo') {
+          perfilResolvido = true;
+          emitirEstado({ state: 'active', user: fbUser, perfil: cached });
+          return;
+        }
+        try {
+          const snapGet = await Promise.race([
+            docRef.get(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3500))
+          ]);
+          if (!perfilResolvido && snapGet && snapGet.exists) {
+            const p = Object.assign({ uid: snapGet.id }, snapGet.data() || {});
+            perfilResolvido = true;
+            if (p.status === 'ativo') {
+              salvarCacheCampo(fbUser.uid, p);
+              emitirEstado({ state: 'active', user: fbUser, perfil: p });
+            } else if (p.status === 'pendente') {
+              emitirEstado({ state: 'pending', user: fbUser, perfil: p });
+            } else {
+              emitirEstado({ state: 'blocked', user: fbUser, perfil: p });
+            }
+            return;
+          }
+        } catch (_) {}
+        if (!perfilResolvido) {
+          emitirEstado({ state: 'unauthenticated', user: null, perfil: null });
+        }
+      }, 2800);
+
       internal.unsubDoc = docRef.onSnapshot((snap) => {
+        perfilResolvido = true;
+        clearTimeout(docWatchdog);
         if (!snap.exists) {
+          try { localStorage.removeItem('campo_perfil_cache_' + fbUser.uid); } catch (_) {}
           const usernameFallback = (fbUser.email || '').split('@')[0] || 'usuario';
           emitirEstado({
             state: 'blocked',
@@ -377,6 +437,7 @@
         }
 
         if (perfil.status === 'ativo') {
+          salvarCacheCampo(fbUser.uid, perfil);
           if (internal.ultimoAcessoAtualizadoUid !== fbUser.uid) {
             internal.ultimoAcessoAtualizadoUid = fbUser.uid;
             docRef.update({ ultimoAcesso: new Date().toISOString() }).catch(() => {});
@@ -387,7 +448,14 @@
 
         emitirEstado({ state: 'blocked', user: fbUser, perfil });
       }, (err) => {
+        perfilResolvido = true;
+        clearTimeout(docWatchdog);
         console.warn('[CampoAuth] Erro ao escutar perfil do usuário:', err);
+        const cached = lerCacheCampo(fbUser.uid);
+        if (cached && cached.status === 'ativo') {
+          emitirEstado({ state: 'active', user: fbUser, perfil: cached });
+          return;
+        }
         emitirEstado({
           state: 'blocked',
           user: fbUser,

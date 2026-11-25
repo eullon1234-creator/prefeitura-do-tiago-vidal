@@ -1,7 +1,7 @@
 // ========================================================
 // SERVICE WORKER - PREFEITURA DE CANTEIRO (PWA OFFLINE)
 // ========================================================
-const CACHE_NAME = 'prefeitura-pwa-v6.4';
+const CACHE_NAME = 'prefeitura-pwa-v6.5';
 const ASSETS_TO_CACHE = [
   './',
   'index.html',
@@ -87,15 +87,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Não interceptar requisições de API (o app.js já gerencia) ou Firebase Auth/Firestore/Imgbb
+  // Nunca interceptar requisições de outros domínios (Firebase SDK gstatic, Auth, Firestore, ImgBB, CDNs)
+  // nem métodos não-GET ou chamadas /api/ — evita travamento no iOS Safari e Android PWA
   if (
-    url.pathname.includes('/api/') ||
-    url.hostname.includes('firestore') ||
-    url.hostname.includes('googleapis') ||
-    url.hostname.includes('firebaseapp') ||
-    url.hostname.includes('identitytoolkit') ||
-    url.hostname.includes('securetoken') ||
-    url.hostname.includes('imgbb')
+    event.request.method !== 'GET' ||
+    url.origin !== self.location.origin ||
+    url.pathname.includes('/api/')
   ) {
     return;
   }

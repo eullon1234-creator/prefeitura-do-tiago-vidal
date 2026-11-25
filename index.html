@@ -511,6 +511,14 @@
             <p class="text-sm font-bold text-white">Verificando credenciais...</p>
             <p class="text-xs text-slate-400 mt-1">Conectando ao servidor seguro da Prefeitura</p>
           </div>
+          <div id="authLoadingEscapeBox" class="hidden pt-2 flex flex-col gap-2">
+            <button type="button" onclick="PrefeituraAuth.irParaLoginDireto()" class="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition">
+              <i class="fa-solid fa-right-to-bracket mr-1.5"></i>Ir direto para o Login
+            </button>
+            <button type="button" onclick="PrefeituraAuth.limparCacheERecarregar()" class="w-full h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-[11px] transition">
+              <i class="fa-solid fa-rotate-right mr-1.5"></i>Limpar cache antigo e recarregar
+            </button>
+          </div>
         </div>
 
         <!-- VIEW 2: PRIMEIRO ACESSO (CRIAR CONTA MASTER DO PREFEITO) -->
@@ -10677,8 +10685,8 @@ service cloud.firestore {
   <div id="toastContainer" class="fixed bottom-4 right-4 z-[110] flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- Scripts da Aplicação e Sistema de Autenticação (RBAC) -->
-  <script src="auth.js?v=6.4"></script>
-  <script src="app.js?v=6.0"></script>
+  <script src="auth.js?v=6.5"></script>
+  <script src="app.js?v=6.5"></script>
 
   <!-- MODAL DE CHECK-IN RÁPIDO EM LOTE (FASE 2) -->
   <div id="modalCheckinLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
